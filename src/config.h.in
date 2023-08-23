@@ -1,0 +1,2 @@
+#cmakedefine GQLITE_HAVE_CLOG
+#cmakedefine GQLITE_HAVE_SQLITE

@@ -1,0 +1,52 @@
+{
+  // See https://go.microsoft.com/fwlink/?LinkId=733558
+  // for the documentation about the tasks.json format
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build gqlite and dependencies (debug)",
+      "type": "shell",
+      "command": "lrs-pkg build --build-mode=debug gqlite",
+      "group": {
+        "kind": "build"
+      },
+      "presentation": {
+          "clear": true
+      }
+    },
+    {
+      "label": "build gqlite and dependencies (release)",
+      "type": "shell",
+      "command": "lrs-pkg build gqlite",
+      "group": {
+        "kind": "build"
+      },
+      "presentation": {
+          "clear": true
+      }
+    },
+    {
+      "label": "build gqlite (debug)",
+      "type": "shell",
+      "command": "lrs-pkg build --no-recursive --build-mode=debug gqlite",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "presentation": {
+          "clear": true
+      }
+    },
+    {
+      "label": "build gqlite and dependencies (release)",
+      "type": "shell",
+      "command": "lrs-pkg build gqlite",
+      "group": {
+        "kind": "build"
+      },
+      "presentation": {
+          "clear": true
+      }
+    },
+  ]
+}
