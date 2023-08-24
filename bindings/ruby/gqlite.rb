@@ -1,0 +1,53 @@
+require 'ffi'
+require 'objspace'
+
+module Gqlite
+  class Error < StandardError
+  end
+  module CApi
+    extend FFI::Library
+    ffi_lib 'gqlite'
+    attach_function :gqlite_api_error_create, [], :pointer
+    attach_function :gqlite_api_error_destroy, [:pointer], :void
+    attach_function :gqlite_api_error_has_error, [:pointer], :bool
+    attach_function :gqlite_api_error_get_message, [:pointer], :string
+    attach_function :gqlite_database_create_from_sqlite_file, [:pointer, :string], :pointer
+    attach_function :gqlite_database_destroy, [:pointer, :pointer], :void
+    attach_function :gqlite_database_oc_query, [:pointer, :pointer, :string, :pointer], :pointer
+    attach_function :gqlite_result_destroy, [:pointer, :pointer], :void
+    attach_function :gqlite_result_error, [:pointer, :pointer], :string
+    attach_function :gqlite_result_status, [:pointer, :pointer], :int
+    ApiError = CApi.gqlite_api_error_create()
+    def CApi.call_function(fname, *args)
+      r = CApi.send fname, ApiError, *args
+      if CApi.gqlite_api_error_has_error(ApiError)
+        err = CApi.gqlite_api_error_get_message ApiError
+        CApi.gqlite_api_error_clear_error ApiError
+        raise Error.new err
+      end
+      return r
+    end
+  end
+  class Database
+    def initialize(sqlite_filename: nil)
+      if sqlite_filename != nil
+        @dbhandle = CApi.call_function :gqlite_database_create_from_sqlite_file, sqlite_filename
+      else
+        raise Error.new "No database backend was selected."
+      end
+      ObjectSpace.define_finalizer self, proc {|id|
+        CApi.call_function :gqlite_database_destroy, @dbhandle
+      }
+    end
+    def execute_oc_query(query, bindings: nil)
+      r = CApi.call_function :gqlite_database_oc_query, @dbhandle, query, nil
+      if CApi.call_function(:gqlite_result_status, r) == 0
+        return r
+      else
+        str = CApi.call_function(:gqlite_result_error, r)
+        CApi.call_function :gqlite_result_destroy, r
+        raise Error.new str
+      end
+    end
+  end
+end

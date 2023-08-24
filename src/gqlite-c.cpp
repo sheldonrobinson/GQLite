@@ -38,9 +38,13 @@ extern "C"
     std::unordered_map<std::string, std::any> bindings;
   };
 
-  gqlite_database_t gqlite_database_create_sqlite(gqlite_api_error_t, void* _handle)
+  gqlite_database_t gqlite_database_create_from_sqlite(gqlite_api_error_t, void* _handle)
   {
     return new gqlite_database{gqlite::database::create_from_sqlite(_handle)}; 
+  }
+  gqlite_database_t gqlite_database_create_from_sqlite_file(gqlite_api_error_t, const char* _filename)
+  {
+    return new gqlite_database{gqlite::database::create_from_sqlite_file(_filename)}; 
   }
 
   void gqlite_database_destroy(gqlite_api_error_t, gqlite_database_t _database)
@@ -61,6 +65,19 @@ extern "C"
   gqlite_bindings_t gqlite_bindings_create(gqlite_api_error_t)
   {
     return new gqlite_bindings;
+  }
+  void gqlite_result_destroy(gqlite_api_error_t, gqlite_result_t _result)
+  {
+    delete _result;
+  }
+  const char* gqlite_result_error(gqlite_api_error_t, gqlite_result_t _result)
+  {
+    return _result->result.get_error().c_str();
+  }
+
+  int gqlite_result_status(gqlite_api_error_t, gqlite_result_t _result)
+  {
+    return _result->result.get_status() == gqlite::result::status::success ? GQLITE_RESULT_SUCCESS : GQLITE_RESULT_ERROR;
   }
 
 }

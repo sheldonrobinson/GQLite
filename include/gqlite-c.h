@@ -18,7 +18,9 @@ bool gqlite_api_error_has_error(gqlite_api_error_t);
 /**
  * Create a database, using the sqlite backend. Expect as argument an handle to a sqlite database.
  */
-gqlite_database_t gqlite_database_create_sqlite(gqlite_api_error_t, void*);
+gqlite_database_t gqlite_database_create_from_sqlite(gqlite_api_error_t, void*);
+
+gqlite_database_t gqlite_database_create_from_sqlite_file(gqlite_api_error_t, const char*);
 
 /**
  * Destroy the database. Does not delete any database handle passed as an argument.
