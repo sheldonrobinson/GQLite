@@ -1,9 +1,7 @@
 #ifndef _OC_ALGEBRA_NODES_H_
 #define _OC_ALGEBRA_NODES_H_
 
-#include <any>
-#include <vector>
-#include <unordered_map>
+#include <gqlite.h>
 
 #include "node.h"
 

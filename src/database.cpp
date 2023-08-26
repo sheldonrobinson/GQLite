@@ -48,16 +48,11 @@ database database::create_from_sqlite_file(const std::string& _filename)
   return database(backends::sqlite::from_file(_filename));
 }
 
-result database::execute_oc_query(const std::string& _string, const std::unordered_map<std::string, std::any>& _bindings)
+value database::execute_oc_query(const std::string& _string, const std::unordered_map<std::string, value>& _bindings)
 {
   std::stringstream ss(_string);
   oc::lexer l(&ss);
   oc::parser parser(&l);
   oc::algebra::node_csp node = parser.parse();
-  if(node)
-  {
-    return d->backend_->execute_oc_query(node, _bindings);
-  } else {
-    return result::from_error(parser.get_error());
-  }
+  return d->backend_->execute_oc_query(node, _bindings);
 }

@@ -48,7 +48,7 @@ sqlite* sqlite::from_file(const std::string& _filename)
   return new sqlite(handle);
 }
 
-gqlite::result sqlite::execute_oc_query(oc::algebra::node_csp _node, const std::unordered_map<std::string, std::any>& _variant)
+gqlite::value sqlite::execute_oc_query(oc::algebra::node_csp _node, const std::unordered_map<std::string, value>& _variant)
 {
-  return gqlite::result::from_error("sqlite not implemented");
+  throw gqlite::exception("sqlite not implemented");
 }

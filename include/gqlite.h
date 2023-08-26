@@ -1,29 +1,37 @@
-#include <any>
-#include <unordered_map>
+#include <exception>
 #include <memory>
 #include <string>
+#include <unordered_map>
+#include <vector>
 
 namespace gqlite
 {
   class backend;
-  class result
+  class exception : public std::exception
   {
   public:
-
-    enum status
+    exception(const std::string& _error) : m_error(_error), m_c_error(m_error.c_str()) {}
+    exception(const char* _error) : m_c_error(_error) {}
+    const char* what() const throw() override
     {
-      success, failure
-    };
+      return m_c_error;
+    }
+  private:
+    std::string m_error;
+    const char* m_c_error;
+  };
+  class value
+  {
   public:
-    result();
-    result(const result& _rhs);
-    result& operator=(const result& _rhs);
-    ~result();
-    static result from_error(const std::string& _error);
+    value();
+    value(const value& _rhs);
+    value& operator=(const value& _rhs);
+    ~value();
   public:
-    status get_status() const;
-    std::string get_error() const;
-    std::any value();
+    double to_double() const;
+    std::string to_string() const;
+    std::unordered_map<std::string, value> to_map() const;
+    std::vector<value> to_vector() const;
   private:
     struct data;
     std::shared_ptr<data> d;
@@ -39,7 +47,7 @@ namespace gqlite
     static database create_from_sqlite(void*);
     static database create_from_sqlite_file(const std::string& _filename);
   public:
-    result execute_oc_query(const std::string& _string, const std::unordered_map<std::string, std::any>& _variant = std::unordered_map<std::string, std::any>());
+    value execute_oc_query(const std::string& _string, const std::unordered_map<std::string, value>& _variant = std::unordered_map<std::string, value>());
   private:
     struct data;
     std::shared_ptr<data> d;

@@ -12,7 +12,6 @@ struct parser::data
 {
   lexer* lex;
   token tok;
-  std::string error;
 
   algebra::node_csp parse_create();
   void get_next_token();
@@ -45,7 +44,7 @@ algebra::node_csp parser::data::parse_create()
   }
   CHECK_IS_OF_TYPE(token_type::ENDBRACKET);
   get_next_token();
-  std::unordered_map<GQLITE_LIST(std::string, std::any)> properties;
+  std::unordered_map<GQLITE_LIST(std::string, value)> properties;
   return std::make_shared<algebra::create_nodes>(std::vector<algebra::graph_node_csp>{std::make_shared<algebra::graph_node>(variable, labels, properties)});
 }
 
@@ -56,8 +55,7 @@ void parser::data::get_next_token()
 
 void parser::data::report_error(const token& _token, const std::string& _errorMsg)
 {
-  gqlite_assert(error.empty());
-  error = std::to_string(_token.line) + ":" + std::to_string(_token.column) + ":" + _errorMsg;
+  throw gqlite::exception(std::to_string(_token.line) + ":" + std::to_string(_token.column) + ":" + _errorMsg);
 }
 
 void parser::data::report_unexpected(const token& _token)
@@ -108,10 +106,5 @@ algebra::node_csp parser::parse()
       d->report_unexpected(d->tok);
       return nullptr;
   }
-}
-
-std::string parser::get_error() const
-{
-  return d->error;
 }
 

@@ -7,13 +7,13 @@ extern "C" {
 typedef struct gqlite_api_context* gqlite_api_context_t;
 typedef struct gqlite_database* gqlite_database_t;
 typedef struct gqlite_backend* gqlite_backend_t;
-typedef struct gqlite_result* gqlite_result_t;
-typedef struct gqlite_bindings* gqlite_bindings_t;
+typedef struct gqlite_value* gqlite_value_t;
 
 gqlite_api_context_t gqlite_api_context_create();
 void gqlite_api_context_destroy(gqlite_api_context_t);
 const char* gqlite_api_context_get_message(gqlite_api_context_t);
 bool gqlite_api_context_has_error(gqlite_api_context_t);
+void gqlite_api_context_clear_error(gqlite_api_context_t);
 
 /**
  * Create a database, using the sqlite backend. Expect as argument an handle to a sqlite database.
@@ -30,20 +30,13 @@ void gqlite_database_destroy(gqlite_api_context_t, gqlite_database_t);
 /**
  * Execute an OpenCypher query on the database.
  */
-gqlite_result_t gqlite_database_oc_query(gqlite_api_context_t, gqlite_database_t, const char*, gqlite_bindings_t);
-
-void gqlite_result_destroy(gqlite_api_context_t, gqlite_result_t);
-const char* gqlite_result_error(gqlite_api_context_t, gqlite_result_t);
-
-enum { GQLITE_RESULT_SUCCESS, GQLITE_RESULT_ERROR };
-
-int gqlite_result_status(gqlite_api_context_t, gqlite_result_t);
+gqlite_value_t gqlite_database_oc_query(gqlite_api_context_t, gqlite_database_t, const char*, gqlite_value_t);
 
 /**
- * Create a bindings object to use in a query.
+ * Create a value object to use in a query.
  */
-gqlite_bindings_t gqlite_bindings_create(gqlite_api_context_t);
-void gqlite_bindings_destroy(gqlite_api_context_t, gqlite_bindings_t);
+gqlite_value_t gqlite_value_create(gqlite_api_context_t);
+void gqlite_value_destroy(gqlite_api_context_t, gqlite_value_t);
 
 #ifdef __cplusplus
 }

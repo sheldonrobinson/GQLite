@@ -10,7 +10,7 @@
             "cStandard": "c11",
             "cppStandard": "c++20",
             "intelliSenseMode": "gcc-x64",
-            "compileCommands": "${env:LRS_PKG_ROOT}/host-build-debug/GameMaster/compile_commands.json"
+            "compileCommands": "${env:LRS_PKG_ROOT}/host-build-debug/gqlite/compile_commands.json"
         }
     ],
     "version": 4

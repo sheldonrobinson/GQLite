@@ -102,7 +102,7 @@ add_library(gqlite SHARED
   src/backend.cpp
   src/database.cpp
   src/gqlite-c.cpp
-  src/result.cpp
+  src/value.cpp
   src/oc/lexer.cpp
   src/oc/token.cpp
   src/oc/parser.cpp
