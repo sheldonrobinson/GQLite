@@ -31,7 +31,7 @@ module Gqlite
   class Database
     def initialize(sqlite_filename: nil)
       if sqlite_filename != nil
-        dbhandle = CApi.call_function :gqlite_database_create_from_sqlite_file, sqlite_filename
+        @dbhandle = CApi.call_function :gqlite_database_create_from_sqlite_file, sqlite_filename
       else
         raise Error.new "No database backend was selected."
       end
