@@ -76,12 +76,14 @@ extern "C"
     BEGIN_CHECK
     return new gqlite_database{gqlite::database::create_from_sqlite(_handle)};
     END_CHECK
+    return nullptr;
   }
   gqlite_database_t gqlite_database_create_from_sqlite_file(gqlite_api_context_t _context, const char* _filename)
   {
     BEGIN_CHECK
     return new gqlite_database{gqlite::database::create_from_sqlite_file(_filename)};
     END_CHECK
+    return nullptr;
   }
 
   void gqlite_database_destroy(gqlite_api_context_t _context, gqlite_database_t _database)
@@ -101,6 +103,7 @@ extern "C"
     }
     return new gqlite_value{ _database->db.execute_oc_query(_query, bindings) };
     END_CHECK
+    return nullptr;
   }
 
   gqlite_value_t gqlite_value_create(gqlite_api_context_t)
