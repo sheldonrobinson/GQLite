@@ -36,6 +36,8 @@ const char* gqlite::oc::token_type_to_string(token_type _type)
       return "->";
     case RIGHT_ARROW:
       return "<-";
+    case COLON:
+      return ":";
     case COLONCOLON:
       return "::";
     case EQUAL:

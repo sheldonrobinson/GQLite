@@ -114,6 +114,8 @@ add_library(gqlite SHARED
   src/backends/sqlite.cpp
   )
 
+target_link_libraries(gqlite ${SQLITE3_LIBRARY})
+
 install(TARGETS gqlite EXPORT gqliteTargets ${INSTALL_TARGETS_DEFAULT_ARGS} )
 
 install(FILES include/gqlite-c.h

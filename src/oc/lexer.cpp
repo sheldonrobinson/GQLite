@@ -113,7 +113,7 @@ token lexer::next_token()
     CHAR_IS_TOKEN( ')', ENDBRACKET );
     CHAR_IS_TOKEN( ',', COMMA );
     CHAR_IS_TOKEN( '=', EQUAL );
-    CHAR_IS_TOKEN_OR_TOKEN( ':', ':', UNKNOWN, COLONCOLON);
+    CHAR_IS_TOKEN_OR_TOKEN( ':', ':', COLON, COLONCOLON);
     CHAR_IS_TOKEN_OR_TOKEN( '-', '>', UNKNOWN, RIGHT_ARROW);
     CHAR_IS_TOKEN_OR_TOKEN( '<', '-', UNKNOWN, LEFT_ARROW);
   }

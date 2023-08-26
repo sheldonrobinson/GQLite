@@ -1,5 +1,7 @@
 #include "parser.h"
 
+#include "algebra/nodes.h"
+
 #include "../logging.h"
 
 #include "lexer.h"
@@ -12,6 +14,7 @@ struct parser::data
   token tok;
   std::string error;
 
+  algebra::node_csp parse_create();
   void get_next_token();
   void report_error(const token& _token, const std::string& _errorMsg);
   void report_unexpected(const token& _token);
@@ -19,6 +22,32 @@ struct parser::data
   bool is_of_type(token_type _type);
 
 };
+
+#define CHECK_IS_OF_TYPE(...) \
+  if(not is_of_type(__VA_ARGS__)) return nullptr
+
+algebra::node_csp parser::data::parse_create()
+{
+  get_next_token();
+  CHECK_IS_OF_TYPE(token_type::STARTBRACKET);
+  std::vector<algebra::graph_node_csp> nodes;
+  get_next_token();
+  CHECK_IS_OF_TYPE(token_type::IDENTIFIER);
+  std::string variable = tok.string;
+  std::vector<std::string> labels;
+  get_next_token();
+  while(tok.type == token_type::COLON)
+  {
+    get_next_token();
+    CHECK_IS_OF_TYPE(token_type::IDENTIFIER);
+    labels.push_back(tok.string);
+    get_next_token();
+  }
+  CHECK_IS_OF_TYPE(token_type::ENDBRACKET);
+  get_next_token();
+  std::unordered_map<GQLITE_LIST(std::string, std::any)> properties;
+  return std::make_shared<algebra::create_nodes>(std::vector<algebra::graph_node_csp>{std::make_shared<algebra::graph_node>(variable, labels, properties)});
+}
 
 void parser::data::get_next_token()
 {
@@ -70,8 +99,15 @@ parser::~parser()
 
 algebra::node_csp parser::parse()
 {
-  d->error = "unimplemented";
-  return nullptr;
+  d->get_next_token();
+  switch(d->tok.type)
+  {
+    case token_type::CREATE:
+      return d->parse_create();
+    default:
+      d->report_unexpected(d->tok);
+      return nullptr;
+  }
 }
 
 std::string parser::get_error() const
