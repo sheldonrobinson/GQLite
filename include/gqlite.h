@@ -20,6 +20,23 @@ namespace gqlite
     std::string m_error;
     const char* m_c_error;
   };
+  template<typename _TMessage_>
+  void check_condition(bool _condition, _TMessage_ _message) throw()
+  {
+    if(not _condition)
+    {
+      throw exception(_message);
+    }
+  }
+  enum class value_type
+  {
+    invalid,
+    boolean,
+    number,
+    string,
+    map,
+    vector
+  };
   class value
   {
   public:
@@ -28,10 +45,19 @@ namespace gqlite
     value& operator=(const value& _rhs);
     ~value();
   public:
+    value(double _v);
+    value(const std::string& _v);
+    value(const std::unordered_map<std::string, value>& _v);
+    value(const std::vector<value>& _v);
+  public:
+    value_type get_type() const;
+    bool to_bool() const;
     double to_double() const;
     std::string to_string() const;
     std::unordered_map<std::string, value> to_map() const;
     std::vector<value> to_vector() const;
+  public:
+    std::string to_json() const;
   private:
     struct data;
     std::shared_ptr<data> d;
@@ -47,9 +73,14 @@ namespace gqlite
     static database create_from_sqlite(void*);
     static database create_from_sqlite_file(const std::string& _filename);
   public:
-    value execute_oc_query(const std::string& _string, const std::unordered_map<std::string, value>& _variant = std::unordered_map<std::string, value>());
+    value execute_oc_query(const std::string& _string, const std::unordered_map<std::string, value>& _variant = {});
   private:
     struct data;
     std::shared_ptr<data> d;
   };
+}
+
+namespace std
+{
+  const char* to_string(gqlite::value_type _type);
 }
