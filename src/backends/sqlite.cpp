@@ -3,25 +3,35 @@
 #include <map>
 #include <sqlite3.h>
 
+#include "sqlite_queries.h"
+
+#include "../oc/algebra/abstract_node_visitor.h"
 #include "../logging.h"
 
 using namespace gqlite::backends;
 
-struct sqlite::data
+namespace gqlite::backends
 {
-  sqlite3* handle;
-  void throwLastError();
-  void create_graph(const std::string& _name);
-  bool has_graph(const std::string& _name);
-  value execute_sql(const std::string& _query, const std::map<int, value>& _bindings = {});
-};
+  struct sqlite_data
+  {
+    sqlite3* handle;
+    void throwLastError();
+    void create_graph(const std::string& _name);
+    bool has_graph(const std::string& _name);
+    value execute_sql(const std::string& _query, const std::map<int, value>& _bindings = {});
+    uint64_t last_row_id();
+  };
+}
 
-void sqlite::data::throwLastError()
+struct sqlite::data : public sqlite_data
+{};
+
+void sqlite_data::throwLastError()
 {
   throw gqlite::exception(std::string(sqlite3_errmsg(handle)));
 }
 
-gqlite::value sqlite::data::execute_sql(const std::string& _query, const std::map<int, value>& _bindings)
+gqlite::value sqlite_data::execute_sql(const std::string& _query, const std::map<int, value>& _bindings)
 {
   sqlite3_stmt* ps;
   const char* ptr = _query.data();
@@ -103,21 +113,54 @@ gqlite::value sqlite::data::execute_sql(const std::string& _query, const std::ma
   }
 }
 
-void sqlite::data::create_graph(const std::string& _name)
+void sqlite_data::create_graph(const std::string& _name)
 {
-  execute_sql("CREATE TABLE gqlite_" + _name + "_nodes(id INTEGER PRIMARY KEY AUTOINCREMENT, properties TEXT NOT NULL)");
-  execute_sql("CREATE TABLE gqlite_" + _name + "_edges(id INTEGER PRIMARY KEY AUTOINCREMENT, properties TEXT NOT NULL, left INTEGER, right INTEGER, FOREIGN KEY(left) REFERENCES " + _name + "_nodes(id), FOREIGN KEY(right) REFERENCES " + _name + "_nodes(id))");
-  execute_sql("CREATE TABLE gqlite_" + _name + "_labels(label TEXT NOT NULL, node_id INTEGER)");
+  execute_sql(sqlite_queries::create_graph(_name));
 }
 
-bool sqlite::data::has_graph(const std::string& _name)
+bool sqlite_data::has_graph(const std::string& _name)
 {
-  value r= execute_sql("SELECT count(*) FROM sqlite_master WHERE type='table' AND (name='gqlite_" + _name + "_nodes' or name='gqlite_" + _name + "_edges' or name='gqlite_" + _name + "_labels')");
+  value r= execute_sql(sqlite_queries::has_graph(_name));
   std::vector<value> v = r.to_vector();
   check_condition(v.size() == 1, "Should have gotten only one result");
   v = v.begin()->to_vector();
   check_condition(v.size() == 1, "Should have gotten only one result");
   return v.begin()->to_bool();
+}
+
+uint64_t sqlite_data::last_row_id()
+{
+  return sqlite3_last_insert_rowid(handle);
+}
+
+namespace gqlite::backends::sqlite_oc_executor
+{
+  namespace algebra = gqlite::oc::algebra;
+
+  struct visitor : public gqlite::oc::algebra::abstract_node_visitor<void>
+  {
+    sqlite_data* data;
+    value result;
+    std::string graph_name = "default";
+    void visit(algebra::graph_node_csp _node) override
+    {
+      throw gqlite::exception("sqlite not implemented graph_node");
+    }
+    void visit(algebra::create_nodes_csp _node) override
+    {
+      return;
+      for(algebra::graph_node_csp node : _node->get_nodes())
+      {
+        std::string json_properties = value(node->get_properties()).to_json();
+        data->execute_sql(sqlite_queries::create_node(graph_name), {{0, json_properties}});
+        int row_id = data->last_row_id();
+        for(const std::string& label : node->get_labels())
+        {
+          data->execute_sql(sqlite_queries::add_label(graph_name), {{0, label}, {1, row_id}});
+        }
+      }
+    }
+  };
 }
 
 sqlite::sqlite(void* _db) : d(new data)
@@ -147,5 +190,8 @@ sqlite* sqlite::from_file(const std::string& _filename)
 
 gqlite::value sqlite::execute_oc_query(oc::algebra::node_csp _node, const std::unordered_map<std::string, value>& _bindings)
 {
-  throw gqlite::exception("sqlite not implemented");
+  sqlite_oc_executor::visitor executor;
+  executor.data = d;
+  executor.start(_node);
+  return executor.result;
 }

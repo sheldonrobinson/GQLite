@@ -1,0 +1,1 @@
+INSERT INTO /%= _name %/_nodes (properties) VALUES (?000)

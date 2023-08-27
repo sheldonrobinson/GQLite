@@ -17,6 +17,7 @@ const char* std::to_string(value_type _type)
     case map: return "map";
     case vector: return "vector";
   }
+  return "unknown value type";
 }
 
 struct value::data
@@ -96,5 +97,6 @@ std::vector<value> value::to_vector() const
 
 std::string value::to_json() const
 {
-  throw "wip";
+  if(d->type == value_type::map and to_map().size() == 0) return "{}";
+  throw exception("wip: to_json");
 }

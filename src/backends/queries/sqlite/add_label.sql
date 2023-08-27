@@ -1,0 +1,1 @@
+INSERT INTO /%= _name %/_nodes (label, node_id) VALUES (?000, ?001)

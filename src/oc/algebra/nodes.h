@@ -32,18 +32,18 @@ namespace gqlite::oc::algebra
   _TYPE_ get_ ## _NAME_() const;
 
 #define OC_ALGEBRA_GENERATE(_KLASS_NAME_, _MEMBER_DEF_)                                                                                         \
-  class _KLASS_NAME_ : public node                                                                                                                      \
-  {                                                                                                                                                     \
-  public:                                                                                                                                               \
+  class _KLASS_NAME_ : public node                                                                                                              \
+  {                                                                                                                                             \
+  public:                                                                                                                                       \
     _KLASS_NAME_(_MEMBER_DEF_(_KLASS_NAME_, OC_ALGEBRA_GENERATE_CONSTRUCTOR_ARGUMENT) void* _ = nullptr);                                       \
-    ~_KLASS_NAME_();                                                                                                                                    \
-  public:                                                                                                                                               \
+    ~_KLASS_NAME_();                                                                                                                            \
+  public:                                                                                                                                       \
     _MEMBER_DEF_(_KLASS_NAME_, OC_ALGEBRA_GENERATE_ACCESSOR_DECLARATION);                                                                       \
-    using node::accept;                                                                                                                                 \
-  private:                                                                                                                                              \
-    void accept(details::abstract_node_visitor_adaptor* _node, void* _r, void* _parameter) const override;                                                 \
-  private:                                                                                                                                              \
-    struct data;                                                                                                                                     \
+    using node::accept;                                                                                                                         \
+  private:                                                                                                                                      \
+    void accept(details::abstract_node_visitor_adaptor* _node, void* _r, void* _parameter) const override;                                      \
+  private:                                                                                                                                      \
+    struct data;                                                                                                                                \
   };
 
 namespace gqlite::oc::algebra
