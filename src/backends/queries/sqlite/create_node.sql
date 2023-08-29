@@ -1,1 +1,1 @@
-INSERT INTO /%= _name %/_nodes (properties) VALUES (?000)
+INSERT INTO gqlite_/%= _name %/_nodes (properties) VALUES (?001)

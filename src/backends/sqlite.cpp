@@ -57,7 +57,13 @@ gqlite::value sqlite_data::execute_sql(const std::string& _query, const std::map
           break;
         default:
         {
-          std::string js = value.to_json();
+          std::string js;
+          if(value.get_type() == value_type::string)
+          {
+            js = value.to_string();
+          } else {
+            js = value.to_json();
+          }
           char* arr = new char[js.size()];
           std::copy(js.begin(), js.end(), arr);
           sqlite3_bind_text(ps, key, arr, js.size(), [](void* _ptr) { delete[] static_cast<char*>(_ptr); });
@@ -137,28 +143,37 @@ namespace gqlite::backends::sqlite_oc_executor
 {
   namespace algebra = gqlite::oc::algebra;
 
-  struct visitor : public gqlite::oc::algebra::abstract_node_visitor<void>
+  struct visitor : public gqlite::oc::algebra::abstract_node_visitor<gqlite::value>
   {
     sqlite_data* data;
     value result;
     std::string graph_name = "default";
-    void visit(algebra::graph_node_csp _node) override
+    gqlite::value visit(algebra::graph_node_csp _node) override
     {
       throw gqlite::exception("sqlite not implemented graph_node");
     }
-    void visit(algebra::create_nodes_csp _node) override
+    gqlite::value visit(algebra::create_nodes_csp _node) override
     {
-      return;
       for(algebra::graph_node_csp node : _node->get_nodes())
       {
-        std::string json_properties = value(node->get_properties()).to_json();
-        data->execute_sql(sqlite_queries::create_node(graph_name), {{0, json_properties}});
+        std::unordered_map<std::string, value> props;
+        for(auto const& [k,v] : node->get_properties())
+        {
+          props[k] = start(v);
+        }
+        std::string json_properties = value(props).to_json();
+        data->execute_sql(sqlite_queries::create_node(graph_name), {{1, json_properties}});
         int row_id = data->last_row_id();
         for(const std::string& label : node->get_labels())
         {
-          data->execute_sql(sqlite_queries::add_label(graph_name), {{0, label}, {1, row_id}});
+          data->execute_sql(sqlite_queries::add_label(graph_name), {{1, label}, {2, row_id}});
         }
       }
+      return gqlite::value();
+    }
+    gqlite::value visit(algebra::value_csp _node) override
+    {
+      return _node->get_value();
     }
   };
 }

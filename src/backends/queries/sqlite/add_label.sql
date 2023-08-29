@@ -1,1 +1,1 @@
-INSERT INTO /%= _name %/_nodes (label, node_id) VALUES (?000, ?001)
+INSERT INTO gqlite_/%= _name %/_labels   (label, node_id) VALUES (?001, ?002)

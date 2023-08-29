@@ -1,4 +1,6 @@
 #include "gqlite.h"
+
+#include <sstream>
 #include <variant>
 
 #include "format.h"
@@ -24,7 +26,55 @@ struct value::data
 {
   value_type type;
   std::variant<bool, double, std::string, std::unordered_map<std::string, value>, std::vector<value>> value_container;
+
+  void to_json(std::stringstream& _stream);
 };
+
+void value::data::to_json(std::stringstream& _stream)
+{
+  bool first = true;
+  switch(type)
+  {
+  case value_type::number:
+    _stream << std::get<double>(value_container);
+    break;
+  case value_type::string:
+    _stream << '"' << std::get<std::string>(value_container) << '"';
+    break;
+  case value_type::map:
+    _stream << '{';
+    for(auto const& [k, v] : std::get<std::unordered_map<std::string, value>>(value_container))
+    {
+      if(first)
+      {
+        first = false;
+      } else {
+        _stream << ',';
+      }
+      _stream << '"' << k << "\":";
+      v.d->to_json(_stream);
+    }
+    _stream << '}';
+    break;
+  case value_type::vector:
+    _stream << '[';
+    for(const value& v : std::get<std::vector<value>>(value_container))
+    {
+      if(first)
+      {
+        first = false;
+      } else {
+        _stream << ',';
+      }
+      v.d->to_json(_stream);
+    }
+    _stream << ']';
+    break;
+  case value_type::invalid:
+    _stream << "null";
+  }
+
+}
 
 value::value() : d(new data)
 {}
@@ -45,7 +95,7 @@ value::~value()
 value::value(double _v) : d(new data{value_type::number, _v})
 {}
 
-value::value(const std::string& _v) : d(new data{value_type::number, _v})
+value::value(const std::string& _v) : d(new data{value_type::string, _v})
 {}
 
 value::value(const std::unordered_map<std::string, value>& _v) : d(new data{value_type::map, _v})
@@ -97,6 +147,7 @@ std::vector<value> value::to_vector() const
 
 std::string value::to_json() const
 {
-  if(d->type == value_type::map and to_map().size() == 0) return "{}";
-  throw exception("wip: to_json");
+  std::stringstream ss;
+  d->to_json(ss);
+  return ss.str();
 }

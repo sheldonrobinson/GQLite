@@ -14,6 +14,8 @@ struct parser::data
   token tok;
 
   algebra::node_csp parse_create();
+  std::unordered_map<std::string, algebra::node_csp> parse_properties();
+  algebra::node_csp parse_expression();
   void get_next_token();
   void report_error(const token& _token, const std::string& _errorMsg);
   void report_unexpected(const token& _token);
@@ -22,30 +24,72 @@ struct parser::data
 
 };
 
-#define CHECK_IS_OF_TYPE(...) \
-  if(not is_of_type(__VA_ARGS__)) return nullptr
-
 algebra::node_csp parser::data::parse_create()
 {
   get_next_token();
-  CHECK_IS_OF_TYPE(token_type::STARTBRACKET);
+  is_of_type(token_type::STARTBRACKET);
   std::vector<algebra::graph_node_csp> nodes;
   get_next_token();
-  CHECK_IS_OF_TYPE(token_type::IDENTIFIER);
+  is_of_type(token_type::IDENTIFIER);
   std::string variable = tok.string;
   std::vector<std::string> labels;
   get_next_token();
   while(tok.type == token_type::COLON)
   {
     get_next_token();
-    CHECK_IS_OF_TYPE(token_type::IDENTIFIER);
+    is_of_type(token_type::IDENTIFIER);
     labels.push_back(tok.string);
     get_next_token();
   }
-  CHECK_IS_OF_TYPE(token_type::ENDBRACKET);
+  std::unordered_map<std::string, algebra::node_csp> properties;
+  if(tok.type == token_type::STARTBRACE)
+  {
+    properties = parse_properties();
+  }
+  is_of_type(token_type::ENDBRACKET);
   get_next_token();
-  std::unordered_map<GQLITE_LIST(std::string, value)> properties;
   return std::make_shared<algebra::create_nodes>(std::vector<algebra::graph_node_csp>{std::make_shared<algebra::graph_node>(variable, labels, properties)});
+}
+
+std::unordered_map<std::string, algebra::node_csp> parser::data::parse_properties()
+{
+  std::unordered_map<std::string, algebra::node_csp> p;
+  is_of_type(token_type::STARTBRACE);
+  get_next_token();
+  while(tok.type != token_type::ENDBRACE)
+  {
+    if(tok.type != token_type::STRING and tok.type != token_type::IDENTIFIER)
+    {
+      report_unexpected(tok);
+    }
+    std::string key = tok.string;
+    get_next_token();
+    is_of_type(token_type::COLON);
+    get_next_token();
+    p[key] = parse_expression();
+    if(tok.type == token_type::COMMA)
+    {
+      get_next_token();
+    } else {
+      break;
+    }
+  }
+  is_of_type(token_type::ENDBRACE);
+  get_next_token();
+  return p;
+}
+
+algebra::node_csp parser::data::parse_expression()
+{
+  token t = tok;
+  switch (tok.type)
+  {
+  case token_type::STRING:
+    get_next_token();
+    return std::make_shared<algebra::value>(t.string);
+  default:
+    report_unexpected(tok);
+  }
 }
 
 void parser::data::get_next_token()

@@ -40,14 +40,7 @@ module Gqlite
       }
     end
     def execute_oc_query(query, bindings: nil)
-      r = CApi.call_function :gqlite_database_oc_query, @dbhandle, query, nil
-      if CApi.call_function(:gqlite_result_status, r) == 0
-        return r
-      else
-        str = CApi.call_function(:gqlite_result_error, r)
-        CApi.call_function :gqlite_result_destroy, r
-        raise Error.new str
-      end
+      return CApi.call_function :gqlite_database_oc_query, @dbhandle, query, nil
     end
   end
 end

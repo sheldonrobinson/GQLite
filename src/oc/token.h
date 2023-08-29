@@ -28,7 +28,7 @@ namespace gqlite::oc
   // Keywords
     CREATE,
   };
-  static const char* token_type_to_string(token_type _type );
+  const char* token_type_to_string(token_type _type );
   struct token
   {
     /// type of the token

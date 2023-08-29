@@ -102,7 +102,7 @@ token lexer::next_token()
     IDENTIFIER_IS_KEYWORD( "CREATE", CREATE );
 
     return token(token_type::IDENTIFIER, identifierStr, line(), initial_col);
-  } else if( lastChar == '"' ) {
+  } else if(lastChar == '"' or lastChar == '\'' ) {
     return get_string(lastChar);
   } else {
     CHAR_IS_TOKEN(';', SEMI );
@@ -222,7 +222,7 @@ token lexer::get_string(int lastChar)
   while( not eof() )
   {
     int nextChar = get_next_char();
-    if( nextChar == '"' and previousChar != '\\')
+    if( nextChar == lastChar and previousChar != '\\')
     {
       return token(token_type::STRING, identifierStr, line(), initial_col );
     } else {
