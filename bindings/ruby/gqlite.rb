@@ -1,5 +1,6 @@
 require 'ffi'
 require 'objspace'
+require 'json'
 
 module Gqlite
   class Error < StandardError
@@ -17,6 +18,8 @@ module Gqlite
     attach_function :gqlite_database_oc_query, [:pointer, :pointer, :string, :pointer], :pointer
     attach_function :gqlite_value_create, [:pointer], :pointer
     attach_function :gqlite_value_destroy, [:pointer, :pointer], :void
+    attach_function :gqlite_value_to_json, [:pointer, :pointer], :string
+    attach_function :gqlite_value_is_valid, [:pointer, :pointer], :bool
     ApiError = CApi.gqlite_api_context_create()
     def CApi.call_function(fname, *args)
       r = CApi.send fname, ApiError, *args
@@ -40,7 +43,14 @@ module Gqlite
       }
     end
     def execute_oc_query(query, bindings: nil)
-      return CApi.call_function :gqlite_database_oc_query, @dbhandle, query, nil
+      ret = CApi.call_function :gqlite_database_oc_query, @dbhandle, query, nil
+      if CApi.call_function(:gqlite_value_is_valid, ret)
+        val = JSON.parse CApi.call_function :gqlite_value_to_json, ret
+      else
+        ret = nil
+      end
+      CApi.call_function :gqlite_value_destroy, ret
+      return val
     end
   end
 end

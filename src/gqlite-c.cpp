@@ -114,5 +114,17 @@ extern "C"
   {
     delete _value;
   }
+  const char* gqlite_value_to_json(gqlite_api_context_t _context, gqlite_value_t _value)
+  {
+    BEGIN_CHECK
+    return _context->set_string(_value->value.to_json());
+    END_CHECK
+    return nullptr;
+  }
+  bool gqlite_value_is_valid(gqlite_api_context_t, gqlite_value_t _value)
+  {
+    return _value->value.get_type() != gqlite::value_type::invalid;
+  }
+
 
 }

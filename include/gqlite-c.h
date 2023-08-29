@@ -37,6 +37,8 @@ gqlite_value_t gqlite_database_oc_query(gqlite_api_context_t, gqlite_database_t,
  */
 gqlite_value_t gqlite_value_create(gqlite_api_context_t);
 void gqlite_value_destroy(gqlite_api_context_t, gqlite_value_t);
+const char* gqlite_value_to_json(gqlite_api_context_t, gqlite_value_t);
+bool gqlite_value_is_valid(gqlite_api_context_t, gqlite_value_t);
 
 #ifdef __cplusplus
 }

@@ -76,7 +76,7 @@ void value::data::to_json(std::stringstream& _stream)
 
 }
 
-value::value() : d(new data)
+value::value() : d(new data{value_type::invalid})
 {}
 
 value::value(const value& _rhs) : d(_rhs.d)
