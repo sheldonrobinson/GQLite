@@ -14,6 +14,7 @@ struct parser::data
   token tok;
 
   algebra::node_csp parse_create();
+  algebra::node_csp parse_return();
   std::unordered_map<std::string, algebra::node_csp> parse_properties();
   algebra::node_csp parse_expression();
   void get_next_token();
@@ -27,28 +28,60 @@ struct parser::data
 algebra::node_csp parser::data::parse_create()
 {
   get_next_token();
-  is_of_type(token_type::STARTBRACKET);
-  std::vector<algebra::graph_node_csp> nodes;
-  get_next_token();
-  is_of_type(token_type::IDENTIFIER);
-  std::string variable = tok.string;
-  std::vector<std::string> labels;
-  get_next_token();
-  while(tok.type == token_type::COLON)
+  std::vector<algebra::graph_node_csp> graph_nodes;
+  do
   {
+    is_of_type(token_type::STARTBRACKET);
+    std::vector<algebra::graph_node_csp> nodes;
     get_next_token();
     is_of_type(token_type::IDENTIFIER);
-    labels.push_back(tok.string);
+    std::string variable = tok.string;
+    std::vector<std::string> labels;
     get_next_token();
-  }
-  std::unordered_map<std::string, algebra::node_csp> properties;
-  if(tok.type == token_type::STARTBRACE)
-  {
-    properties = parse_properties();
-  }
-  is_of_type(token_type::ENDBRACKET);
+    while(tok.type == token_type::COLON)
+    {
+      get_next_token();
+      is_of_type(token_type::IDENTIFIER);
+      labels.push_back(tok.string);
+      get_next_token();
+    }
+    std::unordered_map<std::string, algebra::node_csp> properties;
+    if(tok.type == token_type::STARTBRACE)
+    {
+      properties = parse_properties();
+    }
+    is_of_type(token_type::ENDBRACKET);
+    get_next_token();
+    graph_nodes.push_back(std::make_shared<algebra::graph_node>(variable, labels, properties));
+    if(tok.type == token_type::COMMA)
+    {
+      get_next_token();
+    } else {
+      break;
+    }
+  } while(true);
+
+  return std::make_shared<algebra::create_nodes>(graph_nodes);
+}
+
+algebra::node_csp parser::data::parse_return()
+{
+  is_of_type(token_type::RETURN);
   get_next_token();
-  return std::make_shared<algebra::create_nodes>(std::vector<algebra::graph_node_csp>{std::make_shared<algebra::graph_node>(variable, labels, properties)});
+  std::vector<std::string> variables;
+  do
+  {
+    is_of_type(token_type::IDENTIFIER);
+    variables.push_back(tok.string);
+    get_next_token();
+    if(tok.type == token_type::COMMA)
+    {
+      get_next_token();
+    } else {
+      break;
+    }
+  } while(true);
+  return std::make_shared<algebra::return_statement>(variables);
 }
 
 std::unordered_map<std::string, algebra::node_csp> parser::data::parse_properties()
@@ -149,6 +182,10 @@ algebra::node_csp parser::parse()
     {
     case token_type::CREATE:
       nodes.push_back(d->parse_create());
+      break;
+    case token_type::RETURN:
+      nodes.push_back(d->parse_return());
+      d->is_of_type(token_type::END_OF_FILE);
       break;
     default:
       d->report_unexpected(d->tok);

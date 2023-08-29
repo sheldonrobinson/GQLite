@@ -112,12 +112,12 @@ stream << "_nodes (properties) VALUES (?001)";
   std::string node_map_to_label(const std::string& _graph_name)
   {
     std::stringstream stream;
-    #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_create.sql"
+    #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_map_to_label.sql"
 stream << "INSERT INTO gqlite_";
-#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_create.sql"
+#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_map_to_label.sql"
 stream << ( _graph_name );
-#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_create.sql"
-stream << "_nodes (properties) VALUES (?001)";
+#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_map_to_label.sql"
+stream << "_labels   (label, node_id) VALUES (?001, ?002)";
 
     return stream.str();
   }

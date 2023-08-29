@@ -25,7 +25,7 @@ namespace gqlite
     const char* m_c_error;
   };
   template<typename _TMessage_>
-  void check_condition(bool _condition, _TMessage_ _message) throw()
+  void check_condition(bool _condition, _TMessage_ _message)
   {
     if(not _condition)
     {
@@ -54,7 +54,13 @@ namespace gqlite
     value(double _v);
     value(const std::string& _v);
     value(const std::unordered_map<std::string, value>& _v);
+    /// not part of the public API
+    template<typename _T_>
+    value(const std::initializer_list<typename std::unordered_map<std::string, _T_>::value_type>& _v);
     value(const std::vector<value>& _v);
+    /// not part of the public API
+    template<typename _T_>
+    value(const std::vector<_T_>& _v);
   public:
     value_type get_type() const;
     bool to_bool() const;

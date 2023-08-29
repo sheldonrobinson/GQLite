@@ -99,7 +99,8 @@ token lexer::next_token()
   {
     identifierStr = get_identifier(lastChar);
     
-    IDENTIFIER_IS_KEYWORD( "CREATE", CREATE );
+    IDENTIFIER_IS_KEYWORD("CREATE", CREATE);
+    IDENTIFIER_IS_KEYWORD("RETURN", RETURN);
 
     return token(token_type::IDENTIFIER, identifierStr, line(), initial_col);
   } else if(lastChar == '"' or lastChar == '\'' ) {
@@ -119,7 +120,7 @@ token lexer::next_token()
   }
   if( lastChar > 128 ) return next_token();
   identifierStr = lastChar;
-  std::cerr << "Unknown token : " << lastChar << " '" << identifierStr << "' at " << initial_line << "," << initial_col << std::endl;
+  std::cerr << "Unknown token : " << lastChar << " '" << identifierStr << "' at " << initial_line << "," << initial_col << " eof is" << eof() << std::endl;
   assert( not isspace(lastChar));
   return token(token_type::UNKNOWN, initial_line, initial_col);
 }
@@ -161,7 +162,7 @@ void lexer::unget()
 
 bool lexer::eof() const
 {
-  return d->stream->eof();
+  return !d->stream->good();
 }
 
 int lexer::line() const

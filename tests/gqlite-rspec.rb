@@ -13,11 +13,11 @@ RSpec.describe "database" do
     db.execute_oc_query "CREATE (n1)"
     db.execute_oc_query "CREATE (n1), (n2)"
     n1 = db.execute_oc_query "CREATE (n1:Person) RETURN n1"
-    expect(n1).to eq([{type: "node", id: 4, labels: ["Person"], properties: {}}])
+    expect(n1).to eq([{"type" => "node", "id" => 4, "labels" => ["Person"], "properties" => {}}])
     db.execute_oc_query "CREATE (n1:Person), (n2:Film)"
     db.execute_oc_query "CREATE (n1 {name: 'Andres', title: 'Developer'})"
     n1 = db.execute_oc_query "CREATE (n1:Person {name: 'Andres', title: 'Developer'}) RETURN n1"
-    expect(n1).to eq([{type: "node", id: 7, labels: ["Person"], properties: {name: 'Andres', title: 'Developer'}}])
+    expect(n1).to eq([{"type" => "node", "id" => 8, "labels" => ["Person"], "properties" => {"name" => 'Andres', "title" => 'Developer'}}]) 
   end
   it "can be queried with oc to create nodes and edges" do
     file = Tempfile.new('testdb')
