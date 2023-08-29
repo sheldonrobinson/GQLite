@@ -17,8 +17,8 @@ struct parser::data
   std::unordered_map<std::string, algebra::node_csp> parse_properties();
   algebra::node_csp parse_expression();
   void get_next_token();
-  void report_error(const token& _token, const std::string& _errorMsg);
-  void report_unexpected(const token& _token);
+  [[noreturn]] void report_error(const token& _token, const std::string& _errorMsg);
+  [[noreturn]] void report_unexpected(const token& _token);
   bool is_of_type(const token& _token, token_type _type);
   bool is_of_type(token_type _type);
 
@@ -102,7 +102,7 @@ void parser::data::report_error(const token& _token, const std::string& _errorMs
   throw gqlite::exception(std::to_string(_token.line) + ":" + std::to_string(_token.column) + ":" + _errorMsg);
 }
 
-void parser::data::report_unexpected(const token& _token)
+void parser::data::report_unexpected(const token& _token) 
 {
   if(_token.string.empty())
   {
@@ -141,14 +141,27 @@ parser::~parser()
 
 algebra::node_csp parser::parse()
 {
+  std::vector<algebra::node_csp> nodes;
   d->get_next_token();
-  switch(d->tok.type)
+  while(d->tok.type != token_type::END_OF_FILE)
   {
+    switch(d->tok.type)
+    {
     case token_type::CREATE:
-      return d->parse_create();
+      nodes.push_back(d->parse_create());
+      break;
     default:
       d->report_unexpected(d->tok);
-      return nullptr;
+    }
+  }
+  switch(nodes.size())
+  {
+  case 0:
+    d->report_error(token(), "Empty query.");
+  case 1:
+    return nodes.front();
+  default:
+    return std::make_shared<algebra::statements>(nodes);
   }
 }
 

@@ -2,6 +2,7 @@
 
 #include <map>
 #include <sqlite3.h>
+#include <variant>
 
 #include "sqlite_queries.h"
 
@@ -15,11 +16,18 @@ namespace gqlite::backends
   struct sqlite_data
   {
     sqlite3* handle;
+    std::unordered_map<int, std::string> id_to_label;
+    std::unordered_map<std::string, int> label_to_id;
+
     void throwLastError();
-    void create_graph(const std::string& _name);
-    bool has_graph(const std::string& _name);
+    void graph_create(const std::string& _name);
+    bool graph_has(const std::string& _name);
+    bool table_has(const std::string& _name);
+
     value execute_sql(const std::string& _query, const std::map<int, value>& _bindings = {});
     uint64_t last_row_id();
+    int id_for_label(const std::string& _string);
+    std::string label_for_id(int _id);
   };
 }
 
@@ -119,14 +127,14 @@ gqlite::value sqlite_data::execute_sql(const std::string& _query, const std::map
   }
 }
 
-void sqlite_data::create_graph(const std::string& _name)
+void sqlite_data::graph_create(const std::string& _name)
 {
-  execute_sql(sqlite_queries::create_graph(_name));
+  execute_sql(sqlite_queries::graph_create(_name));
 }
 
-bool sqlite_data::has_graph(const std::string& _name)
+bool sqlite_data::graph_has(const std::string& _name)
 {
-  value r= execute_sql(sqlite_queries::has_graph(_name));
+  value r= execute_sql(sqlite_queries::graph_has(_name));
   std::vector<value> v = r.to_vector();
   check_condition(v.size() == 1, "Should have gotten only one result");
   v = v.begin()->to_vector();
@@ -134,14 +142,81 @@ bool sqlite_data::has_graph(const std::string& _name)
   return v.begin()->to_bool();
 }
 
+bool sqlite_data::table_has(const std::string& _name)
+{
+  value r = execute_sql(sqlite_queries::table_has(), {{1, _name}});
+  std::vector<value> v = r.to_vector();
+  check_condition(v.size() == 1, "Should have gotten only one result for table_has.");
+  v = v.begin()->to_vector();
+  check_condition(v.size() == 1, "Should have gotten only one column for table_has.");
+  return v.begin()->to_bool();
+}
+
+
 uint64_t sqlite_data::last_row_id()
 {
   return sqlite3_last_insert_rowid(handle);
 }
 
+int sqlite_data::id_for_label(const std::string& _string)
+{
+  auto it = label_to_id.find(_string);
+  if(it == label_to_id.end())
+  {
+    value r = execute_sql(sqlite_queries::label_get_from_name(), {{1, _string}});
+    std::vector<value> v = r.to_vector();
+    if(v.size() == 0)
+    {
+      execute_sql(sqlite_queries::label_get_from_id(), {{1, _string}});
+      int id = last_row_id();
+      id_to_label[id] = _string;
+      label_to_id[_string] = id;
+      return id;
+    } else {
+      v = v.begin()->to_vector();
+      check_condition(v.size() == 1, "Should have gotten only one column for label_get_from_id.");
+      return v.begin()->to_integer();
+    }
+  } else {
+    return it->second;
+  }
+}
+
+std::string sqlite_data::label_for_id(int _id)
+{
+  auto it = id_to_label.find(_id);
+  if(it == id_to_label.end())
+  {
+    value r = execute_sql(sqlite_queries::label_get_from_id(), {{1, _id}});
+    std::vector<value> v = r.to_vector();
+    if(v.size() == 0)
+    {
+      throw gqlite::exception("Internal error: unknown label id {}", _id);
+    } else {
+      v = v.begin()->to_vector();
+      check_condition(v.size() == 1, "Should have gotten only one column for label_get_from_id.");
+      return v.begin()->to_string();
+    }
+  } else {
+    return it->second;
+  }
+}
+
 namespace gqlite::backends::sqlite_oc_executor
 {
   namespace algebra = gqlite::oc::algebra;
+
+  struct node_ref
+  {
+    int id;
+    value cache;
+  };
+  struct edge_ref
+  {
+    int id;
+    value cache;
+  };
+  using exec_value = std::variant<node_ref, edge_ref, value>;
 
   struct visitor : public gqlite::oc::algebra::abstract_node_visitor<gqlite::value>
   {
@@ -162,11 +237,11 @@ namespace gqlite::backends::sqlite_oc_executor
           props[k] = start(v);
         }
         std::string json_properties = value(props).to_json();
-        data->execute_sql(sqlite_queries::create_node(graph_name), {{1, json_properties}});
+        data->execute_sql(sqlite_queries::node_create(graph_name), {{1, json_properties}});
         int row_id = data->last_row_id();
         for(const std::string& label : node->get_labels())
         {
-          data->execute_sql(sqlite_queries::add_label(graph_name), {{1, label}, {2, row_id}});
+          data->execute_sql(sqlite_queries::node_map_to_label(graph_name), {{1, data->id_for_label(label)}, {2, row_id}});
         }
       }
       return gqlite::value();
@@ -175,15 +250,27 @@ namespace gqlite::backends::sqlite_oc_executor
     {
       return _node->get_value();
     }
+    gqlite::value visit(algebra::statements_csp _node) override
+    {
+      for(algebra::node_csp node : _node->get_nodes())
+      {
+        start(node);
+      }
+      return gqlite::value();
+    }
   };
 }
 
 sqlite::sqlite(void* _db) : d(new data)
 {
   d->handle = reinterpret_cast<sqlite3*>(_db);
-  if(not d->has_graph("default"))
+  if(not d->table_has("gqlite_labels"))
   {
-    d->create_graph("default");
+    d->execute_sql(sqlite_queries::label_create_table());
+  }
+  if(not d->graph_has("default"))
+  {
+    d->graph_create("default");
   }
 }
 

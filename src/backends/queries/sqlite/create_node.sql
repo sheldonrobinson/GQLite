@@ -1,1 +1,0 @@
-INSERT INTO gqlite_/%= _name %/_nodes (properties) VALUES (?001)

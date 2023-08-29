@@ -14,6 +14,7 @@ const char* std::to_string(value_type _type)
     using enum value_type;
     case invalid: return "invalid";
     case boolean: return "boolean";
+    case integer: return "integer";
     case number: return "number";
     case string: return "string";
     case map: return "map";
@@ -25,7 +26,7 @@ const char* std::to_string(value_type _type)
 struct value::data
 {
   value_type type;
-  std::variant<bool, double, std::string, std::unordered_map<std::string, value>, std::vector<value>> value_container;
+  std::variant<bool, int, double, std::string, std::unordered_map<std::string, value>, std::vector<value>> value_container;
 
   void to_json(std::stringstream& _stream);
 };
@@ -35,6 +36,9 @@ void value::data::to_json(std::stringstream& _stream)
   bool first = true;
   switch(type)
   {
+  case value_type::integer:
+    _stream << std::get<int>(value_container);
+    break;
   case value_type::number:
     _stream << std::get<double>(value_container);
     break;
@@ -92,6 +96,9 @@ value& value::operator=(const value& _rhs)
 value::~value()
 {}
 
+value::value(int _v) : d(new data{value_type::integer, _v})
+{}
+
 value::value(double _v) : d(new data{value_type::number, _v})
 {}
 
@@ -115,16 +122,39 @@ bool value::to_bool() const
   {
     case value_type::boolean:
       return std::get<bool>(d->value_container);
+    case value_type::integer:
+      return std::get<int>(d->value_container) != 0;
     case value_type::number:
       return std::get<double>(d->value_container) != 0.0;
     default:
       throw exception(format_string("Value is not a bool, it is {}", d->type));
   }
 }
+
+int value::to_integer() const
+{
+  switch(d->type)
+  {
+    case value_type::integer:
+      return std::get<int>(d->value_container);
+    case value_type::number:
+      return std::get<double>(d->value_container);
+    default:
+      throw exception(format_string("Value is not a number, it is {}", d->type));
+  }
+}
+
 double value::to_double() const
 {
-  if(d->type != value_type::number) throw exception(format_string("Value is not a number, it is {}", d->type));
-  return std::get<double>(d->value_container);
+  switch(d->type)
+  {
+    case value_type::integer:
+      return std::get<int>(d->value_container);
+    case value_type::number:
+      return std::get<double>(d->value_container);
+    default:
+      throw exception(format_string("Value is not a number, it is {}", d->type));
+  }
 }
 
 std::string value::to_string() const

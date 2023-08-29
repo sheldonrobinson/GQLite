@@ -5,6 +5,13 @@
 
 OC_ALGEBRA_GENERATE(create_nodes, OC_ALGEBRA_CREATE_NODES_MEMBERS)
 
+// Misc
+
+#define OC_ALGEBRA_STATEMENTS_MEMBERS(_KLASS_NAME_, F) \
+  F(_KLASS_NAME_, std::vector<node_csp>, nodes)
+
+OC_ALGEBRA_GENERATE(statements, OC_ALGEBRA_STATEMENTS_MEMBERS)
+
 // Expressions
 
 #define OC_ALGEBRA_GRAPH_NODE_MEMBERS(_KLASS_NAME_, F)          \

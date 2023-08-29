@@ -3,10 +3,15 @@
 require 'tempfile'
 
 sqlite_queries = [
-  ['create_graph(const std::string& _name)', 'create_graph.sql'],
-  ['has_graph(const std::string& _name)', 'has_graph.sql'],
-  ['add_label(const std::string& _name)', 'add_label.sql'],
-  ['create_node(const std::string& _name)', 'create_node.sql']
+  ['graph_create(const std::string& _graph_name)', 'graph_create.sql'],
+  ['graph_has(const std::string& _graph_name)', 'graph_has.sql'],
+  ['label_create_table()', 'label_create_table.sql'],
+  ['label_get_from_id()', 'label_get_from_id.sql'],
+  ['label_get_from_name()', 'label_get_from_name.sql'],
+  ['label_insert()', 'label_insert.sql'],
+  ['node_create(const std::string& _graph_name)', 'node_create.sql'],
+  ['node_map_to_label(const std::string& _graph_name)', 'node_create.sql'],
+  ['table_has()', 'table_has.sql']
 ]
 
 output = File.open("sqlite_queries.h", "w")

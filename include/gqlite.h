@@ -14,6 +14,8 @@ namespace gqlite
   public:
     exception(const std::string& _error) : m_error(_error), m_c_error(m_error.c_str()) {}
     exception(const char* _error) : m_c_error(_error) {}
+    template<typename _T_, typename... _TOther_>
+    exception(const char* _format, const _T_& _value, const _TOther_&... _other);
     const char* what() const throw() override
     {
       return m_c_error;
@@ -34,6 +36,7 @@ namespace gqlite
   {
     invalid,
     boolean,
+    integer,
     number,
     string,
     map,
@@ -47,6 +50,7 @@ namespace gqlite
     value& operator=(const value& _rhs);
     ~value();
   public:
+    value(int _v);
     value(double _v);
     value(const std::string& _v);
     value(const std::unordered_map<std::string, value>& _v);
@@ -54,6 +58,7 @@ namespace gqlite
   public:
     value_type get_type() const;
     bool to_bool() const;
+    int to_integer() const;
     double to_double() const;
     std::string to_string() const;
     std::unordered_map<std::string, value> to_map() const;
