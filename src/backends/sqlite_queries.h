@@ -121,6 +121,30 @@ stream << "_labels   (label, node_id) VALUES (?001, ?002)";
 
     return stream.str();
   }
+  std::string node_get_labels(const std::string& _graph_name)
+  {
+    std::stringstream stream;
+    #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_get_labels.sql"
+stream << "SELECT label FROM gqlite_";
+#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_get_labels.sql"
+stream << ( _graph_name );
+#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_get_labels.sql"
+stream << "_labels WHERE node_id = ?001";
+
+    return stream.str();
+  }
+  std::string node_get_properties(const std::string& _graph_name)
+  {
+    std::stringstream stream;
+    #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_get_properties.sql"
+stream << "SELECT properties FROM gqlite_";
+#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_get_properties.sql"
+stream << ( _graph_name );
+#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_get_properties.sql"
+stream << "_nodes WHERE id = ?001";
+
+    return stream.str();
+  }
   std::string table_has()
   {
     std::stringstream stream;

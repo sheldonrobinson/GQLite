@@ -11,6 +11,8 @@ sqlite_queries = [
   ['label_insert()', 'label_insert.sql'],
   ['node_create(const std::string& _graph_name)', 'node_create.sql'],
   ['node_map_to_label(const std::string& _graph_name)', 'node_map_to_label.sql'],
+  ['node_get_labels(const std::string& _graph_name)', 'node_get_labels.sql'],
+  ['node_get_properties(const std::string& _graph_name)', 'node_get_properties.sql'],
   ['table_has()', 'table_has.sql']
 ]
 

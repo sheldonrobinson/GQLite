@@ -99,8 +99,9 @@ token lexer::next_token()
   {
     identifierStr = get_identifier(lastChar);
     
-    IDENTIFIER_IS_KEYWORD("CREATE", CREATE);
-    IDENTIFIER_IS_KEYWORD("RETURN", RETURN);
+#define TOKEN_KEYWORD(_K_) IDENTIFIER_IS_KEYWORD(# _K_, _K_)
+    #include "token_keywords.h"
+#undef TOKEN_KEYWORD
 
     return token(token_type::IDENTIFIER, identifierStr, line(), initial_col);
   } else if(lastChar == '"' or lastChar == '\'' ) {

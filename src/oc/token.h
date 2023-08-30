@@ -26,8 +26,9 @@ namespace gqlite::oc
     IDENTIFIER,
     STRING,
   // Keywords
-    CREATE,
-    RETURN
+#define TOKEN_KEYWORD(_K_) _K_,
+    #include "token_keywords.h"
+#undef TOKEN_KEYWORD
   };
   const char* token_type_to_string(token_type _type );
   struct token

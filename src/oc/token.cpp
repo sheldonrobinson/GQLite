@@ -46,10 +46,11 @@ const char* gqlite::oc::token_type_to_string(token_type _type)
       return "identifier";
     case STRING:
       return "string";
-    case CREATE:
-      return "create";
-    case RETURN:
-      return "return";
+#define TOKEN_KEYWORD(_K_)  \
+    case _K_:               \
+      return # _K_;
+    #include "token_keywords.h"
+#undef TOKEN_KEYWORD
   }
   std::cerr << "add the token" << (int)_type << std::endl;
   std::abort();

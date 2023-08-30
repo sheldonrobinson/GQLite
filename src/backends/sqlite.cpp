@@ -228,11 +228,18 @@ namespace gqlite::backends::sqlite_oc_executor
   using element_ref_vector_sp = std::shared_ptr<element_ref_vector>;
   using exec_value = std::variant<element_ref, element_ref_vector_sp, gqlite::value>;
 
+  /**
+   * @internal
+   * This visitor is used to execute the queries
+   */
   struct visitor : public gqlite::oc::algebra::abstract_node_visitor<exec_value>
   {
     sqlite_data* data;
     std::string graph_name = "default";
     std::unordered_map<std::string, exec_value> variables;
+    /**
+     * @return a value representing the node/edge from @p _value
+     */
     gqlite::value get_value(const element_ref& _value)
     {
       struct value_getter
@@ -242,7 +249,33 @@ namespace gqlite::backends::sqlite_oc_executor
         {
           if(_node_ref->cache.get_type() == value_type::invalid)
           {
-            throw gqlite::exception("wip: value getter for node ref");
+            // Retrieve properties
+            gqlite::value properties;
+            {
+              // Query
+              std::vector<gqlite::value> properties_val_list_vector = v->data->execute_sql(sqlite_queries::node_get_properties(v->graph_name), {{1, _node_ref->id}}).to_vector();
+              check_condition(properties_val_list_vector.size() == 1, "When getting a node, should have received only one node");
+              std::vector<gqlite::value> properties_row = properties_val_list_vector.front().to_vector();
+              check_condition(properties_row.size() == 1, "When getting a node, properties get should only have given one column");
+              properties = gqlite::value::from_json(properties_row.front().to_string());
+            }
+
+            // Retrieve labels
+            std::vector<gqlite::value> labels;
+            {
+              // Query
+              std::vector<gqlite::value> labels_val_list_vector = v->data->execute_sql(sqlite_queries::node_get_labels(v->graph_name), {{1, _node_ref->id}}).to_vector();
+              for(const gqlite::value& label_row_value : labels_val_list_vector)
+              {
+                std::vector<gqlite::value> label_row = label_row_value.to_vector();
+                check_condition(label_row.size() == 1, "When getting a node, labels get should only have given one column");
+                labels.push_back(v->data->label_for_id(label_row.front().to_integer()));
+              }
+            }
+            // Generate the cache
+            _node_ref->cache = gqlite::value{{
+              {"type", gqlite::value("node")}, {"labels", gqlite::value(labels)}, {"id", gqlite::value(_node_ref->id)}, {"properties", gqlite::value(properties)}
+            }};
           }
           return _node_ref->cache;
         }
@@ -257,6 +290,9 @@ namespace gqlite::backends::sqlite_oc_executor
       };
       return std::visit(value_getter{this}, _value);
     }
+    /**
+     * @return a value representing the executed value from @p _value
+     */
     gqlite::value get_value(const exec_value& _value)
     {
       struct value_getter
@@ -286,6 +322,9 @@ namespace gqlite::backends::sqlite_oc_executor
       };
       return std::visit(value_getter{this}, _value);
     }
+    /**
+     * Get the variable stored in \ref variables or throw an exception.
+     */
     exec_value get_variable(const std::string& _name)
     {
       auto it = variables.find(_name);
@@ -296,10 +335,12 @@ namespace gqlite::backends::sqlite_oc_executor
         return it->second;
       }
     }
+    // Unused nodes
     exec_value visit(algebra::graph_node_csp _node) override
     {
       throw gqlite::exception("sqlite not implemented graph_node");
     }
+    // Node creation
     exec_value visit(algebra::create_nodes_csp _node) override
     {
       for(algebra::graph_node_csp node : _node->get_nodes())
@@ -325,6 +366,23 @@ namespace gqlite::backends::sqlite_oc_executor
         });
       }
       return gqlite::value();
+    }
+    // Match
+    exec_value visit(algebra::match_nodes_csp _node) override
+    {
+      std::string query = "SELECT id FROM gqlite_" + graph_name + "_nodes";
+
+      gqlite::value r = data->execute_sql(query);
+      
+      element_ref_vector_sp erv = std::make_shared<element_ref_vector>();
+
+      for(const gqlite::value& row_value : r.to_vector())
+      {
+        std::vector<gqlite::value> row = row_value.to_vector();
+        check_condition(row.size() == 1, "Should have gotten only one column for label_get_from_id.");
+        erv->refs.push_back(std::make_shared<node_ref>(row.front().to_integer()));
+      }
+      return erv;
     }
     exec_value visit(algebra::value_csp _node) override
     {

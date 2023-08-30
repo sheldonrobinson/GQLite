@@ -35,6 +35,12 @@ namespace gqlite
     {
       return _v;
     }
+    template<>
+    inline std::string to_string<char>(const char& _v)
+    {
+      std::string v;
+      return v += _v;
+    }
   }
   template<typename _T_, typename... _Targs_>
   inline std::string format_string(const std::string& _format, const _T_& _a, const _Targs_&... _args)
@@ -49,5 +55,6 @@ namespace gqlite
     return format_string(f, _args...);
   }
 }
+
 
 #endif

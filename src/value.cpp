@@ -3,7 +3,7 @@
 #include <sstream>
 #include <variant>
 
-#include "format.h"
+#include "gqlite_p.h"
 
 using namespace gqlite;
 
@@ -30,6 +30,189 @@ struct value::data
 
   void to_json(std::stringstream& _stream);
 };
+
+namespace {
+  /**
+   * @internal
+   * class use to read json files
+   */
+  struct json_reader
+  {
+    std::stringstream stream;
+    int last_char;
+    /// @brief get the next char
+    void fetch_next_char()
+    {
+      while(std::isspace(last_char = stream.get()))
+      {
+        if(last_char == std::stringstream::traits_type::eof())
+        {
+          return;
+        } else if(stream.fail())
+        {
+          throw gqlite::exception("Failure in getting json data from stream");
+        }
+      }
+    };
+    /// @brief start parsing
+    /// @throw gqlite::exception
+    /// @return the parsed value
+    gqlite::value start()
+    {
+      fetch_next_char();
+      return read_value();
+    }
+    std::string read_string()
+    {
+      is_char('"');
+      fetch_next_char();
+      std::string string;
+      bool keep_nc = false;
+      while(keep_nc or last_char != '"')
+      {
+        if(not keep_nc and last_char == '\\')
+        {
+          keep_nc = true;
+        } else {
+          if(keep_nc)
+          {
+            keep_nc = false;
+            if(last_char == 'n')
+            {
+              string += '\n';
+            } else {
+              string += char(last_char);
+            }
+          } else {
+            string += char(last_char);
+          }
+        }
+        if(not stream.good())
+        {
+          throw gqlite::exception("Unifinished string: {}", string);
+        }
+        fetch_next_char();
+      }
+      fetch_next_char(); // eat the '"'
+      return string;
+    }
+    void is_char(int _c)
+    {
+      if(last_char != _c)
+      {
+        throw gqlite::exception("Expected '{}' but got '{}'", char(_c), char(last_char));
+      }
+    }
+    gqlite::value read_value()
+    {
+      switch (last_char)
+      {
+      case '{':
+      {
+        // Parse object
+        std::unordered_map<std::string, value> map;
+        fetch_next_char();
+        while(last_char != '}')
+        {
+          std::string str = read_string();
+          is_char(':');
+          fetch_next_char();
+          gqlite::value val = read_value();
+          map[str] = val;
+          if(last_char == ',')
+          {
+            fetch_next_char();
+          } else {
+            break;
+          }
+        }
+        is_char('}');
+        fetch_next_char();
+        return map;
+      }
+      case '[':
+      {
+        // Parse array
+        std::vector<value> vec;
+        fetch_next_char();
+        while(last_char != ']')
+        {
+          gqlite::value val = read_value();
+          vec.push_back(val);
+          if(last_char == ',')
+          {
+            fetch_next_char();
+          } else {
+            break;
+          }
+        }
+        is_char(']');
+        fetch_next_char();
+        return vec;
+      }
+      case '"':
+        return read_string();
+      case 't':
+      {
+        // Parse true
+        fetch_next_char(); is_char('r');
+        fetch_next_char(); is_char('u');
+        fetch_next_char(); is_char('e');
+        return true;
+      }
+      case 'f':
+      {
+        // Parse false
+        fetch_next_char(); is_char('a');
+        fetch_next_char(); is_char('l');
+        fetch_next_char(); is_char('s');
+        fetch_next_char(); is_char('e');
+        return false;
+      }
+      case 'n':
+      {
+        // Parse null
+        fetch_next_char(); is_char('u');
+        fetch_next_char(); is_char('l');
+        fetch_next_char(); is_char('l');
+        return value();
+      }
+      // Parse number
+      case '-':
+      case '0':
+      case '1':
+      case '2':
+      case '3':
+      case '4':
+      case '5':
+      case '6':
+      case '7':
+      case '8':
+      case '9':
+      {
+        std::string number;
+        number += char(last_char);
+        fetch_next_char();
+        bool is_integer = true;
+        while((last_char >= '0' and last_char <= '9') or last_char == '.' or last_char == 'e' or last_char == '+' or last_char == '-')
+        {
+          is_integer = is_integer and (last_char != '.' and last_char != 'e');
+          number += char(last_char);
+          fetch_next_char();
+        }
+        if(is_integer)
+        {
+          return std::stoi(number);
+        } else {
+          return std::stod(number);
+        }
+      }
+      default:
+        throw gqlite::exception("Unexpected {}", char(last_char));
+      }
+    }
+  };
+}
 
 void value::data::to_json(std::stringstream& _stream)
 {
@@ -77,7 +260,6 @@ void value::data::to_json(std::stringstream& _stream)
   case value_type::invalid:
     _stream << "null";
   }
-
 }
 
 value::value() : d(new data{value_type::invalid})
@@ -180,4 +362,10 @@ std::string value::to_json() const
   std::stringstream ss;
   d->to_json(ss);
   return ss.str();
+}
+
+value value::from_json(const std::string& _json)
+{
+  json_reader reader{std::stringstream(_json)};
+  return reader.start();
 }

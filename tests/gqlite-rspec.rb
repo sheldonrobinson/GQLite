@@ -1,6 +1,18 @@
+#!/usr/bin/env rspec
+
 require 'rspec'
 require 'gqlite'
 require 'tempfile'
+
+def create_node(id, labels, properties)
+  {"type" => "node", "id" => id, "labels" => labels, "properties" => properties}
+end
+
+def add_node(list, id, labels, properties)
+  node = create_node(id, labels, properties)
+  list.push node
+  return node
+end
 
 RSpec.describe "database" do
   it "can be created" do
@@ -10,14 +22,49 @@ RSpec.describe "database" do
   it "can be queried with oc to create nodes" do
     file = Tempfile.new('testdb')
     db = Gqlite::Database.new(sqlite_filename: file.path)
+    
+    # Variable that hold the current state of the graph
+    gc = []
+
+    # Test simple create
     db.execute_oc_query "CREATE (n1)"
+    add_node gc, 1, [], {}
+    nodes = db.execute_oc_query "MATCHES (nodes)"
+    expect(nodes).to eq(gc)
+
+    # Test create two nodes
     db.execute_oc_query "CREATE (n1), (n2)"
+    add_node gc, 2, [], {}
+    add_node gc, 3, [], {}
+    nodes = db.execute_oc_query "MATCHES (nodes)"
+    expect(nodes).to eq(gc)
+    
+    # Test label and return
     n1 = db.execute_oc_query "CREATE (n1:Person) RETURN n1"
-    expect(n1).to eq([{"type" => "node", "id" => 4, "labels" => ["Person"], "properties" => {}}])
+    n1_person = add_node(gc, 4, ["Person"], {})
+    expect(n1).to eq([n1_person])
+    nodes = db.execute_oc_query "MATCHES (nodes)"
+    expect(nodes).to eq(gc)
+
+    # Test two nodes
     db.execute_oc_query "CREATE (n1:Person), (n2:Film)"
+    add_node gc, 5, ["Person"], {}
+    add_node gc, 6, ["Film"], {}
+    nodes = db.execute_oc_query "MATCHES (nodes)"
+    expect(nodes).to eq(gc)
+
+    # Test properties
     db.execute_oc_query "CREATE (n1 {name: 'Andres', title: 'Developer'})"
+    add_node gc, 7, [], {"name" => 'Andres', "title" => 'Developer'}
+    nodes = db.execute_oc_query "MATCHES (nodes)"
+    expect(nodes).to eq(gc)
+
+    # Test label properties
     n1 = db.execute_oc_query "CREATE (n1:Person {name: 'Andres', title: 'Developer'}) RETURN n1"
-    expect(n1).to eq([{"type" => "node", "id" => 8, "labels" => ["Person"], "properties" => {"name" => 'Andres', "title" => 'Developer'}}]) 
+    n1_ref = add_node gc, 8, ["Person"], {"name" => 'Andres', "title" => 'Developer'}
+    expect(n1).to eq([n1_ref])
+    nodes = db.execute_oc_query "MATCHES (nodes)"
+    expect(nodes).to eq(gc)
   end
   it "can be queried with oc to create nodes and edges" do
     file = Tempfile.new('testdb')

@@ -71,6 +71,7 @@ namespace gqlite
     std::vector<value> to_vector() const;
   public:
     std::string to_json() const;
+    static value from_json(const std::string& _json);
   private:
     struct data;
     std::shared_ptr<data> d;

@@ -14,7 +14,9 @@ struct parser::data
   token tok;
 
   algebra::node_csp parse_create();
+  algebra::node_csp parse_matches();
   algebra::node_csp parse_return();
+  std::vector<algebra::graph_node_csp> parse_graph_nodes();
   std::unordered_map<std::string, algebra::node_csp> parse_properties();
   algebra::node_csp parse_expression();
   void get_next_token();
@@ -28,6 +30,36 @@ struct parser::data
 algebra::node_csp parser::data::parse_create()
 {
   get_next_token();
+  return std::make_shared<algebra::create_nodes>(parse_graph_nodes());
+}
+
+algebra::node_csp parser::data::parse_matches()
+{
+  get_next_token();
+  return std::make_shared<algebra::match_nodes>(parse_graph_nodes());
+}
+
+algebra::node_csp parser::data::parse_return()
+{
+  get_next_token();
+  std::vector<std::string> variables;
+  do
+  {
+    is_of_type(token_type::IDENTIFIER);
+    variables.push_back(tok.string);
+    get_next_token();
+    if(tok.type == token_type::COMMA)
+    {
+      get_next_token();
+    } else {
+      break;
+    }
+  } while(true);
+  return std::make_shared<algebra::return_statement>(variables);
+}
+
+std::vector<algebra::graph_node_csp> parser::data::parse_graph_nodes()
+{
   std::vector<algebra::graph_node_csp> graph_nodes;
   do
   {
@@ -60,28 +92,7 @@ algebra::node_csp parser::data::parse_create()
       break;
     }
   } while(true);
-
-  return std::make_shared<algebra::create_nodes>(graph_nodes);
-}
-
-algebra::node_csp parser::data::parse_return()
-{
-  is_of_type(token_type::RETURN);
-  get_next_token();
-  std::vector<std::string> variables;
-  do
-  {
-    is_of_type(token_type::IDENTIFIER);
-    variables.push_back(tok.string);
-    get_next_token();
-    if(tok.type == token_type::COMMA)
-    {
-      get_next_token();
-    } else {
-      break;
-    }
-  } while(true);
-  return std::make_shared<algebra::return_statement>(variables);
+  return graph_nodes;
 }
 
 std::unordered_map<std::string, algebra::node_csp> parser::data::parse_properties()
@@ -182,6 +193,9 @@ algebra::node_csp parser::parse()
     {
     case token_type::CREATE:
       nodes.push_back(d->parse_create());
+      break;
+    case token_type::MATCHES:
+      nodes.push_back(d->parse_matches());
       break;
     case token_type::RETURN:
       nodes.push_back(d->parse_return());
