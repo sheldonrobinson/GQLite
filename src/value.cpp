@@ -62,17 +62,19 @@ namespace {
       fetch_next_char();
       return read_value();
     }
+    /// @brief read a string
+    /// @return the string without quotation
     std::string read_string()
     {
       is_char('"');
       fetch_next_char();
       std::string string;
-      bool keep_nc = false;
+      bool keep_nc = false; // this is used to indicate if the last character was a '\' or not
       while(keep_nc or last_char != '"')
       {
         if(not keep_nc and last_char == '\\')
         {
-          keep_nc = true;
+          keep_nc = true; // make sure to ignore the next character if it is a '"' or to properly handle a '\n'
         } else {
           if(keep_nc)
           {
@@ -96,6 +98,7 @@ namespace {
       fetch_next_char(); // eat the '"'
       return string;
     }
+    /// @brief throw an exception if last_char different from @param _c 
     void is_char(int _c)
     {
       if(last_char != _c)
@@ -103,6 +106,8 @@ namespace {
         throw gqlite::exception("Expected '{}' but got '{}'", char(_c), char(last_char));
       }
     }
+    /// @brief read the next value
+    /// @return and return it
     gqlite::value read_value()
     {
       switch (last_char)
