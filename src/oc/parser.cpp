@@ -80,10 +80,15 @@ std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>> pars
     is_of_type(token_type::STARTBRACKET);
     std::vector<algebra::graph_node_csp> nodes;
     get_next_token();
-    is_of_type(token_type::IDENTIFIER);
-    std::string variable = tok.string;
+    // identifier
+    std::string variable;
+    if(tok.type == token_type::IDENTIFIER)
+    { 
+      variable = tok.string;
+      get_next_token();
+    }
+    // Labels
     std::vector<std::string> labels;
-    get_next_token();
     while(tok.type == token_type::COLON)
     {
       get_next_token();
@@ -91,14 +96,17 @@ std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>> pars
       labels.push_back(tok.string);
       get_next_token();
     }
+    // Properties
     std::unordered_map<std::string, algebra::node_csp> properties;
     if(tok.type == token_type::STARTBRACE)
     {
       properties = parse_properties();
     }
+    // End of node
     is_of_type(token_type::ENDBRACKET);
     get_next_token();
     algebra::graph_node_csp gnode = std::make_shared<algebra::graph_node>(variable, labels, properties);
+    // Handle, check if edge is active
     bool add_to_patterns = true;
     if(current_edge.active)
     {
@@ -113,6 +121,7 @@ std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>> pars
       current_edge.active = false;
       add_to_patterns = false;
     }
+    // If comma, an other node statement comes after
     if(tok.type == token_type::COMMA)
     {
       get_next_token();

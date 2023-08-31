@@ -443,6 +443,8 @@ namespace gqlite::backends::sqlite_oc_executor
         check_condition(row.size() == 1, "Should have gotten only one column for label_get_from_id.");
         erv->refs.push_back(std::make_shared<node_ref>(row.front().to_integer()));
       }
+      check_condition(_node->get_patterns().size() == 1, "wip: match more than 1");
+      check_condition(_node->get_patterns().front().get_type() == algebra::node_type::graph_node, "wip: match graph node");
       variables[_node->get_patterns().front().get_value<algebra::graph_node>()->get_variable()] = erv;
       return empty{};
     }
