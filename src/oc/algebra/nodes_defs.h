@@ -32,6 +32,7 @@ OC_ALGEBRA_GENERATE(return_statement, OC_ALGEBRA_RETURN_MEMBERS)
 OC_ALGEBRA_GENERATE(graph_node, OC_ALGEBRA_GRAPH_NODE_MEMBERS)
 
 #define OC_ALGEBRA_GRAPH_EDGE_MEMBERS(_KLASS_NAME_, F)          \
+  F(_KLASS_NAME_, std::string, variable)                        \
   F(_KLASS_NAME_, graph_node_csp, source)                       \
   F(_KLASS_NAME_, graph_node_csp, destination)                  \
   F(_KLASS_NAME_, edge_directivity, directivity)                \

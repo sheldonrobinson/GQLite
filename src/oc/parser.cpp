@@ -116,7 +116,7 @@ std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>> pars
       } else {
         current_edge.source = gnode;
       }
-      algebra::graph_edge_csp ge = std::make_shared<algebra::graph_edge>(current_edge.source, current_edge.destination, current_edge.directivity, current_edge.label, current_edge.properties);
+      algebra::graph_edge_csp ge = std::make_shared<algebra::graph_edge>(current_edge.variable, current_edge.source, current_edge.destination, current_edge.directivity, current_edge.label, current_edge.properties);
       patterns.push_back(ge);
       current_edge.active = false;
       add_to_patterns = false;

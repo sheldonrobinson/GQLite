@@ -1,5 +1,6 @@
 #include "sqlite.h"
 
+#include <list>
 #include <map>
 #include <sqlite3.h>
 #include <variant>
@@ -431,6 +432,83 @@ namespace gqlite::backends::sqlite_oc_executor
     // Match
     exec_value visit(algebra::match_csp _node) override
     {
+      int count = 0;
+      std::string sql_variables;
+      std::string sql_tables;
+      std::string sql_conditions;
+
+      for(const algebra::alternative<algebra::graph_node, algebra::graph_edge>& pattern : _node->get_patterns())
+      {
+        if(count != 0)
+        {
+          sql_variables += ", ";
+          sql_tables += " JOIN ";
+        }
+        pattern.visit<void>([this, &sql_variables, &sql_tables, &sql_conditions, &count](const algebra::graph_node_csp _node)
+        {
+          sql_variables += "tb" + std::to_string(count) + ".id";
+          sql_tables += "gqlite_" + graph_name + "_nodes AS tb" + std::to_string(count);
+        },
+        [this, &sql_variables, &sql_tables, &sql_conditions, &count](const algebra::graph_edge_csp _edge)
+        {
+          sql_variables += "tb" + std::to_string(count) + ".id";
+          sql_tables += "gqlite_" + graph_name + "_edges AS tb" + std::to_string(count);
+        });
+        ++count;
+      }
+      if(not sql_conditions.empty())
+      {
+        sql_conditions = (count == 1 ? " WHERE " : " ON ") + sql_conditions;
+      }
+      gqlite::value r = data->execute_sql("SELECT " + sql_variables + " FROM " + sql_tables + sql_conditions);
+      std::vector<element_ref_vector_sp> ervs;
+      ervs.reserve(count);
+      for(int i = 0; i < count; ++i)
+      {
+        ervs.push_back(std::make_shared<element_ref_vector>());
+      }
+
+      for(const gqlite::value& row_value : r.to_vector())
+      {
+        int idx = 0;
+        std::vector<gqlite::value> row = row_value.to_vector();
+        check_condition(row.size() == count, "Wrong number of column return by SQL Query.");
+
+        for(const algebra::alternative<algebra::graph_node, algebra::graph_edge>& pattern : _node->get_patterns())
+        {
+          gqlite::value val = row[idx];
+          ervs[idx]->refs.push_back(
+            pattern.visit<element_ref>([val](const algebra::graph_node_csp _node) -> element_ref
+            {
+              return std::make_shared<node_ref>(val.to_integer());
+            },
+            [val](const algebra::graph_edge_csp _edge) -> element_ref
+            {
+              return std::make_shared<edge_ref>(val.to_integer());
+            })
+          );
+          ++idx;
+        }
+      }
+      int idx = 0;
+      for(const algebra::alternative<algebra::graph_node, algebra::graph_edge>& pattern : _node->get_patterns())
+      {
+        std::string variable = pattern.visit<std::string>([](const algebra::graph_node_csp _node)
+          {
+            return _node->get_variable();
+          },
+          [](const algebra::graph_edge_csp _edge)
+          {
+            return _edge->get_variable();
+          });
+        if(not variable.empty())
+        {
+          variables[variable] = ervs[idx];
+        }
+        ++idx;
+      }
+      return empty{};
+#if 0
       std::string query = "SELECT id FROM gqlite_" + graph_name + "_nodes";
 
       gqlite::value r = data->execute_sql(query);
@@ -447,6 +525,7 @@ namespace gqlite::backends::sqlite_oc_executor
       check_condition(_node->get_patterns().front().get_type() == algebra::node_type::graph_node, "wip: match graph node");
       variables[_node->get_patterns().front().get_value<algebra::graph_node>()->get_variable()] = erv;
       return empty{};
+#endif
     }
     exec_value visit(algebra::value_csp _node) override
     {
