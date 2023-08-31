@@ -7,6 +7,10 @@
 
 namespace gqlite::oc::algebra
 {
+  enum class edge_directivity
+  {
+    directed, undirected
+  };
   template<typename _TR_, typename... _TArgs_>
   class abstract_node_visitor;
   namespace details

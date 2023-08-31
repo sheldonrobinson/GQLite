@@ -28,14 +28,20 @@ const char* gqlite::oc::token_type_to_string(token_type _type)
       return "(";
     case ENDBRACKET:
       return ")";
+    case STARTBOXBRACKET:
+      return "[";
+    case ENDBOXBRACKET:
+      return "]";
+    case MINUS:
+      return "-";
     case COMMA:
       return ",";
     case DOT:
       return ".";
     case LEFT_ARROW:
-      return "->";
-    case RIGHT_ARROW:
       return "<-";
+    case RIGHT_ARROW:
+      return "->";
     case COLON:
       return ":";
     case COLONCOLON:

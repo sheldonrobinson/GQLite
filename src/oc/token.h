@@ -15,6 +15,9 @@ namespace gqlite::oc
     ENDBRACE, ///< }
     STARTBRACKET, ///< (
     ENDBRACKET, ///< )
+    STARTBOXBRACKET, ///< [
+    ENDBOXBRACKET, ///< ]
+    MINUS, ///< -
     COMMA, ///< ,
     COLON, ///< :
     COLONCOLON, ///< :

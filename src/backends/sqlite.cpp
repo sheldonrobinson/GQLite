@@ -340,8 +340,12 @@ namespace gqlite::backends::sqlite_oc_executor
     {
       throw gqlite::exception("sqlite not implemented graph_node");
     }
+    exec_value visit(algebra::graph_edge_csp _node) override
+    {
+      throw gqlite::exception("sqlite not implemented edge_node");
+    }
     // Node creation
-    exec_value visit(algebra::create_nodes_csp _node) override
+    exec_value visit(algebra::create_csp _node) override
     {
       for(algebra::graph_node_csp node : _node->get_nodes())
       {
@@ -368,7 +372,7 @@ namespace gqlite::backends::sqlite_oc_executor
       return gqlite::value();
     }
     // Match
-    exec_value visit(algebra::match_nodes_csp _node) override
+    exec_value visit(algebra::match_csp _node) override
     {
       std::string query = "SELECT id FROM gqlite_" + graph_name + "_nodes";
 
@@ -407,7 +411,7 @@ namespace gqlite::backends::sqlite_oc_executor
           return val;
         }
       }
-      return exec_value();
+      return gqlite::value();
     }
   };
 }

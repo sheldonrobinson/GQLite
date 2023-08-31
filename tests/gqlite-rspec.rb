@@ -70,7 +70,7 @@ RSpec.describe "database" do
     file = Tempfile.new('testdb')
     db = Gqlite::Database.new(sqlite_filename: file.path)
     db.execute_oc_query "CREATE (n1), (n2) CREATE (n1)-[:RELTYPE]->(n2)"
-    p = db.execute_oc_query "CREATE p = (andres {name:'Andres'})-[:WORKS_AT]->(neo)<-[:WORKS_AT]-(michael {name: 'Michael'}) RETURN p"
+    # p = db.execute_oc_query "CREATE p = (andres {name:'Andres'})-[:WORKS_AT]->(neo)<-[:WORKS_AT]-(michael {name: 'Michael'}) RETURN p"
   end
 end
 

@@ -113,10 +113,12 @@ token lexer::next_token()
     CHAR_IS_TOKEN( '}', ENDBRACE );
     CHAR_IS_TOKEN( '(', STARTBRACKET );
     CHAR_IS_TOKEN( ')', ENDBRACKET );
+    CHAR_IS_TOKEN( '[', STARTBOXBRACKET );
+    CHAR_IS_TOKEN( ']', ENDBOXBRACKET );
     CHAR_IS_TOKEN( ',', COMMA );
     CHAR_IS_TOKEN( '=', EQUAL );
     CHAR_IS_TOKEN_OR_TOKEN( ':', ':', COLON, COLONCOLON);
-    CHAR_IS_TOKEN_OR_TOKEN( '-', '>', UNKNOWN, RIGHT_ARROW);
+    CHAR_IS_TOKEN_OR_TOKEN( '-', '>', MINUS, RIGHT_ARROW);
     CHAR_IS_TOKEN_OR_TOKEN( '<', '-', UNKNOWN, LEFT_ARROW);
   }
   if( lastChar > 128 ) return next_token();
