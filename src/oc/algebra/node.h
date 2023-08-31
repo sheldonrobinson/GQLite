@@ -1,7 +1,10 @@
 #ifndef _OC_ALGEBRA_ABSTRACT_NODE_H_
 #define _OC_ALGEBRA_ABSTRACT_NODE_H_
 
+#include <functional>
 #include <memory>
+
+#include <gqlite.h>
 #include "node_type.h"
 #include "../../global.h"
 
@@ -44,10 +47,10 @@ namespace gqlite::oc::algebra
     {
     }
     template<typename _To_, std::enable_if_t<traits::contains_v<_To_, _T_...>, int> = 0>
-    alternative(std::shared_ptr<const _To_> _v) : m_node(_v), m_type(_v->type())
+    alternative(std::shared_ptr<const _To_> _v) : m_node(_v), m_type(_v->get_type())
     {}
     template<typename _To_, std::enable_if_t<traits::contains_v<_To_, _T_...>, int> = 0>
-    alternative(const _To_* _v) : m_node(_v), m_type(_v->type())
+    alternative(const _To_* _v) : m_node(_v), m_type(_v->get_type())
     {}
     node_type get_type() const { return m_type; }
     template<typename _To_, std::enable_if_t<traits::contains_v<_To_, _T_...>, int> = 0>
@@ -57,7 +60,21 @@ namespace gqlite::oc::algebra
     }
     bool is_valid() const { return m_type != node_type::__Invalid__; }
     node_csp get_node() const { return m_node; }
+    template<typename _TRet_>
+    _TRet_ visit(std::function<_TRet_(std::shared_ptr<const _T_>)>... _functors) const
+    {
+      return visit_impl(_functors...);
+    }
   private:
+    template<typename _TRet_, typename _T1_, typename... _TOther_>
+    _TRet_ visit_impl(std::function<_TRet_(std::shared_ptr<const _T1_>)> _f1, std::function<_TRet_(std::shared_ptr<const _TOther_>)>... _others) const
+    {
+      std::shared_ptr<const _T1_> t = std::dynamic_pointer_cast<const _T1_>(m_node);
+      if(t) return _f1(t);
+      return visit_impl<_TRet_>(_others...);
+    }
+    template<typename _TRet_>
+    _TRet_ visit_impl() const { throw gqlite::exception("Internal error: no alternative found."); }
     node_csp m_node;
     node_type m_type;
   };

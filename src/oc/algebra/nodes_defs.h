@@ -1,14 +1,12 @@
 // Queries
 
-#define OC_ALGEBRA_CREATE_NODES_MEMBERS(_KLASS_NAME_, F)  \
-  F(_KLASS_NAME_, std::vector<graph_node_csp>, nodes)     \
-  F(_KLASS_NAME_, std::vector<graph_edge_csp>, edges)
+#define OC_ALGEBRA_CREATE_NODES_MEMBERS(_KLASS_NAME_, F)                          \
+  F(_KLASS_NAME_, std::vector<alternative<GQLITE_LIST(graph_node, graph_edge)>>, patterns)
 
 OC_ALGEBRA_GENERATE(create, OC_ALGEBRA_CREATE_NODES_MEMBERS)
 
-#define OC_ALGEBRA_MATCH_NODES_MEMBERS(_KLASS_NAME_, F) \
-  F(_KLASS_NAME_, std::vector<graph_node_csp>, nodes)   \
-  F(_KLASS_NAME_, std::vector<graph_edge_csp>, edges)
+#define OC_ALGEBRA_MATCH_NODES_MEMBERS(_KLASS_NAME_, F)                           \
+  F(_KLASS_NAME_, std::vector<alternative<GQLITE_LIST(graph_node, graph_edge)>>, patterns)
 
 OC_ALGEBRA_GENERATE(match, OC_ALGEBRA_MATCH_NODES_MEMBERS)
 

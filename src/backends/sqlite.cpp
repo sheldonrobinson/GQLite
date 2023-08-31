@@ -17,8 +17,8 @@ namespace gqlite::backends
   struct sqlite_data
   {
     sqlite3* handle;
-    std::unordered_map<int, std::string> id_to_label;
-    std::unordered_map<std::string, int> label_to_id;
+    std::unordered_map<int, std::string> id_to_label = {{0, std::string()}};
+    std::unordered_map<std::string, int> label_to_id = {{std::string(), 0}};
 
     void throwLastError();
     void graph_create(const std::string& _name);
@@ -291,6 +291,21 @@ namespace gqlite::backends::sqlite_oc_executor
       return std::visit(value_getter{this}, _value);
     }
     /**
+     * @return a node ref or an exception if not a node ref
+     */
+    node_ref_sp get_node_ref(const exec_value& _value)
+    {
+      if(std::holds_alternative<element_ref>(_value))
+      {
+        element_ref er = std::get<element_ref>(_value);
+        if(std::holds_alternative<node_ref_sp>(er))
+        {
+          return std::get<node_ref_sp>(er);
+        }
+      }
+      throw gqlite::exception("Expected a reference to a node");
+    }
+    /**
      * @return a value representing the executed value from @p _value
      */
     gqlite::value get_value(const exec_value& _value)
@@ -344,29 +359,66 @@ namespace gqlite::backends::sqlite_oc_executor
     {
       throw gqlite::exception("sqlite not implemented edge_node");
     }
-    // Node creation
-    exec_value visit(algebra::create_csp _node) override
+    // Node/Edge creation
+    bool has_node(algebra::graph_node_csp _node)
     {
-      for(algebra::graph_node_csp node : _node->get_nodes())
+      return not _node->get_variable().empty() and variables.find(_node->get_variable()) != variables.end();
+    }
+    gqlite::value get_properties(const std::unordered_map<std::string, algebra::node_csp>& _properties)
+    {
+      std::unordered_map<std::string, value> props;
+      for(auto const& [k,v] : _properties)
       {
-        std::unordered_map<std::string, value> props;
-        for(auto const& [k,v] : node->get_properties())
-        {
-          props[k] = get_value(start(v));
-        }
-        std::string json_properties = value(props).to_json();
-        data->execute_sql(sqlite_queries::node_create(graph_name), {{1, json_properties}});
-        int row_id = data->last_row_id();
-        for(const std::string& label : node->get_labels())
-        {
-          data->execute_sql(sqlite_queries::node_map_to_label(graph_name), {{1, data->id_for_label(label)}, {2, row_id}});
-        }
-        variables[node->get_variable()] = std::make_shared<node_ref>(node_ref{
+        props[k] = get_value(start(v));
+      }
+      return props;
+    }
+    node_ref_sp create_node(algebra::graph_node_csp _node)
+    {
+      if(has_node(_node))
+      {
+        throw gqlite::exception("Duplicate node variable bound {}", _node->get_variable());
+      }
+      gqlite::value props = get_properties(_node->get_properties());
+      std::string json_properties = props.to_json();
+      data->execute_sql(sqlite_queries::node_create(graph_name), {{1, json_properties}});
+      int row_id = data->last_row_id();
+      for(const std::string& label : _node->get_labels())
+      {
+        data->execute_sql(sqlite_queries::node_map_to_label(graph_name), {{1, data->id_for_label(label)}, {2, row_id}});
+      }
+      node_ref_sp nr = std::make_shared<node_ref>(node_ref{
           row_id,
           gqlite::value{
           {
-            {"type", gqlite::value("node")}, {"labels", gqlite::value(node->get_labels())}, {"id", gqlite::value(row_id)}, {"properties", props}            
+            {"type", gqlite::value("node")}, {"labels", gqlite::value(_node->get_labels())}, {"id", gqlite::value(row_id)}, {"properties", props}            
           }}
+        });
+      if(not _node->get_variable().empty())
+      {
+        variables[_node->get_variable()] = nr;
+      }
+      return nr;
+    }
+    void create_edge(const algebra::graph_edge_csp _edge)
+    {
+      node_ref_sp source = has_node(_edge->get_source()) ? get_node_ref(variables[_edge->get_source()->get_variable()]) : create_node(_edge->get_source());
+      node_ref_sp destination = has_node(_edge->get_destination()) ? get_node_ref(variables[_edge->get_destination()->get_variable()]) : create_node(_edge->get_destination());
+      int label_id = data->id_for_label(_edge->get_label());
+      
+      data->execute_sql(sqlite_queries::edge_create(graph_name), {{0, label_id}, {1, get_properties(_edge->get_properties()).to_json()}, {2, source->id}, {3, destination->id}});
+    }
+    exec_value visit(algebra::create_csp _node) override
+    {
+      for(const algebra::alternative<algebra::graph_node, algebra::graph_edge>& pattern : _node->get_patterns())
+      {
+        pattern.visit<void>([this](const algebra::graph_node_csp _node)
+        {
+          create_node(_node);
+        },
+        [this](const algebra::graph_edge_csp _edge)
+        {
+          create_edge(_edge);
         });
       }
       return gqlite::value();

@@ -44,7 +44,7 @@ namespace gqlite::oc::algebra::visitors::details
   {
     static void call(print* _visitor, std::string& _indentation, const char* _name, const gqlite::oc::algebra::alternative<_T_...>& _t)
     {
-      if(_t.isValid())
+      if(_t.is_valid())
       {
         if(_name != 0)
         {
@@ -52,7 +52,7 @@ namespace gqlite::oc::algebra::visitors::details
         }
         std::string indentation = _indentation;
         _indentation += "  ";
-        _visitor->accept(_t.node());
+        _visitor->accept(_t.get_node());
         _indentation = indentation;
       }
     }

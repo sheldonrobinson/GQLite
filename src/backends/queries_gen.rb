@@ -3,6 +3,7 @@
 require 'tempfile'
 
 sqlite_queries = [
+  ['edge_create(const std::string& _graph_name)', 'edge_create.sql'],
   ['graph_create(const std::string& _graph_name)', 'graph_create.sql'],
   ['graph_has(const std::string& _graph_name)', 'graph_has.sql'],
   ['label_create_table()', 'label_create_table.sql'],

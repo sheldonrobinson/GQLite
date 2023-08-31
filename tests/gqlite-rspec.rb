@@ -69,7 +69,24 @@ RSpec.describe "database" do
   it "can be queried with oc to create nodes and edges" do
     file = Tempfile.new('testdb')
     db = Gqlite::Database.new(sqlite_filename: file.path)
+    
+    # Variable that hold the current state of the graph
+    gc = []
+
+    # Simple create
     db.execute_oc_query "CREATE (n1), (n2) CREATE (n1)-[:RELTYPE]->(n2)"
+    add_node gc, 1, [], {}
+    add_node gc, 2, [], {}
+    nodes = db.execute_oc_query "MATCHES (nodes)"
+    expect(nodes).to eq(gc)
+
+    # Simple create 2
+    db.execute_oc_query "CREATE (n1)-[:RELTYPE]->(n2)"
+    add_node gc, 3, [], {}
+    add_node gc, 4, [], {}
+    nodes = db.execute_oc_query "MATCHES (nodes)"
+    expect(nodes).to eq(gc)
+
     # p = db.execute_oc_query "CREATE p = (andres {name:'Andres'})-[:WORKS_AT]->(neo)<-[:WORKS_AT]-(michael {name: 'Michael'}) RETURN p"
   end
 end

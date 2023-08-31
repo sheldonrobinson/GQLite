@@ -3,6 +3,18 @@
 
 namespace gqlite::backends::sqlite_queries
 {
+  std::string edge_create(const std::string& _graph_name)
+  {
+    std::stringstream stream;
+    #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_create.sql"
+stream << "INSERT INTO gqlite_";
+#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_create.sql"
+stream << ( _graph_name );
+#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_create.sql"
+stream << "_edges (label, properties, left, right) VALUES (?001, ?002, ?003, ?004)";
+
+    return stream.str();
+  }
   std::string graph_create(const std::string& _graph_name)
   {
     std::stringstream stream;
@@ -16,27 +28,30 @@ stream << "_nodes(id INTEGER PRIMARY KEY AUTOINCREMENT, properties TEXT NOT NULL
 #line 2 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_create.sql"
 stream << ( _graph_name );
 #line 2 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_create.sql"
-stream << "_edges(id INTEGER PRIMARY KEY AUTOINCREMENT, properties TEXT NOT NULL,\n"
+stream << "_edges(id INTEGER PRIMARY KEY AUTOINCREMENT,\n"
+"       label INTEGER,\n"
+"       properties TEXT NOT NULL,\n"
 "       left INTEGER,\n"
 "       right INTEGER,\n"
+"       FOREIGN KEY(label) REFERENCES gqlite_labels(id),\n"
 "       FOREIGN KEY(left) REFERENCES gqlite_";
-#line 5 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_create.sql"
+#line 8 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_create.sql"
 stream << ( _graph_name );
-#line 5 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_create.sql"
+#line 8 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_create.sql"
 stream << "_nodes(id), FOREIGN KEY(right) REFERENCES gqlite_";
-#line 5 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_create.sql"
+#line 8 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_create.sql"
 stream << ( _graph_name );
-#line 5 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_create.sql"
+#line 8 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_create.sql"
 stream << "_nodes(id));\n"
 "CREATE TABLE gqlite_";
-#line 6 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_create.sql"
+#line 9 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_create.sql"
 stream << ( _graph_name );
-#line 6 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_create.sql"
+#line 9 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_create.sql"
 stream << "_labels(label INTEGER, node_id INTEGER,\n"
 "        FOREIGN KEY(label) REFERENCES gqlite_labels(id), FOREIGN KEY(node_id) REFERENCES gqlite_";
-#line 7 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_create.sql"
+#line 10 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_create.sql"
 stream << ( _graph_name );
-#line 7 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_create.sql"
+#line 10 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_create.sql"
 stream << "_nodes(id))";
 
     return stream.str();
@@ -66,8 +81,9 @@ stream << "_labels')";
   std::string label_create_table()
   {
     std::stringstream stream;
-    #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/label_create_table.sql"
-stream << "CREATE TABLE gqlite_labels(id INTEGER PRIMARY KEY AUTOINCREMENT, label TEXT NOT NULL UNIQUE)";
+    #line 2 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/label_create_table.sql"
+stream << "CREATE TABLE gqlite_labels(id INTEGER PRIMARY KEY AUTOINCREMENT, label TEXT NOT NULL UNIQUE);\n"
+"INSERT INTO gqlite_labels(id, label) VALUES (0, \"\")";
 
     return stream.str();
   }
