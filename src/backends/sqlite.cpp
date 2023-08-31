@@ -217,6 +217,7 @@ namespace gqlite::backends::sqlite_oc_executor
     int id;
     value cache;
   };
+  struct empty {};
   using node_ref_sp = std::shared_ptr<node_ref>;
   using edge_ref_sp = std::shared_ptr<edge_ref>;
   using element_ref = std::variant<node_ref_sp, edge_ref_sp>;
@@ -226,7 +227,7 @@ namespace gqlite::backends::sqlite_oc_executor
     value cache;
   };
   using element_ref_vector_sp = std::shared_ptr<element_ref_vector>;
-  using exec_value = std::variant<element_ref, element_ref_vector_sp, gqlite::value>;
+  using exec_value = std::variant<element_ref, element_ref_vector_sp, gqlite::value, empty>;
 
   /**
    * @internal
@@ -334,6 +335,10 @@ namespace gqlite::backends::sqlite_oc_executor
         {
           return _value;
         }
+        gqlite::value operator()(const empty&)
+        {
+          return gqlite::value();
+        }
       };
       return std::visit(value_getter{this}, _value);
     }
@@ -421,7 +426,7 @@ namespace gqlite::backends::sqlite_oc_executor
           create_edge(_edge);
         });
       }
-      return gqlite::value();
+      return empty{};
     }
     // Match
     exec_value visit(algebra::match_csp _node) override
@@ -438,7 +443,8 @@ namespace gqlite::backends::sqlite_oc_executor
         check_condition(row.size() == 1, "Should have gotten only one column for label_get_from_id.");
         erv->refs.push_back(std::make_shared<node_ref>(row.front().to_integer()));
       }
-      return erv;
+      variables[_node->get_patterns().front().get_value<algebra::graph_node>()->get_variable()] = erv;
+      return empty{};
     }
     exec_value visit(algebra::value_csp _node) override
     {
