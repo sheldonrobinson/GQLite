@@ -21,7 +21,7 @@ namespace gqlite::backends
     std::unordered_map<int, std::string> id_to_label = {{0, std::string()}};
     std::unordered_map<std::string, int> label_to_id = {{std::string(), 0}};
 
-    void throwLastError();
+    void throwLastError(const std::string& _query);
     void graph_create(const std::string& _name);
     bool graph_has(const std::string& _name);
     bool table_has(const std::string& _name);
@@ -36,9 +36,9 @@ namespace gqlite::backends
 struct sqlite::data : public sqlite_data
 {};
 
-void sqlite_data::throwLastError()
+void sqlite_data::throwLastError(const std::string& _query)
 {
-  throw gqlite::exception(std::string(sqlite3_errmsg(handle)));
+  throw gqlite::exception("Error {}, while executing {}", sqlite3_errmsg(handle), _query);
 }
 
 gqlite::value sqlite_data::execute_sql(const std::string& _query, const std::map<int, value>& _bindings)
@@ -53,7 +53,7 @@ gqlite::value sqlite_data::execute_sql(const std::string& _query, const std::map
     if(sqlite3_prepare_v2(handle, ptr, ptr_end - ptr, &ps, &ptr) != SQLITE_OK)
     {
       sqlite3_finalize(ps);
-      throwLastError();
+      throwLastError(_query);
     }
     for(const auto& [key, value] : _bindings)
     {
@@ -118,7 +118,7 @@ gqlite::value sqlite_data::execute_sql(const std::string& _query, const std::map
       q_rs.push_back(rows);
       break;
     default:
-      throwLastError();
+      throwLastError(_query);
     }
   }
   if(q_rs.size() == 1)
@@ -433,6 +433,7 @@ namespace gqlite::backends::sqlite_oc_executor
     exec_value visit(algebra::match_csp _node) override
     {
       int count = 0;
+      int count_variables = 0;
       std::string sql_variables;
       std::string sql_tables;
       std::string sql_conditions;
@@ -444,15 +445,19 @@ namespace gqlite::backends::sqlite_oc_executor
           sql_variables += ", ";
           sql_tables += " JOIN ";
         }
-        pattern.visit<void>([this, &sql_variables, &sql_tables, &sql_conditions, &count](const algebra::graph_node_csp _node)
+        pattern.visit<void>([this, &sql_variables, &sql_tables, &sql_conditions, count, &count_variables](const algebra::graph_node_csp _node)
         {
           sql_variables += "tb" + std::to_string(count) + ".id";
           sql_tables += "gqlite_" + graph_name + "_nodes AS tb" + std::to_string(count);
+          ++count_variables;
         },
-        [this, &sql_variables, &sql_tables, &sql_conditions, &count](const algebra::graph_edge_csp _edge)
+        [this, &sql_variables, &sql_tables, &sql_conditions, count, &count_variables](const algebra::graph_edge_csp _edge)
         {
-          sql_variables += "tb" + std::to_string(count) + ".id";
+          sql_variables += "tb" + std::to_string(count) + ".left, ";
+          sql_variables += "tb" + std::to_string(count) + ".id, ";
+          sql_variables += "tb" + std::to_string(count) + ".right";
           sql_tables += "gqlite_" + graph_name + "_edges AS tb" + std::to_string(count);
+          count_variables += 3;
         });
         ++count;
       }
@@ -462,8 +467,8 @@ namespace gqlite::backends::sqlite_oc_executor
       }
       gqlite::value r = data->execute_sql("SELECT " + sql_variables + " FROM " + sql_tables + sql_conditions);
       std::vector<element_ref_vector_sp> ervs;
-      ervs.reserve(count);
-      for(int i = 0; i < count; ++i)
+      ervs.reserve(count_variables);
+      for(int i = 0; i < count_variables; ++i)
       {
         ervs.push_back(std::make_shared<element_ref_vector>());
       }
@@ -472,40 +477,47 @@ namespace gqlite::backends::sqlite_oc_executor
       {
         int idx = 0;
         std::vector<gqlite::value> row = row_value.to_vector();
-        check_condition(row.size() == count, "Wrong number of column return by SQL Query.");
+        check_condition(row.size() == count_variables, "Wrong number of column return by SQL Query.");
 
         for(const algebra::alternative<algebra::graph_node, algebra::graph_edge>& pattern : _node->get_patterns())
         {
-          gqlite::value val = row[idx];
-          ervs[idx]->refs.push_back(
-            pattern.visit<element_ref>([val](const algebra::graph_node_csp _node) -> element_ref
-            {
-              return std::make_shared<node_ref>(val.to_integer());
-            },
-            [val](const algebra::graph_edge_csp _edge) -> element_ref
-            {
-              return std::make_shared<edge_ref>(val.to_integer());
-            })
-          );
-          ++idx;
+          pattern.visit<void>([&row, &ervs, &idx](const algebra::graph_node_csp _node)
+          {
+            ervs[idx]->refs.push_back(std::make_shared<node_ref>(row[idx].to_integer()));
+            ++idx;
+          },
+          [&row, &ervs, &idx](const algebra::graph_edge_csp _edge)
+          {
+            ervs[idx]->refs.push_back(std::make_shared<node_ref>(row[idx].to_integer()));
+            ++idx;
+            ervs[idx]->refs.push_back(std::make_shared<edge_ref>(row[idx].to_integer()));
+            ++idx;
+            ervs[idx]->refs.push_back(std::make_shared<node_ref>(row[idx].to_integer()));
+            ++idx;
+          });
         }
       }
       int idx = 0;
-      for(const algebra::alternative<algebra::graph_node, algebra::graph_edge>& pattern : _node->get_patterns())
+      std::function<void(const std::string&)> ervs_to_variables = [&idx, &ervs, this](const std::string& _varname)
       {
-        std::string variable = pattern.visit<std::string>([](const algebra::graph_node_csp _node)
-          {
-            return _node->get_variable();
-          },
-          [](const algebra::graph_edge_csp _edge)
-          {
-            return _edge->get_variable();
-          });
-        if(not variable.empty())
+        if(not _varname.empty())
         {
-          variables[variable] = ervs[idx];
+          variables[_varname] = ervs[idx];
         }
         ++idx;
+      };
+      for(const algebra::alternative<algebra::graph_node, algebra::graph_edge>& pattern : _node->get_patterns())
+      {
+        pattern.visit<void>([ervs_to_variables](const algebra::graph_node_csp _node)
+          {
+            ervs_to_variables(_node->get_variable());
+          },
+          [ervs_to_variables](const algebra::graph_edge_csp _edge)
+          {
+            ervs_to_variables(_edge->get_source()->get_variable());
+            ervs_to_variables(_edge->get_variable());
+            ervs_to_variables(_edge->get_destination()->get_variable());
+          });
       }
       return empty{};
 #if 0

@@ -36,6 +36,11 @@ namespace gqlite
       return _v;
     }
     template<>
+    inline std::string to_string<const char*>(const char* const& _v)
+    {
+      return _v;
+    }
+    template<>
     inline std::string to_string<char>(const char& _v)
     {
       std::string v;
