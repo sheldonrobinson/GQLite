@@ -50,7 +50,7 @@ database database::create_from_sqlite_file(const std::string& _filename)
   return database(backends::sqlite::from_file(_filename));
 }
 
-value database::execute_oc_query(const std::string& _string, const std::unordered_map<std::string, value>& _bindings)
+value database::execute_oc_query(const std::string& _string, const value_map& _bindings)
 {
   std::stringstream ss(_string);
   oc::lexer l(&ss);

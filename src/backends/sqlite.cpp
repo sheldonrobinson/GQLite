@@ -355,6 +355,19 @@ namespace gqlite::backends::sqlite_oc_executor
         return it->second;
       }
     }
+    value_map get_properties(const element_ref& _value)
+    {
+      return get_value(_value).to_map()["properties"].to_map();
+    }
+    value get_property(const value& _value, const std::vector<std::string>& _path)
+    {
+      value cval = _value;
+      for(const std::string& pn : _path)
+      {
+        cval = cval.to_map()[pn];
+      }
+      return cval;
+    }
     // Unused nodes
     exec_value visit(algebra::graph_node_csp _node) override
     {
@@ -364,6 +377,10 @@ namespace gqlite::backends::sqlite_oc_executor
     {
       throw gqlite::exception("sqlite not implemented edge_node");
     }
+    exec_value visit(algebra::named_expression_csp _node) override
+    {
+      throw gqlite::exception("sqlite not implemented named_expression");
+    }
     // Node/Edge creation
     bool has_node(algebra::graph_node_csp _node)
     {
@@ -371,7 +388,7 @@ namespace gqlite::backends::sqlite_oc_executor
     }
     gqlite::value get_properties(const std::unordered_map<std::string, algebra::node_csp>& _properties)
     {
-      std::unordered_map<std::string, value> props;
+      value_map props;
       for(auto const& [k,v] : _properties)
       {
         props[k] = get_value(start(v));
@@ -519,35 +536,78 @@ namespace gqlite::backends::sqlite_oc_executor
           });
       }
       return empty{};
-#if 0
-      std::string query = "SELECT id FROM gqlite_" + graph_name + "_nodes";
-
-      gqlite::value r = data->execute_sql(query);
-      
-      element_ref_vector_sp erv = std::make_shared<element_ref_vector>();
-
-      for(const gqlite::value& row_value : r.to_vector())
-      {
-        std::vector<gqlite::value> row = row_value.to_vector();
-        check_condition(row.size() == 1, "Should have gotten only one column for label_get_from_id.");
-        erv->refs.push_back(std::make_shared<node_ref>(row.front().to_integer()));
-      }
-      check_condition(_node->get_patterns().size() == 1, "wip: match more than 1");
-      check_condition(_node->get_patterns().front().get_type() == algebra::node_type::graph_node, "wip: match graph node");
-      variables[_node->get_patterns().front().get_value<algebra::graph_node>()->get_variable()] = erv;
-      return empty{};
-#endif
     }
     exec_value visit(algebra::value_csp _node) override
     {
       return _node->get_value();
     }
+    exec_value visit(algebra::variable_csp _node) override
+    {
+      return get_variable(_node->get_identifier());
+    }
+    exec_value visit(algebra::member_access_csp _node) override
+    {
+      exec_value value = start(_node->get_left());
+
+      struct member_access
+      {
+        visitor* self;
+        algebra::member_access_csp node;
+        gqlite::value operator()(const element_ref& _v)
+        {
+          return self->get_property(self->get_properties(_v), node->get_path());
+        }
+        gqlite::value operator()(const element_ref_vector_sp& _v)
+        {
+          std::vector<gqlite::value> values;
+          for(const element_ref& v : _v->refs)
+          {
+            values.push_back(operator()(_v));
+          }
+          return gqlite::value(values);
+        }
+        gqlite::value operator()(const gqlite::value& _v, bool _allow_array = true)
+        {
+          switch(_v.get_type())
+          {
+            case gqlite::value_type::map:
+            {
+              return self->get_property(_v.to_map(), node->get_path());
+            }
+            case gqlite::value_type::vector:
+            {
+              if(_allow_array)
+              {
+                std::vector<gqlite::value> values;
+                for(const gqlite::value& v : _v.to_vector())
+                {
+                  values.push_back(operator()(_v, false));
+                }
+                return values;
+              }
+              [[fallthrough]];
+            }
+            default:
+              throw gqlite::exception("Invalid value type, expected a map, got {}.", _v.to_json());
+          }
+        }
+        gqlite::value operator()(const empty&)
+        {
+          return gqlite::value();
+        }
+      };
+      return std::visit(member_access{this, _node}, value);
+    }
     exec_value visit(algebra::return_statement_csp rs) override
     {
+      bool has_labels = false;
+      std::vector<value> labels;
       std::vector<value> results;
-      for(const std::string& rv : rs->get_variables())
+      for(const algebra::named_expression_csp& rv : rs->get_expressions())
       {
-        results.push_back(get_value(get_variable(rv)));
+        has_labels = has_labels or not rv->get_name().empty();
+        labels.push_back(rv->get_name());
+        results.push_back(get_value(accept(rv)));
       }
       return value(results);
     }
@@ -595,7 +655,7 @@ sqlite* sqlite::from_file(const std::string& _filename)
   return new sqlite(handle);
 }
 
-gqlite::value sqlite::execute_oc_query(oc::algebra::node_csp _node, const std::unordered_map<std::string, value>& _bindings)
+gqlite::value sqlite::execute_oc_query(oc::algebra::node_csp _node, const value_map& _bindings)
 {
   sqlite_oc_executor::visitor executor;
   executor.data = d;
@@ -607,7 +667,7 @@ gqlite::value sqlite::get_debug_stats() const
   gqlite::value result = d->execute_sql(sqlite_queries::get_debug_stats("default"));
   std::vector<gqlite::value> rows = result.to_vector();
   check_condition(rows.size() == 6, "Invalid number of debug stats.");
-  std::unordered_map<std::string, value> stats;
+  value_map stats;
   stats["nodes_count"] = rows[0].to_vector()[0].to_integer();
   stats["edges_count"] = rows[1].to_vector()[0].to_integer();
   stats["labels_assignment_count"] = rows[2].to_vector()[0].to_integer();

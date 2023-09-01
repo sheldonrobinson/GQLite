@@ -9,7 +9,7 @@ namespace gqlite
   public:
     virtual ~backend();
   public:
-    virtual value execute_oc_query(oc::algebra::node_csp _node, const std::unordered_map<std::string, value>& _bindings) = 0;
+    virtual value execute_oc_query(oc::algebra::node_csp _node, const value_map& _bindings) = 0;
     virtual value get_debug_stats() const = 0;
   };
 }

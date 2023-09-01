@@ -43,6 +43,8 @@ namespace gqlite
     map,
     vector
   };
+  class value;
+  using value_map = std::unordered_map<std::string, value>;
   class value
   {
   public:
@@ -54,7 +56,7 @@ namespace gqlite
     value(int _v);
     value(double _v);
     value(const std::string& _v);
-    value(const std::unordered_map<std::string, value>& _v);
+    value(const value_map& _v);
     /// not part of the public API
     template<typename _T_>
     value(const std::initializer_list<typename std::unordered_map<std::string, _T_>::value_type>& _v);
@@ -68,7 +70,7 @@ namespace gqlite
     int to_integer() const;
     double to_double() const;
     std::string to_string() const;
-    std::unordered_map<std::string, value> to_map() const;
+    value_map to_map() const;
     std::vector<value> to_vector() const;
   public:
     std::string to_json() const;
@@ -93,7 +95,7 @@ namespace gqlite
      */
     gqlite::value get_debug_stats() const;
   public:
-    value execute_oc_query(const std::string& _string, const std::unordered_map<std::string, value>& _variant = {});
+    value execute_oc_query(const std::string& _string, const value_map& _variant = {});
   private:
     struct data;
     std::shared_ptr<data> d;

@@ -97,7 +97,7 @@ extern "C"
   gqlite_value_t gqlite_database_oc_query(gqlite_api_context_t _context, gqlite_database_t _database, const char* _query, gqlite_value_t _bindings)
   {
     BEGIN_CHECK
-    std::unordered_map<std::string, gqlite::value> bindings;
+    gqlite::value_map bindings;
     if(_bindings)
     {
       bindings = _bindings->value.to_map();

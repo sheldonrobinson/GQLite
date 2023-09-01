@@ -26,7 +26,7 @@ const char* std::to_string(value_type _type)
 struct value::data
 {
   value_type type;
-  std::variant<bool, int, double, std::string, std::unordered_map<std::string, value>, std::vector<value>> value_container;
+  std::variant<bool, int, double, std::string, value_map, std::vector<value>> value_container;
 
   void to_json(std::stringstream& _stream);
 };
@@ -115,7 +115,7 @@ namespace {
       case '{':
       {
         // Parse object
-        std::unordered_map<std::string, value> map;
+        value_map map;
         fetch_next_char();
         while(last_char != '}')
         {
@@ -235,7 +235,7 @@ void value::data::to_json(std::stringstream& _stream)
     break;
   case value_type::map:
     _stream << '{';
-    for(auto const& [k, v] : std::get<std::unordered_map<std::string, value>>(value_container))
+    for(auto const& [k, v] : std::get<value_map>(value_container))
     {
       if(first)
       {
@@ -292,7 +292,7 @@ value::value(double _v) : d(new data{value_type::number, _v})
 value::value(const std::string& _v) : d(new data{value_type::string, _v})
 {}
 
-value::value(const std::unordered_map<std::string, value>& _v) : d(new data{value_type::map, _v})
+value::value(const value_map& _v) : d(new data{value_type::map, _v})
 {}
 
 value::value(const std::vector<value>& _v) : d(new data{value_type::vector, _v})
@@ -350,10 +350,10 @@ std::string value::to_string() const
   return std::get<std::string>(d->value_container);
 }
 
-std::unordered_map<std::string, value> value::to_map() const
+value_map value::to_map() const
 {
   if(d->type != value_type::map) throw exception(format_string("Value is not a map, it is {}", d->type));
-  return std::get<std::unordered_map<std::string, value>>(d->value_container);
+  return std::get<value_map>(d->value_container);
 }
 
 std::vector<value> value::to_vector() const

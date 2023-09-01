@@ -1,6 +1,6 @@
 #include "lexer.h"
 
-#include <assert.h>
+#include <algorithm>
 #include <iostream>
 #include <vector>
 
@@ -31,7 +31,7 @@ lexer::~lexer()
 }
 
 #define IDENTIFIER_IS_KEYWORD( tokenname, tokenid) \
-  if( identifierStr == tokenname) \
+  if( identifierStrUC == tokenname) \
   { \
     return token(token_type::tokenid, line(), initial_col); \
   }
@@ -98,7 +98,8 @@ token lexer::next_token()
   if(std::isalpha(lastChar) or lastChar == '_')
   {
     identifierStr = get_identifier(lastChar);
-    
+    std::string identifierStrUC = identifierStr;
+    std::transform(identifierStrUC.begin(), identifierStrUC.end(), identifierStrUC.begin(), ::toupper);   
 #define TOKEN_KEYWORD(_K_) IDENTIFIER_IS_KEYWORD(# _K_, _K_)
     #include "token_keywords.h"
 #undef TOKEN_KEYWORD
@@ -124,7 +125,6 @@ token lexer::next_token()
   if( lastChar > 128 ) return next_token();
   identifierStr = lastChar;
   std::cerr << "Unknown token : " << lastChar << " '" << identifierStr << "' at " << initial_line << "," << initial_col << " eof is" << eof() << std::endl;
-  assert( not isspace(lastChar));
   return token(token_type::UNKNOWN, initial_line, initial_col);
 }
 

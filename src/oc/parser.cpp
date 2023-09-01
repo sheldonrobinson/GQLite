@@ -19,6 +19,8 @@ struct parser::data
   std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>> parse_patterns(bool _allow_undirected_edge);
   std::unordered_map<std::string, algebra::node_csp> parse_properties();
   algebra::node_csp parse_expression();
+  algebra::node_csp parse_member_expression();
+  algebra::node_csp parse_terminal_expression();
   void get_next_token();
   [[noreturn]] void report_error(const token& _token, const std::string& _errorMsg);
   [[noreturn]] void report_unexpected(const token& _token);
@@ -42,12 +44,18 @@ algebra::node_csp parser::data::parse_matches()
 algebra::node_csp parser::data::parse_return()
 {
   get_next_token();
-  std::vector<std::string> variables;
+  std::vector<algebra::named_expression_csp> expressions;
   do
   {
-    is_of_type(token_type::IDENTIFIER);
-    variables.push_back(tok.string);
-    get_next_token();
+    std::string name;
+    algebra::node_csp node = parse_expression();
+    if(tok.type == token_type::AS)
+    {
+      get_next_token();
+      is_of_type(token_type::IDENTIFIER);
+      get_next_token();
+    }
+    expressions.push_back(std::make_shared<algebra::named_expression>(name, node));
     if(tok.type == token_type::COMMA)
     {
       get_next_token();
@@ -55,7 +63,7 @@ algebra::node_csp parser::data::parse_return()
       break;
     }
   } while(true);
-  return std::make_shared<algebra::return_statement>(variables);
+  return std::make_shared<algebra::return_statement>(expressions);
 }
 
 namespace
@@ -225,17 +233,49 @@ std::unordered_map<std::string, algebra::node_csp> parser::data::parse_propertie
   return p;
 }
 
-algebra::node_csp parser::data::parse_expression()
+algebra::node_csp parser::data::parse_terminal_expression()
 {
   token t = tok;
   switch (tok.type)
   {
+  case token_type::IDENTIFIER:
+    get_next_token();
+    return std::make_shared<algebra::variable>(t.string);
   case token_type::STRING:
     get_next_token();
     return std::make_shared<algebra::value>(t.string);
+  case token_type::TRUE:
+    get_next_token();
+    return std::make_shared<algebra::value>(true);
+  case token_type::FALSE:
+    get_next_token();
+    return std::make_shared<algebra::value>(false);
   default:
     report_unexpected(tok);
   }
+}
+
+algebra::node_csp parser::data::parse_member_expression()
+{
+  algebra::node_csp left = parse_terminal_expression();
+  if(tok.type == token_type::DOT)
+  {
+    std::vector<std::string> path;
+    while (tok.type == token_type::DOT)
+    {
+      get_next_token();
+      is_of_type(token_type::IDENTIFIER);
+      path.push_back(tok.string);
+      get_next_token();
+    }
+    return std::make_shared<algebra::member_access>(left, path);
+  }
+  return left;
+}
+
+algebra::node_csp parser::data::parse_expression()
+{
+  return parse_member_expression();
 }
 
 void parser::data::get_next_token()

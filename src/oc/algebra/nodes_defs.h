@@ -17,8 +17,8 @@ OC_ALGEBRA_GENERATE(match, OC_ALGEBRA_MATCH_NODES_MEMBERS)
 
 OC_ALGEBRA_GENERATE(statements, OC_ALGEBRA_STATEMENTS_MEMBERS)
 
-#define OC_ALGEBRA_RETURN_MEMBERS(_KLASS_NAME_, F) \
-  F(_KLASS_NAME_, std::vector<std::string>, variables)
+#define OC_ALGEBRA_RETURN_MEMBERS(_KLASS_NAME_, F)    \
+  F(_KLASS_NAME_, std::vector<named_expression_csp>, expressions)
 
 OC_ALGEBRA_GENERATE(return_statement, OC_ALGEBRA_RETURN_MEMBERS)
 
@@ -45,3 +45,26 @@ OC_ALGEBRA_GENERATE(graph_edge, OC_ALGEBRA_GRAPH_EDGE_MEMBERS)
   F(_KLASS_NAME_, gqlite::value, value)
 
 OC_ALGEBRA_GENERATE(value, OC_ALGEBRA_VALUE_MEMBERS)
+
+#define OC_ALGEBRA_NAMED_EXPRESSION(_KLASS_NAME_, F)      \
+  F(_KLASS_NAME_, std::string, name)                      \
+  F(_KLASS_NAME_, node_csp, expression)
+
+OC_ALGEBRA_GENERATE(named_expression, OC_ALGEBRA_NAMED_EXPRESSION)
+
+#define OC_ALGEBRA_VARIABLE_MEMBERS(_KLASS_NAME_, F) \
+  F(_KLASS_NAME_, std::string, identifier)
+
+OC_ALGEBRA_GENERATE(variable, OC_ALGEBRA_VARIABLE_MEMBERS)
+
+#define OC_ALGEBRA_MEMBER_ACCESS_MEMBERS(_KLASS_NAME_, F) \
+  F(_KLASS_NAME_, node_csp, left)                         \
+  F(_KLASS_NAME_, std::vector<std::string>, path)
+
+OC_ALGEBRA_GENERATE(member_access, OC_ALGEBRA_MEMBER_ACCESS_MEMBERS)
+
+#define OC_ALGEBRA_BINARY_MEMBERS(_KLASS_NAME_, F) \
+  F(_KLASS_NAME_, node_csp, left)                  \
+  F(_KLASS_NAME_, node_csp, right)
+
+// OC_ALGEBRA_GENERATE(_binop, OC_ALGEBRA_BINARY_MEMBERS)
