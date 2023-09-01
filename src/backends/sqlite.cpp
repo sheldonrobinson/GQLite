@@ -412,7 +412,7 @@ namespace gqlite::backends::sqlite_oc_executor
       node_ref_sp destination = has_node(_edge->get_destination()) ? get_node_ref(variables[_edge->get_destination()->get_variable()]) : create_node(_edge->get_destination());
       int label_id = data->id_for_label(_edge->get_label());
       
-      data->execute_sql(sqlite_queries::edge_create(graph_name), {{0, label_id}, {1, get_properties(_edge->get_properties()).to_json()}, {2, source->id}, {3, destination->id}});
+      data->execute_sql(sqlite_queries::edge_create(graph_name), {{1, label_id}, {2, get_properties(_edge->get_properties()).to_json()}, {3, source->id}, {4, destination->id}});
     }
     exec_value visit(algebra::create_csp _node) override
     {

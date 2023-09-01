@@ -86,7 +86,7 @@ RSpec.describe "database" do
     db.execute_oc_query "CREATE (n1)-[:RELTYPE]->(n2)"
     add_node gc, 3, [], {}
     add_node gc, 4, [], {}
-    nodes = db.execute_oc_query "MATCHES (nodes)"
+    nodes = db.execute_oc_query "MATCHES (nodes) RETURN nodes"
     expect(nodes).to eq([gc])
 
     # p = db.execute_oc_query "CREATE p = (andres {name:'Andres'})-[:WORKS_AT]->(neo)<-[:WORKS_AT]-(michael {name: 'Michael'}) RETURN p"
