@@ -30,5 +30,4 @@ namespace gqlite
     }
     *this = value(vo);
   }
-
 }

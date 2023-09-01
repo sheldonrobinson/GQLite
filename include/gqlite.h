@@ -9,6 +9,7 @@
 namespace gqlite
 {
   class backend;
+  struct debug_stats;
   class exception : public std::exception
   {
   public:
@@ -86,6 +87,11 @@ namespace gqlite
     ~database();
     static database create_from_sqlite(void*);
     static database create_from_sqlite_file(const std::string& _filename);
+    /**
+     * @internal
+     * Part of the private API, what is returned by this function may change at any time.
+     */
+    gqlite::value get_debug_stats() const;
   public:
     value execute_oc_query(const std::string& _string, const std::unordered_map<std::string, value>& _variant = {});
   private:

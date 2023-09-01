@@ -15,6 +15,40 @@ stream << "_edges (label, properties, left, right) VALUES (?001, ?002, ?003, ?00
 
     return stream.str();
   }
+  std::string get_debug_stats(const std::string& _graph_name)
+  {
+    std::stringstream stream;
+    #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/get_debug_stats.sql"
+stream << "SELECT COUNT(*) FROM gqlite_";
+#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/get_debug_stats.sql"
+stream << ( _graph_name );
+#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/get_debug_stats.sql"
+stream << "_nodes\n"
+"UNION ALL SELECT COUNT(*) FROM gqlite_";
+#line 2 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/get_debug_stats.sql"
+stream << ( _graph_name );
+#line 2 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/get_debug_stats.sql"
+stream << "_edges\n"
+"UNION ALL SELECT COUNT(*) FROM gqlite_";
+#line 3 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/get_debug_stats.sql"
+stream << ( _graph_name );
+#line 3 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/get_debug_stats.sql"
+stream << "_labels\n"
+"UNION ALL SELECT COUNT(*) FROM gqlite_";
+#line 4 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/get_debug_stats.sql"
+stream << ( _graph_name );
+#line 4 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/get_debug_stats.sql"
+stream << "_nodes WHERE properties != '{}'\n"
+"UNION ALL SELECT COUNT(*) FROM gqlite_";
+#line 5 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/get_debug_stats.sql"
+stream << ( _graph_name );
+#line 7 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/get_debug_stats.sql"
+stream << "_edges WHERE properties != '{}'\n"
+"UNION ALL SELECT COUNT(*) FROM gqlite_labels\n"
+"";
+
+    return stream.str();
+  }
   std::string graph_create(const std::string& _graph_name)
   {
     std::stringstream stream;

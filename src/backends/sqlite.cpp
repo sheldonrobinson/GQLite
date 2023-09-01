@@ -8,7 +8,6 @@
 #include "sqlite_queries.h"
 
 #include "../oc/algebra/abstract_node_visitor.h"
-#include "../gqlite_p.h"
 #include "../logging.h"
 
 using namespace gqlite::backends;
@@ -169,7 +168,7 @@ int sqlite_data::id_for_label(const std::string& _string)
     std::vector<value> v = r.to_vector();
     if(v.size() == 0)
     {
-      execute_sql(sqlite_queries::label_get_from_id(), {{1, _string}});
+      execute_sql(sqlite_queries::label_insert(), {{1, _string}});
       int id = last_row_id();
       id_to_label[id] = _string;
       label_to_id[_string] = id;
@@ -601,4 +600,18 @@ gqlite::value sqlite::execute_oc_query(oc::algebra::node_csp _node, const std::u
   sqlite_oc_executor::visitor executor;
   executor.data = d;
   return executor.get_value(executor.start(_node));
+}
+
+gqlite::value sqlite::get_debug_stats() const
+{
+  gqlite::value result = d->execute_sql(sqlite_queries::get_debug_stats("default"));
+  std::vector<gqlite::value> rows = result.to_vector();
+  check_condition(rows.size() == 6, "Invalid number of debug stats.");
+  std::unordered_map<std::string, value> stats;
+  stats["nodes_count"] = rows[0].to_vector()[0].to_integer();
+  stats["edges_count"] = rows[1].to_vector()[0].to_integer();
+  stats["labels_assignment_count"] = rows[2].to_vector()[0].to_integer();
+  stats["properties_count"] = rows[3].to_vector()[0].to_integer() + rows[4].to_vector()[0].to_integer();
+  stats["labels_count"] = rows[5].to_vector()[0].to_integer();
+  return stats;
 }

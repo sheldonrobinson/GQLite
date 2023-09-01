@@ -1,5 +1,7 @@
 #include "backends/sqlite.h"
 
+#include "database_p.h"
+
 #include <sstream>
 
 #include "logging.h"
@@ -55,4 +57,9 @@ value database::execute_oc_query(const std::string& _string, const std::unordere
   oc::parser parser(&l);
   oc::algebra::node_csp node = parser.parse();
   return d->backend_->execute_oc_query(node, _bindings);
+}
+
+gqlite::value database::get_debug_stats() const
+{
+  return d->backend_->get_debug_stats();
 }

@@ -1,5 +1,6 @@
 #include "gqlite-c.h"
 #include "gqlite.h"
+#include "gqlite_p.h"
 
 #include "logging.h"
 
@@ -126,5 +127,9 @@ extern "C"
     return _value->value.get_type() != gqlite::value_type::invalid;
   }
 
+  gqlite_value_t gqlite_private_test_stats(gqlite_database_t _database)
+  {
+    return new gqlite_value { _database->db.get_debug_stats() };
+  }
 
 }

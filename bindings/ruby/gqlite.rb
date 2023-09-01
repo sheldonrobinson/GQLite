@@ -32,6 +32,7 @@ module Gqlite
     end
   end
   class Database
+    attr_reader :dbhandle
     def initialize(sqlite_filename: nil)
       if sqlite_filename != nil
         @dbhandle = CApi.call_function :gqlite_database_create_from_sqlite_file, sqlite_filename
