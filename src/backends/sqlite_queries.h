@@ -34,12 +34,12 @@ stream << "_edges\n"
 stream << ( _graph_name );
 #line 3 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/get_debug_stats.sql"
 stream << "_labels\n"
-"UNION ALL SELECT COUNT(*) FROM gqlite_";
+"UNION ALL SELECT COUNT(j.value) FROM gqlite_";
 #line 4 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/get_debug_stats.sql"
 stream << ( _graph_name );
 #line 4 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/get_debug_stats.sql"
 stream << "_nodes t, json_each(properties) j\n"
-"UNION ALL SELECT COUNT(*) FROM gqlite_";
+"UNION ALL SELECT COUNT(j.value) FROM gqlite_";
 #line 5 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/get_debug_stats.sql"
 stream << ( _graph_name );
 #line 7 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/get_debug_stats.sql"

@@ -33,7 +33,7 @@ namespace gqlite::oc::algebra
     virtual ~node();
   public:
     node_type get_type() const;
-
+    virtual bool equals(const std::shared_ptr<const node>& _node) const = 0;
   protected:
     virtual void accept(details::abstract_node_visitor_adaptor* _node, void* _r, void* _parameter) const = 0;
   };

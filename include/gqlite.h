@@ -17,6 +17,8 @@ namespace gqlite
     exception(const char* _error) : m_c_error(_error) {}
     template<typename _T_, typename... _TOther_>
     exception(const char* _format, const _T_& _value, const _TOther_&... _other);
+    template<typename _T_, typename... _TOther_>
+    exception(const std::string& _format, const _T_& _value, const _TOther_&... _other);
     const char* what() const throw() override
     {
       return m_c_error;
@@ -64,6 +66,7 @@ namespace gqlite
     /// not part of the public API
     template<typename _T_>
     value(const std::vector<_T_>& _v);
+    bool operator==(const value& _rhs) const;
   public:
     value_type get_type() const;
     bool to_bool() const;

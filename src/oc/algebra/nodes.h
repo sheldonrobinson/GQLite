@@ -40,6 +40,7 @@ namespace gqlite::oc::algebra
   public:                                                                                                                                       \
     _MEMBER_DEF_(_KLASS_NAME_, OC_ALGEBRA_GENERATE_ACCESSOR_DECLARATION);                                                                       \
     using node::accept;                                                                                                                         \
+    bool equals(const std::shared_ptr<const node>& _node) const override;                                                                       \
   private:                                                                                                                                      \
     void accept(details::abstract_node_visitor_adaptor* _node, void* _r, void* _parameter) const override;                                      \
   private:                                                                                                                                      \

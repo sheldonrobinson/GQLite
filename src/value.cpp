@@ -303,6 +303,11 @@ value_type value::get_type() const
   return d->type;
 }
 
+bool value::operator==(const value& _rhs) const
+{
+  return d->type == _rhs.d->type and d->value_container == _rhs.d->value_container;
+}
+
 bool value::to_bool() const
 {
   switch(d->type)

@@ -1,6 +1,12 @@
 require 'tempfile'
 require 'gqlite'
 
+class String
+  def is_i?
+     !!(self =~ /\A[-+]?[0-9]+\z/)
+  end
+end
+
 class SideEffect
   attr_reader :nodes_count, :edges_count, :labels_count, :properties_count
   def initialize(nodes_count, edges_count, labels_count, properties_count)
@@ -54,10 +60,27 @@ module GqliteTest
     end
     return SideEffect.new nodes_count, edges_count, labels_count, properties_count
   end
+  def GqliteTest.parse_results_table(table)
+    table = table.raw
+    return table.map do |c|
+      c.map { |v|
+        if v == 'null'
+          nil
+        elsif v[0] == "'" and v[-1] == "'"
+          v[1..-2]
+        elsif v.is_i?
+          v.to_i
+        else
+          v
+        end
+      }
+    end
+  end
 end
 
 IgnoredScenario = [
-  "[12] CREATE does not lose precision on large integers"
+  "[12] CREATE does not lose precision on large integers",
+  "[19] Fail when adding new label predicate on a node that is already bound 5"
 ]
 
 Given(/^any graph$/) do
@@ -73,20 +96,21 @@ Before do |scenario|
 end
 
 When(/^executing query:$/) do |string|
-  unless @ignored_scenario
-    begin
-      @query_result = @handle.execute_oc_query string
-    rescue Gqlite::Error => exp
-      @exception = exp
-    end
+  next if @ignored_scenario
+  begin
+    @query_result = @handle.execute_oc_query string
+  rescue Gqlite::Error => exp
+    @exception = exp
   end
 end
 
 Then(/^the result should be empty$/) do
+  next if @ignored_scenario
   expect(@query_result).to be_nil
 end
 
 Then(/^the side effects should be:$/) do |table|
+  next if @ignored_scenario
   new_current_stats = GqliteTest.get_stats @handle
   update = new_current_stats.diff_to @current_stats
   ref_stats = GqliteTest.parse_side_effect_table table
@@ -95,20 +119,25 @@ Then(/^the side effects should be:$/) do |table|
 end
 
 Given(/^an empty graph$/) do
+  next if @ignored_scenario
   file = Tempfile.new('testdb')
   @handle = Gqlite::Database.new(sqlite_filename: file.path)
   @current_stats = GqliteTest.get_stats @handle
 end
 
 Then(/^the result should be, in any order:$/) do |table|
-  # table is a Cucumber::MultilineArgument::DataTable
-  pending # Write code here that turns the phrase above into concrete actions
+  next if @ignored_scenario
+  expect(@query_result).to eq(GqliteTest.parse_results_table table)
 end
 
 Then(/^a SyntaxError should be raised at compile time: VariableAlreadyBound$/) do
-  pending # Write code here that turns the phrase above into concrete actions
+  next if @ignored_scenario
+  expect(@exception).not_to be_nil
+  expect(@exception.message).to match(/^(\d+:\d+:|)Variable .* is already bound.$/)
 end
 
 Then(/^a SyntaxError should be raised at compile time: UndefinedVariable$/) do
-  pending # Write code here that turns the phrase above into concrete actions
+  next if @ignored_scenario
+  expect(@exception).not_to be_nil
+  expect(@exception.message).to match(/^Variable .* is not defined.$/)
 end

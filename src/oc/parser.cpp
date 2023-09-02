@@ -2,6 +2,7 @@
 
 #include "algebra/nodes.h"
 
+#include "../gqlite_p.h"
 #include "../logging.h"
 
 #include "lexer.h"
@@ -21,13 +22,56 @@ struct parser::data
   algebra::node_csp parse_expression();
   algebra::node_csp parse_member_expression();
   algebra::node_csp parse_terminal_expression();
+  void validate(algebra::graph_node_csp);
+  void validate(algebra::graph_edge_csp);
   void get_next_token();
-  [[noreturn]] void report_error(const token& _token, const std::string& _errorMsg);
+  template<typename... _T_>
+  [[noreturn]] void report_error(const token& _token, const std::string& _errorMsg, const _T_&... _values);
   [[noreturn]] void report_unexpected(const token& _token);
   bool is_of_type(const token& _token, token_type _type);
   bool is_of_type(token_type _type);
 
+  std::unordered_map<std::string, algebra::node_csp> bounded_variables;
 };
+
+namespace gqlite::details
+{
+  template<>
+  inline std::string to_string<token_type>(const token_type& _v)
+  {
+    return token_type_to_string(_v);
+  }
+}
+
+void parser::data::validate(algebra::graph_node_csp _node)
+{
+  if(_node->get_variable().empty()) return;
+  auto it = bounded_variables.find(_node->get_variable());
+  if(it == bounded_variables.end())
+  {
+    bounded_variables[_node->get_variable()] = _node;
+    return;
+  }
+  if(_node->get_labels().empty() and _node->get_properties().empty()) return;
+  if(_node->equals(it->second)) return;
+  report_error(tok, "Variable {} is already bound.", _node->get_variable());
+}
+
+void parser::data::validate(algebra::graph_edge_csp _node)
+{
+  validate(_node->get_source());
+  validate(_node->get_destination());
+  if(_node->get_variable().empty()) return;
+  auto it = bounded_variables.find(_node->get_variable());
+  if(it == bounded_variables.end())
+  {
+    bounded_variables[_node->get_variable()] = _node;
+    return;
+  }
+  if(_node->get_label().empty() and _node->get_properties().empty()) return;
+  if(_node->equals(it->second)) return;
+  report_error(tok, "Variable {} is already bound.", _node->get_variable());
+}
 
 algebra::node_csp parser::data::parse_create()
 {
@@ -53,6 +97,7 @@ algebra::node_csp parser::data::parse_return()
     {
       get_next_token();
       is_of_type(token_type::IDENTIFIER);
+      name = tok.string;
       get_next_token();
     }
     expressions.push_back(std::make_shared<algebra::named_expression>(name, node));
@@ -125,6 +170,7 @@ std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>> pars
         current_edge.source = gnode;
       }
       algebra::graph_edge_csp ge = std::make_shared<algebra::graph_edge>(current_edge.variable, current_edge.source, current_edge.destination, current_edge.directivity, current_edge.label, current_edge.properties);
+      validate(ge);
       patterns.push_back(ge);
       current_edge.active = false;
       add_to_patterns = false;
@@ -193,10 +239,10 @@ std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>> pars
       is_of_type(token_type::STARTBRACKET);
       add_to_patterns = false;
     } else {
-      if(add_to_patterns) { patterns.push_back(gnode); }
+      if(add_to_patterns) { validate(gnode); patterns.push_back(gnode); }
       break;
     }
-    if(add_to_patterns) { patterns.push_back(gnode); }
+    if(add_to_patterns) { validate(gnode); patterns.push_back(gnode); }
   } while(true);
   if(current_edge.active)
   {
@@ -298,18 +344,19 @@ void parser::data::get_next_token()
   tok = lex->next_token();
 }
 
-void parser::data::report_error(const token& _token, const std::string& _errorMsg)
+template<typename... _T_>
+void parser::data::report_error(const token& _token, const std::string& _errorMsg, const _T_&... _values)
 {
-  throw gqlite::exception(std::to_string(_token.line) + ":" + std::to_string(_token.column) + ":" + _errorMsg);
+  throw gqlite::exception("{}:{}:" + _errorMsg, _token.line, _token.column, _values...);
 }
 
 void parser::data::report_unexpected(const token& _token) 
 {
   if(_token.string.empty())
   {
-    report_error(_token, std::string("Unexpected token ") + token_type_to_string(_token.type));
+    report_error(_token, "Unexpected token {}", _token.type);
   } else {
-    report_error(_token, std::string("Unexpected token ") + token_type_to_string(_token.type) + " (" + _token.string + ")");
+    report_error(_token, "Unexpected token {} ({})", _token.type, _token.string);
   }
 }
 
@@ -318,9 +365,9 @@ bool parser::data::is_of_type(const token& _token, token_type _type)
   if(_token.type == _type) return true;
   if(_token.string.empty())
   {
-    report_error(_token, std::string("Expected token ") + token_type_to_string(_type) + " got " + token_type_to_string(_token.type));
+    report_error(_token, "Expected token {} got {}", _type, _token.type);
   } else {
-    report_error(_token, std::string("Expected token ") + token_type_to_string(_type) + " got " + token_type_to_string(_token.type) + " (" + _token.string + ")");
+    report_error(_token, "Expected token  {} got {} ({})", _type, _token.type, _token.string);
   }
   return false;
 }

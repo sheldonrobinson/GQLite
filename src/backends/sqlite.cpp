@@ -399,7 +399,7 @@ namespace gqlite::backends::sqlite_oc_executor
     {
       if(has_node(_node))
       {
-        throw gqlite::exception("Duplicate node variable bound {}", _node->get_variable());
+        throw gqlite::exception("Variable {} is already bound.", _node->get_variable());
       }
       gqlite::value props = get_properties(_node->get_properties());
       std::string json_properties = props.to_json();
@@ -602,14 +602,37 @@ namespace gqlite::backends::sqlite_oc_executor
     {
       bool has_labels = false;
       std::vector<value> labels;
-      std::vector<value> results;
+      std::vector<std::vector<value>> results_columns;
+      std::size_t rows = 1;
       for(const algebra::named_expression_csp& rv : rs->get_expressions())
       {
         has_labels = has_labels or not rv->get_name().empty();
         labels.push_back(rv->get_name());
-        results.push_back(get_value(accept(rv->get_expression())));
+        value column_value = get_value(accept(rv->get_expression()));
+        std::vector<value> column = (column_value.get_type() == value_type::vector) ? column_value.to_vector() : std::vector<value>{column_value};
+        results_columns.push_back(column);
+        rows = std::max(rows, column.size());
       }
-      return value(results);
+      std::vector<value> results_rows;
+      if(has_labels)
+      {
+        results_rows.push_back(labels);
+      }
+      for(int i = 0; i < rows; ++i)
+      {
+        std::vector<value> row;
+        for(const std::vector<value>& col : results_columns)
+        {
+          if(i < col.size())
+          {
+            row.push_back(col[i]);
+          } else {
+            row.push_back(value());
+          }
+        }
+        results_rows.push_back(row);
+      }
+      return value(results_rows);
     }
     exec_value visit(algebra::statements_csp _node) override
     {
