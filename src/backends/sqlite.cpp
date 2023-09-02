@@ -689,12 +689,13 @@ gqlite::value sqlite::get_debug_stats() const
 {
   gqlite::value result = d->execute_sql(sqlite_queries::get_debug_stats("default"));
   std::vector<gqlite::value> rows = result.to_vector();
-  check_condition(rows.size() == 6, "Invalid number of debug stats.");
+  check_condition(rows.size() == 7, "Invalid number of debug stats.");
   value_map stats;
   stats["nodes_count"] = rows[0].to_vector()[0].to_integer();
   stats["edges_count"] = rows[1].to_vector()[0].to_integer();
   stats["labels_assignment_count"] = rows[2].to_vector()[0].to_integer();
   stats["properties_count"] = rows[3].to_vector()[0].to_integer() + rows[4].to_vector()[0].to_integer();
   stats["labels_count"] = rows[5].to_vector()[0].to_integer();
+  stats["labels_assignment_nodes_count"] = rows[6].to_vector()[0].to_integer();
   return stats;
 }

@@ -42,10 +42,14 @@ stream << "_nodes t, json_each(properties) j\n"
 "UNION ALL SELECT COUNT(j.value) FROM gqlite_";
 #line 5 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/get_debug_stats.sql"
 stream << ( _graph_name );
-#line 7 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/get_debug_stats.sql"
+#line 5 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/get_debug_stats.sql"
 stream << "_edges t, json_each(properties) j\n"
 "UNION ALL SELECT COUNT(*) FROM gqlite_labels\n"
-"";
+"UNION ALL SELECT COUNT(DISTINCT label) FROM gqlite_";
+#line 7 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/get_debug_stats.sql"
+stream << ( _graph_name );
+#line 7 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/get_debug_stats.sql"
+stream << "_labels";
 
     return stream.str();
   }
