@@ -108,22 +108,34 @@ IgnoredScenario = [
   "[19] Fail when adding new label predicate on a node that is already bound 5"
 ]
 
+Before do |scenario|
+  @ignored_scenario = IgnoredScenario.include? scenario.name
+end
+
 Given(/^any graph$/) do
   if @handle.nil?
     file = Tempfile.new('testdb')
     @handle = Gqlite::Database.new(sqlite_filename: file.path)
-    @current_stats = GqliteTest.get_stats @handle
   end
 end
 
-Before do |scenario|
-  @ignored_scenario = IgnoredScenario.include? scenario.name
+Given(/^having executed:$/) do |string|
+  next if @ignored_scenario
+  @handle.execute_oc_query string
+end
+
+Given(/^an empty graph$/) do
+  next if @ignored_scenario
+  file = Tempfile.new('testdb')
+  @handle = Gqlite::Database.new(sqlite_filename: file.path)
 end
 
 When(/^executing query:$/) do |string|
   next if @ignored_scenario
   begin
+    @stats_before = GqliteTest.get_stats @handle
     @query_result = GqliteTest.parse_results(@handle.execute_oc_query string)
+    @stats_after = GqliteTest.get_stats @handle
   rescue Gqlite::Error => exp
     @exception = exp
   end
@@ -138,26 +150,11 @@ When(/^executing control query:$/) do |string|
   end
 end
 
-Given(/^having executed:$/) do |string|
-  next if @ignored_scenario
-  @handle.execute_oc_query string
-end
-
-Given(/^an empty graph$/) do
-  next if @ignored_scenario
-  file = Tempfile.new('testdb')
-  @handle = Gqlite::Database.new(sqlite_filename: file.path)
-  @current_stats = GqliteTest.get_stats @handle
-end
-
-
 Then(/^the side effects should be:$/) do |table|
   next if @ignored_scenario
-  new_current_stats = GqliteTest.get_stats @handle
-  update = new_current_stats.diff_to @current_stats
+  diff_stats = @stats_after .diff_to @stats_before
   ref_stats = GqliteTest.parse_side_effect_table table
-  expect(update).to eq(ref_stats)
-  @current_stats = new_current_stats
+  expect(diff_stats).to eq(ref_stats)
 end
 
 Then(/^the result should be empty$/) do

@@ -21,6 +21,19 @@ namespace gqlite
 
 namespace gqlite
 {
+  /**
+   * @internal
+   * @return \p _integer converted to a string, with a minimum size of \p _width, filled with 0.
+   */
+  inline std::string to_string_fixed_width(int _integer, int _width)
+  {
+    std::string s = std::to_string(_integer);
+    while(s.size() < _width)
+    {
+      s = '0' + s;
+    }
+    return s;
+  }
   inline std::string format_string(const std::string& _format)
   {
     return _format;

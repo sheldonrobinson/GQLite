@@ -303,8 +303,21 @@ namespace gqlite::backends::sqlite_oc_executor
         {
           return std::get<node_ref_sp>(er);
         }
+      } else if(std::holds_alternative<element_ref_vector_sp>(_value))
+      {
+        element_ref_vector_sp erv = std::get<element_ref_vector_sp>(_value);
+        if(erv->refs.size() == 1)
+        {
+          element_ref er = erv->refs.front();
+          if(std::holds_alternative<node_ref_sp>(er))
+          {
+            return std::get<node_ref_sp>(er);
+          }
+        } else {
+          throw gqlite::exception("Expected a single item.");
+        }
       }
-      throw gqlite::exception("Expected a reference to a node");
+      throw gqlite::exception("Expected a reference to a node.");
     }
     /**
      * @return a value representing the executed value from @p _value
@@ -453,6 +466,7 @@ namespace gqlite::backends::sqlite_oc_executor
       std::string sql_variables;
       std::string sql_tables;
       std::string sql_conditions;
+      std::map<int, value> bindings;
 
       for(const algebra::alternative<algebra::graph_node, algebra::graph_edge>& pattern : _node->get_patterns())
       {
@@ -461,10 +475,21 @@ namespace gqlite::backends::sqlite_oc_executor
           sql_variables += ", ";
           sql_tables += " JOIN ";
         }
-        pattern.visit<void>([this, &sql_variables, &sql_tables, &sql_conditions, count, &count_variables](const algebra::graph_node_csp _node)
+        pattern.visit<void>([this, &sql_variables, &sql_tables, &sql_conditions, count, &count_variables, &bindings](const algebra::graph_node_csp _node)
         {
+          std::string count_s = std::to_string(count);
           sql_variables += "tb" + std::to_string(count) + ".id";
-          sql_tables += "gqlite_" + graph_name + "_nodes AS tb" + std::to_string(count);
+          sql_tables += "gqlite_" + graph_name + "_nodes AS tb" + count_s;
+          if(not _node->get_labels().empty())
+          {
+            sql_tables += " JOIN gqlite_" + graph_name + "_labels AS tb_lab" + count_s;
+            sql_conditions += " AND tb" + count_s + ".id = tb_lab" + count_s + ".node_id ";
+            for(const std::string& label : _node->get_labels())
+            {
+              sql_conditions += " AND ?" + to_string_fixed_width(bindings.size() + 1, 3) + " = tb_lab" + count_s + ".label ";
+              bindings[bindings.size() + 1] = data->id_for_label(label);
+            }
+          }
           ++count_variables;
         },
         [this, &sql_variables, &sql_tables, &sql_conditions, count, &count_variables](const algebra::graph_edge_csp _edge)
@@ -479,9 +504,9 @@ namespace gqlite::backends::sqlite_oc_executor
       }
       if(not sql_conditions.empty())
       {
-        sql_conditions = (count == 1 ? " WHERE " : " ON ") + sql_conditions;
+        sql_conditions = (count == 1 ? " WHERE TRUE " : " ON TRUE ") + sql_conditions;
       }
-      gqlite::value r = data->execute_sql("SELECT " + sql_variables + " FROM " + sql_tables + sql_conditions);
+      gqlite::value r = data->execute_sql("SELECT " + sql_variables + " FROM " + sql_tables + sql_conditions, bindings);
       std::vector<element_ref_vector_sp> ervs;
       ervs.reserve(count_variables);
       for(int i = 0; i < count_variables; ++i)

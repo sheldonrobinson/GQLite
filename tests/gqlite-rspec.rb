@@ -15,7 +15,7 @@ def add_node(list, id, labels, properties)
 end
 
 def make_results(gc)
-  return gc.map { |x| [x]}
+  [["nodes"]] + gc.map { |x| [x]}
 end
 
 RSpec.describe "database" do
@@ -46,7 +46,7 @@ RSpec.describe "database" do
     # Test label and return
     n1 = db.execute_oc_query "CREATE (n1:Person) RETURN n1"
     n1_person = add_node(gc, 4, ["Person"], {})
-    expect(n1).to eq([[n1_person]])
+    expect(n1).to eq([["n1"], [n1_person]])
     nodes = db.execute_oc_query "MATCH (nodes) RETURN nodes"
     expect(nodes).to eq(make_results(gc))
 
@@ -66,7 +66,7 @@ RSpec.describe "database" do
     # Test label properties
     n1 = db.execute_oc_query "CREATE (n1:Person {name: 'Andres', title: 'Developer'}) RETURN n1"
     n1_ref = add_node gc, 8, ["Person"], {"name" => 'Andres', "title" => 'Developer'}
-    expect(n1).to eq([[n1_ref]])
+    expect(n1).to eq([["n1"],[n1_ref]])
     nodes = db.execute_oc_query "MATCH (nodes) RETURN nodes"
     expect(nodes).to eq(make_results(gc))
   end
@@ -92,6 +92,10 @@ RSpec.describe "database" do
     add_node gc, 4, [], {}
     nodes = db.execute_oc_query "MATCH (nodes) RETURN nodes"
     expect(nodes).to eq(make_results(gc))
+
+    # Create with match
+    db.execute_oc_query "CREATE (:X), (:Y)"
+    db.execute_oc_query "MATCH (x:X), (y:Y) CREATE (x)-[:R]->(y)"
 
     # p = db.execute_oc_query "CREATE p = (andres {name:'Andres'})-[:WORKS_AT]->(neo)<-[:WORKS_AT]-(michael {name: 'Michael'}) RETURN p"
   end
