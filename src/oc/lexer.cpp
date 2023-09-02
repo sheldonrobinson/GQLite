@@ -31,7 +31,7 @@ lexer::~lexer()
 }
 
 #define IDENTIFIER_IS_KEYWORD( tokenname, tokenid) \
-  if( identifierStrUC == tokenname) \
+  if( identifierStr == tokenname) \
   { \
     return token(token_type::tokenid, line(), initial_col); \
   }
@@ -98,15 +98,33 @@ token lexer::next_token()
   if(std::isalpha(lastChar) or lastChar == '_')
   {
     identifierStr = get_identifier(lastChar);
-    std::string identifierStrUC = identifierStr;
-    std::transform(identifierStrUC.begin(), identifierStrUC.end(), identifierStrUC.begin(), ::toupper);   
 #define TOKEN_KEYWORD(_K_) IDENTIFIER_IS_KEYWORD(# _K_, _K_)
+#define TOKEN_KEYWORD2(_K_, _S_) IDENTIFIER_IS_KEYWORD(_S_, _K_)
     #include "token_keywords.h"
 #undef TOKEN_KEYWORD
+#undef TOKEN_KEYWORD2
 
     return token(token_type::IDENTIFIER, identifierStr, line(), initial_col);
   } else if(lastChar == '"' or lastChar == '\'' ) {
     return get_string(lastChar);
+  } else if(lastChar >= '0' and lastChar <= '9') {
+    std::string number;
+    number += char(lastChar);
+    lastChar = get_next_char();
+    bool is_integer = true;
+    while((lastChar >= '0' and lastChar <= '9') or lastChar == '.' or lastChar == 'e' or lastChar == '+' or lastChar == '-')
+    {
+      is_integer = is_integer and (lastChar != '.' and lastChar != 'e');
+      number += char(lastChar);
+      lastChar = get_next_char();
+    }
+    unget();
+    if(is_integer)
+    {
+      return token(token_type::INTEGER, number, line(), initial_col);
+    } else {
+      return token(token_type::FLOATING_POINT, number, line(), initial_col);
+    }
   } else {
     CHAR_IS_TOKEN(';', SEMI );
     CHAR_IS_TOKEN('.', DOT );

@@ -55,8 +55,12 @@ const char* gqlite::oc::token_type_to_string(token_type _type)
 #define TOKEN_KEYWORD(_K_)  \
     case _K_:               \
       return # _K_;
+#define TOKEN_KEYWORD2(_K_, _S_)  \
+    case _K_:                     \
+      return _S_;
     #include "token_keywords.h"
 #undef TOKEN_KEYWORD
+#undef TOKEN_KEYWORD2
   }
   std::cerr << "add the token" << (int)_type << std::endl;
   std::abort();
@@ -73,5 +77,4 @@ token::token(token_type _type, int _line, int _column) : type(_type), line(_line
 
 token::token(token_type _type, const std::string& _string, int _line, int _column) : type(_type), line(_line), column(_column), string(_string)
 {
-  assert( _type == token_type::IDENTIFIER or _type == token_type::STRING );
 }

@@ -28,10 +28,14 @@ namespace gqlite::oc
   // Constants
     IDENTIFIER,
     STRING,
+    INTEGER,
+    FLOATING_POINT,
   // Keywords
 #define TOKEN_KEYWORD(_K_) _K_,
+#define TOKEN_KEYWORD2(_K_, _S_) _K_,
     #include "token_keywords.h"
 #undef TOKEN_KEYWORD
+#undef TOKEN_KEYWORD2
   };
   const char* token_type_to_string(token_type _type );
   struct token

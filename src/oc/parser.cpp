@@ -238,12 +238,27 @@ algebra::node_csp parser::data::parse_terminal_expression()
   token t = tok;
   switch (tok.type)
   {
+  case token_type::NULL_TOKEN:
+    get_next_token();
+    return std::make_shared<algebra::value>(gqlite::value());
   case token_type::IDENTIFIER:
     get_next_token();
     return std::make_shared<algebra::variable>(t.string);
   case token_type::STRING:
     get_next_token();
     return std::make_shared<algebra::value>(t.string);
+  case token_type::INTEGER:
+    get_next_token();
+    try
+    {
+      return std::make_shared<algebra::value>(std::stoi(t.string));
+    } catch(std::out_of_range)
+    {
+      throw gqlite::exception("Integer {} is too large.", t.string);
+    }
+  case token_type::FLOATING_POINT:
+    get_next_token();
+    return std::make_shared<algebra::value>(std::stod(t.string));
   case token_type::TRUE:
     get_next_token();
     return std::make_shared<algebra::value>(true);
@@ -336,7 +351,7 @@ algebra::node_csp parser::parse()
     case token_type::CREATE:
       nodes.push_back(d->parse_create());
       break;
-    case token_type::MATCHES:
+    case token_type::MATCH:
       nodes.push_back(d->parse_matches());
       break;
     case token_type::RETURN:
