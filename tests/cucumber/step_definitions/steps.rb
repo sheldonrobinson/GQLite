@@ -1,5 +1,6 @@
 require 'tempfile'
 require 'gqlite'
+require 'yaml'
 
 class String
   def is_i?
@@ -27,18 +28,13 @@ module GqliteTest
   module CApi
     extend FFI::Library
     ffi_lib 'gqlite'
-    class Stats < FFI::Struct 
-      layout :nodes_count, :int, 
-             :edges_count, :int, 
-             :labels_count, :int
-    end
-    attach_function :gqlite_private_test_stats, [:pointer], Stats
+    attach_function :gqlite_private_test_stats, [:pointer], :pointer
   end
   def GqliteTest.get_stats(handle)
     ret = CApi.gqlite_private_test_stats handle.dbhandle
     val = JSON.parse Gqlite::CApi.call_function :gqlite_value_to_json, ret
     Gqlite::CApi.call_function :gqlite_value_destroy, ret
-    return SideEffect.new val["nodes_count"], val["edges_count"], val["labels_count"], val["properties_count"]
+    return SideEffect.new val["nodes_count"], val["edges_count"], val["labels_assignment_nodes_count"], val["properties_count"]
   end
   def GqliteTest.parse_side_effect_table(table)
     nodes_count = 0; edges_count = 0; labels_count = 0; properties_count = 0
@@ -48,7 +44,7 @@ module GqliteTest
       if label == '+nodes'
         nodes_count = count
       end
-      if label == '+edges'
+      if label == '+relationships'
         edges_count = count
       end
       if label == '+labels'
@@ -60,8 +56,20 @@ module GqliteTest
     end
     return SideEffect.new nodes_count, edges_count, labels_count, properties_count
   end
+  def GqliteTest.parse_results(results)
+    return nil if results.nil?
+    return results.map do |c|
+      c.map { |v|
+        if v.instance_of? Hash
+          v.delete "id"
+        end
+        v
+      }
+    end
+  end
   def GqliteTest.parse_results_table(table)
     table = table.raw
+    r_node = /\((\w*)((:\w*)*)( {.*})?\)/
     return table.map do |c|
       c.map { |v|
         if v == 'null'
@@ -71,7 +79,24 @@ module GqliteTest
         elsif v.is_i?
           v.to_i
         else
-          v
+          arr = v.scan r_node
+          if arr.size > 0
+            labels = arr[0][1]
+            if labels.nil?
+              labels = []
+            else
+              labels = labels.split(":").reject(&:empty?)
+            end
+            properties = arr[0][3] 
+            if properties.nil?
+              properties = {}
+            else
+              properties = YAML.load properties
+            end
+            { "type"=>"node", "properties" => properties, "labels" => labels }
+          else
+            v
+          end
         end
       }
     end
@@ -98,16 +123,33 @@ end
 When(/^executing query:$/) do |string|
   next if @ignored_scenario
   begin
-    @query_result = @handle.execute_oc_query string
+    @query_result = GqliteTest.parse_results(@handle.execute_oc_query string)
   rescue Gqlite::Error => exp
     @exception = exp
   end
 end
 
-Then(/^the result should be empty$/) do
+When(/^executing control query:$/) do |string|
   next if @ignored_scenario
-  expect(@query_result).to be_nil
+  begin
+    @query_result = GqliteTest.parse_results(@handle.execute_oc_query string)
+  rescue Gqlite::Error => exp
+    @exception = exp
+  end
 end
+
+Given(/^having executed:$/) do |string|
+  next if @ignored_scenario
+  @handle.execute_oc_query string
+end
+
+Given(/^an empty graph$/) do
+  next if @ignored_scenario
+  file = Tempfile.new('testdb')
+  @handle = Gqlite::Database.new(sqlite_filename: file.path)
+  @current_stats = GqliteTest.get_stats @handle
+end
+
 
 Then(/^the side effects should be:$/) do |table|
   next if @ignored_scenario
@@ -118,11 +160,9 @@ Then(/^the side effects should be:$/) do |table|
   @current_stats = new_current_stats
 end
 
-Given(/^an empty graph$/) do
+Then(/^the result should be empty$/) do
   next if @ignored_scenario
-  file = Tempfile.new('testdb')
-  @handle = Gqlite::Database.new(sqlite_filename: file.path)
-  @current_stats = GqliteTest.get_stats @handle
+  expect(@query_result).to be_nil
 end
 
 Then(/^the result should be, in any order:$/) do |table|
@@ -140,4 +180,16 @@ Then(/^a SyntaxError should be raised at compile time: UndefinedVariable$/) do
   next if @ignored_scenario
   expect(@exception).not_to be_nil
   expect(@exception.message).to match(/^Variable .* is not defined.$/)
+end
+
+Then(/^a SyntaxError should be raised at compile time: NoSingleRelationshipType$/) do
+  pending # Write code here that turns the phrase above into concrete actions
+end
+
+Then(/^a SyntaxError should be raised at compile time: RequiresDirectedRelationship$/) do
+  pending # Write code here that turns the phrase above into concrete actions
+end
+
+Then(/^a SyntaxError should be raised at compile time: CreatingVarLength$/) do
+  pending # Write code here that turns the phrase above into concrete actions
 end
