@@ -92,6 +92,10 @@ algebra::node_csp parser::data::parse_return()
   do
   {
     std::string name;
+    if(tok.type == token_type::IDENTIFIER)
+    {
+      name = tok.string;
+    }
     algebra::node_csp node = parse_expression();
     if(tok.type == token_type::AS)
     {
@@ -99,6 +103,9 @@ algebra::node_csp parser::data::parse_return()
       is_of_type(token_type::IDENTIFIER);
       name = tok.string;
       get_next_token();
+    } else if(node->get_type() != algebra::node_type::variable)
+    {
+      is_of_type(token_type::AS);
     }
     expressions.push_back(std::make_shared<algebra::named_expression>(name, node));
     if(tok.type == token_type::COMMA)

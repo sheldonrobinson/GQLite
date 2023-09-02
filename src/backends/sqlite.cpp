@@ -600,13 +600,11 @@ namespace gqlite::backends::sqlite_oc_executor
     }
     exec_value visit(algebra::return_statement_csp rs) override
     {
-      bool has_labels = false;
       std::vector<value> labels;
       std::vector<std::vector<value>> results_columns;
       std::size_t rows = 1;
       for(const algebra::named_expression_csp& rv : rs->get_expressions())
       {
-        has_labels = has_labels or not rv->get_name().empty();
         labels.push_back(rv->get_name());
         value column_value = get_value(accept(rv->get_expression()));
         std::vector<value> column = (column_value.get_type() == value_type::vector) ? column_value.to_vector() : std::vector<value>{column_value};
@@ -614,10 +612,7 @@ namespace gqlite::backends::sqlite_oc_executor
         rows = std::max(rows, column.size());
       }
       std::vector<value> results_rows;
-      if(has_labels)
-      {
-        results_rows.push_back(labels);
-      }
+      results_rows.push_back(labels);
       for(int i = 0; i < rows; ++i)
       {
         std::vector<value> row;
