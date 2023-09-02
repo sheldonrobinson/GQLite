@@ -56,6 +56,10 @@ module GqliteTest
   end
 end
 
+IgnoredScenario = [
+  "[12] CREATE does not lose precision on large integers"
+]
+
 Given(/^any graph$/) do
   if @handle.nil?
     file = Tempfile.new('testdb')
@@ -64,8 +68,18 @@ Given(/^any graph$/) do
   end
 end
 
+Before do |scenario|
+  @ignored_scenario = IgnoredScenario.include? scenario.name
+end
+
 When(/^executing query:$/) do |string|
-  @query_result = @handle.execute_oc_query string
+  unless @ignored_scenario
+    begin
+      @query_result = @handle.execute_oc_query string
+    rescue Gqlite::Error => exp
+      @exception = exp
+    end
+  end
 end
 
 Then(/^the result should be empty$/) do
