@@ -607,7 +607,7 @@ namespace gqlite::backends::sqlite_oc_executor
       {
         has_labels = has_labels or not rv->get_name().empty();
         labels.push_back(rv->get_name());
-        results.push_back(get_value(accept(rv)));
+        results.push_back(get_value(accept(rv->get_expression())));
       }
       return value(results);
     }
