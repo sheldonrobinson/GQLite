@@ -105,7 +105,13 @@ algebra::node_csp parser::data::parse_return()
       get_next_token();
     } else if(node->get_type() != algebra::node_type::variable)
     {
-      is_of_type(token_type::AS);
+      if(node->get_type() == algebra::node_type::member_access)
+      {
+        algebra::member_access_csp ma = std::static_pointer_cast<const algebra::member_access>(node);
+        name = name + "." + join(ma->get_path(), ".");
+      } else {
+        is_of_type(token_type::AS);
+      }
     }
     expressions.push_back(std::make_shared<algebra::named_expression>(name, node));
     if(tok.type == token_type::COMMA)

@@ -2,6 +2,7 @@
 
 #include "config.h"
 
+#include <numeric>
 #include <string>
 
 #ifdef GQLITE_HAVE_CLOG
@@ -21,6 +22,21 @@ namespace gqlite
 
 namespace gqlite
 {
+  /**
+   * @internal
+   * @return the result of joining the element of a vector with delimiter
+   */
+  inline std::string join(const std::vector<std::string>& _v, const std::string& _delimiter)
+  {
+    return std::accumulate(
+      std::next(_v.begin()), 
+      _v.end(), 
+      _v[0], 
+      [_delimiter](std::string a, std::string b) {
+          return a + _delimiter + b;
+      }
+    );
+  }
   /**
    * @internal
    * @return \p _integer converted to a string, with a minimum size of \p _width, filled with 0.

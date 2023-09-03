@@ -355,6 +355,10 @@ namespace gqlite::backends::sqlite_oc_executor
       };
       return std::visit(value_getter{this}, _value);
     }
+    bool has_variable(const std::string& _variable)
+    {
+      return not _variable.empty() and variables.find(_variable) != variables.end();
+    }
     /**
      * Get the variable stored in \ref variables or throw an exception.
      */
@@ -410,7 +414,7 @@ namespace gqlite::backends::sqlite_oc_executor
     }
     node_ref_sp create_node(algebra::graph_node_csp _node)
     {
-      if(has_node(_node))
+      if(has_variable(_node->get_variable()))
       {
         throw gqlite::exception("Variable {} is already bound.", _node->get_variable());
       }
@@ -437,11 +441,27 @@ namespace gqlite::backends::sqlite_oc_executor
     }
     void create_edge(const algebra::graph_edge_csp _edge)
     {
+      if(has_variable(_edge->get_variable()))
+      {
+        throw gqlite::exception("Variable {} is already bound.", _edge->get_variable());
+      }
       node_ref_sp source = has_node(_edge->get_source()) ? get_node_ref(variables[_edge->get_source()->get_variable()]) : create_node(_edge->get_source());
       node_ref_sp destination = has_node(_edge->get_destination()) ? get_node_ref(variables[_edge->get_destination()->get_variable()]) : create_node(_edge->get_destination());
       int label_id = data->id_for_label(_edge->get_label());
       
-      data->execute_sql(sqlite_queries::edge_create(graph_name), {{1, label_id}, {2, get_properties(_edge->get_properties()).to_json()}, {3, source->id}, {4, destination->id}});
+      value props = get_properties(_edge->get_properties());
+      data->execute_sql(sqlite_queries::edge_create(graph_name), {{1, label_id}, {2, props.to_json()}, {3, source->id}, {4, destination->id}});
+      int row_id = data->last_row_id();
+      edge_ref_sp nr = std::make_shared<edge_ref>(edge_ref{
+          row_id,
+          value{
+            {{"type", value("edge")}, {"label", value(_edge->get_label())}, {"id", value(row_id)}, {"properties", props}}
+          }
+        });
+      if(not _edge->get_variable().empty())
+      {
+        variables[_edge->get_variable()] = nr;
+      }
     }
     exec_value visit(algebra::create_csp _node) override
     {

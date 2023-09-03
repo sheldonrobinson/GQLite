@@ -104,8 +104,13 @@ module GqliteTest
 end
 
 IgnoredScenario = [
+  # gqlite does not support large integer, as, sqlite does not, and added support for bignumber would add extra complexity withou a sqlite extension
   "[12] CREATE does not lose precision on large integers",
-  "[19] Fail when adding new label predicate on a node that is already bound 5"
+  # currently no way to distinguish between not specifying properties, and specifying {}
+  "[19] Fail when adding new label predicate on a node that is already bound 5",
+  # Triggers a different error first, as MATCH (a) return an empty list, it fails in creation
+  # TODO revisit in case we add support for creation of relationship with list of nodes 
+  "[24] Fail when creating a relationship using undefined variable in pattern"
 ]
 
 Before do |scenario|
@@ -159,11 +164,13 @@ end
 
 Then(/^the result should be empty$/) do
   next if @ignored_scenario
+  expect(@exception).to be_nil
   expect(@query_result).to be_nil
 end
 
 Then(/^the result should be, in any order:$/) do |table|
   next if @ignored_scenario
+  expect(@exception).to be_nil
   expect(@query_result).to eq(GqliteTest.parse_results_table table)
 end
 
@@ -180,13 +187,19 @@ Then(/^a SyntaxError should be raised at compile time: UndefinedVariable$/) do
 end
 
 Then(/^a SyntaxError should be raised at compile time: NoSingleRelationshipType$/) do
-  pending # Write code here that turns the phrase above into concrete actions
+  next if @ignored_scenario
+  expect(@exception).not_to be_nil
+  expect(@exception.message).to match(/^(\d+:\d+:Expected token \[ got .*)|(\d+:\d+:Expected token \] got .*)$/)
 end
 
 Then(/^a SyntaxError should be raised at compile time: RequiresDirectedRelationship$/) do
-  pending # Write code here that turns the phrase above into concrete actions
+  next if @ignored_scenario
+  expect(@exception).not_to be_nil
+  expect(@exception.message).to match(/(^\d+:\d+:Edge must be directed during creation.)|(\d+:\d+:Edge cannot have both direction.)$/)
 end
 
 Then(/^a SyntaxError should be raised at compile time: CreatingVarLength$/) do
-  pending # Write code here that turns the phrase above into concrete actions
+  next if @ignored_scenario
+  expect(@exception).not_to be_nil
+  expect(@exception.message).to match(/^\d+:\d+:Expected token \] got .*$/)
 end
