@@ -47,6 +47,7 @@ namespace gqlite
   };
   class value;
   using value_map = std::unordered_map<std::string, value>;
+  using value_vector = std::vector<value>;
   class value
   {
   public:
@@ -62,7 +63,7 @@ namespace gqlite
     /// not part of the public API
     template<typename _T_>
     value(const std::initializer_list<typename std::unordered_map<std::string, _T_>::value_type>& _v);
-    value(const std::vector<value>& _v);
+    value(const value_vector& _v);
     /// not part of the public API
     template<typename _T_>
     value(const std::vector<_T_>& _v);
@@ -74,7 +75,7 @@ namespace gqlite
     double to_double() const;
     std::string to_string() const;
     value_map to_map() const;
-    std::vector<value> to_vector() const;
+    value_vector to_vector() const;
   public:
     std::string to_json() const;
     static value from_json(const std::string& _json);

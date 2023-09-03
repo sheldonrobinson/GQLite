@@ -45,7 +45,7 @@ gqlite::value sqlite_data::execute_sql(const std::string& _query, const std::map
   sqlite3_stmt* ps;
   const char* ptr = _query.data();
   const char* ptr_end = _query.data() + _query.size();
-  std::vector<value> q_rs;
+  value_vector q_rs;
   while(ptr != ptr_end)
   {
     sqlite3_stmt* ps;
@@ -80,11 +80,11 @@ gqlite::value sqlite_data::execute_sql(const std::string& _query, const std::map
         }
       }
     }
-    std::vector<value> rows;
+    value_vector rows;
     int code = sqlite3_step(ps);
     while(code == SQLITE_ROW)
     {
-      std::vector<value> row;
+      value_vector row;
       for(int i = 0; i < sqlite3_data_count(ps); ++i)
       {
         switch(sqlite3_column_type(ps, i))
@@ -136,7 +136,7 @@ void sqlite_data::graph_create(const std::string& _name)
 bool sqlite_data::graph_has(const std::string& _name)
 {
   value r= execute_sql(sqlite_queries::graph_has(_name));
-  std::vector<value> v = r.to_vector();
+  value_vector v = r.to_vector();
   check_condition(v.size() == 1, "Should have gotten only one result");
   v = v.begin()->to_vector();
   check_condition(v.size() == 1, "Should have gotten only one result");
@@ -146,7 +146,7 @@ bool sqlite_data::graph_has(const std::string& _name)
 bool sqlite_data::table_has(const std::string& _name)
 {
   value r = execute_sql(sqlite_queries::table_has(), {{1, _name}});
-  std::vector<value> v = r.to_vector();
+  value_vector v = r.to_vector();
   check_condition(v.size() == 1, "Should have gotten only one result for table_has.");
   v = v.begin()->to_vector();
   check_condition(v.size() == 1, "Should have gotten only one column for table_has.");
@@ -165,7 +165,7 @@ int sqlite_data::id_for_label(const std::string& _string)
   if(it == label_to_id.end())
   {
     value r = execute_sql(sqlite_queries::label_get_from_name(), {{1, _string}});
-    std::vector<value> v = r.to_vector();
+    value_vector v = r.to_vector();
     if(v.size() == 0)
     {
       execute_sql(sqlite_queries::label_insert(), {{1, _string}});
@@ -189,7 +189,7 @@ std::string sqlite_data::label_for_id(int _id)
   if(it == id_to_label.end())
   {
     value r = execute_sql(sqlite_queries::label_get_from_id(), {{1, _id}});
-    std::vector<value> v = r.to_vector();
+    value_vector v = r.to_vector();
     if(v.size() == 0)
     {
       throw gqlite::exception("Internal error: unknown label id {}", _id);
@@ -254,21 +254,21 @@ namespace gqlite::backends::sqlite_oc_executor
             gqlite::value properties;
             {
               // Query
-              std::vector<gqlite::value> properties_val_list_vector = v->data->execute_sql(sqlite_queries::node_get_properties(v->graph_name), {{1, _node_ref->id}}).to_vector();
+              value_vector properties_val_list_vector = v->data->execute_sql(sqlite_queries::node_get_properties(v->graph_name), {{1, _node_ref->id}}).to_vector();
               check_condition(properties_val_list_vector.size() == 1, "When getting a node, should have received only one node");
-              std::vector<gqlite::value> properties_row = properties_val_list_vector.front().to_vector();
+              value_vector properties_row = properties_val_list_vector.front().to_vector();
               check_condition(properties_row.size() == 1, "When getting a node, properties get should only have given one column");
               properties = gqlite::value::from_json(properties_row.front().to_string());
             }
 
             // Retrieve labels
-            std::vector<gqlite::value> labels;
+            value_vector labels;
             {
               // Query
-              std::vector<gqlite::value> labels_val_list_vector = v->data->execute_sql(sqlite_queries::node_get_labels(v->graph_name), {{1, _node_ref->id}}).to_vector();
+              value_vector labels_val_list_vector = v->data->execute_sql(sqlite_queries::node_get_labels(v->graph_name), {{1, _node_ref->id}}).to_vector();
               for(const gqlite::value& label_row_value : labels_val_list_vector)
               {
-                std::vector<gqlite::value> label_row = label_row_value.to_vector();
+                value_vector label_row = label_row_value.to_vector();
                 check_condition(label_row.size() == 1, "When getting a node, labels get should only have given one column");
                 labels.push_back(v->data->label_for_id(label_row.front().to_integer()));
               }
@@ -335,7 +335,7 @@ namespace gqlite::backends::sqlite_oc_executor
         {
           if(_vector->cache.get_type() == value_type::invalid)
           {
-            std::vector<gqlite::value> values;
+            value_vector values;
             for(const element_ref& e_ref : _vector->refs)
             {
               values.push_back(v->get_value(e_ref));
@@ -537,7 +537,7 @@ namespace gqlite::backends::sqlite_oc_executor
       for(const gqlite::value& row_value : r.to_vector())
       {
         int idx = 0;
-        std::vector<gqlite::value> row = row_value.to_vector();
+        value_vector row = row_value.to_vector();
         check_condition(row.size() == count_variables, "Wrong number of column return by SQL Query.");
 
         for(const algebra::alternative<algebra::graph_node, algebra::graph_edge>& pattern : _node->get_patterns())
@@ -590,6 +590,19 @@ namespace gqlite::backends::sqlite_oc_executor
     {
       return get_variable(_node->get_identifier());
     }
+    exec_value visit(algebra::array_csp _node) override
+    {
+      std::vector<value> values;
+      for(const algebra::node_csp& v : _node->get_array())
+      {
+        values.push_back(get_value(start(v)));
+      }
+      return values;
+    }
+    exec_value visit(algebra::map_csp _node) override
+    {
+      return get_properties(_node->get_map());
+    }
     exec_value visit(algebra::member_access_csp _node) override
     {
       exec_value value = start(_node->get_left());
@@ -604,7 +617,7 @@ namespace gqlite::backends::sqlite_oc_executor
         }
         gqlite::value operator()(const element_ref_vector_sp& _v)
         {
-          std::vector<gqlite::value> values;
+          value_vector values;
           for(const element_ref& v : _v->refs)
           {
             values.push_back(operator()(_v));
@@ -623,7 +636,7 @@ namespace gqlite::backends::sqlite_oc_executor
             {
               if(_allow_array)
               {
-                std::vector<gqlite::value> values;
+                value_vector values;
                 for(const gqlite::value& v : _v.to_vector())
                 {
                   values.push_back(operator()(_v, false));
@@ -645,23 +658,23 @@ namespace gqlite::backends::sqlite_oc_executor
     }
     exec_value visit(algebra::return_statement_csp rs) override
     {
-      std::vector<value> labels;
-      std::vector<std::vector<value>> results_columns;
+      value_vector labels;
+      std::vector<value_vector> results_columns;
       std::size_t rows = 1;
       for(const algebra::named_expression_csp& rv : rs->get_expressions())
       {
         labels.push_back(rv->get_name());
         value column_value = get_value(accept(rv->get_expression()));
-        std::vector<value> column = (column_value.get_type() == value_type::vector) ? column_value.to_vector() : std::vector<value>{column_value};
+        value_vector column = (column_value.get_type() == value_type::vector) ? column_value.to_vector() : value_vector{column_value};
         results_columns.push_back(column);
         rows = std::max(rows, column.size());
       }
-      std::vector<value> results_rows;
+      value_vector results_rows;
       results_rows.push_back(labels);
       for(int i = 0; i < rows; ++i)
       {
-        std::vector<value> row;
-        for(const std::vector<value>& col : results_columns)
+        value_vector row;
+        for(const value_vector& col : results_columns)
         {
           if(i < col.size())
           {
@@ -728,7 +741,7 @@ gqlite::value sqlite::execute_oc_query(oc::algebra::node_csp _node, const value_
 gqlite::value sqlite::get_debug_stats() const
 {
   gqlite::value result = d->execute_sql(sqlite_queries::get_debug_stats("default"));
-  std::vector<gqlite::value> rows = result.to_vector();
+  value_vector rows = result.to_vector();
   check_condition(rows.size() == 7, "Invalid number of debug stats.");
   value_map stats;
   stats["nodes_count"] = rows[0].to_vector()[0].to_integer();

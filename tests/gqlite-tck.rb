@@ -15,8 +15,8 @@ else
   File.write("openCypher_update", Time.now.to_i)
 end
 
-features = [ 'create/Create1.feature', 'create/Create2.feature' ]
-# features = [ 'create/Create2.feature' ]
+# features = [ 'create/Create1.feature', 'create/Create2.feature' ]
+features = [ 'create/Create4.feature' ]
 features = features.map { |file| 'openCypher/tck/features/clauses/' + file }
 args = features.concat %w(--require cucumber/step_definitions/ --fail-fast)
 # args = %w(cucumber/features)

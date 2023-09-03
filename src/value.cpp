@@ -26,7 +26,7 @@ const char* std::to_string(value_type _type)
 struct value::data
 {
   value_type type;
-  std::variant<bool, int, double, std::string, value_map, std::vector<value>> value_container;
+  std::variant<bool, int, double, std::string, value_map, value_vector> value_container;
 
   void to_json(std::stringstream& _stream);
 };
@@ -138,7 +138,7 @@ namespace {
       case '[':
       {
         // Parse array
-        std::vector<value> vec;
+        value_vector vec;
         fetch_next_char();
         while(last_char != ']')
         {
@@ -250,7 +250,7 @@ void value::data::to_json(std::stringstream& _stream)
     break;
   case value_type::vector:
     _stream << '[';
-    for(const value& v : std::get<std::vector<value>>(value_container))
+    for(const value& v : std::get<value_vector>(value_container))
     {
       if(first)
       {
@@ -295,7 +295,7 @@ value::value(const std::string& _v) : d(new data{value_type::string, _v})
 value::value(const value_map& _v) : d(new data{value_type::map, _v})
 {}
 
-value::value(const std::vector<value>& _v) : d(new data{value_type::vector, _v})
+value::value(const value_vector& _v) : d(new data{value_type::vector, _v})
 {}
 
 value_type value::get_type() const
@@ -361,10 +361,10 @@ value_map value::to_map() const
   return std::get<value_map>(d->value_container);
 }
 
-std::vector<value> value::to_vector() const
+value_vector value::to_vector() const
 {
   if(d->type != value_type::vector) throw exception(format_string("Value is not a vector, it is {}", d->type));
-  return std::get<std::vector<value>>(d->value_container);
+  return std::get<value_vector>(d->value_container);
 }
 
 std::string value::to_json() const

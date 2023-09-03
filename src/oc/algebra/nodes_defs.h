@@ -22,7 +22,7 @@ OC_ALGEBRA_GENERATE(statements, OC_ALGEBRA_STATEMENTS_MEMBERS)
 
 OC_ALGEBRA_GENERATE(return_statement, OC_ALGEBRA_RETURN_MEMBERS)
 
-// Expressions
+// Values
 
 #define OC_ALGEBRA_GRAPH_NODE_MEMBERS(_KLASS_NAME_, F)          \
   F(_KLASS_NAME_, std::string, variable)                        \
@@ -45,6 +45,20 @@ OC_ALGEBRA_GENERATE(graph_edge, OC_ALGEBRA_GRAPH_EDGE_MEMBERS)
   F(_KLASS_NAME_, gqlite::value, value)
 
 OC_ALGEBRA_GENERATE(value, OC_ALGEBRA_VALUE_MEMBERS)
+
+
+#define OC_ALGEBRA_MAP_MEMBERS(_KLASS_NAME_, F) \
+  F(_KLASS_NAME_, std::unordered_map<GQLITE_LIST(std::string, node_csp)>, map)
+
+OC_ALGEBRA_GENERATE(map, OC_ALGEBRA_MAP_MEMBERS)
+
+#define OC_ALGEBRA_ARRAY_MEMBERS(_KLASS_NAME_, F) \
+  F(_KLASS_NAME_, std::vector<node_csp>, array)
+
+OC_ALGEBRA_GENERATE(array, OC_ALGEBRA_ARRAY_MEMBERS)
+
+
+// Expressions
 
 #define OC_ALGEBRA_NAMED_EXPRESSION(_KLASS_NAME_, F)      \
   F(_KLASS_NAME_, std::string, name)                      \

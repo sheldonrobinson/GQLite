@@ -27,7 +27,7 @@ namespace gqlite
   template<typename _T_>
   value::value(const std::vector<_T_>& _v) : value()
   {
-    std::vector<value> vo;
+    value_vector vo;
     for(const _T_& t : _v)
     {
       vo.push_back(t);
