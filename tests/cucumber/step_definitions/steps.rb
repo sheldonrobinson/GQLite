@@ -182,6 +182,12 @@ Then(/^the side effects should be:$/) do |table|
   expect(diff_stats).to eq(ref_stats)
 end
 
+Then(/^no side effects$/) do
+  next if @ignored_scenario
+  diff_stats = @stats_after .diff_to @stats_before
+  expect(diff_stats).to eq(SideEffect.new 0, 0, 0, 0)
+end
+
 Then(/^the result should be empty$/) do
   next if @ignored_scenario
   expect(@exception).to be_nil
