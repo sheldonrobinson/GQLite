@@ -660,7 +660,7 @@ namespace gqlite::backends::sqlite_oc_executor
     {
       value_vector labels;
       std::vector<value_vector> results_columns;
-      std::size_t rows = 1;
+      std::size_t rows = 0;
       for(const algebra::named_expression_csp& rv : rs->get_expressions())
       {
         labels.push_back(rv->get_name());
