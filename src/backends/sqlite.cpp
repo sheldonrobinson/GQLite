@@ -502,12 +502,14 @@ namespace gqlite::backends::sqlite_oc_executor
           sql_tables += "gqlite_" + graph_name + "_nodes AS tb" + count_s;
           if(not _node->get_labels().empty())
           {
-            sql_tables += " JOIN gqlite_" + graph_name + "_labels AS tb_lab" + count_s;
-            sql_conditions += " AND tb" + count_s + ".id = tb_lab" + count_s + ".node_id ";
+            int label_count = 0;
             for(const std::string& label : _node->get_labels())
             {
-              sql_conditions += " AND ?" + to_string_fixed_width(bindings.size() + 1, 3) + " = tb_lab" + count_s + ".label ";
+              sql_tables += " JOIN gqlite_" + graph_name + "_labels AS tb_lab" + std::to_string(label_count) + "_" + count_s;
+              sql_conditions += " AND tb" + count_s + ".id = tb_lab" + std::to_string(label_count) + "_" + count_s + ".node_id"
+                               " AND ?" + to_string_fixed_width(bindings.size() + 1, 3) + " = tb_lab" + std::to_string(label_count) + "_" + count_s + ".label ";
               bindings[bindings.size() + 1] = data->id_for_label(label);
+              ++label_count;
             }
           }
           ++count_variables;
@@ -526,7 +528,8 @@ namespace gqlite::backends::sqlite_oc_executor
       {
         sql_conditions = (count == 1 ? " WHERE TRUE " : " ON TRUE ") + sql_conditions;
       }
-      gqlite::value r = data->execute_sql("SELECT " + sql_variables + " FROM " + sql_tables + sql_conditions, bindings);
+      std::cout << ("SELECT DISTINCT " + sql_variables + " FROM " + sql_tables + sql_conditions) << std::endl;
+      gqlite::value r = data->execute_sql("SELECT DISTINCT " + sql_variables + " FROM " + sql_tables + sql_conditions, bindings);
       std::vector<element_ref_vector_sp> ervs;
       ervs.reserve(count_variables);
       for(int i = 0; i < count_variables; ++i)
