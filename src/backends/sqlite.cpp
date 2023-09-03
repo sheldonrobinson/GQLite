@@ -733,9 +733,19 @@ sqlite* sqlite::from_file(const std::string& _filename)
 
 gqlite::value sqlite::execute_oc_query(oc::algebra::node_csp _node, const value_map& _bindings)
 {
-  sqlite_oc_executor::visitor executor;
-  executor.data = d;
-  return executor.get_value(executor.start(_node));
+  d->execute_sql("BEGIN");
+  try
+  {
+    sqlite_oc_executor::visitor executor;
+    executor.data = d;
+    value val = executor.get_value(executor.start(_node));
+    d->execute_sql("COMMIT");
+    return val;
+  } catch(const exception& _ex)
+  {
+    d->execute_sql("ROLLBACK");
+    throw _ex;
+  }
 }
 
 gqlite::value sqlite::get_debug_stats() const
