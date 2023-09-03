@@ -1,6 +1,7 @@
 require 'tempfile'
 require 'gqlite'
 require 'yaml'
+require 'rspec'
 
 class String
   def is_i?
@@ -103,6 +104,25 @@ module GqliteTest
   end
 end
 
+RSpec::Matchers.matcher :eq_in_any_order do |expected|
+  match do |actual|
+    next false if actual.length != expected.length
+    for i in 0..actual.length
+      match = false
+      for j in 0..actual.length
+        if actual[i] == expected[j]
+          match = true
+          break
+        end
+      end
+      unless match
+        next false
+      end
+    end
+    true
+  end
+end
+
 IgnoredScenario = [
   # gqlite does not support large integer, as, sqlite does not, and added support for bignumber would add extra complexity withou a sqlite extension
   "[12] CREATE does not lose precision on large integers",
@@ -171,7 +191,7 @@ end
 Then(/^the result should be, in any order:$/) do |table|
   next if @ignored_scenario
   expect(@exception).to be_nil
-  expect(@query_result).to eq(GqliteTest.parse_results_table table)
+  expect(@query_result).to eq_in_any_order(GqliteTest.parse_results_table table)
 end
 
 Then(/^a SyntaxError should be raised at compile time: VariableAlreadyBound$/) do
