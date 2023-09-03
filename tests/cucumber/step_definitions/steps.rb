@@ -69,7 +69,7 @@ module GqliteTest
   end
   def GqliteTest.parse_results_table(table)
     table = table.raw
-    r_node = /\((\w*)((:\w*)*)( {.*})?\)/
+    r_node = /\((\w*)((:\w*)*)(\s*{.*})?\)/
     return table.map do |c|
       c.map { |v|
         if v == 'null'
