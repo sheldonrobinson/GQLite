@@ -239,16 +239,18 @@ std::string lexer::get_identifier(int lastChar)
 token lexer::get_string(int lastChar)
 {
   int initial_col = column();
-  int previousChar = lastChar;
   std::string identifierStr = "";
   while( not eof() )
   {
     int nextChar = get_next_char();
-    if( nextChar == lastChar and previousChar != '\\')
+    if(nextChar == '\\')
+    {
+      nextChar = get_next_char();
+      identifierStr += nextChar;
+    } else if( nextChar == lastChar)
     {
       return token(token_type::STRING, identifierStr, line(), initial_col );
     } else {
-      previousChar = nextChar;
       identifierStr += nextChar;
     }
   }
