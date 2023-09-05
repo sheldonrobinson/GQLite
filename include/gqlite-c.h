@@ -5,7 +5,7 @@ extern "C" {
 #endif
 
 typedef struct gqlite_api_context* gqlite_api_context_t;
-typedef struct gqlite_database* gqlite_database_t;
+typedef struct gqlite_connection* gqlite_connection_t;
 typedef struct gqlite_backend* gqlite_backend_t;
 typedef struct gqlite_value* gqlite_value_t;
 
@@ -16,21 +16,21 @@ bool gqlite_api_context_has_error(gqlite_api_context_t);
 void gqlite_api_context_clear_error(gqlite_api_context_t);
 
 /**
- * Create a database, using the sqlite backend. Expect as argument an handle to a sqlite database.
+ * Create a connection, using the sqlite backend. Expect as argument an handle to a sqlite connection.
  */
-gqlite_database_t gqlite_database_create_from_sqlite(gqlite_api_context_t, void*);
+gqlite_connection_t gqlite_connection_create_from_sqlite(gqlite_api_context_t, void*);
 
-gqlite_database_t gqlite_database_create_from_sqlite_file(gqlite_api_context_t, const char*);
-
-/**
- * Destroy the database. Does not delete any database handle passed as an argument.
- */
-void gqlite_database_destroy(gqlite_api_context_t, gqlite_database_t);
+gqlite_connection_t gqlite_connection_create_from_sqlite_file(gqlite_api_context_t, const char*);
 
 /**
- * Execute an OpenCypher query on the database.
+ * Destroy the connection. Does not delete any connection handle passed as an argument.
  */
-gqlite_value_t gqlite_database_oc_query(gqlite_api_context_t, gqlite_database_t, const char*, gqlite_value_t);
+void gqlite_connection_destroy(gqlite_api_context_t, gqlite_connection_t);
+
+/**
+ * Execute an OpenCypher query on the connection.
+ */
+gqlite_value_t gqlite_connection_oc_query(gqlite_api_context_t, gqlite_connection_t, const char*, gqlite_value_t);
 
 /**
  * Create a value object to use in a query.

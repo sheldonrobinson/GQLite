@@ -16,16 +16,16 @@ void print_help()
 {
   std::cout << R"VGG(.help             show this message
 .once ?FILE?      save result of next query in FILE.
-.open ?FILE?      close existing database and reopen FILE.
+.open ?FILE?      close existing connection and reopen FILE.
 .quit             Exit this program)VGG"  <<std::endl;
 }
 
 int main(int argc, const char** argv)
 {
-  gqlite::database handle;
+  gqlite::connection handle;
   if(argc == 2)
   {
-    handle = gqlite::database:: create_from_sqlite_file(argv[1]);
+    handle = gqlite::connection:: create_from_sqlite_file(argv[1]);
   }
   std::cout << "Enter '.help' for usage hints." << std::endl;
   char *line;
@@ -58,7 +58,7 @@ int main(int argc, const char** argv)
           {
             std::cout << ".open expect a filename as argument" << std::endl;
           } else {
-            handle = gqlite::database:: create_from_sqlite_file(command_split[1]);
+            handle = gqlite::connection:: create_from_sqlite_file(command_split[1]);
           }
         } else if(command_split[0] == ".quit")
         {

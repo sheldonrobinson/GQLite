@@ -75,7 +75,7 @@ set(CMAKE_CXX_STANDARD 20)
 find_package(SQLite)
 
 set_package_properties(SQLite PROPERTIES
-    DESCRIPTION "SQLite is a C-language library that implements a small, fast, self-contained, high-reliability, full-featured, SQL database engine."
+    DESCRIPTION "SQLite is a C-language library that implements a small, fast, self-contained, high-reliability, full-featured, SQL connection engine."
     URL "http://www.sqlite.org"
     TYPE OPTIONAL
     PURPOSE "Required for sqlite module.")
@@ -115,7 +115,7 @@ configure_file(src/config.h.in src/config.h)
 
 add_library(gqlite SHARED
   src/backend.cpp
-  src/database.cpp
+  src/connection.cpp
   src/gqlite-c.cpp
   src/value.cpp
   src/oc/lexer.cpp

@@ -63,38 +63,38 @@ extern "C"
     _context->error_message.clear();
   }
 
-  struct gqlite_database
+  struct gqlite_connection
   {
-    gqlite::database db;
+    gqlite::connection db;
   };
   struct gqlite_value
   {
     gqlite::value value;
   };
 
-  gqlite_database_t gqlite_database_create_from_sqlite(gqlite_api_context_t _context, void* _handle)
+  gqlite_connection_t gqlite_connection_create_from_sqlite(gqlite_api_context_t _context, void* _handle)
   {
     BEGIN_CHECK
-    return new gqlite_database{gqlite::database::create_from_sqlite(_handle)};
+    return new gqlite_connection{gqlite::connection::create_from_sqlite(_handle)};
     END_CHECK
     return nullptr;
   }
-  gqlite_database_t gqlite_database_create_from_sqlite_file(gqlite_api_context_t _context, const char* _filename)
+  gqlite_connection_t gqlite_connection_create_from_sqlite_file(gqlite_api_context_t _context, const char* _filename)
   {
     BEGIN_CHECK
-    return new gqlite_database{gqlite::database::create_from_sqlite_file(_filename)};
+    return new gqlite_connection{gqlite::connection::create_from_sqlite_file(_filename)};
     END_CHECK
     return nullptr;
   }
 
-  void gqlite_database_destroy(gqlite_api_context_t _context, gqlite_database_t _database)
+  void gqlite_connection_destroy(gqlite_api_context_t _context, gqlite_connection_t _connection)
   {
     BEGIN_CHECK
-    delete _database;
+    delete _connection;
     END_CHECK
   }
 
-  gqlite_value_t gqlite_database_oc_query(gqlite_api_context_t _context, gqlite_database_t _database, const char* _query, gqlite_value_t _bindings)
+  gqlite_value_t gqlite_connection_oc_query(gqlite_api_context_t _context, gqlite_connection_t _connection, const char* _query, gqlite_value_t _bindings)
   {
     BEGIN_CHECK
     gqlite::value_map bindings;
@@ -102,7 +102,7 @@ extern "C"
     {
       bindings = _bindings->value.to_map();
     }
-    return new gqlite_value{ _database->db.execute_oc_query(_query, bindings) };
+    return new gqlite_value{ _connection->db.execute_oc_query(_query, bindings) };
     END_CHECK
     return nullptr;
   }
@@ -127,9 +127,9 @@ extern "C"
     return _value->value.get_type() != gqlite::value_type::invalid;
   }
 
-  gqlite_value_t gqlite_private_test_stats(gqlite_database_t _database)
+  gqlite_value_t gqlite_private_test_stats(gqlite_connection_t _connection)
   {
-    return new gqlite_value { _database->db.get_debug_stats() };
+    return new gqlite_value { _connection->db.get_debug_stats() };
   }
 
 }

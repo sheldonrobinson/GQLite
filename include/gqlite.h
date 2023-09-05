@@ -83,16 +83,16 @@ namespace gqlite
     struct data;
     std::shared_ptr<data> d;
   };
-  class database
+  class connection
   {
-    database(backend* _backend);
+    connection(backend* _backend);
   public:
-    database();
-    database(const database& _rhs);
-    database& operator=(const database& _rhs);
-    ~database();
-    static database create_from_sqlite(void*);
-    static database create_from_sqlite_file(const std::string& _filename);
+    connection();
+    connection(const connection& _rhs);
+    connection& operator=(const connection& _rhs);
+    ~connection();
+    static connection create_from_sqlite(void*);
+    static connection create_from_sqlite_file(const std::string& _filename);
     /**
      * @internal
      * Part of the private API, what is returned by this function may change at any time.

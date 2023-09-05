@@ -120,7 +120,7 @@ end
 Given(/^any graph$/) do
   if @handle.nil?
     file = Tempfile.new('testdb')
-    @handle = Gqlite::Database.new(sqlite_filename: file.path)
+    @handle = Gqlite::Connection.new(sqlite_filename: file.path)
   end
 end
 
@@ -132,7 +132,7 @@ end
 Given(/^an empty graph$/) do
   next if @ignored_scenario
   file = Tempfile.new('testdb')
-  @handle = Gqlite::Database.new(sqlite_filename: file.path)
+  @handle = Gqlite::Connection.new(sqlite_filename: file.path)
 end
 
 When(/^executing query:$/) do |string|

@@ -18,14 +18,14 @@ def make_results(gc)
   [["nodes"]] + gc.map { |x| [x]}
 end
 
-RSpec.describe "database" do
+RSpec.describe "connection" do
   it "can be created" do
     file = Tempfile.new('testdb')
-    db = Gqlite::Database.new(sqlite_filename: file.path)
+    db = Gqlite::Connection.new(sqlite_filename: file.path)
   end
   it "can be queried with oc to create nodes" do
     file = Tempfile.new('testdb')
-    db = Gqlite::Database.new(sqlite_filename: file.path)
+    db = Gqlite::Connection.new(sqlite_filename: file.path)
     
     # Variable that hold the current state of the graph
     gc = []
@@ -72,7 +72,7 @@ RSpec.describe "database" do
   end
   it "can be queried with oc to create nodes and edges" do
     file = Tempfile.new('testdb')
-    db = Gqlite::Database.new(sqlite_filename: file.path)
+    db = Gqlite::Connection.new(sqlite_filename: file.path)
     
     # Variable that hold the current state of the graph
     gc = []
