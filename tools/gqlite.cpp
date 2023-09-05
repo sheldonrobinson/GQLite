@@ -1,6 +1,7 @@
 // Simple test of readline
 
 #include <iostream>
+#include <fstream>
 
 #include <readline/readline.h>
 #include <readline/history.h>
@@ -13,7 +14,10 @@ using namespace std;
 
 void print_help()
 {
-
+  std::cout << R"VGG(.help             show this message
+.once ?FILE?      save result of next query in FILE.
+.open ?FILE?      close existing database and reopen FILE.
+.quit             Exit this program)VGG"  <<std::endl;
 }
 
 int main(int argc, const char** argv)
@@ -26,6 +30,7 @@ int main(int argc, const char** argv)
   std::cout << "Enter '.help' for usage hints." << std::endl;
   char *line;
   std::string statement;
+  std::string output_filename;
   while ((line = readline("gqlite> ")) != nullptr)
   {
     if (*line)
@@ -39,6 +44,14 @@ int main(int argc, const char** argv)
         if(command_split[0] == ".help")
         {
           print_help();
+        } else if(command_split[0] == ".once")
+        {
+          if(command_split.size() != 2)
+          {
+            std::cout << ".once expect a filename as argument" << std::endl;
+          } else {
+            output_filename = command_split[1];
+          }
         } else if(command_split[0] == ".open")
         {
           if(command_split.size() != 2)
@@ -67,7 +80,20 @@ int main(int argc, const char** argv)
         try
         {
           gqlite::value val = handle.execute_oc_query(command);
-          std::cout << val.to_json() << std::endl;
+          if(output_filename.empty())
+          {
+            std::cout << val.to_json() << std::endl;
+          } else {
+            std::ofstream ofss;
+            ofss.open(output_filename, std::ios::out);
+            if(ofss.is_open())
+            {
+              ofss << val.to_json();
+              std::cout << "Results was written to '" << output_filename << "'" << std::endl;
+            } else {
+              std::cout << "Failed to open '" << output_filename << "' for writting." << std::endl; 
+            }
+          }
         } catch(const gqlite::exception& _ex)
         {
           std::cout << "Error occured during execution of query: '" << _ex.what() << "'" << std::endl;
