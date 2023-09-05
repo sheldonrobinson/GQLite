@@ -4,6 +4,7 @@
 
 #include "../gqlite_p.h"
 #include "../logging.h"
+#include "../string.h"
 
 #include "lexer.h"
 
@@ -108,7 +109,7 @@ algebra::node_csp parser::data::parse_return()
       if(node->get_type() == algebra::node_type::member_access)
       {
         algebra::member_access_csp ma = std::static_pointer_cast<const algebra::member_access>(node);
-        name = name + "." + join(ma->get_path(), ".");
+        name = name + "." + string::join(ma->get_path(), ".");
       } else {
         is_of_type(token_type::AS);
       }

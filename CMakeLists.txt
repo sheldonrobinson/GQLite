@@ -1,5 +1,6 @@
 project(gqlite)
 
+cmake_minimum_required(VERSION 3.10)
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake/modules)
 
 ########################
@@ -68,7 +69,6 @@ include(FeatureSummary)
 
 set(CMAKE_CXX_STANDARD 20)
 
-
 ########################
 ## Find SQLite
 
@@ -80,11 +80,26 @@ set_package_properties(SQLite PROPERTIES
     TYPE OPTIONAL
     PURPOSE "Required for sqlite module.")
 
+########################
+## Find clog
+
 find_package(clog)
 set_package_properties(sqlite PROPERTIES
     DESCRIPTION "clog library."
     TYPE OPTIONAL
     PURPOSE "Used for debug messages")
+
+########################
+## Find readline
+
+find_package(Readline)
+set_package_properties(Readline PROPERTIES
+    DESCRIPTION "Readline library."
+    TYPE OPTIONAL
+    PURPOSE "Used for to read from input")
+
+########################
+## Find Build stuff
 
 include_directories(include ${CMAKE_CURRENT_BINARY_DIR}/src)
 
@@ -114,7 +129,7 @@ add_library(gqlite SHARED
   src/backends/sqlite.cpp
   )
 
-target_link_libraries(gqlite ${SQLITE3_LIBRARY})
+target_link_libraries(gqlite PRIVATE ${SQLITE3_LIBRARY})
 
 install(TARGETS gqlite EXPORT gqliteTargets ${INSTALL_TARGETS_DEFAULT_ARGS} )
 
@@ -122,3 +137,11 @@ install(FILES include/gqlite-c.h
       DESTINATION ${INSTALL_INCLUDE_DIR}/)
   
 install(DIRECTORY bindings/ruby DESTINATION ${INSTALL_LIB_DIR})
+
+if(READLINE_FOUND)
+  add_executable(gqlite_cmd tools/gqlite.cpp)
+  target_link_libraries(gqlite_cmd PRIVATE gqlite ${Readline_LIBRARY})
+  set_property(TARGET gqlite_cmd PROPERTY OUTPUT_NAME gqlite)
+
+  install(TARGETS gqlite_cmd EXPORT gqliteTargets ${INSTALL_TARGETS_DEFAULT_ARGS} )
+endif()
