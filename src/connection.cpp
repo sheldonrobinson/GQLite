@@ -38,12 +38,12 @@ connection::~connection()
 {
 }
 
-connection connection::create_from_sqlite(void* _sqlite_connection)
+connection connection::create_from_sqlite(void* _sqlite_connection, const gqlite::value&)
 {
   return connection(new backends::sqlite(_sqlite_connection));
 }
 
-connection connection::create_from_sqlite_file(const std::string& _filename)
+connection connection::create_from_sqlite_file(const std::string& _filename, const gqlite::value&)
 {
   return connection(backends::sqlite::from_file(_filename));
 }

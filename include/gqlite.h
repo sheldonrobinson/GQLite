@@ -91,8 +91,8 @@ namespace gqlite
     connection(const connection& _rhs);
     connection& operator=(const connection& _rhs);
     ~connection();
-    static connection create_from_sqlite(void*);
-    static connection create_from_sqlite_file(const std::string& _filename);
+    static connection create_from_sqlite(void*, const value& _options = value());
+    static connection create_from_sqlite_file(const std::string& _filename, const value& _options = value());
     /**
      * @internal
      * Part of the private API, what is returned by this function may change at any time.

@@ -72,17 +72,21 @@ extern "C"
     gqlite::value value;
   };
 
-  gqlite_connection_t gqlite_connection_create_from_sqlite(gqlite_api_context_t _context, void* _handle)
+  gqlite_connection_t gqlite_connection_create_from_sqlite(gqlite_api_context_t _context, void* _handle, gqlite_value_t _options)
   {
     BEGIN_CHECK
-    return new gqlite_connection{gqlite::connection::create_from_sqlite(_handle)};
+    gqlite::value options;
+    if(_options) options = _options->value;
+    return new gqlite_connection{gqlite::connection::create_from_sqlite(_handle, options)};
     END_CHECK
     return nullptr;
   }
-  gqlite_connection_t gqlite_connection_create_from_sqlite_file(gqlite_api_context_t _context, const char* _filename)
+  gqlite_connection_t gqlite_connection_create_from_sqlite_file(gqlite_api_context_t _context, const char* _filename, gqlite_value_t _options)
   {
     BEGIN_CHECK
-    return new gqlite_connection{gqlite::connection::create_from_sqlite_file(_filename)};
+    gqlite::value options;
+    if(_options) options = _options->value;
+    return new gqlite_connection{gqlite::connection::create_from_sqlite_file(_filename, options)};
     END_CHECK
     return nullptr;
   }

@@ -18,9 +18,9 @@ void gqlite_api_context_clear_error(gqlite_api_context_t);
 /**
  * Create a connection, using the sqlite backend. Expect as argument an handle to a sqlite connection.
  */
-gqlite_connection_t gqlite_connection_create_from_sqlite(gqlite_api_context_t, void*);
+gqlite_connection_t gqlite_connection_create_from_sqlite(gqlite_api_context_t, void*, gqlite_value_t _options);
 
-gqlite_connection_t gqlite_connection_create_from_sqlite_file(gqlite_api_context_t, const char*);
+gqlite_connection_t gqlite_connection_create_from_sqlite_file(gqlite_api_context_t, const char*, gqlite_value_t _options);
 
 /**
  * Destroy the connection. Does not delete any connection handle passed as an argument.
