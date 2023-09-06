@@ -99,7 +99,16 @@ set_package_properties(Readline PROPERTIES
     PURPOSE "Used for to read from input")
 
 ########################
-## Find Build stuff
+## Find python3
+
+find_package (Python3 COMPONENTS Interpreter Development)
+set_package_properties(Python3 PROPERTIES
+    DESCRIPTION ""
+    TYPE OPTIONAL
+    PURPOSE "Used for python3 bindings.")
+
+########################
+## Build library
 
 include_directories(include ${CMAKE_CURRENT_BINARY_DIR}/src)
 
@@ -135,8 +144,32 @@ install(TARGETS gqlite EXPORT gqliteTargets ${INSTALL_TARGETS_DEFAULT_ARGS} )
 
 install(FILES include/gqlite-c.h
       DESTINATION ${INSTALL_INCLUDE_DIR}/)
-  
+
+########################
+## Build python
+
+if(Python3_FOUND)
+  set(Python3_SHORT_VERSION "${Python3_VERSION_MAJOR}.${Python3_VERSION_MINOR}")
+
+  set(PYTHON_SITE_PACKAGES_INSTALL_DIR ${INSTALL_LIB_DIR}/python${Python3_SHORT_VERSION}/dist-packages/)
+
+  add_custom_target(python3_ffi_lib ALL
+      COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/bindings/python/build.py ${CMAKE_CURRENT_SOURCE_DIR}
+      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+      DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/bindings/python/build.py
+  )
+  message(STATUS ${PYTHON3_SHORT_VERSION})
+  install(FILES ${CMAKE_CURRENT_BINARY_DIR}/__c_gqlite.cpython-${Python3_VERSION_MAJOR}${Python3_VERSION_MINOR}-x86_64-linux-gnu.so DESTINATION ${PYTHON_SITE_PACKAGES_INSTALL_DIR}/gqlite)
+  install(DIRECTORY bindings/python/gqlite DESTINATION ${PYTHON_SITE_PACKAGES_INSTALL_DIR})
+endif()
+
+########################
+## Build ruby
+
 install(DIRECTORY bindings/ruby DESTINATION ${INSTALL_LIB_DIR})
+
+########################
+## Build tools
 
 if(READLINE_FOUND)
   add_executable(gqlite_cmd tools/gqlite.cpp)
