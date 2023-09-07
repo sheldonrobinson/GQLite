@@ -132,7 +132,7 @@ extern "C"
   }
   bool gqlite_value_is_valid(gqlite_api_context_t, gqlite_value_t _value)
   {
-    return _value->value.get_type() != gqlite::value_type::invalid;
+    return _value and _value->value.get_type() != gqlite::value_type::invalid;
   }
 
   gqlite_value_t gqlite_private_test_stats(gqlite_connection_t _connection)
