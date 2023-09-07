@@ -126,8 +126,6 @@ end
 IgnoredScenario = [
   # gqlite does not support large integer, as, sqlite does not, and added support for bignumber would add extra complexity withou a sqlite extension
   "[12] CREATE does not lose precision on large integers",
-  # currently no way to distinguish between not specifying properties, and specifying {}
-  "[19] Fail when adding new label predicate on a node that is already bound 5",
   # Triggers a different error first, as MATCH (a) return an empty list, it fails in creation
   # TODO revisit in case we add support for creation of relationship with list of nodes 
   "[24] Fail when creating a relationship using undefined variable in pattern",
