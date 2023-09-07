@@ -156,18 +156,18 @@ Given(/^any graph$/) do
 end
 
 Given(/^having executed:$/) do |string|
-  next if @ignored_scenario
+  pending if @ignored_scenario
   @handle.execute_oc_query string
 end
 
 Given(/^an empty graph$/) do
-  next if @ignored_scenario
+  pending if @ignored_scenario
   file = Tempfile.new('testdb')
   @handle = Gqlite::Connection.new(sqlite_filename: file.path)
 end
 
 When(/^executing query:$/) do |string|
-  next if @ignored_scenario
+  pending if @ignored_scenario
   begin
     @stats_before = GqliteTest.get_stats @handle
     @query_result = GqliteTest.parse_results(@handle.execute_oc_query string)
@@ -178,7 +178,7 @@ When(/^executing query:$/) do |string|
 end
 
 When(/^executing control query:$/) do |string|
-  next if @ignored_scenario
+  pending if @ignored_scenario
   begin
     @query_result = GqliteTest.parse_results(@handle.execute_oc_query string)
   rescue Gqlite::Error => exp
@@ -187,69 +187,69 @@ When(/^executing control query:$/) do |string|
 end
 
 Then(/^the side effects should be:$/) do |table|
-  next if @ignored_scenario
+  pending if @ignored_scenario
   diff_stats = @stats_after .diff_to @stats_before
   ref_stats = GqliteTest.parse_side_effect_table table
   expect(diff_stats).to eq(ref_stats)
 end
 
 Then(/^no side effects$/) do
-  next if @ignored_scenario
+  pending if @ignored_scenario
   diff_stats = @stats_after .diff_to @stats_before
   expect(diff_stats).to eq(SideEffect.new 0, 0, 0, 0)
 end
 
 Then(/^the result should be empty$/) do
-  next if @ignored_scenario
+  pending if @ignored_scenario
   expect(@exception).to be_nil
   expect(@query_result).to be_nil
 end
 
 Then(/^the result should be, in any order:$/) do |table|
-  next if @ignored_scenario
+  pending if @ignored_scenario
   expect(@exception).to be_nil
   expect(@query_result).not_to be_nil
   expect(@query_result).to eq_in_any_order(GqliteTest.parse_results_table table)
 end
 
 Then(/^a SyntaxError should be raised at compile time: VariableAlreadyBound$/) do
-  next if @ignored_scenario
+  pending if @ignored_scenario
   expect(@exception).not_to be_nil
   expect(@exception.message).to match(/^(\d+:\d+:|)Variable .* is already bound.$/)
 end
 
 Then(/^a SyntaxError should be raised at compile time: UndefinedVariable$/) do
-  next if @ignored_scenario
+  pending if @ignored_scenario
   expect(@exception).not_to be_nil
   expect(@exception.message).to match(/^Variable .* is not defined.$/)
 end
 
 Then(/^a SyntaxError should be raised at compile time: NoSingleRelationshipType$/) do
-  next if @ignored_scenario
+  pending if @ignored_scenario
   expect(@exception).not_to be_nil
   expect(@exception.message).to match(/^(\d+:\d+:Expected token \[ got .*)|(\d+:\d+:Expected token \] got .*)$/)
 end
 
 Then(/^a SyntaxError should be raised at compile time: RequiresDirectedRelationship$/) do
-  next if @ignored_scenario
+  pending if @ignored_scenario
   expect(@exception).not_to be_nil
   expect(@exception.message).to match(/(^\d+:\d+:Edge must be directed during creation.)|(\d+:\d+:Edge cannot have both direction.)$/)
 end
 
 Then(/^a SyntaxError should be raised at compile time: CreatingVarLength$/) do
-  next if @ignored_scenario
+  pending if @ignored_scenario
   expect(@exception).not_to be_nil
   expect(@exception.message).to match(/^\d+:\d+:Expected token \] got .*$/)
 end
 
 Then(/^a SyntaxError should be raised at compile time: InvalidParameterUse$/) do
-  next if @ignored_scenario
+  pending if @ignored_scenario
   expect(@exception).not_to be_nil
   expect(@exception.message).to match(/^\d+:\d+:Expected token \) got .*$/)
 end
 
 Then(/^a SyntaxError should be raised at compile time: VariableTypeConflict$/) do
-  next if @ignored_scenario
+  pending if @ignored_scenario
   expect(@exception).not_to be_nil
   expect(@exception.message).to match(/^.* is already defined.$/)
 end
