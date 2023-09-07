@@ -19,13 +19,8 @@ namespace gqlite
     exception(const char* _format, const _T_& _value, const _TOther_&... _other);
     template<typename _T_, typename... _TOther_>
     exception(const std::string& _format, const _T_& _value, const _TOther_&... _other);
-    exception(const exception& _rhs) : exception(_rhs.m_error) {}
-    exception& operator=(const exception& _rhs)
-    {
-      m_error = _rhs.m_error;
-      m_c_error = m_error.c_str();
-      return *this;
-    }
+    exception(const exception& _rhs);
+    exception& operator=(const exception& _rhs);
     const char* what() const throw() override
     {
       return m_c_error;

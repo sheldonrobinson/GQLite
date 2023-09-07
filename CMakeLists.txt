@@ -125,6 +125,7 @@ configure_file(src/config.h.in src/config.h)
 add_library(gqlite SHARED
   src/backend.cpp
   src/connection.cpp
+  src/exception.cpp
   src/gqlite-c.cpp
   src/value.cpp
   src/oc/lexer.cpp

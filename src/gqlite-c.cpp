@@ -11,10 +11,14 @@
   }                                       \
   try                                     \
   {
-#define END_CHECK                         \
-  } catch(const gqlite::exception& _ex)   \
-  {                                       \
-    _context->error_message = _ex.what(); \
+#define END_CHECK                                 \
+  } catch(const gqlite::exception& _ex)           \
+  {                                               \
+    _context->error_message = _ex.what();         \
+    if(_context->error_message.empty())           \
+    {                                             \
+      _context->error_message = "Unknown error";  \
+    }                                             \
   }
 
 extern "C"
