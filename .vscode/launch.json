@@ -5,13 +5,38 @@
     "version": "0.2.0",
     "configurations": [
                 {
-            "name": "gqlite tests (gdb)",
+            "name": "gqlite tck (gdb)",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${env:LRS_PKG_ROOT}/host-build-debug/tests/gqlite",
-            "args": [],
+            "program": "/usr/bin/ruby",
+            "args": ["${env:LRS_PKG_ROOT}/src/gqlite/tests/gqlite-tck.rb"],
             "stopAtEntry": false,
-            "cwd": "${env:LRS_PKG_ROOT}",
+            "cwd": "${env:LRS_PKG_ROOT}/src/gqlite/tests/",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ],
+            "showDisplayString": true
+        },
+        {
+            "name": "gqlite rspec (gdb)",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "/usr/bin/ruby",
+            "args": ["/usr/bin/rspec", "${env:LRS_PKG_ROOT}/src/gqlite/tests/gqlite-rspec.rb"],
+            "stopAtEntry": false,
+            "cwd": "${env:LRS_PKG_ROOT}/src/gqlite/tests/",
             "environment": [],
             "externalConsole": false,
             "MIMode": "gdb",
