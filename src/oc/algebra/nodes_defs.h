@@ -27,7 +27,7 @@ OC_ALGEBRA_GENERATE(return_statement, OC_ALGEBRA_RETURN_MEMBERS)
 #define OC_ALGEBRA_GRAPH_NODE_MEMBERS(_KLASS_NAME_, F)          \
   F(_KLASS_NAME_, std::string, variable)                        \
   F(_KLASS_NAME_, std::vector<std::string>, labels)             \
-  F(_KLASS_NAME_, std::unordered_map<GQLITE_LIST(std::string, node_csp)>, properties)
+  F(_KLASS_NAME_, map_csp, properties)
 
 OC_ALGEBRA_GENERATE(graph_node, OC_ALGEBRA_GRAPH_NODE_MEMBERS)
 
@@ -37,7 +37,7 @@ OC_ALGEBRA_GENERATE(graph_node, OC_ALGEBRA_GRAPH_NODE_MEMBERS)
   F(_KLASS_NAME_, graph_node_csp, destination)                  \
   F(_KLASS_NAME_, edge_directivity, directivity)                \
   F(_KLASS_NAME_, std::string, label)                           \
-  F(_KLASS_NAME_, std::unordered_map<GQLITE_LIST(std::string, node_csp)>, properties)
+  F(_KLASS_NAME_, map_csp, properties)
 
 OC_ALGEBRA_GENERATE(graph_edge, OC_ALGEBRA_GRAPH_EDGE_MEMBERS)
 

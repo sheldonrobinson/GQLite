@@ -229,6 +229,60 @@ namespace gqlite::backends::sqlite_oc_executor
   using element_ref_vector_sp = std::shared_ptr<element_ref_vector>;
   using exec_value = std::variant<element_ref, element_ref_vector_sp, gqlite::value, empty>;
 
+  struct filter_visitor : public gqlite::oc::algebra::abstract_node_visitor<std::string>
+  {
+    std::map<int, value>* bindings;
+    // Unused nodes
+    std::string visit(algebra::graph_node_csp _node) override
+    {
+      throw gqlite::exception("sqlite not implemented graph_node");
+    }
+    std::string visit(algebra::graph_edge_csp _node) override
+    {
+      throw gqlite::exception("sqlite not implemented edge_node");
+    }
+    std::string visit(algebra::named_expression_csp _node) override
+    {
+      throw gqlite::exception("sqlite not implemented named_expression");
+    }
+    std::string visit(algebra::create_csp _node) override
+    {
+      throw gqlite::exception("sqlite not implemented create");
+    }
+    std::string visit(algebra::match_csp _node) override
+    {
+      throw gqlite::exception("sqlite not implemented match");
+    }
+    std::string visit(algebra::statements_csp _node) override
+    {
+      throw gqlite::exception("sqlite not implemented statements");
+    }
+    std::string visit(algebra::return_statement_csp _node) override
+    {
+      throw gqlite::exception("sqlite not implemented return");
+    }
+    std::string visit(algebra::value_csp _node) override
+    {
+      throw gqlite::exception("sqlite not implemented value");
+    }
+    std::string visit(algebra::map_csp _node) override
+    {
+      throw gqlite::exception("sqlite not implemented map");
+    }
+    std::string visit(algebra::array_csp _node) override
+    {
+      throw gqlite::exception("sqlite not implemented array");
+    }
+    std::string visit(algebra::variable_csp _node) override
+    {
+      throw gqlite::exception("sqlite not implemented variable");
+    }
+    std::string visit(algebra::member_access_csp _node) override
+    {
+      throw gqlite::exception("sqlite not implemented member_access");
+    }
+  };
+
   /**
    * @internal
    * This visitor is used to execute the queries
@@ -416,9 +470,15 @@ namespace gqlite::backends::sqlite_oc_executor
     {
       if(has_variable(_node->get_variable()))
       {
-        throw gqlite::exception("Variable {} is already bound.", _node->get_variable());
+        throw exception("Variable {} is already bound.", _node->get_variable());
       }
-      gqlite::value props = get_properties(_node->get_properties());
+      value props;
+      if(_node->get_properties())
+      {
+        props = get_properties(_node->get_properties()->get_map());
+      } else {
+        props = value_map();
+      }
       std::string json_properties = props.to_json();
       data->execute_sql(sqlite_queries::node_create(graph_name), {{1, json_properties}});
       int row_id = data->last_row_id();
@@ -443,13 +503,19 @@ namespace gqlite::backends::sqlite_oc_executor
     {
       if(has_variable(_edge->get_variable()))
       {
-        throw gqlite::exception("Variable {} is already bound.", _edge->get_variable());
+        throw exception("Variable {} is already bound.", _edge->get_variable());
       }
       node_ref_sp source = has_node(_edge->get_source()) ? get_node_ref(variables[_edge->get_source()->get_variable()]) : create_node(_edge->get_source());
       node_ref_sp destination = has_node(_edge->get_destination()) ? get_node_ref(variables[_edge->get_destination()->get_variable()]) : create_node(_edge->get_destination());
       int label_id = data->id_for_label(_edge->get_label());
       
-      value props = get_properties(_edge->get_properties());
+      value props;
+      if(_edge->get_properties())
+      {
+        props = get_properties(_edge->get_properties()->get_map());
+      } else {
+        props = value_map();
+      }
       data->execute_sql(sqlite_queries::edge_create(graph_name), {{1, label_id}, {2, props.to_json()}, {3, source->id}, {4, destination->id}});
       int row_id = data->last_row_id();
       edge_ref_sp nr = std::make_shared<edge_ref>(edge_ref{
@@ -488,6 +554,9 @@ namespace gqlite::backends::sqlite_oc_executor
       std::string sql_conditions;
       std::map<int, value> bindings;
 
+      filter_visitor fil_vis;
+      fil_vis.bindings = &bindings;
+
       for(const algebra::alternative<algebra::graph_node, algebra::graph_edge>& pattern : _node->get_patterns())
       {
         if(count != 0)
@@ -495,7 +564,7 @@ namespace gqlite::backends::sqlite_oc_executor
           sql_variables += ", ";
           sql_tables += " JOIN ";
         }
-        pattern.visit<void>([this, &sql_variables, &sql_tables, &sql_conditions, count, &count_variables, &bindings](const algebra::graph_node_csp _node)
+        pattern.visit<void>([this, &sql_variables, &sql_tables, &sql_conditions, count, &count_variables, &bindings, &fil_vis](const algebra::graph_node_csp _node)
         {
           std::string count_s = std::to_string(count);
           sql_variables += "tb" + std::to_string(count) + ".id";
@@ -511,6 +580,10 @@ namespace gqlite::backends::sqlite_oc_executor
               bindings[bindings.size() + 1] = data->id_for_label(label);
               ++label_count;
             }
+          }
+          if(_node->get_properties())
+          {
+            sql_conditions += fil_vis.start(_node->get_properties());
           }
           ++count_variables;
         },
@@ -528,7 +601,6 @@ namespace gqlite::backends::sqlite_oc_executor
       {
         sql_conditions = (count == 1 ? " WHERE TRUE " : " ON TRUE ") + sql_conditions;
       }
-      std::cout << ("SELECT DISTINCT " + sql_variables + " FROM " + sql_tables + sql_conditions) << std::endl;
       gqlite::value r = data->execute_sql("SELECT DISTINCT " + sql_variables + " FROM " + sql_tables + sql_conditions, bindings);
       std::vector<element_ref_vector_sp> ervs;
       ervs.reserve(count_variables);

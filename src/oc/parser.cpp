@@ -53,7 +53,7 @@ void parser::data::validate(algebra::graph_node_csp _node)
     bounded_variables[_node->get_variable()] = _node;
     return;
   }
-  if(_node->get_labels().empty() and _node->get_properties().empty()) return;
+  if(_node->get_labels().empty() and not _node->get_properties()) return;
   if(_node->equals(it->second)) return;
   report_error(tok, "Variable {} is already bound.", _node->get_variable());
 }
@@ -69,7 +69,7 @@ void parser::data::validate(algebra::graph_edge_csp _node)
     bounded_variables[_node->get_variable()] = _node;
     return;
   }
-  if(_node->get_label().empty() and _node->get_properties().empty()) return;
+  if(_node->get_label().empty() and not _node->get_properties()) return;
   if(_node->equals(it->second)) return;
   report_error(tok, "Variable {} is already bound.", _node->get_variable());
 }
@@ -134,7 +134,7 @@ namespace
     algebra::graph_node_csp source, destination;
     std::string variable;
     std::string label;
-    std::unordered_map<std::string, algebra::node_csp> properties;
+    algebra::map_csp properties;
   };
 }
 
@@ -164,10 +164,10 @@ std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>> pars
       get_next_token();
     }
     // Properties
-    std::unordered_map<std::string, algebra::node_csp> properties;
+    algebra::map_csp properties;
     if(tok.type == token_type::STARTBRACE)
     {
-      properties = parse_properties();
+      properties = std::make_shared<algebra::map>(parse_properties());
     }
     // End of node
     is_of_type(token_type::ENDBRACKET);
@@ -227,7 +227,7 @@ std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>> pars
       }
       if(tok.type == token_type::STARTBRACE)
       {
-        current_edge.properties = parse_properties();
+        current_edge.properties = std::make_shared<algebra::map>(parse_properties());
       }
       is_of_type(token_type::ENDBOXBRACKET);
       get_next_token();
