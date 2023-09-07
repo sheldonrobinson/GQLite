@@ -197,6 +197,7 @@ end
 Then(/^the result should be, in any order:$/) do |table|
   next if @ignored_scenario
   expect(@exception).to be_nil
+  expect(@query_result).not_to be_nil
   expect(@query_result).to eq_in_any_order(GqliteTest.parse_results_table table)
 end
 
