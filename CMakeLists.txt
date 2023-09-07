@@ -108,6 +108,28 @@ set_package_properties(Python3 PROPERTIES
     PURPOSE "Used for python3 bindings.")
 
 ########################
+## Find cffi
+
+if(Python3_FOUND)
+  execute_process(
+    COMMAND
+      ${Python3_EXECUTABLE} "-c" "import cffi"
+    RESULT_VARIABLE PYTHON3_CFFI_STATUS
+    ERROR_QUIET
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+endif()
+
+if(NOT PYTHON3_CFFI_STATUS)
+  set(PYTHON3_CFFI_FOUND TRUE)
+endif()
+
+set_package_properties(PYTHON3_CFFI PROPERTIES
+    DESCRIPTION "Python3's cffi package"
+    TYPE OPTIONAL
+    PURPOSE "Used for python3 bindings.")
+
+########################
 ## Build library
 
 include_directories(include ${CMAKE_CURRENT_BINARY_DIR}/src)
@@ -149,7 +171,7 @@ install(FILES include/gqlite-c.h
 ########################
 ## Build python
 
-if(Python3_FOUND)
+if(Python3_FOUND AND PYTHON3_CFFI_FOUND)
   set(Python3_SHORT_VERSION "${Python3_VERSION_MAJOR}.${Python3_VERSION_MINOR}")
 
   set(PYTHON_SITE_PACKAGES_INSTALL_DIR ${INSTALL_LIB_DIR}/python${Python3_SHORT_VERSION}/dist-packages/)
