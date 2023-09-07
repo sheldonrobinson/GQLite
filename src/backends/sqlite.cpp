@@ -263,7 +263,9 @@ namespace gqlite::backends::sqlite_oc_executor
     }
     std::string visit(algebra::value_csp _node) override
     {
-      throw gqlite::exception("sqlite not implemented value");
+      int idx = bindings->size() + 1;
+      (*bindings)[idx] = _node->get_value();
+      return "?" + to_string_fixed_width(idx, 3);
     }
     std::string visit(algebra::map_csp _node) override
     {
@@ -436,8 +438,26 @@ namespace gqlite::backends::sqlite_oc_executor
       for(const std::string& pn : _path)
       {
         cval = cval.to_map()[pn];
-      }
+     }
       return cval;
+    }
+    /**
+     * Generate a filter expression for a map
+     */
+    std::string generate_filter(const algebra::map_csp& _map, const std::string& _path, filter_visitor* _filter_visitor)
+    {
+      std::string r;
+      for(const auto& [k, v] : _map->get_map())
+      {
+        std::string path = _path + "." + k;
+        if(v->get_type() == algebra::node_type::map)
+        {
+          r += generate_filter(std::static_pointer_cast<const algebra::map>(_map), path, _filter_visitor);
+        } else {
+          r += format_string(" AND json_extract({}') = {} ", path, _filter_visitor->start(v));
+        }
+      }
+      return r;
     }
     // Unused nodes
     exec_value visit(algebra::graph_node_csp _node) override
@@ -583,7 +603,7 @@ namespace gqlite::backends::sqlite_oc_executor
           }
           if(_node->get_properties())
           {
-            sql_conditions += fil_vis.start(_node->get_properties());
+            sql_conditions += generate_filter(_node->get_properties(), "tb" + std::to_string(count) + ".properties, '$", &fil_vis);
           }
           ++count_variables;
         },
@@ -638,6 +658,10 @@ namespace gqlite::backends::sqlite_oc_executor
       {
         if(not _varname.empty())
         {
+          if(has_variable(_varname))
+          {
+            throw exception("{} is already defined.", _varname);
+          }
           variables[_varname] = ervs[idx];
         }
         ++idx;
@@ -695,7 +719,7 @@ namespace gqlite::backends::sqlite_oc_executor
           value_vector values;
           for(const element_ref& v : _v->refs)
           {
-            values.push_back(operator()(_v));
+            values.push_back(operator()(v));
           }
           return gqlite::value(values);
         }

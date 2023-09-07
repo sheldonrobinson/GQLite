@@ -16,7 +16,7 @@ namespace gqlite::oc::algebra::details
   template<typename _T_>
   bool equals(const std::shared_ptr<const _T_>& _a, const std::shared_ptr<const _T_>& _b) requires std::derived_from<_T_, node>
   {
-    return _a->equals(_b);
+    return (_a == _b) or (_a and _b and _a->equals(_b));
   }
   template<typename... _T_>
   bool equals(const alternative<_T_...>& _a, const alternative<_T_...>& _b)

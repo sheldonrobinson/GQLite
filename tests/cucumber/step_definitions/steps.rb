@@ -130,11 +130,24 @@ IgnoredScenario = [
   "[19] Fail when adding new label predicate on a node that is already bound 5",
   # Triggers a different error first, as MATCH (a) return an empty list, it fails in creation
   # TODO revisit in case we add support for creation of relationship with list of nodes 
-  "[24] Fail when creating a relationship using undefined variable in pattern"
+  "[24] Fail when creating a relationship using undefined variable in pattern",
+  # Path assignment is not implemented yet
+  # Nor is *
+  "[8] Fail when a path has the same variable in a preceding MATCH",
+  "[9] Fail when a relationship has the same variable in the same pattern",
+  "[10] Fail when a path has the same variable in the same pattern",
+  # with not implemented
+  "[11] Fail when matching a node variable bound to a value"
 ]
 
 Before do |scenario|
-  @ignored_scenario = IgnoredScenario.include? scenario.name
+  @ignored_scenario = false
+  IgnoredScenario.each() do |ignored_scenario_name|
+    if scenario.name.start_with?(ignored_scenario_name)
+      @ignored_scenario = true
+      break
+    end
+  end
 end
 
 Given(/^any graph$/) do
@@ -229,4 +242,16 @@ Then(/^a SyntaxError should be raised at compile time: CreatingVarLength$/) do
   next if @ignored_scenario
   expect(@exception).not_to be_nil
   expect(@exception.message).to match(/^\d+:\d+:Expected token \] got .*$/)
+end
+
+Then(/^a SyntaxError should be raised at compile time: InvalidParameterUse$/) do
+  next if @ignored_scenario
+  expect(@exception).not_to be_nil
+  expect(@exception.message).to match(/^\d+:\d+:Expected token \) got .*$/)
+end
+
+Then(/^a SyntaxError should be raised at compile time: VariableTypeConflict$/) do
+  next if @ignored_scenario
+  expect(@exception).not_to be_nil
+  expect(@exception.message).to match(/^.* is already defined.$/)
 end
