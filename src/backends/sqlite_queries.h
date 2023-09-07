@@ -15,6 +15,18 @@ stream << "_edges (label, properties, left, right) VALUES (?001, ?002, ?003, ?00
 
     return stream.str();
   }
+  std::string edge_get_label_properties(const std::string& _graph_name)
+  {
+    std::stringstream stream;
+    #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_get_label_properties.sql"
+stream << "SELECT label, properties FROM gqlite_";
+#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_get_label_properties.sql"
+stream << ( _graph_name );
+#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_get_label_properties.sql"
+stream << "_edges WHERE id = ?001";
+
+    return stream.str();
+  }
   std::string get_debug_stats(const std::string& _graph_name)
   {
     std::stringstream stream;

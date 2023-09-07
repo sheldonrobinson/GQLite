@@ -340,7 +340,22 @@ namespace gqlite::backends::sqlite_oc_executor
         {
           if(_edge_ref->cache.get_type() == value_type::invalid)
           {
-            throw gqlite::exception("wip: value getter for edge ref");
+            // Retrieve label/properties
+            std::string label;
+            gqlite::value properties;
+            {
+              // Query
+              value_vector properties_val_list_vector = v->data->execute_sql(sqlite_queries::edge_get_label_properties(v->graph_name), {{1, _edge_ref->id}}).to_vector();
+              check_condition(properties_val_list_vector.size() == 1, "When getting an edge, should have received only one edge");
+              value_vector properties_row = properties_val_list_vector.front().to_vector();
+              check_condition(properties_row.size() == 2, "When getting an edge, properties get should only have given two column");
+              label = v->data->label_for_id(properties_row[0].to_integer());
+              properties = gqlite::value::from_json(properties_row[1].to_string());
+            }
+            // Generate the cache
+            _edge_ref->cache = gqlite::value{{
+              {"type", gqlite::value("edge")}, {"label", gqlite::value(label)}, {"id", gqlite::value(_edge_ref->id)}, {"properties", gqlite::value(properties)}
+            }};
           }
           return _edge_ref->cache;
         }
