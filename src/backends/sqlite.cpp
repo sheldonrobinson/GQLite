@@ -580,18 +580,7 @@ namespace gqlite::backends::sqlite_oc_executor
       return empty{};
     }
     // Match
-    void generate_labels_match(const std::vector<std::string>& _labels, std::string* _sql_tables, std::string* _sql_conditions, int* _label_count, const std::string& _node_variable, std::map<int, value>* _bindings)
-    {
-      for(const std::string& label : _labels)
-      {
-        *_sql_tables += format_string(" JOIN gqlite_{}_labels AS tb_lab{}", graph_name, *_label_count);
-        *_sql_conditions += format_string(" AND {} = tb_lab{}.node_id AND ?{} = tb_lab{}.label ",
-                      _node_variable, *_label_count, to_string_fixed_width(_bindings->size() + 1, 3), *_label_count);
-        (*_bindings)[_bindings->size() + 1] = data->id_for_label(label);
-        ++*_label_count;
-      }
-    }
-    exec_value visit(algebra::match_csp _node) override
+    struct match_context
     {
       int count = 0;
       int count_variables = 0;
@@ -600,41 +589,55 @@ namespace gqlite::backends::sqlite_oc_executor
       std::string sql_conditions;
       std::map<int, value> bindings;
       int label_count = 0;
-
+    };
+    void generate_labels_match(const std::vector<std::string>& _labels, match_context* _mc, const std::string& _node_variable)
+    {
+      for(const std::string& label : _labels)
+      {
+        _mc->sql_tables += format_string(" JOIN gqlite_{}_labels AS tb_lab{}", graph_name, _mc->label_count);
+        _mc->sql_conditions += format_string(" AND {} = tb_lab{}.node_id AND ?{} = tb_lab{}.label ",
+                      _node_variable, _mc->label_count, to_string_fixed_width(_mc->bindings.size() + 1, 3), _mc->label_count);
+        _mc->bindings[_mc->bindings.size() + 1] = data->id_for_label(label);
+        ++_mc->label_count;
+      }
+    }
+    exec_value visit(algebra::match_csp _node) override
+    {
+      match_context mc;
       filter_visitor fil_vis;
-      fil_vis.bindings = &bindings;
+      fil_vis.bindings = &mc.bindings;
 
       for(const algebra::alternative<algebra::graph_node, algebra::graph_edge>& pattern : _node->get_patterns())
       {
-        if(count != 0)
+        if(mc.count != 0)
         {
-          sql_variables += ", ";
-          sql_tables += " JOIN ";
+          mc.sql_variables += ", ";
+          mc.sql_tables += " JOIN ";
         }
-        pattern.visit<void>([this, &sql_variables, &sql_tables, &sql_conditions, count, &count_variables, &bindings, &fil_vis, &label_count](const algebra::graph_node_csp _node)
+        pattern.visit<void>([this, &mc, &fil_vis](const algebra::graph_node_csp _node)
         {
-          std::string count_s = std::to_string(count);
-          sql_variables += format_string("tb{}.id", count_s);
-          sql_tables += format_string("gqlite_{}_nodes AS tb{}", graph_name, count_s);
-          generate_labels_match(_node->get_labels(), &sql_tables, &sql_conditions, &label_count, "tb" + count_s + ".id", &bindings);
+          std::string count_s = std::to_string(mc.count);
+          mc.sql_variables += format_string("tb{}.id", count_s);
+          mc.sql_tables += format_string("gqlite_{}_nodes AS tb{}", graph_name, count_s);
+          generate_labels_match(_node->get_labels(), &mc, format_string("tb{}.id", count_s));
           if(_node->get_properties())
           {
-            sql_conditions += generate_filter(_node->get_properties(), "tb" + count_s + ".properties, '$", &fil_vis);
+            mc.sql_conditions += generate_filter(_node->get_properties(), "tb" + count_s + ".properties, '$", &fil_vis);
           }
-          ++count_variables;
+          ++mc.count_variables;
         },
-        [this, &sql_variables, &sql_tables, &sql_conditions, count, &count_variables, &bindings, &fil_vis, &label_count](const algebra::graph_edge_csp _edge)
+        [this, &mc, &fil_vis](const algebra::graph_edge_csp _edge)
         {
-          std::string count_s = std::to_string(count);
-          sql_variables += format_string("tb{}.left, ", count_s);
-          sql_variables += format_string("tb{}.id, ", count_s);
-          sql_variables += format_string("tb{}.right", count_s);
-          sql_tables += format_string("gqlite_{}_edges AS tb{}", graph_name, count_s);
-          generate_labels_match(_edge->get_source()->get_labels(), &sql_tables, &sql_conditions, &label_count, "tb" + count_s + ".left", &bindings);
-          generate_labels_match(_edge->get_destination()->get_labels(), &sql_tables, &sql_conditions, &label_count, "tb" + count_s + ".right", &bindings);
+          std::string count_s = std::to_string(mc.count);
+          mc.sql_variables += format_string("tb{}.left, ", count_s);
+          mc.sql_variables += format_string("tb{}.id, ", count_s);
+          mc.sql_variables += format_string("tb{}.right", count_s);
+          mc.sql_tables += format_string("gqlite_{}_edges AS tb{}", graph_name, count_s);
+          generate_labels_match(_edge->get_source()->get_labels(), &mc, "tb" + count_s + ".left");
+          generate_labels_match(_edge->get_destination()->get_labels(), &mc, "tb" + count_s + ".right");
           if(_edge->get_properties())
           {
-            sql_conditions += generate_filter(_edge->get_properties(), format_string("tb{}.properties, '$", count_s), &fil_vis);
+            mc.sql_conditions += generate_filter(_edge->get_properties(), format_string("tb{}.properties, '$", count_s), &fil_vis);
           }
           if(_edge->get_source()->get_properties())
           {
@@ -646,18 +649,18 @@ namespace gqlite::backends::sqlite_oc_executor
             throw exception("Node properties not implemented, need join.");
             // sql_conditions += generate_filter(_edge->get_destination()->get_properties(), "tb" + count_s + ".properties, '$", &fil_vis);
           }
-          count_variables += 3;
+          mc.count_variables += 3;
         });
-        ++count;
+        ++mc.count;
       }
-      if(not sql_conditions.empty())
+      if(not mc.sql_conditions.empty())
       {
-        sql_conditions = (count == 1 ? " WHERE TRUE " : " ON TRUE ") + sql_conditions;
+        mc.sql_conditions = (mc.count == 1 ? " WHERE TRUE " : " ON TRUE ") + mc.sql_conditions;
       }
-      gqlite::value r = data->execute_sql("SELECT DISTINCT " + sql_variables + " FROM " + sql_tables + sql_conditions, bindings);
+      gqlite::value r = data->execute_sql("SELECT DISTINCT " + mc.sql_variables + " FROM " + mc.sql_tables + mc.sql_conditions, mc.bindings);
       std::vector<element_ref_vector_sp> ervs;
-      ervs.reserve(count_variables);
-      for(int i = 0; i < count_variables; ++i)
+      ervs.reserve(mc.count_variables);
+      for(int i = 0; i < mc.count_variables; ++i)
       {
         ervs.push_back(std::make_shared<element_ref_vector>());
       }
@@ -666,7 +669,7 @@ namespace gqlite::backends::sqlite_oc_executor
       {
         int idx = 0;
         value_vector row = row_value.to_vector();
-        check_condition(row.size() == count_variables, "Wrong number of column return by SQL Query.");
+        check_condition(row.size() == mc.count_variables, "Wrong number of column return by SQL Query.");
 
         for(const algebra::alternative<algebra::graph_node, algebra::graph_edge>& pattern : _node->get_patterns())
         {
