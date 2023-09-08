@@ -580,6 +580,17 @@ namespace gqlite::backends::sqlite_oc_executor
       return empty{};
     }
     // Match
+    void generate_labels_match(const std::vector<std::string>& _labels, std::string* _sql_tables, std::string* _sql_conditions, int* _label_count, const std::string& _node_variable, std::map<int, value>* _bindings)
+    {
+      for(const std::string& label : _labels)
+      {
+        *_sql_tables += " JOIN gqlite_" + graph_name + "_labels AS tb_lab" + std::to_string(*_label_count);
+        *_sql_conditions += " AND " + _node_variable + " = tb_lab" + std::to_string(*_label_count) + ".node_id"
+                          " AND ?" + to_string_fixed_width(_bindings->size() + 1, 3) + " = tb_lab" + std::to_string(*_label_count) + ".label ";
+        (*_bindings)[_bindings->size() + 1] = data->id_for_label(label);
+        ++*_label_count;
+      }
+    }
     exec_value visit(algebra::match_csp _node) override
     {
       int count = 0;
@@ -588,6 +599,7 @@ namespace gqlite::backends::sqlite_oc_executor
       std::string sql_tables;
       std::string sql_conditions;
       std::map<int, value> bindings;
+      int label_count = 0;
 
       filter_visitor fil_vis;
       fil_vis.bindings = &bindings;
@@ -599,35 +611,39 @@ namespace gqlite::backends::sqlite_oc_executor
           sql_variables += ", ";
           sql_tables += " JOIN ";
         }
-        pattern.visit<void>([this, &sql_variables, &sql_tables, &sql_conditions, count, &count_variables, &bindings, &fil_vis](const algebra::graph_node_csp _node)
+        pattern.visit<void>([this, &sql_variables, &sql_tables, &sql_conditions, count, &count_variables, &bindings, &fil_vis, &label_count](const algebra::graph_node_csp _node)
         {
           std::string count_s = std::to_string(count);
           sql_variables += "tb" + std::to_string(count) + ".id";
           sql_tables += "gqlite_" + graph_name + "_nodes AS tb" + count_s;
-          if(not _node->get_labels().empty())
-          {
-            int label_count = 0;
-            for(const std::string& label : _node->get_labels())
-            {
-              sql_tables += " JOIN gqlite_" + graph_name + "_labels AS tb_lab" + std::to_string(label_count) + "_" + count_s;
-              sql_conditions += " AND tb" + count_s + ".id = tb_lab" + std::to_string(label_count) + "_" + count_s + ".node_id"
-                               " AND ?" + to_string_fixed_width(bindings.size() + 1, 3) + " = tb_lab" + std::to_string(label_count) + "_" + count_s + ".label ";
-              bindings[bindings.size() + 1] = data->id_for_label(label);
-              ++label_count;
-            }
-          }
+          generate_labels_match(_node->get_labels(), &sql_tables, &sql_conditions, &label_count, "tb" + count_s + ".id", &bindings);
           if(_node->get_properties())
           {
-            sql_conditions += generate_filter(_node->get_properties(), "tb" + std::to_string(count) + ".properties, '$", &fil_vis);
+            sql_conditions += generate_filter(_node->get_properties(), "tb" + count_s + ".properties, '$", &fil_vis);
           }
           ++count_variables;
         },
-        [this, &sql_variables, &sql_tables, &sql_conditions, count, &count_variables](const algebra::graph_edge_csp _edge)
+        [this, &sql_variables, &sql_tables, &sql_conditions, count, &count_variables, &bindings, &fil_vis, &label_count](const algebra::graph_edge_csp _edge)
         {
-          sql_variables += "tb" + std::to_string(count) + ".left, ";
-          sql_variables += "tb" + std::to_string(count) + ".id, ";
-          sql_variables += "tb" + std::to_string(count) + ".right";
+          std::string count_s = std::to_string(count);
+          sql_variables += "tb" + count_s + ".left, ";
+          sql_variables += "tb" + count_s + ".id, ";
+          sql_variables += "tb" + count_s + ".right";
           sql_tables += "gqlite_" + graph_name + "_edges AS tb" + std::to_string(count);
+          generate_labels_match(_edge->get_source()->get_labels(), &sql_tables, &sql_conditions, &label_count, "tb" + count_s + ".left", &bindings);
+          generate_labels_match(_edge->get_destination()->get_labels(), &sql_tables, &sql_conditions, &label_count, "tb" + count_s + ".right", &bindings);
+          if(_edge->get_properties())
+          {
+            sql_conditions += generate_filter(_edge->get_properties(), "tb" + count_s + ".properties, '$", &fil_vis);
+          }
+          if(_edge->get_source()->get_properties())
+          {
+            sql_conditions += generate_filter(_edge->get_source()->get_properties(), "tb" + count_s + ".properties, '$", &fil_vis);
+          }
+          if(_edge->get_destination()->get_properties())
+          {
+            sql_conditions += generate_filter(_edge->get_destination()->get_properties(), "tb" + count_s + ".properties, '$", &fil_vis);
+          }
           count_variables += 3;
         });
         ++count;
