@@ -158,6 +158,7 @@ add_library(gqlite SHARED
   src/oc/algebra/node_type.cpp
   src/oc/algebra/nodes.cpp
   src/oc/algebra/visitors/print.cpp
+  src/backends/functions.cpp
   src/backends/sqlite.cpp
   )
 

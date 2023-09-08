@@ -5,6 +5,7 @@
 #include <sqlite3.h>
 #include <variant>
 
+#include "functions.h"
 #include "sqlite_queries.h"
 
 #include "../oc/algebra/abstract_node_visitor.h"
@@ -797,7 +798,12 @@ namespace gqlite::backends::sqlite_oc_executor
     }
     exec_value visit(algebra::function_call_csp _node) override
     {
-      throw gqlite::exception("sqlite exec not implemented function_call");
+      std::vector<value> args;
+      for(const algebra::node_csp& arg : _node->get_arguments())
+      {
+        args.push_back(get_value(start(arg)));
+      }
+      return functions::call(_node->get_name(), args);
     }
     exec_value visit(algebra::return_statement_csp rs) override
     {
