@@ -303,7 +303,29 @@ algebra::node_csp parser::data::parse_terminal_expression()
     return std::make_shared<algebra::value>(gqlite::value());
   case token_type::IDENTIFIER:
     get_next_token();
-    return std::make_shared<algebra::variable>(t.string);
+    if(tok.type == token_type::STARTBRACKET)
+    {
+      std::vector<algebra::node_csp> arguments;
+      get_next_token();
+      if(tok.type != token_type::ENDBRACKET)
+      {
+        while(tok.type != token_type::END_OF_FILE)
+        {
+          arguments.push_back(parse_expression());
+          if(tok.type == token_type::COMMA)
+          {
+            get_next_token();
+          } else {
+            break;
+          }
+        }
+        is_of_type(token_type::ENDBRACKET);
+      }
+      get_next_token();
+      return std::make_shared<algebra::function_call>(t.string, arguments);
+    } else {
+      return std::make_shared<algebra::variable>(t.string);
+    }
   case token_type::STRING:
     get_next_token();
     return std::make_shared<algebra::value>(t.string);

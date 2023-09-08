@@ -77,6 +77,12 @@ OC_ALGEBRA_GENERATE(variable, OC_ALGEBRA_VARIABLE_MEMBERS)
 
 OC_ALGEBRA_GENERATE(member_access, OC_ALGEBRA_MEMBER_ACCESS_MEMBERS)
 
+#define OC_ALGEBRA_FUNCTION_CALL_EXPRESSION(_KLASS_NAME_, F)  \
+  F(_KLASS_NAME_, std::string, name)                          \
+  F(_KLASS_NAME_, std::vector<node_csp>, arguments)
+
+OC_ALGEBRA_GENERATE(function_call, OC_ALGEBRA_FUNCTION_CALL_EXPRESSION)
+
 #define OC_ALGEBRA_BINARY_MEMBERS(_KLASS_NAME_, F) \
   F(_KLASS_NAME_, node_csp, left)                  \
   F(_KLASS_NAME_, node_csp, right)

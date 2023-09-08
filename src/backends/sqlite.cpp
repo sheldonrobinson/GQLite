@@ -283,6 +283,10 @@ namespace gqlite::backends::sqlite_oc_executor
     {
       throw gqlite::exception("sqlite not implemented member_access");
     }
+    std::string visit(algebra::function_call_csp _node) override
+    {
+      throw gqlite::exception("sqlite not implemented function_call");
+    }
   };
 
   /**
@@ -790,6 +794,10 @@ namespace gqlite::backends::sqlite_oc_executor
         }
       };
       return std::visit(member_access{this, _node}, value);
+    }
+    exec_value visit(algebra::function_call_csp _node) override
+    {
+      throw gqlite::exception("sqlite exec not implemented function_call");
     }
     exec_value visit(algebra::return_statement_csp rs) override
     {
