@@ -16,11 +16,15 @@ else
 end
 
 # Validated
-# features = [ 'create/Create1.feature', 'create/Create2.feature', 'match/Match1.feature' ]
+features = [
+  # Create
+  'create/Create1.feature', 'create/Create2.feature',
+  # Match
+  'match/Match1.feature', 'match/Match2.feature' ]
 # In progress
 # features = [ 'create/Create5.feature' ]
 # Current dev
-features = [ 'match/Match2.feature' ]
+# features = [  ]
 
 features = features.map { |file| 'openCypher/tck/features/clauses/' + file }
 args = features.concat %w(--require cucumber/step_definitions/ --fail-fast)

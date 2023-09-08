@@ -134,8 +134,16 @@ IgnoredScenario = [
   "[8] Fail when a path has the same variable in a preceding MATCH",
   "[9] Fail when a relationship has the same variable in the same pattern",
   "[10] Fail when a path has the same variable in the same pattern",
+  "[9] Fail when a node has the same variable in a preceding MATCH",
+  "[10] Fail when a path has the same variable in a preceding MATCH",
+  "[11] Fail when a node has the same variable in the same pattern",
+  "[12] Fail when a path has the same variable in the same pattern",
   # with not implemented
-  "[11] Fail when matching a node variable bound to a value"
+  "[11] Fail when matching a node variable bound to a value",
+  "[7] Matching twice with conflicting relationship types on same relationship",
+  "[13] Fail when matching a relationship variable bound to a value",
+  # bindings ($) not implemented
+  "[8] Fail when using parameter as relationship predicate in MATCH"
 ]
 
 Before do |scenario|
