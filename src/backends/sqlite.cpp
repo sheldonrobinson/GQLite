@@ -584,9 +584,9 @@ namespace gqlite::backends::sqlite_oc_executor
     {
       for(const std::string& label : _labels)
       {
-        *_sql_tables += " JOIN gqlite_" + graph_name + "_labels AS tb_lab" + std::to_string(*_label_count);
-        *_sql_conditions += " AND " + _node_variable + " = tb_lab" + std::to_string(*_label_count) + ".node_id"
-                          " AND ?" + to_string_fixed_width(_bindings->size() + 1, 3) + " = tb_lab" + std::to_string(*_label_count) + ".label ";
+        *_sql_tables += format_string(" JOIN gqlite_{}_labels AS tb_lab{}", graph_name, *_label_count);
+        *_sql_conditions += format_string(" AND {} = tb_lab{}.node_id AND ?{} = tb_lab{}.label ",
+                      _node_variable, *_label_count, to_string_fixed_width(_bindings->size() + 1, 3), *_label_count);
         (*_bindings)[_bindings->size() + 1] = data->id_for_label(label);
         ++*_label_count;
       }
@@ -614,8 +614,8 @@ namespace gqlite::backends::sqlite_oc_executor
         pattern.visit<void>([this, &sql_variables, &sql_tables, &sql_conditions, count, &count_variables, &bindings, &fil_vis, &label_count](const algebra::graph_node_csp _node)
         {
           std::string count_s = std::to_string(count);
-          sql_variables += "tb" + std::to_string(count) + ".id";
-          sql_tables += "gqlite_" + graph_name + "_nodes AS tb" + count_s;
+          sql_variables += format_string("tb{}.id", count_s);
+          sql_tables += format_string("gqlite_{}_nodes AS tb{}", graph_name, count_s);
           generate_labels_match(_node->get_labels(), &sql_tables, &sql_conditions, &label_count, "tb" + count_s + ".id", &bindings);
           if(_node->get_properties())
           {
@@ -626,23 +626,25 @@ namespace gqlite::backends::sqlite_oc_executor
         [this, &sql_variables, &sql_tables, &sql_conditions, count, &count_variables, &bindings, &fil_vis, &label_count](const algebra::graph_edge_csp _edge)
         {
           std::string count_s = std::to_string(count);
-          sql_variables += "tb" + count_s + ".left, ";
-          sql_variables += "tb" + count_s + ".id, ";
-          sql_variables += "tb" + count_s + ".right";
-          sql_tables += "gqlite_" + graph_name + "_edges AS tb" + std::to_string(count);
+          sql_variables += format_string("tb{}.left, ", count_s);
+          sql_variables += format_string("tb{}.id, ", count_s);
+          sql_variables += format_string("tb{}.right", count_s);
+          sql_tables += format_string("gqlite_{}_edges AS tb{}", graph_name, count_s);
           generate_labels_match(_edge->get_source()->get_labels(), &sql_tables, &sql_conditions, &label_count, "tb" + count_s + ".left", &bindings);
           generate_labels_match(_edge->get_destination()->get_labels(), &sql_tables, &sql_conditions, &label_count, "tb" + count_s + ".right", &bindings);
           if(_edge->get_properties())
           {
-            sql_conditions += generate_filter(_edge->get_properties(), "tb" + count_s + ".properties, '$", &fil_vis);
+            sql_conditions += generate_filter(_edge->get_properties(), format_string("tb{}.properties, '$", count_s), &fil_vis);
           }
           if(_edge->get_source()->get_properties())
           {
-            sql_conditions += generate_filter(_edge->get_source()->get_properties(), "tb" + count_s + ".properties, '$", &fil_vis);
+            throw exception("Node properties not implemented, need join.");
+            // sql_conditions += generate_filter(_edge->get_source()->get_properties(), "tb" + count_s + ".properties, '$", &fil_vis);
           }
           if(_edge->get_destination()->get_properties())
           {
-            sql_conditions += generate_filter(_edge->get_destination()->get_properties(), "tb" + count_s + ".properties, '$", &fil_vis);
+            throw exception("Node properties not implemented, need join.");
+            // sql_conditions += generate_filter(_edge->get_destination()->get_properties(), "tb" + count_s + ".properties, '$", &fil_vis);
           }
           count_variables += 3;
         });
