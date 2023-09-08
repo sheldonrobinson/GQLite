@@ -547,7 +547,8 @@ namespace gqlite::backends::sqlite_oc_executor
       }
       node_ref_sp source = has_node(_edge->get_source()) ? get_node_ref(variables[_edge->get_source()->get_variable()]) : create_node(_edge->get_source());
       node_ref_sp destination = has_node(_edge->get_destination()) ? get_node_ref(variables[_edge->get_destination()->get_variable()]) : create_node(_edge->get_destination());
-      int label_id = data->id_for_label(_edge->get_label());
+      std::string label = _edge->get_labels().empty() ? std::string() : _edge->get_labels().front();
+      int label_id = data->id_for_label(label);
       
       value props;
       if(_edge->get_properties())
@@ -561,7 +562,7 @@ namespace gqlite::backends::sqlite_oc_executor
       edge_ref_sp nr = std::make_shared<edge_ref>(edge_ref{
           row_id,
           value{
-            {{"type", value("edge")}, {"label", value(_edge->get_label())}, {"id", value(row_id)}, {"properties", props}}
+            {{"type", value("edge")}, {"label", value(label)}, {"id", value(row_id)}, {"properties", props}}
           }
         });
       if(not _edge->get_variable().empty())
@@ -640,6 +641,15 @@ namespace gqlite::backends::sqlite_oc_executor
           mc.sql_tables += format_string("gqlite_{}_edges AS tb{}", graph_name, count_s);
           generate_labels_match(_edge->get_source()->get_labels(), &mc, "tb" + count_s + ".left");
           generate_labels_match(_edge->get_destination()->get_labels(), &mc, "tb" + count_s + ".right");
+          if(not _edge->get_labels().empty())
+          {
+            mc.sql_conditions += " AND (FALSE ";
+            for(const std::string& label : _edge->get_labels())
+            {
+              mc.sql_conditions += format_string(" OR tb{}.label = {}", count_s, data->id_for_label(label));
+            }
+            mc.sql_conditions += ")";
+          }
           if(_edge->get_properties())
           {
             mc.sql_conditions += generate_filter(_edge->get_properties(), format_string("tb{}.properties, '$", count_s), &fil_vis);

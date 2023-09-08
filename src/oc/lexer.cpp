@@ -134,6 +134,7 @@ token lexer::next_token()
     CHAR_IS_TOKEN( ')', ENDBRACKET );
     CHAR_IS_TOKEN( '[', STARTBOXBRACKET );
     CHAR_IS_TOKEN( ']', ENDBOXBRACKET );
+    CHAR_IS_TOKEN( '|', PIPE );
     CHAR_IS_TOKEN( ',', COMMA );
     CHAR_IS_TOKEN( '=', EQUAL );
     CHAR_IS_TOKEN_OR_TOKEN( ':', ':', COLON, COLONCOLON);

@@ -32,6 +32,8 @@ const char* gqlite::oc::token_type_to_string(token_type _type)
       return "[";
     case ENDBOXBRACKET:
       return "]";
+    case PIPE:
+      return "|";
     case MINUS:
       return "-";
     case COMMA:

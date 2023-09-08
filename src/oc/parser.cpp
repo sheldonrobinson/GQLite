@@ -18,7 +18,7 @@ struct parser::data
   algebra::node_csp parse_create();
   algebra::node_csp parse_matches();
   algebra::node_csp parse_return();
-  std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>> parse_patterns(bool _allow_undirected_edge);
+  std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>> parse_patterns(bool _allow_undirected_edge, bool _allow_multiple_edge_labels);
   std::unordered_map<std::string, algebra::node_csp> parse_properties();
   algebra::node_csp parse_expression();
   algebra::node_csp parse_member_expression();
@@ -69,7 +69,7 @@ void parser::data::validate(algebra::graph_edge_csp _node)
     bounded_variables[_node->get_variable()] = _node;
     return;
   }
-  if(_node->get_label().empty() and not _node->get_properties()) return;
+  if(_node->get_labels().empty() and not _node->get_properties()) return;
   if(_node->equals(it->second)) return;
   report_error(tok, "Variable {} is already bound.", _node->get_variable());
 }
@@ -77,13 +77,13 @@ void parser::data::validate(algebra::graph_edge_csp _node)
 algebra::node_csp parser::data::parse_create()
 {
   get_next_token();
-  return std::make_shared<algebra::create>(parse_patterns(false));
+  return std::make_shared<algebra::create>(parse_patterns(false, false));
 }
 
 algebra::node_csp parser::data::parse_matches()
 {
   get_next_token();
-  return std::make_shared<algebra::match>(parse_patterns(true));
+  return std::make_shared<algebra::match>(parse_patterns(true, true));
 }
 
 algebra::node_csp parser::data::parse_return()
@@ -133,12 +133,12 @@ namespace
     algebra::edge_directivity directivity;
     algebra::graph_node_csp source, destination;
     std::string variable;
-    std::string label;
+    std::vector<std::string> labels;
     algebra::map_csp properties;
   };
 }
 
-std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>> parser::data::parse_patterns(bool _allow_undirected_edge)
+std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>> parser::data::parse_patterns(bool _allow_undirected_edge, bool _allow_multiple_edge_labels)
 {
   std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>> patterns;
   edge current_edge;
@@ -183,7 +183,7 @@ std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>> pars
       } else {
         current_edge.source = gnode;
       }
-      algebra::graph_edge_csp ge = std::make_shared<algebra::graph_edge>(current_edge.variable, current_edge.source, current_edge.destination, current_edge.directivity, current_edge.label, current_edge.properties);
+      algebra::graph_edge_csp ge = std::make_shared<algebra::graph_edge>(current_edge.variable, current_edge.source, current_edge.destination, current_edge.directivity, current_edge.labels, current_edge.properties);
       validate(ge);
       patterns.push_back(ge);
       current_edge.active = false;
@@ -222,8 +222,23 @@ std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>> pars
       { // label
         get_next_token();
         is_of_type(token_type::IDENTIFIER);
-        current_edge.label = tok.string;
+        current_edge.labels.push_back(tok.string);
         get_next_token();
+        if(_allow_multiple_edge_labels)
+        {
+          while(tok.type != token_type::END_OF_FILE)
+          {
+            if(tok.type == token_type::PIPE)
+            {
+              get_next_token();
+              is_of_type(token_type::IDENTIFIER);
+              current_edge.labels.push_back(tok.string);
+              get_next_token();
+            } else {
+              break;
+            }
+          }
+        }
       }
       if(tok.type == token_type::STARTBRACE)
       {
