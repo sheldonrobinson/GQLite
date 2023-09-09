@@ -753,33 +753,6 @@ namespace gqlite::backends::sqlite_oc_executor
         check_condition(not has_variable(k), format_string("{} is already defined.", k));
         variables[k] = ervs[vi.sql_column];
       }
-#if 0
-      int idx = 0;
-      std::function<void(const std::string&)> ervs_to_variables = [&idx, &ervs, this](const std::string& _varname)
-      {
-        if(not _varname.empty())
-        {
-          if(not has_variable(_varname))
-          {
-            variables[_varname] = ervs[idx];
-          }
-        }
-        ++idx;
-      };
-      for(const algebra::alternative<algebra::graph_node, algebra::graph_edge>& pattern : _node->get_patterns())
-      {
-        pattern.visit<void>([ervs_to_variables](const algebra::graph_node_csp _node)
-          {
-            ervs_to_variables(_node->get_variable());
-          },
-          [ervs_to_variables](const algebra::graph_edge_csp _edge)
-          {
-            ervs_to_variables(_edge->get_source()->get_variable());
-            ervs_to_variables(_edge->get_variable());
-            ervs_to_variables(_edge->get_destination()->get_variable());
-          });
-      }
-#endif
       return empty{};
     }
     exec_value visit(algebra::value_csp _node) override
