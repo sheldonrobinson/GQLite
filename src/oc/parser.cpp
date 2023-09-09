@@ -18,7 +18,7 @@ struct parser::data
   algebra::node_csp parse_create();
   algebra::node_csp parse_matches();
   algebra::node_csp parse_return();
-  std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>> parse_patterns(bool _allow_undirected_edge, bool _allow_multiple_edge_labels);
+  std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>> parse_patterns(bool _allow_undirected_edge, bool _allow_multiple_edge_labels, bool _require_one_label);
   std::unordered_map<std::string, algebra::node_csp> parse_properties();
   algebra::node_csp parse_expression();
   algebra::node_csp parse_member_expression();
@@ -77,13 +77,13 @@ void parser::data::validate(algebra::graph_edge_csp _node)
 algebra::node_csp parser::data::parse_create()
 {
   get_next_token();
-  return std::make_shared<algebra::create>(parse_patterns(false, false));
+  return std::make_shared<algebra::create>(parse_patterns(false, false, true));
 }
 
 algebra::node_csp parser::data::parse_matches()
 {
   get_next_token();
-  return std::make_shared<algebra::match>(parse_patterns(true, true));
+  return std::make_shared<algebra::match>(parse_patterns(true, true, false));
 }
 
 algebra::node_csp parser::data::parse_return()
@@ -138,7 +138,7 @@ namespace
   };
 }
 
-std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>> parser::data::parse_patterns(bool _allow_undirected_edge, bool _allow_multiple_edge_labels)
+std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>> parser::data::parse_patterns(bool _allow_undirected_edge, bool _allow_multiple_edge_labels, bool _require_one_label)
 {
   std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>> patterns;
   edge current_edge;
@@ -212,7 +212,10 @@ std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>> pars
       get_next_token();
       if(tok.type == token_type::RIGHT_ARROW or tok.type == token_type::MINUS)
       {
-
+        if(_require_one_label)
+        {
+          is_of_type(token_type::STARTBOXBRACKET);
+        }
       } else {
         is_of_type(token_type::STARTBOXBRACKET);
         get_next_token();
@@ -250,6 +253,8 @@ std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>> pars
               }
             }
           }
+        } else if(_require_one_label) {
+          is_of_type(token_type::COLON); //
         }
         if(tok.type == token_type::STARTBRACE)
         {

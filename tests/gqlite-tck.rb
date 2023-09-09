@@ -20,9 +20,9 @@ features = [
   # Create
   'create/Create1.feature', 'create/Create2.feature',
   # Match
-  'match/Match1.feature', 'match/Match2.feature' ]
+  'match/Match1.feature', 'match/Match2.feature', 'match/Match3.feature' ]
 # In progress
-# features = [ 'create/Create5.feature' ]
+# features = [ 'create/Create5.feature', 'match/Match6.feature' ]
 # Current dev
 # features = [  ]
 
