@@ -594,6 +594,7 @@ namespace gqlite::backends::sqlite_oc_executor
       std::string sql_tables;
       std::string sql_conditions;
       std::map<int, value> bindings;
+      std::vector<std::pair<std::string, std::string>> edge_sql_var_to_oc_var;
       int label_count = 0;
       std::map<std::string, std::string> oc_var_to_sql_var;
     };
@@ -687,9 +688,20 @@ namespace gqlite::backends::sqlite_oc_executor
             throw exception("Node properties not implemented, need join.");
             // sql_conditions += generate_filter(_edge->get_destination()->get_properties(), "tb" + count_s + ".properties, '$", &fil_vis);
           }
+          // Ensure identical oc variablle are joined in SQL
           generate_var_match(&mc, _edge->get_source()->get_variable(), sql_source_var);
           generate_var_match(&mc, _edge->get_variable(), sql_edge_var);
           generate_var_match(&mc, _edge->get_destination()->get_variable(), sql_destination_var);
+          // ensure edge isomorphism, i.e., if the variable names are different, the edges must be different
+          for(const std::pair<std::string, std::string>& sql_var_to_oc_var : mc.edge_sql_var_to_oc_var)
+          {
+            if(sql_var_to_oc_var.second != _edge->get_variable() and not _edge->get_variable().empty())
+            {
+              mc.sql_conditions += format_string(" AND {} != {}", sql_edge_var, sql_var_to_oc_var.first);
+            }
+          }
+          mc.edge_sql_var_to_oc_var.push_back({sql_edge_var, _edge->get_variable()});
+          // Increase variable counter
           mc.count_variables += 3;
         });
         ++mc.count;
