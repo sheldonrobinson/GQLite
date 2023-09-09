@@ -210,42 +210,54 @@ std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>> pars
       }
       // Parse
       get_next_token();
-      is_of_type(token_type::STARTBOXBRACKET);
-      get_next_token();
-      // parse edge
-      if(tok.type == token_type::IDENTIFIER)
-      { // identifier
-        current_edge.variable = tok.string;
+      if(tok.type == token_type::RIGHT_ARROW or tok.type == token_type::MINUS)
+      {
+
+      } else {
+        is_of_type(token_type::STARTBOXBRACKET);
         get_next_token();
-      }
-      if(tok.type == token_type::COLON)
-      { // label
-        get_next_token();
-        is_of_type(token_type::IDENTIFIER);
-        current_edge.labels.push_back(tok.string);
-        get_next_token();
-        if(_allow_multiple_edge_labels)
-        {
-          while(tok.type != token_type::END_OF_FILE)
+        // parse edge
+        if(tok.type == token_type::IDENTIFIER)
+        { // identifier
+          current_edge.variable = tok.string;
+          get_next_token();
+        }
+        if(tok.type == token_type::COLON)
+        { // label
+          get_next_token();
+          is_of_type(token_type::IDENTIFIER);
+          current_edge.labels.push_back(tok.string);
+          get_next_token();
+          if(_allow_multiple_edge_labels)
           {
-            if(tok.type == token_type::PIPE)
+            while(tok.type != token_type::END_OF_FILE)
             {
-              get_next_token();
-              is_of_type(token_type::IDENTIFIER);
-              current_edge.labels.push_back(tok.string);
-              get_next_token();
-            } else {
-              break;
+              if(tok.type == token_type::PIPE)
+              {
+                get_next_token();
+                if(tok.type == token_type::COLON)
+                {
+                  get_next_token();
+                }
+                is_of_type(token_type::IDENTIFIER);
+                if(std::find(current_edge.labels.begin(), current_edge.labels.end(), tok.string) == current_edge.labels.end())
+                {
+                  current_edge.labels.push_back(tok.string);
+                }
+                get_next_token();
+              } else {
+                break;
+              }
             }
           }
         }
+        if(tok.type == token_type::STARTBRACE)
+        {
+          current_edge.properties = std::make_shared<algebra::map>(parse_properties());
+        }
+        is_of_type(token_type::ENDBOXBRACKET);
+        get_next_token();
       }
-      if(tok.type == token_type::STARTBRACE)
-      {
-        current_edge.properties = std::make_shared<algebra::map>(parse_properties());
-      }
-      is_of_type(token_type::ENDBOXBRACKET);
-      get_next_token();
       if(tok.type == token_type::MINUS)
       {
         if(current_edge.directivity == algebra::edge_directivity::undirected)
