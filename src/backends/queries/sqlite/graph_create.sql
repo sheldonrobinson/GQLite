@@ -7,4 +7,7 @@ CREATE TABLE gqlite_/%= _graph_name %/_edges(id INTEGER PRIMARY KEY AUTOINCREMEN
        FOREIGN KEY(label) REFERENCES gqlite_labels(id),
        FOREIGN KEY(left) REFERENCES gqlite_/%= _graph_name %/_nodes(id), FOREIGN KEY(right) REFERENCES gqlite_/%= _graph_name %/_nodes(id));
 CREATE TABLE gqlite_/%= _graph_name %/_labels(label INTEGER, node_id INTEGER,
-        FOREIGN KEY(label) REFERENCES gqlite_labels(id), FOREIGN KEY(node_id) REFERENCES gqlite_/%= _graph_name %/_nodes(id))
+        FOREIGN KEY(label) REFERENCES gqlite_labels(id), FOREIGN KEY(node_id) REFERENCES gqlite_/%= _graph_name %/_nodes(id));
+CREATE VIEW gqlite_/%= _graph_name %/_edges_undirected (id, label, properties, left, right) AS
+        SELECT id, label, properties, left, right FROM gqlite_/%= _graph_name %/_edges
+        UNION SELECT id, label, properties, right, left FROM gqlite_/%= _graph_name %/_edges;

@@ -102,7 +102,22 @@ stream << "_labels(label INTEGER, node_id INTEGER,\n"
 #line 10 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_create.sql"
 stream << ( _graph_name );
 #line 10 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_create.sql"
-stream << "_nodes(id))";
+stream << "_nodes(id));\n"
+"CREATE VIEW gqlite_";
+#line 11 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_create.sql"
+stream << ( _graph_name );
+#line 11 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_create.sql"
+stream << "_edges_undirected (id, label, properties, left, right) AS\n"
+"        SELECT id, label, properties, left, right FROM gqlite_";
+#line 12 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_create.sql"
+stream << ( _graph_name );
+#line 12 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_create.sql"
+stream << "_edges\n"
+"        UNION SELECT id, label, properties, right, left FROM gqlite_";
+#line 13 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_create.sql"
+stream << ( _graph_name );
+#line 13 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_create.sql"
+stream << "_edges;";
 
     return stream.str();
   }

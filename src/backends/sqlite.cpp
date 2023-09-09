@@ -635,10 +635,13 @@ namespace gqlite::backends::sqlite_oc_executor
         [this, &mc, &fil_vis](const algebra::graph_edge_csp _edge)
         {
           std::string count_s = std::to_string(mc.count);
-          mc.sql_variables += format_string("tb{}.left, ", count_s);
-          mc.sql_variables += format_string("tb{}.id, ", count_s);
-          mc.sql_variables += format_string("tb{}.right", count_s);
-          mc.sql_tables += format_string("gqlite_{}_edges AS tb{}", graph_name, count_s);
+          mc.sql_variables += format_string("tb{}.left, tb{}.id, tb{}.right", count_s, count_s, count_s);
+          if(_edge->get_directivity() == algebra::edge_directivity::undirected)
+          {
+            mc.sql_tables += format_string("gqlite_{}_edges_undirected AS tb{}", graph_name, count_s);
+          } else {
+            mc.sql_tables += format_string("gqlite_{}_edges AS tb{}", graph_name, count_s);
+          }
           generate_labels_match(_edge->get_source()->get_labels(), &mc, "tb" + count_s + ".left");
           generate_labels_match(_edge->get_destination()->get_labels(), &mc, "tb" + count_s + ".right");
           if(not _edge->get_labels().empty())
@@ -672,7 +675,9 @@ namespace gqlite::backends::sqlite_oc_executor
       {
         mc.sql_conditions = (mc.count == 1 ? " WHERE TRUE " : " ON TRUE ") + mc.sql_conditions;
       }
-      gqlite::value r = data->execute_sql("SELECT DISTINCT " + mc.sql_variables + " FROM " + mc.sql_tables + mc.sql_conditions, mc.bindings);
+      std::string sql_query = "SELECT DISTINCT " + mc.sql_variables + " FROM " + mc.sql_tables + mc.sql_conditions;
+      // std::cout << sql_query << std::endl;
+      gqlite::value r = data->execute_sql(sql_query, mc.bindings);
       std::vector<element_ref_vector_sp> ervs;
       ervs.reserve(mc.count_variables);
       for(int i = 0; i < mc.count_variables; ++i)

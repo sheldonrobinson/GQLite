@@ -261,6 +261,7 @@ std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>> pars
         {
           report_error(tok, "Edge cannot have both direction.");
         }
+        current_edge.directivity = algebra::edge_directivity::directed;
       } else {
         report_unexpected(tok);
       }
