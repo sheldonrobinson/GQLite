@@ -64,8 +64,11 @@ gqlite::value sqlite_data::execute_sql(const std::string& _query, const std::map
         case value_type::invalid:
           sqlite3_bind_null(ps, key);
           break;
+        case value_type::integer:
+          sqlite3_bind_int(ps, key, value.to_integer());
+          break;
         case value_type::number:
-          sqlite3_bind_int(ps, key, value.to_double());
+          sqlite3_bind_double(ps, key, value.to_double());
           break;
         default:
         {
@@ -836,7 +839,13 @@ namespace gqlite::backends::sqlite_oc_executor
         mc.sql_conditions = (mc.count == 1 ? " WHERE TRUE " : " ON TRUE ") + mc.sql_conditions;
       }
       std::string sql_query = "SELECT DISTINCT " + mc.sql_variables + " FROM " + mc.sql_tables + mc.sql_conditions;
+#if 0
       std::cout << sql_query << std::endl;
+      for(auto const& [k,v] : mc.bindings)
+      {
+        std::cout << " [" << k << "] = " << v.to_json() << std::endl;
+      }
+#endif
       gqlite::value r = ec.data->execute_sql(sql_query, mc.bindings);
 
       // 4) Store the results.
