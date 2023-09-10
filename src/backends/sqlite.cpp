@@ -390,8 +390,8 @@ namespace gqlite::backends::sqlite_oc_executor
     {                                                                                                 \
       return format_string("({} " _OP_ " {})", start(_node->get_left()), start(_node->get_right()));  \
     }
-    FILTER_VISITOR_BINARY_OP(logical_and, "&&")
-    FILTER_VISITOR_BINARY_OP(logical_or, "||")
+    FILTER_VISITOR_BINARY_OP(logical_and, "AND")
+    FILTER_VISITOR_BINARY_OP(logical_or, "OR")
     FILTER_VISITOR_BINARY_OP(relational_equal, "=")
     FILTER_VISITOR_BINARY_OP(relational_different, "!=")
     FILTER_VISITOR_BINARY_OP(relational_inferior, "<")
