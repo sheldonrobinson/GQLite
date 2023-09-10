@@ -9,6 +9,7 @@
 #include "sqlite_queries.h"
 
 #include "../oc/algebra/abstract_node_visitor.h"
+#include "../errors.h"
 #include "../logging.h"
 #include "../string.h"
 
@@ -251,6 +252,7 @@ namespace gqlite::backends::sqlite_oc_executor
     {
       std::string sql_var;
       std::string sql_properties_var;
+      std::string sql_label_var;
       std::size_t sql_column;
       bool is_node;
     };
@@ -272,37 +274,38 @@ namespace gqlite::backends::sqlite_oc_executor
       }
       return cond;
     }
-    std::string get_sql_variable(const std::string& _oc_variable)
+
+    var_info& get_variable_info(const std::string& _oc_variable)
     {
       auto it = oc_var_to_sql_var.find(_oc_variable);
       if(it == oc_var_to_sql_var.end())
       {
         throw gqlite::exception("Unknown variable '{}'", _oc_variable);
       }
-      return it->second.sql_var;
+      return it->second;
+    }
+
+    std::string get_sql_variable(const std::string& _oc_variable)
+    {
+      return get_variable_info(_oc_variable).sql_var;
     }
     std::string get_sql_properties_variable(const std::string& _oc_variable)
     {
-      auto it = oc_var_to_sql_var.find(_oc_variable);
-      if(it == oc_var_to_sql_var.end())
-      {
-        throw gqlite::exception("Unknown variable '{}'", _oc_variable);
-      }
-      std::string properties_var = it->second.sql_properties_var;
+      var_info& info = get_variable_info(_oc_variable);
+      std::string properties_var = info.sql_properties_var;
       if(properties_var.empty())
       {
-        properties_var = retrieve_sql_properties(it->second.sql_var);
-        it->second.sql_properties_var = properties_var;
+        properties_var = retrieve_sql_properties(info.sql_var);
+        info.sql_properties_var = properties_var;
       }
       return properties_var;
     }
     std::string retrieve_sql_properties(const std::string& _sql_var)
     {
-      std::string count_s = std::to_string(count);
-      ++count;
-      std::string properties_var = format_string("tb{}.properties", count_s);
-      sql_tables += format_string(" JOIN gqlite_{}_nodes AS tb{} ", ec->graph_name, count_s);
-      sql_conditions += format_string(" AND tb{}.id = {}", count_s, _sql_var);
+      std::string count_s = std::to_string(count++);
+      std::string properties_var = format_string("tbp{}.properties", count_s);
+      sql_tables += format_string(" JOIN gqlite_{}_nodes AS tbp{} ", ec->graph_name, count_s);
+      sql_conditions += format_string(" AND tbp{}.id = {}", count_s, _sql_var);
       return properties_var;
     }
   };
@@ -366,7 +369,21 @@ namespace gqlite::backends::sqlite_oc_executor
     }
     std::string visit(algebra::function_call_csp _node) override
     {
-      throw gqlite::exception("sqlite not implemented function_call");
+      if(_node->get_name() == "type")
+      {
+        errors::check_arguments_size("type", _node->get_arguments(), 1);
+        algebra::node_csp arg0 = _node->get_arguments().front();
+        errors::check_argument_type("type", arg0->get_type(), algebra::node_type::variable);
+        algebra::variable_csp arg0_var = std::static_pointer_cast<const algebra::variable>(arg0);
+        match_context::var_info& info = mc->get_variable_info(arg0_var->get_identifier());
+        if(info.is_node)
+        {
+          throw gqlite::exception("type expect an edge for variable {}", arg0_var->get_identifier());
+        }
+        return gqlite::format_string("(SELECT label FROM gqlite_labels WHERE id = {})", info.sql_label_var);
+      } else {
+        throw gqlite::exception("unknown function {}", _node->get_name());
+      }
     }
 #define FILTER_VISITOR_BINARY_OP(_AL_, _OP_)                                                          \
     std::string visit(algebra::_AL_ ## _csp _node) override                                           \
@@ -704,7 +721,7 @@ namespace gqlite::backends::sqlite_oc_executor
       return empty{};
     }
     // Match
-    void generate_var_match(match_context* _mc, const std::string& _oc_var, const std::string& _sql_var, const std::string& _sql_properties_var, bool _is_node)
+    void generate_var_match(match_context* _mc, const std::string& _oc_var, const std::string& _sql_var, const std::string& _sql_properties_var, const std::string& _label_var, bool _is_node)
     {
       if(not _oc_var.empty())
       {
@@ -717,7 +734,7 @@ namespace gqlite::backends::sqlite_oc_executor
           }
           if(not _mc->sql_variables.empty()) _mc->sql_variables += ", ";
           _mc->sql_variables += _sql_var;
-          _mc->oc_var_to_sql_var[_oc_var] = {_sql_var, _sql_properties_var, _mc->oc_var_to_sql_var.size(), _is_node};
+          _mc->oc_var_to_sql_var[_oc_var] = {_sql_var, _sql_properties_var, _label_var, _mc->oc_var_to_sql_var.size(), _is_node};
         } else {
           if(it->second.is_node != _is_node) throw exception("{} is redefined as a variable of a different type", _oc_var);
           _mc->sql_conditions += format_string(" AND {} = {} ", _sql_var, it->second.sql_var);
@@ -739,7 +756,7 @@ namespace gqlite::backends::sqlite_oc_executor
         }
         pattern.visit<void>([this, &mc, &fil_vis](const algebra::graph_node_csp _node)
         {
-          std::string count_s = std::to_string(mc.count);
+          std::string count_s = std::to_string(mc.count++);
           std::string sql_var = format_string("tb{}.id", count_s);
           std::string sql_properties_var = format_string("tb{}.properties", count_s);
           mc.sql_tables += format_string("gqlite_{}_nodes AS tb{}", ec.graph_name, count_s);
@@ -748,14 +765,15 @@ namespace gqlite::backends::sqlite_oc_executor
           {
             mc.sql_conditions += generate_filter(_node->get_properties(), sql_properties_var + ", '$", &fil_vis);
           }
-          generate_var_match(&mc, _node->get_variable(), sql_var, sql_properties_var, true);
+          generate_var_match(&mc, _node->get_variable(), sql_var, sql_properties_var, std::string(), true);
         },
         [this, &mc, &fil_vis](const algebra::graph_edge_csp _edge)
         {
-          std::string count_s = std::to_string(mc.count);
+          std::string count_s = std::to_string(mc.count++);
           std::string sql_source_var = format_string("tb{}.left", count_s);
           std::string sql_edge_var = format_string("tb{}.id", count_s);
           std::string sql_properties_edge_var = format_string("tb{}.properties", count_s);
+          std::string sql_label_edge_var = format_string("tb{}.label", count_s);
           std::string sql_source_properties_var;
           std::string sql_destination_properties_var;
           std::string sql_destination_var = format_string("tb{}.right", count_s);
@@ -772,7 +790,8 @@ namespace gqlite::backends::sqlite_oc_executor
             mc.sql_conditions += " AND (FALSE ";
             for(const std::string& label : _edge->get_labels())
             {
-              mc.sql_conditions += format_string(" OR tb{}.label = {}", count_s, ec.data->id_for_label(label));
+              mc.sql_conditions += format_string(" OR {} = {}", sql_label_edge_var
+              , ec.data->id_for_label(label));
             }
             mc.sql_conditions += ")";
           }
@@ -791,9 +810,9 @@ namespace gqlite::backends::sqlite_oc_executor
             mc.sql_conditions += generate_filter(_edge->get_destination()->get_properties(), sql_destination_properties_var + ", '$", &fil_vis);
           }
           // Ensure identical oc variablle are joined in SQL
-          generate_var_match(&mc, _edge->get_source()->get_variable(), sql_source_var, sql_source_properties_var, true);
-          generate_var_match(&mc, _edge->get_variable(), sql_edge_var, sql_properties_edge_var, false);
-          generate_var_match(&mc, _edge->get_destination()->get_variable(), sql_destination_var, sql_destination_properties_var, true);
+          generate_var_match(&mc, _edge->get_source()->get_variable(), sql_source_var, sql_source_properties_var, std::string(), true);
+          generate_var_match(&mc, _edge->get_variable(), sql_edge_var, sql_properties_edge_var, sql_label_edge_var, false);
+          generate_var_match(&mc, _edge->get_destination()->get_variable(), sql_destination_var, sql_destination_properties_var, std::string(), true);
           // ensure edge isomorphism, i.e., if the variable names are different, the edges must be different
           for(const std::pair<std::string, std::string>& sql_var_to_oc_var : mc.edge_sql_var_to_oc_var)
           {
@@ -805,7 +824,6 @@ namespace gqlite::backends::sqlite_oc_executor
           mc.edge_sql_var_to_oc_var.push_back({sql_edge_var, _edge->get_variable()});
           // Increase variable counter
         });
-        ++mc.count;
       }
       // 2) Handle where
       if(_node->get_where())
@@ -818,7 +836,7 @@ namespace gqlite::backends::sqlite_oc_executor
         mc.sql_conditions = (mc.count == 1 ? " WHERE TRUE " : " ON TRUE ") + mc.sql_conditions;
       }
       std::string sql_query = "SELECT DISTINCT " + mc.sql_variables + " FROM " + mc.sql_tables + mc.sql_conditions;
-      // std::cout << sql_query << std::endl;
+      std::cout << sql_query << std::endl;
       gqlite::value r = ec.data->execute_sql(sql_query, mc.bindings);
 
       // 4) Store the results.
