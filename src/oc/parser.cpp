@@ -419,25 +419,30 @@ algebra::node_csp parser::data::parse_terminal_expression()
   }
   case token_type::STARTBOXBRACKET:
   {
-    std::vector<algebra::node_csp> nodes;
-    get_next_token();
-    while(tok.type != token_type::END_OF_FILE)
-    {
-      nodes.push_back(parse_expression());
-      if(tok.type == token_type::COMMA)
-      {
-        get_next_token();
-      } else {
-        is_of_type(token_type::ENDBOXBRACKET);
-        get_next_token();
-        return std::make_shared<algebra::array>(nodes);
-      }
-    }
-    report_unexpected(tok);
+    return parse_expression_list();
   }
   default:
     report_unexpected(tok);
   }
+}
+
+algebra::node_csp parser::data::parse_expression_list()
+{
+  std::vector<algebra::node_csp> nodes;
+  get_next_token();
+  while(tok.type != token_type::END_OF_FILE)
+  {
+    nodes.push_back(parse_expression());
+    if(tok.type == token_type::COMMA)
+    {
+      get_next_token();
+    } else {
+      is_of_type(token_type::ENDBOXBRACKET);
+      get_next_token();
+      return std::make_shared<algebra::array>(nodes);
+    }
+  }
+  report_unexpected(tok);
 }
 
 algebra::node_csp parser::data::parse_conditional_and_expression()
