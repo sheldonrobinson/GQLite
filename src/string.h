@@ -22,7 +22,7 @@ namespace gqlite::string
    * @internal
    * @return the result of spliting \p s with delimiter \p delim
    */
-  std::vector<std::string> split (const std::string &s, char delim)
+  inline std::vector<std::string> split (const std::string &s, char delim)
   {
     std::vector<std::string> result;
     std::stringstream ss (s);

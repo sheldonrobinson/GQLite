@@ -5,8 +5,9 @@
 
 OC_ALGEBRA_GENERATE(create, OC_ALGEBRA_CREATE_NODES_MEMBERS)
 
-#define OC_ALGEBRA_MATCH_NODES_MEMBERS(_KLASS_NAME_, F)                           \
-  F(_KLASS_NAME_, std::vector<alternative<GQLITE_LIST(graph_node, graph_edge)>>, patterns)
+#define OC_ALGEBRA_MATCH_NODES_MEMBERS(_KLASS_NAME_, F)                                     \
+  F(_KLASS_NAME_, std::vector<alternative<GQLITE_LIST(graph_node, graph_edge)>>, patterns)  \
+  F(_KLASS_NAME_, node_csp, where)
 
 OC_ALGEBRA_GENERATE(match, OC_ALGEBRA_MATCH_NODES_MEMBERS)
 
@@ -77,6 +78,12 @@ OC_ALGEBRA_GENERATE(variable, OC_ALGEBRA_VARIABLE_MEMBERS)
 
 OC_ALGEBRA_GENERATE(member_access, OC_ALGEBRA_MEMBER_ACCESS_MEMBERS)
 
+#define OC_ALGEBRA_HAS_LABELS_MEMBERS(_KLASS_NAME_, F) \
+  F(_KLASS_NAME_, std::string, left)                   \
+  F(_KLASS_NAME_, std::vector<std::string>, labels)
+
+OC_ALGEBRA_GENERATE(has_labels, OC_ALGEBRA_HAS_LABELS_MEMBERS)
+
 #define OC_ALGEBRA_FUNCTION_CALL_EXPRESSION(_KLASS_NAME_, F)  \
   F(_KLASS_NAME_, std::string, name)                          \
   F(_KLASS_NAME_, std::vector<node_csp>, arguments)
@@ -87,4 +94,23 @@ OC_ALGEBRA_GENERATE(function_call, OC_ALGEBRA_FUNCTION_CALL_EXPRESSION)
   F(_KLASS_NAME_, node_csp, left)                  \
   F(_KLASS_NAME_, node_csp, right)
 
-// OC_ALGEBRA_GENERATE(_binop, OC_ALGEBRA_BINARY_MEMBERS)
+OC_ALGEBRA_GENERATE(logical_and, OC_ALGEBRA_BINARY_MEMBERS)
+OC_ALGEBRA_GENERATE(logical_or, OC_ALGEBRA_BINARY_MEMBERS)
+OC_ALGEBRA_GENERATE(relational_equal, OC_ALGEBRA_BINARY_MEMBERS)
+OC_ALGEBRA_GENERATE(relational_different, OC_ALGEBRA_BINARY_MEMBERS)
+OC_ALGEBRA_GENERATE(relational_inferior, OC_ALGEBRA_BINARY_MEMBERS)
+OC_ALGEBRA_GENERATE(relational_superior, OC_ALGEBRA_BINARY_MEMBERS)
+OC_ALGEBRA_GENERATE(relational_inferior_equal, OC_ALGEBRA_BINARY_MEMBERS)
+OC_ALGEBRA_GENERATE(relational_superior_equal, OC_ALGEBRA_BINARY_MEMBERS)
+OC_ALGEBRA_GENERATE(relational_in, OC_ALGEBRA_BINARY_MEMBERS)
+OC_ALGEBRA_GENERATE(relational_not_in, OC_ALGEBRA_BINARY_MEMBERS)
+OC_ALGEBRA_GENERATE(addition, OC_ALGEBRA_BINARY_MEMBERS)
+OC_ALGEBRA_GENERATE(substraction, OC_ALGEBRA_BINARY_MEMBERS)
+OC_ALGEBRA_GENERATE(multiplication, OC_ALGEBRA_BINARY_MEMBERS)
+OC_ALGEBRA_GENERATE(division, OC_ALGEBRA_BINARY_MEMBERS)
+
+#define OC_ALGEBRA_UNARY_MEMBERS(_KLASS_NAME_, F) \
+  F(_KLASS_NAME_, node_csp, value)
+
+OC_ALGEBRA_GENERATE(logical_negation, OC_ALGEBRA_UNARY_MEMBERS)
+OC_ALGEBRA_GENERATE(negation, OC_ALGEBRA_UNARY_MEMBERS)

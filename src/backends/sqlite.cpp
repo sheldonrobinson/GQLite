@@ -10,6 +10,7 @@
 
 #include "../oc/algebra/abstract_node_visitor.h"
 #include "../logging.h"
+#include "../string.h"
 
 using namespace gqlite::backends;
 
@@ -230,10 +231,60 @@ namespace gqlite::backends::sqlite_oc_executor
   using element_ref_vector_sp = std::shared_ptr<element_ref_vector>;
   using exec_value = std::variant<element_ref, element_ref_vector_sp, gqlite::value, empty>;
 
+  struct execution_context
+  {
+    sqlite_data* data;
+    std::string graph_name = "default";
+  };
+
+  struct match_context
+  {
+    execution_context* ec;
+    int count = 0;
+    std::string sql_variables;
+    std::string sql_tables;
+    std::string sql_conditions;
+    std::map<int, value> bindings;
+    std::vector<std::pair<std::string, std::string>> edge_sql_var_to_oc_var;
+    int label_count = 0;
+    struct var_info
+    {
+      std::string sql_var;
+      std::size_t sql_column;
+      bool is_node;
+    };
+    std::map<std::string, var_info> oc_var_to_sql_var;
+    /**
+     * Generate the SQL join operation needed for matchin labels
+     */
+    std::string generate_labels_match(const std::vector<std::string>& _labels, const std::string& _node_variable)
+    {
+      std::string cond;
+      for(const std::string& label : _labels)
+      {
+        sql_tables += format_string(" JOIN gqlite_{}_labels AS tb_lab{}", ec->graph_name, label_count);
+        if(not cond.empty()) cond += " AND ";
+        cond += format_string(" {} = tb_lab{}.node_id AND ?{} = tb_lab{}.label ",
+                      _node_variable, label_count, to_string_fixed_width(bindings.size() + 1, 3), label_count);
+        bindings[bindings.size() + 1] = ec->data->id_for_label(label);
+        ++label_count;
+      }
+      return cond;
+    }
+  };
+
   struct filter_visitor : public gqlite::oc::algebra::abstract_node_visitor<std::string>
   {
-    std::map<int, value>* bindings;
-    // Unused nodes
+    match_context* mc;
+    std::string get_sql_variable(const std::string& _oc_variable)
+    {
+      auto it = mc->oc_var_to_sql_var.find(_oc_variable);
+      if(it == mc->oc_var_to_sql_var.end())
+      {
+        throw gqlite::exception("Unknown variable '{}'", _oc_variable);
+      }
+      return it->second.sql_var;
+    }
     std::string visit(algebra::graph_node_csp _node) override
     {
       throw gqlite::exception("sqlite not implemented graph_node");
@@ -262,10 +313,14 @@ namespace gqlite::backends::sqlite_oc_executor
     {
       throw gqlite::exception("sqlite not implemented return");
     }
+    std::string visit(algebra::has_labels_csp _node) override
+    {
+      return mc->generate_labels_match(_node->get_labels(), get_sql_variable(_node->get_left()));
+    }
     std::string visit(algebra::value_csp _node) override
     {
-      int idx = bindings->size() + 1;
-      (*bindings)[idx] = _node->get_value();
+      int idx = mc->bindings.size() + 1;
+      mc->bindings[idx] = _node->get_value();
       return "?" + to_string_fixed_width(idx, 3);
     }
     std::string visit(algebra::map_csp _node) override
@@ -278,16 +333,42 @@ namespace gqlite::backends::sqlite_oc_executor
     }
     std::string visit(algebra::variable_csp _node) override
     {
-      throw gqlite::exception("sqlite not implemented variable");
+      return get_sql_variable(_node->get_identifier());
     }
     std::string visit(algebra::member_access_csp _node) override
     {
-      throw gqlite::exception("sqlite not implemented member_access");
+      return format_string("json_extract({}, '$.{}')", start(_node->get_left()), string::join(_node->get_path(), "."));
     }
     std::string visit(algebra::function_call_csp _node) override
     {
       throw gqlite::exception("sqlite not implemented function_call");
     }
+#define FILTER_VISITOR_BINARY_OP(_AL_, _OP_)                                                          \
+    std::string visit(algebra::_AL_ ## _csp _node) override                                           \
+    {                                                                                                 \
+      return format_string("({} " _OP_ " {})", start(_node->get_left()), start(_node->get_right()));  \
+    }
+    FILTER_VISITOR_BINARY_OP(logical_and, "&&")
+    FILTER_VISITOR_BINARY_OP(logical_or, "||")
+    FILTER_VISITOR_BINARY_OP(relational_equal, "=")
+    FILTER_VISITOR_BINARY_OP(relational_different, "!=")
+    FILTER_VISITOR_BINARY_OP(relational_inferior, "<")
+    FILTER_VISITOR_BINARY_OP(relational_superior, ">")
+    FILTER_VISITOR_BINARY_OP(relational_inferior_equal, "<")
+    FILTER_VISITOR_BINARY_OP(relational_superior_equal, ">")
+    FILTER_VISITOR_BINARY_OP(relational_in, "IN")
+    FILTER_VISITOR_BINARY_OP(relational_not_in, "NOT IN")
+    FILTER_VISITOR_BINARY_OP(addition, "+")
+    FILTER_VISITOR_BINARY_OP(substraction, "-")
+    FILTER_VISITOR_BINARY_OP(multiplication, "*")
+    FILTER_VISITOR_BINARY_OP(division, "/")
+#define FILTER_VISITOR_UNARY_OP(_AL_, _OP_)                             \
+    std::string visit(algebra::_AL_ ## _csp _node) override             \
+    {                                                                   \
+      return format_string("(" _OP_ " {})", start(_node->get_value())); \
+    }
+    FILTER_VISITOR_UNARY_OP(logical_negation, "!")
+    FILTER_VISITOR_UNARY_OP(negation, "-")
   };
 
   /**
@@ -296,8 +377,7 @@ namespace gqlite::backends::sqlite_oc_executor
    */
   struct visitor : public gqlite::oc::algebra::abstract_node_visitor<exec_value>
   {
-    sqlite_data* data;
-    std::string graph_name = "default";
+    execution_context ec;
     std::unordered_map<std::string, exec_value> variables;
     /**
      * @return a value representing the node/edge from @p _value
@@ -306,7 +386,7 @@ namespace gqlite::backends::sqlite_oc_executor
     {
       struct value_getter
       {
-        visitor* v;
+        execution_context* v;
         gqlite::value operator()(const node_ref_sp& _node_ref)
         {
           if(_node_ref->cache.get_type() == value_type::invalid)
@@ -365,7 +445,7 @@ namespace gqlite::backends::sqlite_oc_executor
           return _edge_ref->cache;
         }
       };
-      return std::visit(value_getter{this}, _value);
+      return std::visit(value_getter{&ec}, _value);
     }
     /**
      * @return a node ref or an exception if not a node ref
@@ -480,18 +560,31 @@ namespace gqlite::backends::sqlite_oc_executor
       return r;
     }
     // Unused nodes
-    exec_value visit(algebra::graph_node_csp _node) override
-    {
-      throw gqlite::exception("sqlite not implemented graph_node");
+#define UNUSED_NODES(_AL_)                                                          \
+    exec_value visit(algebra::_AL_ ## _csp _node) override                          \
+    {                                                                               \
+      throw gqlite::exception("sqlite execution visitor not implemented " # _AL_);  \
     }
-    exec_value visit(algebra::graph_edge_csp _node) override
-    {
-      throw gqlite::exception("sqlite not implemented edge_node");
-    }
-    exec_value visit(algebra::named_expression_csp _node) override
-    {
-      throw gqlite::exception("sqlite not implemented named_expression");
-    }
+    UNUSED_NODES(logical_and)
+    UNUSED_NODES(logical_or)
+    UNUSED_NODES(relational_equal)
+    UNUSED_NODES(relational_different)
+    UNUSED_NODES(relational_inferior)
+    UNUSED_NODES(relational_superior)
+    UNUSED_NODES(relational_inferior_equal)
+    UNUSED_NODES(relational_superior_equal)
+    UNUSED_NODES(relational_in)
+    UNUSED_NODES(relational_not_in)
+    UNUSED_NODES(addition)
+    UNUSED_NODES(substraction)
+    UNUSED_NODES(multiplication)
+    UNUSED_NODES(division)
+    UNUSED_NODES(logical_negation)
+    UNUSED_NODES(negation)
+    UNUSED_NODES(has_labels)
+    UNUSED_NODES(graph_node)
+    UNUSED_NODES(graph_edge)
+    UNUSED_NODES(named_expression)
     // Node/Edge creation
     bool has_node(algebra::graph_node_csp _node)
     {
@@ -520,11 +613,11 @@ namespace gqlite::backends::sqlite_oc_executor
         props = value_map();
       }
       std::string json_properties = props.to_json();
-      data->execute_sql(sqlite_queries::node_create(graph_name), {{1, json_properties}});
-      int row_id = data->last_row_id();
+      ec.data->execute_sql(sqlite_queries::node_create(ec.graph_name), {{1, json_properties}});
+      int row_id = ec.data->last_row_id();
       for(const std::string& label : _node->get_labels())
       {
-        data->execute_sql(sqlite_queries::node_map_to_label(graph_name), {{1, data->id_for_label(label)}, {2, row_id}});
+        ec.data->execute_sql(sqlite_queries::node_map_to_label(ec.graph_name), {{1, ec.data->id_for_label(label)}, {2, row_id}});
       }
       node_ref_sp nr = std::make_shared<node_ref>(node_ref{
           row_id,
@@ -548,7 +641,7 @@ namespace gqlite::backends::sqlite_oc_executor
       node_ref_sp source = has_node(_edge->get_source()) ? get_node_ref(variables[_edge->get_source()->get_variable()]) : create_node(_edge->get_source());
       node_ref_sp destination = has_node(_edge->get_destination()) ? get_node_ref(variables[_edge->get_destination()->get_variable()]) : create_node(_edge->get_destination());
       std::string label = _edge->get_labels().empty() ? std::string() : _edge->get_labels().front();
-      int label_id = data->id_for_label(label);
+      int label_id = ec.data->id_for_label(label);
       
       value props;
       if(_edge->get_properties())
@@ -557,8 +650,8 @@ namespace gqlite::backends::sqlite_oc_executor
       } else {
         props = value_map();
       }
-      data->execute_sql(sqlite_queries::edge_create(graph_name), {{1, label_id}, {2, props.to_json()}, {3, source->id}, {4, destination->id}});
-      int row_id = data->last_row_id();
+      ec.data->execute_sql(sqlite_queries::edge_create(ec.graph_name), {{1, label_id}, {2, props.to_json()}, {3, source->id}, {4, destination->id}});
+      int row_id = ec.data->last_row_id();
       edge_ref_sp nr = std::make_shared<edge_ref>(edge_ref{
           row_id,
           value{
@@ -586,34 +679,6 @@ namespace gqlite::backends::sqlite_oc_executor
       return empty{};
     }
     // Match
-    struct match_context
-    {
-      int count = 0;
-      std::string sql_variables;
-      std::string sql_tables;
-      std::string sql_conditions;
-      std::map<int, value> bindings;
-      std::vector<std::pair<std::string, std::string>> edge_sql_var_to_oc_var;
-      int label_count = 0;
-      struct var_info
-      {
-        std::string sql_var;
-        std::size_t sql_column;
-        bool is_node;
-      };
-      std::map<std::string, var_info> oc_var_to_sql_var;
-    };
-    void generate_labels_match(match_context* _mc, const std::vector<std::string>& _labels, const std::string& _node_variable)
-    {
-      for(const std::string& label : _labels)
-      {
-        _mc->sql_tables += format_string(" JOIN gqlite_{}_labels AS tb_lab{}", graph_name, _mc->label_count);
-        _mc->sql_conditions += format_string(" AND {} = tb_lab{}.node_id AND ?{} = tb_lab{}.label ",
-                      _node_variable, _mc->label_count, to_string_fixed_width(_mc->bindings.size() + 1, 3), _mc->label_count);
-        _mc->bindings[_mc->bindings.size() + 1] = data->id_for_label(label);
-        ++_mc->label_count;
-      }
-    }
     void generate_var_match(match_context* _mc, const std::string& _oc_var, const std::string& _sql_var, bool _is_node)
     {
       if(not _oc_var.empty())
@@ -637,9 +702,10 @@ namespace gqlite::backends::sqlite_oc_executor
     exec_value visit(algebra::match_csp _node) override
     {
       match_context mc;
+      mc.ec = &ec;
       filter_visitor fil_vis;
-      fil_vis.bindings = &mc.bindings;
-
+      fil_vis.mc = &mc;
+      // 1) Go through the patterns
       for(const algebra::alternative<algebra::graph_node, algebra::graph_edge>& pattern : _node->get_patterns())
       {
         if(mc.count != 0)
@@ -650,8 +716,8 @@ namespace gqlite::backends::sqlite_oc_executor
         {
           std::string count_s = std::to_string(mc.count);
           std::string sql_var = format_string("tb{}.id", count_s);
-          mc.sql_tables += format_string("gqlite_{}_nodes AS tb{}", graph_name, count_s);
-          generate_labels_match(&mc, _node->get_labels(), format_string("tb{}.id", count_s));
+          mc.sql_tables += format_string("gqlite_{}_nodes AS tb{}", ec.graph_name, count_s);
+          mc.sql_conditions += mc.generate_labels_match(_node->get_labels(), format_string("tb{}.id", count_s));
           if(_node->get_properties())
           {
             mc.sql_conditions += generate_filter(_node->get_properties(), "tb" + count_s + ".properties, '$", &fil_vis);
@@ -666,18 +732,18 @@ namespace gqlite::backends::sqlite_oc_executor
           std::string sql_destination_var = format_string("tb{}.right", count_s);
           if(_edge->get_directivity() == algebra::edge_directivity::undirected)
           {
-            mc.sql_tables += format_string("gqlite_{}_edges_undirected AS tb{}", graph_name, count_s);
+            mc.sql_tables += format_string("gqlite_{}_edges_undirected AS tb{}", ec.graph_name, count_s);
           } else {
-            mc.sql_tables += format_string("gqlite_{}_edges AS tb{}", graph_name, count_s);
+            mc.sql_tables += format_string("gqlite_{}_edges AS tb{}", ec.graph_name, count_s);
           }
-          generate_labels_match(&mc, _edge->get_source()->get_labels(), "tb" + count_s + ".left");
-          generate_labels_match(&mc, _edge->get_destination()->get_labels(), "tb" + count_s + ".right");
+          mc.sql_conditions += mc.generate_labels_match(_edge->get_source()->get_labels(), "tb" + count_s + ".left");
+          mc.sql_conditions += mc.generate_labels_match(_edge->get_destination()->get_labels(), "tb" + count_s + ".right");
           if(not _edge->get_labels().empty())
           {
             mc.sql_conditions += " AND (FALSE ";
             for(const std::string& label : _edge->get_labels())
             {
-              mc.sql_conditions += format_string(" OR tb{}.label = {}", count_s, data->id_for_label(label));
+              mc.sql_conditions += format_string(" OR tb{}.label = {}", count_s, ec.data->id_for_label(label));
             }
             mc.sql_conditions += ")";
           }
@@ -712,18 +778,22 @@ namespace gqlite::backends::sqlite_oc_executor
         });
         ++mc.count;
       }
-
-      // Assemble SQL query for execution
+      // 2) Handle where
+      if(_node->get_where())
+      {
+        mc.sql_conditions += " AND " + fil_vis.start(_node->get_where());
+      }
+      // 3) Assemble SQL query for execution
       if(not mc.sql_conditions.empty())
       {
         mc.sql_conditions = (mc.count == 1 ? " WHERE TRUE " : " ON TRUE ") + mc.sql_conditions;
       }
       std::string sql_query = "SELECT DISTINCT " + mc.sql_variables + " FROM " + mc.sql_tables + mc.sql_conditions;
       // std::cout << sql_query << std::endl;
-      gqlite::value r = data->execute_sql(sql_query, mc.bindings);
+      gqlite::value r = ec.data->execute_sql(sql_query, mc.bindings);
 
-      // 3) Store the results.
-      // 3a) initialise ervs, which will contain the results
+      // 4) Store the results.
+      // 4a) initialise ervs, which will contain the results
       std::vector<element_ref_vector_sp> ervs;
       ervs.reserve(mc.oc_var_to_sql_var.size());
       for(int i = 0; i < mc.oc_var_to_sql_var.size(); ++i)
@@ -731,7 +801,7 @@ namespace gqlite::backends::sqlite_oc_executor
         ervs.push_back(std::make_shared<element_ref_vector>());
       }
 
-      // 3b) loop through the SQL results, which are rows, while ervs are columns 
+      // 4b) loop through the SQL results, which are rows, while ervs are columns 
       for(const gqlite::value& row_value : r.to_vector())
       {
         value_vector row = row_value.to_vector();
@@ -747,7 +817,7 @@ namespace gqlite::backends::sqlite_oc_executor
           }
         }
       }
-      // 3c) assigning to variables
+      // 4c) assigning to variables
       for(const auto& [k, vi] : mc.oc_var_to_sql_var)
       {
         check_condition(not has_variable(k), format_string("{} is already defined.", k));
@@ -919,7 +989,7 @@ gqlite::value sqlite::execute_oc_query(oc::algebra::node_csp _node, const value_
   try
   {
     sqlite_oc_executor::visitor executor;
-    executor.data = d;
+    executor.ec.data = d;
     value val = executor.get_value(executor.start(_node));
     d->execute_sql("COMMIT");
     return val;

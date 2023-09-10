@@ -23,9 +23,18 @@ namespace gqlite::oc
     COLON, ///< :
     COLONCOLON, ///< :
     EQUAL, ///< =
+    DIFFERENT, ///< !=
+    SUPERIOR, ///< >
+    INFERIOR, ///< <
+    SUPERIOR_EQUAL, ///< >=
+    INFERIOR_EQUAL, ///< <=
     DOT, ///< .
     LEFT_ARROW, ///< ->
     RIGHT_ARROW, ///< <-
+    PLUS, ///< +
+    STAR, ///< *
+    DIVIDE, ///< /
+    EXCLAMATION, ///< !
   // Constants
     IDENTIFIER,
     STRING,

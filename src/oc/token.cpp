@@ -50,6 +50,24 @@ const char* gqlite::oc::token_type_to_string(token_type _type)
       return "::";
     case EQUAL:
       return "=";
+    case DIFFERENT:
+      return "!=";
+    case SUPERIOR:
+      return ">";
+    case INFERIOR:
+      return "<";
+    case SUPERIOR_EQUAL:
+      return ">=";
+    case INFERIOR_EQUAL:
+      return "<=";
+    case PLUS:
+      return "+";
+    case STAR:
+      return "*";
+    case DIVIDE:
+      return "/";
+    case EXCLAMATION:
+      return "!";
     case IDENTIFIER:
       return "identifier";
     case STRING:
