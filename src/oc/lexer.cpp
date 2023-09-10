@@ -57,13 +57,32 @@ lexer::~lexer()
 #define CHAR_IS_TOKEN_OR_TOKEN_OR_TOKEN( tokenchar_1, tokenchar_2, tokenchar_3, tokenid_1, tokenid_2, tokenid_3 ) \
   if( lastChar == tokenchar_1 ) \
   { \
-    int nextChar = getNextChar(); \
+    int nextChar = get_next_char(); \
     if( nextChar == tokenchar_2 ) \
     { \
       return token(token_type::tokenid_2, line(), initial_col); \
     } else if( nextChar  == tokenchar_3 ) \
     { \
       return token(token_type::tokenid_3, line(), initial_col); \
+    } else { \
+      unget(); \
+      return token(token_type::tokenid_1, line(), initial_col); \
+    } \
+  }
+
+#define CHAR_IS_TOKEN_OR_TOKEN_OR_TOKEN_OR_TOKEN( tokenchar_1, tokenchar_2, tokenchar_3, tokenchar_4, tokenid_1, tokenid_2, tokenid_3, tokenid_4 ) \
+  if( lastChar == tokenchar_1 ) \
+  { \
+    int nextChar = get_next_char(); \
+    if( nextChar == tokenchar_2 ) \
+    { \
+      return token(token_type::tokenid_2, line(), initial_col); \
+    } else if( nextChar  == tokenchar_3 ) \
+    { \
+      return token(token_type::tokenid_3, line(), initial_col); \
+    } else if( nextChar  == tokenchar_4 ) \
+    { \
+      return token(token_type::tokenid_4, line(), initial_col); \
     } else { \
       unget(); \
       return token(token_type::tokenid_1, line(), initial_col); \
@@ -137,9 +156,14 @@ token lexer::next_token()
     CHAR_IS_TOKEN( '|', PIPE );
     CHAR_IS_TOKEN( ',', COMMA );
     CHAR_IS_TOKEN( '=', EQUAL );
+    CHAR_IS_TOKEN( '+', PLUS );
+    CHAR_IS_TOKEN( '*', STAR );
+    CHAR_IS_TOKEN( '/', DIVIDE );
+    CHAR_IS_TOKEN_OR_TOKEN( '!', '=', EXCLAMATION, DIFFERENT)
     CHAR_IS_TOKEN_OR_TOKEN( ':', ':', COLON, COLONCOLON);
     CHAR_IS_TOKEN_OR_TOKEN( '-', '>', MINUS, RIGHT_ARROW);
-    CHAR_IS_TOKEN_OR_TOKEN( '<', '-', UNKNOWN, LEFT_ARROW);
+    CHAR_IS_TOKEN_OR_TOKEN( '>', '=', SUPERIOR, SUPERIOR_EQUAL);
+    CHAR_IS_TOKEN_OR_TOKEN_OR_TOKEN_OR_TOKEN( '<', '-', '=', '>', INFERIOR, LEFT_ARROW, INFERIOR_EQUAL, DIFFERENT);
   }
   if( lastChar > 128 ) return next_token();
   identifierStr = lastChar;
