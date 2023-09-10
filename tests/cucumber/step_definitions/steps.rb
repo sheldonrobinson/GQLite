@@ -138,6 +138,9 @@ IgnoredScenario = [
   "[10] Fail when a path has the same variable in a preceding MATCH",
   "[11] Fail when a node has the same variable in the same pattern",
   "[12] Fail when a path has the same variable in the same pattern",
+  # p = ()-[]->() not supported (path assignment)
+  "[12] Filter path with path length predicate on multi variables with one binding",
+  "[13] Filter path with false path length predicate on multi variables with one binding",
   # with not implemented
   "[11] Fail when matching a node variable bound to a value",
   "[7] Matching twice with conflicting relationship types on same relationship",
@@ -161,7 +164,9 @@ IgnoredScenario = [
   "[27] Matching from null nodes should return no results owing to finding no matches",
   "[28] Matching from null nodes should return no results owing to matches being filtered out",
   # TODO edge isomorphism
-  "[29] Fail when re-using a relationship in the same pattern"
+  "[29] Fail when re-using a relationship in the same pattern",
+  # paths are not supported in where
+  "[2] Join with disjunctive multi-part predicates including patterns"
 ]
 
 Before do |scenario|

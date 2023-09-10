@@ -20,11 +20,14 @@ features = [
   # Create
   'create/Create1.feature', 'create/Create2.feature',
   # Match
-  'match/Match1.feature', 'match/Match2.feature', 'match/Match3.feature' ]
+  'match/Match1.feature', 'match/Match2.feature', 'match/Match3.feature',
+  # MatchWhere
+  'match-where/MatchWhere1.feature', 'match-where/MatchWhere2.feature', 'match-where/MatchWhere3.feature', 'match-where/MatchWhere4.feature'
+ ]
 # In progress
-# features = [ 'create/Create5.feature', 'match/Match6.feature' ]
+# features = [ 'create/Create5.feature', 'match/Match6.feature', 'match-where/MatchWhere5.feature' ]
 # Current dev
-features = [ 'match-where/MatchWhere1.feature' ]
+# features = [ ]
 
 features = features.map { |file| 'openCypher/tck/features/clauses/' + file }
 args = features.concat %w(--require cucumber/step_definitions/ --fail-fast)
