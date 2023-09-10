@@ -545,6 +545,11 @@ algebra::node_csp parser::data::parse_member_expression()
   algebra::node_csp left = parse_terminal_expression();
   if(tok.type == token_type::DOT)
   {
+    if(left->get_type() != algebra::node_type::variable)
+    {
+      report_unexpected(tok);
+    }
+    std::string left_identif = std::static_pointer_cast<const algebra::variable>(left)->get_identifier();
     std::vector<std::string> path;
     while (tok.type == token_type::DOT)
     {
@@ -553,7 +558,7 @@ algebra::node_csp parser::data::parse_member_expression()
       path.push_back(tok.string);
       get_next_token();
     }
-    return std::make_shared<algebra::member_access>(left, path);
+    return std::make_shared<algebra::member_access>(left_identif, path);
   }
   return left;
 }

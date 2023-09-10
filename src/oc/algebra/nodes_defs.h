@@ -73,7 +73,7 @@ OC_ALGEBRA_GENERATE(named_expression, OC_ALGEBRA_NAMED_EXPRESSION)
 OC_ALGEBRA_GENERATE(variable, OC_ALGEBRA_VARIABLE_MEMBERS)
 
 #define OC_ALGEBRA_MEMBER_ACCESS_MEMBERS(_KLASS_NAME_, F) \
-  F(_KLASS_NAME_, node_csp, left)                         \
+  F(_KLASS_NAME_, std::string, left)                      \
   F(_KLASS_NAME_, std::vector<std::string>, path)
 
 OC_ALGEBRA_GENERATE(member_access, OC_ALGEBRA_MEMBER_ACCESS_MEMBERS)
