@@ -202,3 +202,9 @@ if(READLINE_FOUND)
 
   install(TARGETS gqlite_cmd EXPORT gqliteTargets ${INSTALL_TARGETS_DEFAULT_ARGS} )
 endif()
+
+########################
+## Build tests
+
+add_executable(gqlite_cpp_tests tests/cpp/catch_amalgamated.cpp tests/cpp/test_table.cpp)
+target_link_libraries(gqlite_cpp_tests PRIVATE gqlite)

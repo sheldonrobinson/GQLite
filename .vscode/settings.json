@@ -69,7 +69,9 @@
     "typeindex": "cpp",
     "typeinfo": "cpp",
     "variant": "cpp",
-    "ranges": "cpp"
+    "ranges": "cpp",
+    "regex": "cpp",
+    "future": "cpp"
   },
   "python.autoComplete.extraPaths": [
     "/opt/ros/humble/lib/python3.10/site-packages",
