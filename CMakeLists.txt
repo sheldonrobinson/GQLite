@@ -108,6 +108,33 @@ set_package_properties(Python3 PROPERTIES
     PURPOSE "Used for python3 bindings.")
 
 ########################
+## Find Ruby
+
+find_package(Ruby)
+set_package_properties(Ruby PROPERTIES
+    DESCRIPTION ""
+    TYPE OPTIONAL
+    PURPOSE "Used for Ruby bindings.")
+
+########################
+## Find RSpec
+
+find_package(RSpec)
+set_package_properties(RSpec PROPERTIES
+    DESCRIPTION ""
+    TYPE OPTIONAL
+    PURPOSE "Used for testing ruby bindings.")
+
+########################
+## Find Cucumber
+
+find_package(Cucumber)
+set_package_properties(Cucumber PROPERTIES
+    DESCRIPTION ""
+    TYPE OPTIONAL
+    PURPOSE "Used for running the conformance test suite.")
+
+########################
 ## Find cffi
 
 if(Python3_FOUND)
@@ -182,7 +209,6 @@ if(Python3_FOUND AND PYTHON3_CFFI_FOUND)
       WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
       DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/bindings/python/build.py
   )
-  message(STATUS ${PYTHON3_SHORT_VERSION})
   install(FILES ${CMAKE_CURRENT_BINARY_DIR}/__c_gqlite.cpython-${Python3_VERSION_MAJOR}${Python3_VERSION_MINOR}-x86_64-linux-gnu.so DESTINATION ${PYTHON_SITE_PACKAGES_INSTALL_DIR}/gqlite)
   install(DIRECTORY bindings/python/gqlite DESTINATION ${PYTHON_SITE_PACKAGES_INSTALL_DIR})
 endif()
@@ -208,3 +234,20 @@ endif()
 
 add_executable(gqlite_cpp_tests tests/cpp/catch_amalgamated.cpp tests/cpp/test_table.cpp)
 target_link_libraries(gqlite_cpp_tests PRIVATE gqlite)
+
+########################
+## Run teststests
+
+add_test(NAME gqlite-cpp COMMAND ${CMAKE_CURRENT_BINARY_DIR}/gqlite_cpp_tests)
+
+if(RSPEC_FOUND)
+  add_test(NAME gqlite-rb-rspec COMMAND ${RSPEC_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/rb/gqlite-rspec.rb  )
+endif()
+
+if(CUCUMBER_FOUND)
+  add_test(NAME gqlite-rb-tck COMMAND ${Ruby_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/rb/gqlite-tck.rb WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests/rb/)
+endif()
+
+if(Python3_FOUND AND PYTHON3_CFFI_FOUND)
+  add_test(NAME gqlite-py COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/py/python-unittest.py)
+endif()
