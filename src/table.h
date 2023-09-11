@@ -1,8 +1,11 @@
 #include <gqlite.h>
 
+#include <span>
 #include <string>
 #include <unordered_map>
 #include <vector>
+
+#include "gqlite_p.h"
 
 namespace gqlite
 {
@@ -14,6 +17,21 @@ namespace gqlite
   template<typename _T_>
   class table
   {
+  public:
+    class row_view : public std::span<const _T_>
+    {
+      using std::span<const _T_>::span;
+    public:
+      operator std::vector<_T_>() const
+      {
+        return std::vector<_T_>(this->begin(), this->end());
+      }
+      template<template<typename T> class C>
+      bool operator==(const C<_T_>& _v) const
+      {
+        return this->size() == _v.size() and std::equal(this->begin(), this->end(), _v.begin(), _v.end());
+      }
+    };
   public:
     table();
     ~table();
@@ -29,6 +47,8 @@ namespace gqlite
      * Add a row to the table.
      */
     void add_row(const std::vector<_T_>& _row);
+    bool has_column(const std::string& _column) const;
+    std::size_t get_column_index(const std::string& _column) const;
     /**
      * @return the name of the columns
      */
@@ -38,7 +58,7 @@ namespace gqlite
     /**
      * @return the row at index \p _j
      */
-    std::vector<_T_> get_row(std::size_t _j);
+    row_view get_row(std::size_t _j) const;
     /**
      * @return the value at column \p _i and row \p _j
      */
@@ -80,6 +100,18 @@ namespace gqlite
     ++m_rows;
   }
   template<typename _T_>
+  bool table<_T_>::has_column(const std::string& _column) const
+  {
+    return m_labels.find(_column) != m_labels.end();
+  }
+  template<typename _T_>
+  std::size_t table<_T_>::get_column_index(const std::string& _column) const
+  {
+    auto it = m_labels.find(_column);
+    if(it != m_labels.end()) return it->second;
+    throw exception("Unknown column {}");
+  }
+  template<typename _T_>
   inline std::vector<std::string> table<_T_>::get_columns_names() const
   {
     std::vector<std::string> col;
@@ -101,12 +133,13 @@ namespace gqlite
     return m_rows;
   }
   template<typename _T_>
-  inline std::vector<_T_> table<_T_>::get_row(std::size_t _j)
+  inline table<_T_>::row_view table<_T_>::get_row(std::size_t _j) const
   {
-    std::vector<_T_> row;
-    row.reserve(m_columns);
-    row.insert(row.end(), m_values.begin() + _j * m_columns, m_values.begin() + (_j+1) * m_columns);
-    return row;
+    if(_j >= m_rows)
+    {
+      throw exception("Invalid index {}, size is {}", _j, m_rows);
+    }
+    return row_view(m_values.begin() + _j * m_columns, m_values.begin() + (_j+1) * m_columns);
   }
   template<typename _T_>
   inline const _T_& table<_T_>::get_value(std::size_t _i, std::size_t _j) const

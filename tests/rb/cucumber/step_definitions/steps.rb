@@ -283,11 +283,11 @@ end
 Then(/^a SyntaxError should be raised at compile time: VariableTypeConflict$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
-  expect(@exception.message).to match(/^.* is already defined.$/)
+  expect(@exception.message).to match(/^.* is already bound.$/)
 end
 
 Then(/^a SyntaxError should be raised at compile time: RelationshipUniquenessViolation$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
-  expect(@exception.message).to match(/^.* is already defined.$/)
+  expect(@exception.message).to match(/^.* is already bound.$/)
 end

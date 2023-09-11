@@ -2,6 +2,7 @@
 
 #include <functional>
 
+#include "../gqlite_p.h"
 #include "../errors.h"
 
 namespace gqlite::backends::functions
