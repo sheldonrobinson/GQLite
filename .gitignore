@@ -1,2 +1,2 @@
 testdb
-tests/openCypher*
+tests/rb/openCypher*
