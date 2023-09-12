@@ -462,7 +462,7 @@ namespace gqlite::backends::sqlite_oc_executor
     evaluation_context* eval_c;
     int count = 0;
     std::string sql_variables;
-    int sql_variables_count = 0;
+    std::size_t sql_variables_count = 0;
     std::string sql_tables;
     std::string sql_conditions;
     std::map<int, value> bindings;
