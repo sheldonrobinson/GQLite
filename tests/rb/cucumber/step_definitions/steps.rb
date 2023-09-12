@@ -169,6 +169,7 @@ IgnoredScenario = [
   # Aggregations are not supported yet
   "[5] Fail when not aliasing expressions in WITH",
   # ORDER BY not supported yet
+  "[1] Forwarding multiple node and relationship variables",
   "[6] Reusing variable names in WITH"
 ]
 
