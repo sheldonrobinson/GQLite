@@ -1,4 +1,4 @@
-#!/usr/bin/env rspec
+O#!/usr/bin/env rspec
 
 require 'rspec'
 require 'gqlite'

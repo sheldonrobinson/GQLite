@@ -236,7 +236,7 @@ namespace gqlite::backends::sqlite_oc_executor
   struct empty {};
   using node_ref_sp = std::shared_ptr<node_ref>;
   using edge_ref_sp = std::shared_ptr<edge_ref>;
-  using exec_value = std::variant<node_ref_sp, edge_ref_sp, gqlite::value, empty>;
+  using exec_value = std::variant<empty, node_ref_sp, edge_ref_sp, gqlite::value>;
   using exec_value_table = table<exec_value>;
 
   /**
@@ -323,6 +323,34 @@ namespace gqlite::backends::sqlite_oc_executor
       };
       return std::visit(value_getter{this}, _value);
     }
+    /**
+     * @return a value representing the executed value from @p _value to be used in sql query.
+     * A.k.a. nodes/edges id or the value
+     */
+    gqlite::value get_sql_value(const exec_value& _value)
+    {
+      struct value_getter
+      {
+        execution_context* exec_c;
+        gqlite::value operator()(const node_ref_sp& _node_ref)
+        {
+          return _node_ref->id;
+        }
+        gqlite::value operator()(const edge_ref_sp& _edge_ref)
+        {
+          return _edge_ref->id;
+        }
+        gqlite::value operator()(const gqlite::value& _value)
+        {
+          return _value;
+        }
+        gqlite::value operator()(const empty&)
+        {
+          return gqlite::value();
+        }
+      };
+      return std::visit(value_getter{this}, _value);
+    }
   };
 
   /**
@@ -332,6 +360,7 @@ namespace gqlite::backends::sqlite_oc_executor
   {
     exec_value_table table;
     std::vector<exec_value> current_row;
+    std::vector<std::string> new_vars; ///< i.e. the new variables introduced in this match
 
     void prepare_current_row(const exec_value_table& _table, std::size_t _i, bool _first_statement)
     {
@@ -356,6 +385,14 @@ namespace gqlite::backends::sqlite_oc_executor
     {
       return table.has_column(_variable) and not std::holds_alternative<empty>(current_row[table.get_column_index(_variable)]);
     }
+    bool is_new_variable(const std::string& _variable)
+    {
+      return std::find(new_vars.begin(), new_vars.end(), _variable) != new_vars.end();
+    }
+    std::size_t get_new_variable_index(const std::string& _variable)
+    {
+      return std::find(new_vars.begin(), new_vars.end(), _variable) - new_vars.begin();
+    }
     void define_variable(const std::string& _variable)
     {
       if(_variable.empty()) return;
@@ -364,6 +401,7 @@ namespace gqlite::backends::sqlite_oc_executor
         throw exception("Variable {} is already bound.", _variable);
       }
       table.add_column(_variable);
+      new_vars.push_back(_variable);
     }
     void define_variable_if_needed(const std::string& _variable)
     {
@@ -371,6 +409,7 @@ namespace gqlite::backends::sqlite_oc_executor
       if(not table.has_column(_variable))
       {
         table.add_column(_variable);
+        new_vars.push_back(_variable);
       }
     }
     exec_value get_variable(const std::string& _variable)
@@ -424,6 +463,7 @@ namespace gqlite::backends::sqlite_oc_executor
     evaluation_context* eval_c;
     int count = 0;
     std::string sql_variables;
+    int sql_variables_count = 0;
     std::string sql_tables;
     std::string sql_conditions;
     std::map<int, value> bindings;
@@ -448,9 +488,9 @@ namespace gqlite::backends::sqlite_oc_executor
       {
         sql_tables += format_string(" JOIN gqlite_{}_labels AS tb_lab{}", exec_c->graph_name, label_count);
         if(not cond.empty() or _start_with_and) cond += " AND ";
+        std::size_t idx = bind_value(exec_c->data->id_for_label(label));
         cond += format_string(" {} = tb_lab{}.node_id AND ?{} = tb_lab{}.label ",
-                      _node_variable, label_count, to_string_fixed_width(bindings.size() + 1, 3), label_count);
-        bindings[bindings.size() + 1] = exec_c->data->id_for_label(label);
+                      _node_variable, label_count, to_string_fixed_width(idx, 3), label_count);
         ++label_count;
       }
       return cond;
@@ -489,6 +529,13 @@ namespace gqlite::backends::sqlite_oc_executor
       sql_conditions += format_string(" AND tbp{}.id = {}", count_s, _sql_var);
       return properties_var;
     }
+    std::size_t bind_value(const value& _value)
+    {
+      std::size_t binding_id = bindings.size() + 1;
+      bindings[binding_id] = _value;
+      return binding_id;
+    }
+
   };
 
   /**
@@ -511,8 +558,7 @@ namespace gqlite::backends::sqlite_oc_executor
     }
     std::string visit(algebra::value_csp _node) override
     {
-      int idx = mc->bindings.size() + 1;
-      mc->bindings[idx] = _node->get_value();
+      std::size_t idx = mc->bind_value(_node->get_value());
       return "?" + to_string_fixed_width(idx, 3);
     }
     std::string visit(algebra::member_access_csp _node) override
@@ -800,10 +846,22 @@ namespace gqlite::backends::sqlite_oc_executor
         auto it = _mc->oc_var_to_sql_var.find(_oc_var);
         if(it == _mc->oc_var_to_sql_var.end())
         {
-          if(not _mc->sql_variables.empty()) _mc->sql_variables += ", ";
-          _mc->sql_variables += _sql_var;
-          _mc->oc_var_to_sql_var[_oc_var] = {_sql_var, _sql_properties_var, _label_var, _mc->oc_var_to_sql_var.size(), _is_node};
+          // Check if it is a new variable and need to be extracted in the SQL statement
+          if(_mc->eval_c->is_new_variable(_oc_var))
+          {
+            if(not _mc->sql_variables.empty()) _mc->sql_variables += ", ";
+            _mc->sql_variables += _sql_var;
+            _mc->oc_var_to_sql_var[_oc_var] = {_sql_var, _sql_properties_var, _label_var, _mc->sql_variables_count, _is_node};
+            ++_mc->sql_variables_count;
+          } else {
+            // It is a value, bind it.
+            int idx = _mc->bind_value(_mc->exec_c->get_sql_value(_mc->eval_c->get_variable(_oc_var)));
+            std::string binding = format_string("?{}", to_string_fixed_width(idx, 3));
+            _mc->sql_conditions += format_string(" AND {} = {} ", _sql_var, binding);
+            _mc->oc_var_to_sql_var[_oc_var] = {binding, _sql_properties_var, _label_var, std::size_t(-1), _is_node};
+          }
         } else {
+          // Generate match
           if(it->second.is_node != _is_node) throw exception("{} is redefined as a variable of a different type", _oc_var);
           _mc->sql_conditions += format_string(" AND {} = {} ", _sql_var, it->second.sql_var);
         }
@@ -936,16 +994,16 @@ namespace gqlite::backends::sqlite_oc_executor
         if(not first_statement)
         {
           exec_value_table::row_view row_init = table.get_row(i);
-          auto bit = std::back_inserter(values);
-          std::copy(row_init.begin(), row_init.end(), bit);
+          std::copy(row_init.begin(), row_init.end(), values.begin());
           start_new_values = row_init.size();
         }
         for(const gqlite::value& row_value : r.to_vector())
         {
           value_vector row = row_value.to_vector();
-          check_condition(row.size() == mc.oc_var_to_sql_var.size(), "Wrong number of column return by SQL Query.");
-          for(const auto& [k, vi] : mc.oc_var_to_sql_var)
+          check_condition(row.size() == mc.eval_c->new_vars.size(), "Wrong number of column return by SQL Query.");
+          for(const std::string& k : mc.eval_c->new_vars)
           {
+            match_context::var_info vi = mc.oc_var_to_sql_var[k];
             int id = row[vi.sql_column].to_integer();
             if(vi.is_node)
             {

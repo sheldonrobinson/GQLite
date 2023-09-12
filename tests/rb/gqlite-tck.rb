@@ -27,7 +27,7 @@ features = [
 # In progress
 # features = [ 'create/Create5.feature', 'match/Match6.feature', 'match-where/MatchWhere5.feature' ]
 # Current dev
-# features = [ ]
+# features = [  ]
 
 features = features.map { |file| 'openCypher/tck/features/clauses/' + file }
 args = features.concat %w(--require cucumber/step_definitions/ --fail-fast)

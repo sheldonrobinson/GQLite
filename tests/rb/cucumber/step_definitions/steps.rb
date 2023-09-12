@@ -127,7 +127,6 @@ IgnoredScenario = [
   # gqlite does not support large integer, as, sqlite does not, and added support for bignumber would add extra complexity withou a sqlite extension
   "[12] CREATE does not lose precision on large integers",
   # Triggers a different error first, as MATCH (a) return an empty list, it fails in creation
-  # TODO revisit in case we add support for creation of relationship with list of nodes 
   "[24] Fail when creating a relationship using undefined variable in pattern",
   # Path assignment is not implemented yet
   # Nor is *
@@ -141,25 +140,20 @@ IgnoredScenario = [
   # p = ()-[]->() not supported (path assignment)
   "[12] Filter path with path length predicate on multi variables with one binding",
   "[13] Filter path with false path length predicate on multi variables with one binding",
-  # with not implemented
+  # WITH not implemented
   "[11] Fail when matching a node variable bound to a value",
   "[7] Matching twice with conflicting relationship types on same relationship",
   "[13] Fail when matching a relationship variable bound to a value",
+  "[24] Matching twice with duplicate relationship types on same relationship",
+  "[25] Matching twice with an additional node label",
+  "[26] Matching twice with a duplicate predicate",
+  "[30] Fail when using a list or nodes as a node",
   # bindings ($) not implemented
   "[8] Fail when using parameter as relationship predicate in MATCH",
   # <--> is considered an error, unclear if it is equivalent to -- (aka no specified direction,
   # to me it should indicate that there are two edges between the node, in each direction, but
   # is not the case according to the test case)
   "[19] Two bound nodes pointing to the same node",
-  # Multi match statements are not supported yet
-  "[20] Three bound nodes pointing to the same node",
-  "[21] Three bound nodes pointing to the same node with extra connections",
-  "[22] Returning bound nodes that are not part of the pattern",
-  "[23] Matching disconnected patterns",
-  "[24] Matching twice with duplicate relationship types on same relationship",
-  "[25] Matching twice with an additional node label",
-  "[26] Matching twice with a duplicate predicate",
-  "[30] Fail when using a list or nodes as a node",
   # OPTIONAL MATCH is not supported yet
   "[27] Matching from null nodes should return no results owing to finding no matches",
   "[28] Matching from null nodes should return no results owing to matches being filtered out",
