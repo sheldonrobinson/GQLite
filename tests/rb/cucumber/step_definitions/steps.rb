@@ -129,7 +129,8 @@ IgnoredScenario = [
   # Triggers a different error first, as MATCH (a) return an empty list, it fails in creation
   "[24] Fail when creating a relationship using undefined variable in pattern",
   # Path assignment is not implemented yet
-  # Nor is *
+  "[4] Forwarding a path variable",
+  # Path assignment and variable length path are not implemented
   "[8] Fail when a path has the same variable in a preceding MATCH",
   "[9] Fail when a relationship has the same variable in the same pattern",
   "[10] Fail when a path has the same variable in the same pattern",
@@ -157,8 +158,12 @@ IgnoredScenario = [
   # OPTIONAL MATCH is not supported yet
   "[27] Matching from null nodes should return no results owing to finding no matches",
   "[28] Matching from null nodes should return no results owing to matches being filtered out",
+  "[5] Forwarding null",
+  "[6] Forwarind a node variable possibly null",
   # TODO edge isomorphism
   "[29] Fail when re-using a relationship in the same pattern",
+  # WITH allow to reuse variable even with considering edge isomorphism, need a better way to handle that, might have to be tracked by the parser
+  "[3] Forwarding a relationship variable",
   # paths are not supported in where
   "[2] Join with disjunctive multi-part predicates including patterns"
 ]

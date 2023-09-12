@@ -417,7 +417,7 @@ namespace gqlite::backends::sqlite_oc_executor
       {
         return current_row[table.get_column_index(_variable)];
       } else {
-        throw exception("Variable {} is not defined.");
+        throw exception("Variable {} is not defined.", _variable);
       }
     }
     void set_variable(const std::string& _variable, const exec_value& _ev)
@@ -612,11 +612,11 @@ namespace gqlite::backends::sqlite_oc_executor
   /**
    * Visitor to evaluate expressions.
    */
-  struct evaluator_visitor : public gqlite::oc::algebra::default_node_visitor<value>
+  struct evaluator_visitor : public gqlite::oc::algebra::default_node_visitor<exec_value>
   {
     execution_context* exec_c;
     evaluation_context* eval_c;
-    value visit_default(algebra::node_csp _node) override
+    exec_value visit_default(algebra::node_csp _node) override
     {
       throw gqlite::exception("Unimplemented statement node {} in evaluator_visitor", oc::algebra::node_type_name(_node->get_type()));
     }
@@ -642,15 +642,15 @@ namespace gqlite::backends::sqlite_oc_executor
      }
       return cval;
     }
-    value visit(algebra::value_csp _node) override
+    exec_value visit(algebra::value_csp _node) override
     {
       return _node->get_value();
     }
-    value visit(algebra::variable_csp _node) override
+    exec_value visit(algebra::variable_csp _node) override
     {
-      return exec_c->get_value(eval_c->get_variable(_node->get_identifier()));
+      return eval_c->get_variable(_node->get_identifier());
     }
-    value visit(algebra::array_csp _node) override
+    exec_value visit(algebra::array_csp _node) override
     {
       std::vector<value> values;
       for(const algebra::node_csp& v : _node->get_array())
@@ -659,11 +659,11 @@ namespace gqlite::backends::sqlite_oc_executor
       }
       return values;
     }
-    value visit(algebra::map_csp _node) override
+    exec_value visit(algebra::map_csp _node) override
     {
       return get_properties(_node->get_map());
     }
-    value visit(algebra::member_access_csp _node) override
+    exec_value visit(algebra::member_access_csp _node) override
     {
       exec_value value = eval_c->get_variable(_node->get_left());
 
@@ -698,7 +698,7 @@ namespace gqlite::backends::sqlite_oc_executor
       };
       return std::visit(member_access{this, _node}, value);
     }
-    value visit(algebra::function_call_csp _node) override
+    exec_value visit(algebra::function_call_csp _node) override
     {
       std::vector<value> args;
       for(const algebra::node_csp& arg : _node->get_arguments())
@@ -1018,33 +1018,90 @@ namespace gqlite::backends::sqlite_oc_executor
       return value{};
     }
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    // Return
-    value visit(algebra::return_statement_csp rs) override
+    // with
+    value visit(algebra::with_csp w) override
     {
+      if(w->get_all() and w->get_expressions().empty())
+      {
+        return value{};
+      }
+      if(w->get_all() and not w->get_expressions().empty())
+      {
+        throw exception("Unimplemented WITH *, expressions");
+      }
       evaluation_context eval_c;
       eval_c.table = table;
       evaluator_visitor eval_v;
       eval_v.exec_c = &exec_c;
       eval_v.eval_c = &eval_c;
 
+      exec_value_table out_table;
       value_vector labels;
-      for(const algebra::named_expression_csp& rv : rs->get_expressions())
+      for(const algebra::named_expression_csp& rv : w->get_expressions())
       {
-        labels.push_back(rv->get_name());
+        out_table.add_column(rv->get_name());
       }
-      value_vector results_rows;
-      results_rows.push_back(labels);
       for(int i = 0; i < table.get_rows_count(); ++i)
       {
-        value_vector row;
+        std::vector<exec_value> row;
         eval_c.prepare_current_row(table, i, false);
-        for(const algebra::named_expression_csp& rv : rs->get_expressions())
+        for(const algebra::named_expression_csp& rv : w->get_expressions())
         {
           row.push_back(eval_v.start(rv->get_expression()));
         }
-        results_rows.push_back(row);
+        out_table.add_row(row);
       }
-      return value(results_rows);
+      table = out_table;
+      return value();
+    }
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // Return
+    value visit(algebra::return_statement_csp rs) override
+    {
+      if(rs->get_all())
+      {
+        errors::check_condition(rs->get_expressions().empty(), "Unimplemented RETURN *, expressions");
+        value_vector labels;
+        for(const std::string&  c : table.get_columns_names()) { labels.push_back(c); }
+        value_vector results_rows;
+        results_rows.push_back(labels);
+        for(int i = 0; i < table.get_rows_count(); ++i)
+        {
+          value_vector row;
+          for(const exec_value& ev : table.get_row(i))
+          {
+            row.push_back(exec_c.get_value(ev));
+          }
+          results_rows.push_back(row);
+        }
+        return results_rows;
+
+      } else {
+        evaluation_context eval_c;
+        eval_c.table = table;
+        evaluator_visitor eval_v;
+        eval_v.exec_c = &exec_c;
+        eval_v.eval_c = &eval_c;
+
+        value_vector labels;
+        for(const algebra::named_expression_csp& rv : rs->get_expressions())
+        {
+          labels.push_back(rv->get_name());
+        }
+        value_vector results_rows;
+        results_rows.push_back(labels);
+        for(int i = 0; i < table.get_rows_count(); ++i)
+        {
+          value_vector row;
+          eval_c.prepare_current_row(table, i, false);
+          for(const algebra::named_expression_csp& rv : rs->get_expressions())
+          {
+            row.push_back(exec_c.get_value(eval_v.start(rv->get_expression())));
+          }
+          results_rows.push_back(row);
+        }
+        return value(results_rows);
+      }
     }
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Statements

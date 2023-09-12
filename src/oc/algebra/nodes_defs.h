@@ -18,10 +18,17 @@ OC_ALGEBRA_GENERATE(match, OC_ALGEBRA_MATCH_NODES_MEMBERS)
 
 OC_ALGEBRA_GENERATE(statements, OC_ALGEBRA_STATEMENTS_MEMBERS)
 
-#define OC_ALGEBRA_RETURN_MEMBERS(_KLASS_NAME_, F)    \
+#define OC_ALGEBRA_RETURN_MEMBERS(_KLASS_NAME_, F)                \
+  F(_KLASS_NAME_, bool, all)                                      \
   F(_KLASS_NAME_, std::vector<named_expression_csp>, expressions)
 
 OC_ALGEBRA_GENERATE(return_statement, OC_ALGEBRA_RETURN_MEMBERS)
+
+#define OC_ALGEBRA_WITH_MEMBERS(_KLASS_NAME_, F)                  \
+  F(_KLASS_NAME_, bool, all)                                      \
+  F(_KLASS_NAME_, std::vector<named_expression_csp>, expressions)
+
+OC_ALGEBRA_GENERATE(with, OC_ALGEBRA_WITH_MEMBERS)
 
 // Values
 

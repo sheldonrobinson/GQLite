@@ -9,7 +9,7 @@ using namespace gqlite::oc::algebra;
 namespace gqlite::oc::algebra::details
 {
   template<typename _T_>
-  bool equals(const _T_& _a, const _T_& _b) requires std::same_as<_T_, gqlite::value> or std::same_as<_T_, std::string> or std::same_as<_T_, edge_directivity>
+  bool equals(const _T_& _a, const _T_& _b) requires std::same_as<_T_, gqlite::value> or std::same_as<_T_, std::string> or std::same_as<_T_, edge_directivity> or std::is_integral_v<_T_> or std::is_floating_point_v<_T_>
   {
     return _a == _b;
   }
