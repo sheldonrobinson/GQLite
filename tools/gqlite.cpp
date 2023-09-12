@@ -72,14 +72,22 @@ int main(int argc, const char** argv)
           std::cout << "Unknown command '" << command[0] << "' use '.help' for usage hints." << std::endl;
         }
       } else {
+        bool previous_empty = false;
         while(*std::prev(command.end()) != ';' and (line = readline("   ...> ")) != nullptr)
         {
           if (*line)
           {
+            previous_empty = false;
             add_history(line);
             command += line;
             free(line);
-          }          
+          } else {
+            if(previous_empty)
+            {
+              break;
+            }
+            previous_empty = true;
+          }
         }
         *std::prev(command.end()) = ' '; // remove the trailing ';'
         try
