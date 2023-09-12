@@ -9,7 +9,6 @@
 #include "sqlite_queries.h"
 
 #include "../oc/algebra/default_node_visitor.h"
-#include "../errors.h"
 #include "../logging.h"
 #include "../string.h"
 #include "../table.h"
@@ -144,9 +143,9 @@ bool sqlite_data::graph_has(const std::string& _name)
 {
   value r= execute_sql(sqlite_queries::graph_has(_name));
   value_vector v = r.to_vector();
-  check_condition(v.size() == 1, "Should have gotten only one result");
+  errors::check_condition(v.size() == 1, "Should have gotten only one result");
   v = v.begin()->to_vector();
-  check_condition(v.size() == 1, "Should have gotten only one result");
+  errors::check_condition(v.size() == 1, "Should have gotten only one result");
   return v.begin()->to_bool();
 }
 
@@ -154,9 +153,9 @@ bool sqlite_data::table_has(const std::string& _name)
 {
   value r = execute_sql(sqlite_queries::table_has(), {{1, _name}});
   value_vector v = r.to_vector();
-  check_condition(v.size() == 1, "Should have gotten only one result for table_has.");
+  errors::check_condition(v.size() == 1, "Should have gotten only one result for table_has.");
   v = v.begin()->to_vector();
-  check_condition(v.size() == 1, "Should have gotten only one column for table_has.");
+  errors::check_condition(v.size() == 1, "Should have gotten only one column for table_has.");
   return v.begin()->to_bool();
 }
 
@@ -182,7 +181,7 @@ int sqlite_data::id_for_label(const std::string& _string)
       return id;
     } else {
       v = v.begin()->to_vector();
-      check_condition(v.size() == 1, "Should have gotten only one column for label_get_from_id.");
+      errors::check_condition(v.size() == 1, "Should have gotten only one column for label_get_from_id.");
       return v.begin()->to_integer();
     }
   } else {
@@ -202,7 +201,7 @@ std::string sqlite_data::label_for_id(int _id)
       throw gqlite::exception("Internal error: unknown label id {}", _id);
     } else {
       v = v.begin()->to_vector();
-      check_condition(v.size() == 1, "Should have gotten only one column for label_get_from_id.");
+      errors::check_condition(v.size() == 1, "Should have gotten only one column for label_get_from_id.");
       return v.begin()->to_string();
     }
   } else {
@@ -264,9 +263,9 @@ namespace gqlite::backends::sqlite_oc_executor
             {
               // Query
               value_vector properties_val_list_vector = exec_c->data->execute_sql(sqlite_queries::node_get_properties(exec_c->graph_name), {{1, _node_ref->id}}).to_vector();
-              check_condition(properties_val_list_vector.size() == 1, "When getting a node, should have received only one node");
+              errors::check_condition(properties_val_list_vector.size() == 1, "When getting a node, should have received only one node");
               value_vector properties_row = properties_val_list_vector.front().to_vector();
-              check_condition(properties_row.size() == 1, "When getting a node, properties get should only have given one column");
+              errors::check_condition(properties_row.size() == 1, "When getting a node, properties get should only have given one column");
               properties = gqlite::value::from_json(properties_row.front().to_string());
             }
 
@@ -278,7 +277,7 @@ namespace gqlite::backends::sqlite_oc_executor
               for(const gqlite::value& label_row_value : labels_val_list_vector)
               {
                 value_vector label_row = label_row_value.to_vector();
-                check_condition(label_row.size() == 1, "When getting a node, labels get should only have given one column");
+                errors::check_condition(label_row.size() == 1, "When getting a node, labels get should only have given one column");
                 labels.push_back(exec_c->data->label_for_id(label_row.front().to_integer()));
               }
             }
@@ -299,9 +298,9 @@ namespace gqlite::backends::sqlite_oc_executor
             {
               // Query
               value_vector properties_val_list_vector = exec_c->data->execute_sql(sqlite_queries::edge_get_label_properties(exec_c->graph_name), {{1, _edge_ref->id}}).to_vector();
-              check_condition(properties_val_list_vector.size() == 1, "When getting an edge, should have received only one edge");
+              errors::check_condition(properties_val_list_vector.size() == 1, "When getting an edge, should have received only one edge");
               value_vector properties_row = properties_val_list_vector.front().to_vector();
-              check_condition(properties_row.size() == 2, "When getting an edge, properties get should only have given two column");
+              errors::check_condition(properties_row.size() == 2, "When getting an edge, properties get should only have given two column");
               label = exec_c->data->label_for_id(properties_row[0].to_integer());
               properties = gqlite::value::from_json(properties_row[1].to_string());
             }
@@ -1000,7 +999,7 @@ namespace gqlite::backends::sqlite_oc_executor
         for(const gqlite::value& row_value : r.to_vector())
         {
           value_vector row = row_value.to_vector();
-          check_condition(row.size() == mc.eval_c->new_vars.size(), "Wrong number of column return by SQL Query.");
+          errors::check_condition(row.size() == mc.eval_c->new_vars.size(), "Wrong number of column return by SQL Query.");
           for(const std::string& k : mc.eval_c->new_vars)
           {
             match_context::var_info vi = mc.oc_var_to_sql_var[k];
@@ -1115,7 +1114,7 @@ gqlite::value sqlite::get_debug_stats() const
 {
   gqlite::value result = d->execute_sql(sqlite_queries::get_debug_stats("default"));
   value_vector rows = result.to_vector();
-  check_condition(rows.size() == 7, "Invalid number of debug stats.");
+  errors::check_condition(rows.size() == 7, "Invalid number of debug stats got {} expected 7.", rows.size());
   value_map stats;
   stats["nodes_count"] = rows[0].to_vector()[0].to_integer();
   stats["edges_count"] = rows[1].to_vector()[0].to_integer();

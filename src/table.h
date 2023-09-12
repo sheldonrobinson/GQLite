@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "gqlite_p.h"
+#include "errors.h"
 
 namespace gqlite
 {
@@ -96,6 +97,7 @@ namespace gqlite
   template<typename _T_>
   inline void table<_T_>::add_row(const std::vector<_T_>& _row)
   {
+    errors::check_condition(_row.size() == get_columns_count(), "Invalid row size, got {}, expected {}", _row.size(), get_columns_count());
     m_values.insert(m_values.end(), _row.begin(), _row.end());
     ++m_rows;
   }

@@ -29,14 +29,6 @@ namespace gqlite
     std::string m_error;
     const char* m_c_error;
   };
-  template<typename _TMessage_>
-  void check_condition(bool _condition, _TMessage_ _message)
-  {
-    if(not _condition)
-    {
-      throw exception(_message);
-    }
-  }
   enum class value_type
   {
     invalid,
