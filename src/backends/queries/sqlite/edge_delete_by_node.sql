@@ -1,0 +1,1 @@
+DELETE FROM gqlite_/%= _graph_name %/_edges WHERE left=?001 or right=?001

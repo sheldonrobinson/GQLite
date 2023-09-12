@@ -30,6 +30,12 @@ OC_ALGEBRA_GENERATE(return_statement, OC_ALGEBRA_RETURN_MEMBERS)
 
 OC_ALGEBRA_GENERATE(with, OC_ALGEBRA_WITH_MEMBERS)
 
+#define OC_ALGEBRA_DELETE_MEMBERS(_KLASS_NAME_, F)  \
+  F(_KLASS_NAME_, bool, detach)                     \
+  F(_KLASS_NAME_, std::vector<node_csp>, expressions)
+
+OC_ALGEBRA_GENERATE(delete_statement, OC_ALGEBRA_DELETE_MEMBERS)
+
 // Values
 
 #define OC_ALGEBRA_GRAPH_NODE_MEMBERS(_KLASS_NAME_, F)          \

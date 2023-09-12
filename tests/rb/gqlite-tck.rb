@@ -24,7 +24,9 @@ features = [
   # MatchWhere
   'match-where/MatchWhere1.feature', 'match-where/MatchWhere2.feature', 'match-where/MatchWhere3.feature', 'match-where/MatchWhere4.feature',
   # WITH
-  'with/With1.feature', 'with/With2.feature', 'with/With3.feature', 'with/With4.feature'
+  'with/With1.feature', 'with/With2.feature', 'with/With3.feature', 'with/With4.feature',
+  # DELETE
+  'delete/Delete1.feature'
  ]
 # In progress
 # features = [ 'create/Create5.feature', 'match/Match6.feature', 'match-where/MatchWhere5.feature' ]

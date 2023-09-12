@@ -3,6 +3,18 @@
 
 namespace gqlite::backends::sqlite_queries
 {
+  std::string edge_count_by_node(const std::string& _graph_name)
+  {
+    std::stringstream stream;
+    #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_count_by_node.sql"
+stream << "SELECT count(*) FROM gqlite_";
+#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_count_by_node.sql"
+stream << ( _graph_name );
+#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_count_by_node.sql"
+stream << "_edges WHERE left=?001 or right=?001";
+
+    return stream.str();
+  }
   std::string edge_create(const std::string& _graph_name)
   {
     std::stringstream stream;
@@ -12,6 +24,30 @@ stream << "INSERT INTO gqlite_";
 stream << ( _graph_name );
 #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_create.sql"
 stream << "_edges (label, properties, left, right) VALUES (?001, ?002, ?003, ?004)";
+
+    return stream.str();
+  }
+  std::string edge_delete(const std::string& _graph_name)
+  {
+    std::stringstream stream;
+    #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_delete.sql"
+stream << "DELETE FROM gqlite_";
+#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_delete.sql"
+stream << ( _graph_name );
+#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_delete.sql"
+stream << "_edges WHERE id=?001";
+
+    return stream.str();
+  }
+  std::string edge_delete_by_node(const std::string& _graph_name)
+  {
+    std::stringstream stream;
+    #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_delete_by_node.sql"
+stream << "DELETE FROM gqlite_";
+#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_delete_by_node.sql"
+stream << ( _graph_name );
+#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_delete_by_node.sql"
+stream << "_edges WHERE left=?001 or right=?001";
 
     return stream.str();
   }
@@ -187,6 +223,23 @@ stream << "INSERT INTO gqlite_";
 stream << ( _graph_name );
 #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_create.sql"
 stream << "_nodes (properties) VALUES (?001)";
+
+    return stream.str();
+  }
+  std::string node_delete(const std::string& _graph_name)
+  {
+    std::stringstream stream;
+    #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_delete.sql"
+stream << "DELETE FROM gqlite_";
+#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_delete.sql"
+stream << ( _graph_name );
+#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_delete.sql"
+stream << "_labels WHERE node_id=?001;\n"
+"DELETE FROM gqlite_";
+#line 2 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_delete.sql"
+stream << ( _graph_name );
+#line 2 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_delete.sql"
+stream << "_nodes WHERE id=?001";
 
     return stream.str();
   }

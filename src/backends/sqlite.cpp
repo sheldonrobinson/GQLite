@@ -1023,6 +1023,62 @@ namespace gqlite::backends::sqlite_oc_executor
       return value{};
     }
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // delete
+    value visit(algebra::delete_statement_csp _ds) override
+    {
+      evaluation_context eval_c;
+      eval_c.table = table;
+      evaluator_visitor eval_v;
+      eval_v.exec_c = &exec_c;
+      eval_v.eval_c = &eval_c;
+
+      struct deleter
+      {
+        statement_visitor* self;
+        bool detach;
+        void operator()(const node_ref_sp& _node)
+        {
+          if(detach)
+          {
+            self->exec_c.data->execute_sql(sqlite_queries::edge_delete_by_node(self->exec_c.graph_name), {{1, _node->id}});
+          } else {
+            value result = self->exec_c.data->execute_sql(sqlite_queries::edge_count_by_node(self->exec_c.graph_name), {{1, _node->id}});
+            value_vector rows = result.to_vector();
+            errors::check_condition(rows.size() == 1, "Invalid number of rows for counting edges got {} expected 1.", rows.size());
+            value_vector row = rows.front().to_vector();
+            errors::check_condition(row.size() == 1, "Invalid number of columns for counting edges got {} expected 1.", rows.size());
+            int count = row.front().to_integer();
+            errors::check_condition(count == 0, "Cannot delete node with {} relationships.", count);
+          }
+          self->exec_c.data->execute_sql(sqlite_queries::node_delete(self->exec_c.graph_name), {{1, _node->id}});
+        }
+        void operator()(const edge_ref_sp& _edge)
+        {
+          self->exec_c.data->execute_sql(sqlite_queries::edge_delete(self->exec_c.graph_name), {{1, _edge->id}});
+        }
+        void operator()(const value& _value)
+        {
+          throw exception("Cannot delete a value.");
+        }
+        void operator()(const empty&)
+        {
+          throw exception("Cannot delete an empty value.");
+        }
+      };
+
+      for(int i = 0; i < table.get_rows_count(); ++i)
+      {
+        value_vector row;
+        eval_c.prepare_current_row(table, i, false);
+        for(const algebra::node_csp& rv : _ds->get_expressions())
+        {
+          exec_value ev =eval_v.start(rv);
+          std::visit(deleter{this, _ds->get_detach()}, ev);
+        }
+      }
+      return value();
+    }
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // with
     value visit(algebra::with_csp w) override
     {

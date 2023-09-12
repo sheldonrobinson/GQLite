@@ -54,6 +54,18 @@ module GqliteTest
       if label == '+properties'
         properties_count = count
       end
+      if label == '-nodes'
+        nodes_count = -count
+      end
+      if label == '-relationships'
+        edges_count = -count
+      end
+      if label == '-labels'
+        labels_count = -count
+      end
+      if label == '-properties'
+        properties_count = -count
+      end
     end
     return SideEffect.new nodes_count, edges_count, labels_count, properties_count
   end
@@ -160,6 +172,9 @@ IgnoredScenario = [
   "[28] Matching from null nodes should return no results owing to matches being filtered out",
   "[5] Forwarding null",
   "[6] Forwarind a node variable possibly null",
+  "[4] Delete on null node",
+  "[5] Ignore null when deleting node",
+  "[6] Detach delete on null node",
   # TODO edge isomorphism
   "[29] Fail when re-using a relationship in the same pattern",
   # WITH allow to reuse variable even with considering edge isomorphism, need a better way to handle that, might have to be tracked by the parser
@@ -170,7 +185,9 @@ IgnoredScenario = [
   "[5] Fail when not aliasing expressions in WITH",
   # ORDER BY not supported yet
   "[1] Forwarding multiple node and relationship variables",
-  "[6] Reusing variable names in WITH"
+  "[6] Reusing variable names in WITH",
+  # No validation of delete expression
+  "[8] Failing when deleting a label"
 ]
 
 Before do |scenario|
@@ -312,4 +329,16 @@ Then(/^a SyntaxError should be raised at compile time: NoExpressionAlias$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
   expect(@exception.message).to match(/^\d+:\d+:Expected token AS got {}.$/)
+end
+
+Then(/^a ConstraintVerificationFailed should be raised at runtime: DeleteConnectedNode$/) do
+  pending if @ignored_scenario
+  expect(@exception).not_to be_nil
+  expect(@exception.message).to match(/^Cannot delete node with \d+ relationships.$/)
+end
+
+Then(/^a SyntaxError should be raised at compile time: InvalidDelete$/) do
+  pending if @ignored_scenario
+  expect(@exception).not_to be_nil
+  expect(@exception.message).to match(/^Invalid delete expression.$/)
 end
