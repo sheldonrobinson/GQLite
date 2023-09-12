@@ -9,6 +9,7 @@
 #include <gqlite.h>
 
 #include "../src/string.h"
+#include "cfgpath.h"
 
 using namespace std;
 
@@ -31,6 +32,10 @@ int main(int argc, const char** argv)
   char *line;
   std::string statement;
   std::string output_filename;
+  std::string history_filename;
+  history_filename.resize(MAX_PATH);
+  get_user_config_file(&*history_filename.begin(), history_filename.size(), "gqlite", "_history");
+  read_history(history_filename.c_str());
   while ((line = readline("gqlite> ")) != nullptr)
   {
     if (*line)
@@ -103,6 +108,7 @@ int main(int argc, const char** argv)
       std::cout << "Enter '.help' for usage hints." << std::endl;
     }
   }
+  write_history(history_filename.c_str());
 
   return 0;
 }
