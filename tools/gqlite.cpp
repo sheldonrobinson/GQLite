@@ -15,10 +15,13 @@ using namespace std;
 
 void print_help()
 {
-  std::cout << R"VGG(.help             show this message
+  std::cout << R"VGG(List of commands:
 .once ?FILE?      save result of next query in FILE.
 .open ?FILE?      close existing connection and reopen FILE.
-.quit             Exit this program)VGG"  <<std::endl;
+.quit             Exit this program
+.help             show this message
+
+To execute a query, write the query and end it with a ';')VGG"  <<std::endl;
 }
 
 int main(int argc, const char** argv)
