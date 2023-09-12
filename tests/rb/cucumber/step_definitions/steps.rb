@@ -165,7 +165,11 @@ IgnoredScenario = [
   # WITH allow to reuse variable even with considering edge isomorphism, need a better way to handle that, might have to be tracked by the parser
   "[3] Forwarding a relationship variable",
   # paths are not supported in where
-  "[2] Join with disjunctive multi-part predicates including patterns"
+  "[2] Join with disjunctive multi-part predicates including patterns",
+  # Aggregations are not supported yet
+  "[5] Fail when not aliasing expressions in WITH",
+  # ORDER BY not supported yet
+  "[6] Reusing variable names in WITH"
 ]
 
 Before do |scenario|
@@ -239,8 +243,14 @@ Then(/^the result should be, in any order:$/) do |table|
   pending if @ignored_scenario
   expect(@exception).to be_nil
   expect(@query_result).not_to be_nil
-  puts @query_result
   expect(@query_result).to eq_in_any_order(GqliteTest.parse_results_table table)
+end
+
+Then(/^the result should be, in order:$/) do |table|
+  pending if @ignored_scenario
+  expect(@exception).to be_nil
+  expect(@query_result).not_to be_nil
+  expect(@query_result).to eq(GqliteTest.parse_results_table table)
 end
 
 Then(/^a SyntaxError should be raised at compile time: VariableAlreadyBound$/) do
@@ -289,4 +299,16 @@ Then(/^a SyntaxError should be raised at compile time: RelationshipUniquenessVio
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
   expect(@exception.message).to match(/^.* is already bound.$/)
+end
+
+Then(/^a SyntaxError should be raised at compile time: ColumnNameConflict$/) do
+  pending if @ignored_scenario
+  expect(@exception).not_to be_nil
+  expect(@exception.message).to match(/^\d+:\d+:Duplicate column name .* is not allowed.$/)
+end
+
+Then(/^a SyntaxError should be raised at compile time: NoExpressionAlias$/) do
+  pending if @ignored_scenario
+  expect(@exception).not_to be_nil
+  expect(@exception.message).to match(/^\d+:\d+:Expected token AS got {}.$/)
 end

@@ -30,6 +30,7 @@ struct parser::data
   algebra::node_csp parse_member_expression();
   algebra::node_csp parse_terminal_expression();
   algebra::node_csp parse_expression_list();
+  std::vector<algebra::named_expression_csp> parse_named_expressions();
   void validate(algebra::graph_node_csp);
   void validate(algebra::graph_edge_csp);
   void get_next_token();
@@ -100,15 +101,10 @@ algebra::node_csp parser::data::parse_match()
   return std::make_shared<algebra::match>(patterns, where);
 }
 
-algebra::node_csp parser::data::parse_with()
+std::vector<algebra::named_expression_csp> parser::data::parse_named_expressions()
 {
-  get_next_token();
-  if(tok.type == token_type::STAR)
-  {
-    get_next_token();
-    return std::make_shared<algebra::with>(true, std::vector<algebra::named_expression_csp>());
-  }
   std::vector<algebra::named_expression_csp> expressions;
+  std::vector<std::string> labels;
   do
   {
     std::string name;
@@ -133,6 +129,11 @@ algebra::node_csp parser::data::parse_with()
         is_of_type(token_type::AS);
       }
     }
+    if(std::find(labels.begin(), labels.end(), name) != labels.end())
+    {
+      report_error(tok, "Duplicate column name {} is not allowed.");
+    }
+    labels.push_back(name);
     expressions.push_back(std::make_shared<algebra::named_expression>(name, node));
     if(tok.type == token_type::COMMA)
     {
@@ -141,7 +142,18 @@ algebra::node_csp parser::data::parse_with()
       break;
     }
   } while(true);
-  return std::make_shared<algebra::with>(false, expressions);
+  return expressions;
+}
+
+algebra::node_csp parser::data::parse_with()
+{
+  get_next_token();
+  if(tok.type == token_type::STAR)
+  {
+    get_next_token();
+    return std::make_shared<algebra::with>(true, std::vector<algebra::named_expression_csp>());
+  }
+  return std::make_shared<algebra::with>(false, parse_named_expressions());
 }
 
 algebra::node_csp parser::data::parse_return()
@@ -152,40 +164,7 @@ algebra::node_csp parser::data::parse_return()
     get_next_token();
     return std::make_shared<algebra::return_statement>(true, std::vector<algebra::named_expression_csp>());
   }
-  std::vector<algebra::named_expression_csp> expressions;
-  do
-  {
-    std::string name;
-    if(tok.type == token_type::IDENTIFIER)
-    {
-      name = tok.string;
-    }
-    algebra::node_csp node = parse_expression();
-    if(tok.type == token_type::AS)
-    {
-      get_next_token();
-      is_of_type(token_type::IDENTIFIER);
-      name = tok.string;
-      get_next_token();
-    } else if(node->get_type() != algebra::node_type::variable)
-    {
-      if(node->get_type() == algebra::node_type::member_access)
-      {
-        algebra::member_access_csp ma = std::static_pointer_cast<const algebra::member_access>(node);
-        name = name + "." + string::join(ma->get_path(), ".");
-      } else {
-        is_of_type(token_type::AS);
-      }
-    }
-    expressions.push_back(std::make_shared<algebra::named_expression>(name, node));
-    if(tok.type == token_type::COMMA)
-    {
-      get_next_token();
-    } else {
-      break;
-    }
-  } while(true);
-  return std::make_shared<algebra::return_statement>(false, expressions);
+  return std::make_shared<algebra::return_statement>(false, parse_named_expressions());
 }
 
 namespace
@@ -658,7 +637,7 @@ bool parser::data::is_of_type(const token& _token, token_type _type)
   {
     report_error(_token, "Expected token {} got {}", _type, _token.type);
   } else {
-    report_error(_token, "Expected token  {} got {} ({})", _type, _token.type, _token.string);
+    report_error(_token, "Expected token {} got {} ({})", _type, _token.type, _token.string);
   }
   return false;
 }
