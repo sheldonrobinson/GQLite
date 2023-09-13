@@ -26,10 +26,12 @@ features = [
   # WITH
   'with/With1.feature', 'with/With2.feature', 'with/With3.feature', 'with/With4.feature',
   # DELETE
-  'delete/Delete1.feature'
+  'delete/Delete1.feature',
+  # SET
+  'set/Set1.feature', 'set/Set2.feature', 'set/Set4.feature'
  ]
 # In progress
-# features = [ 'create/Create5.feature', 'match/Match6.feature', 'match-where/MatchWhere5.feature' ]
+# features = [ 'create/Create5.feature', 'match/Match6.feature', 'match-where/MatchWhere5.feature', 'set/Set3.feature', 'set/Set5.feature' ]
 # Current dev
 # features = []
 

@@ -175,6 +175,8 @@ IgnoredScenario = [
   "[4] Delete on null node",
   "[5] Ignore null when deleting node",
   "[6] Detach delete on null node",
+  "[8] Ignore null when setting property",
+  "[5] Ignore null when setting properties using an overriding map",
   # TODO edge isomorphism
   "[29] Fail when re-using a relationship in the same pattern",
   # WITH allow to reuse variable even with considering edge isomorphism, need a better way to handle that, might have to be tracked by the parser
@@ -187,7 +189,14 @@ IgnoredScenario = [
   "[1] Forwarding multiple node and relationship variables",
   "[6] Reusing variable names in WITH",
   # No validation of delete expression
-  "[8] Failing when deleting a label"
+  "[8] Failing when deleting a label",
+  # Missing variables should be handled by the parser
+  "[9] Failing when using undefined variable in SET",
+  # Lists are not supported in expressions
+  "[5] Adding a list property",
+  "[6] Concatenate elements onto a list property",
+  "[7] Concatenate elements in reverse onto a list property",
+  "[10] Failing when setting a list of maps as a property"
 ]
 
 Before do |scenario|
