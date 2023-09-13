@@ -36,6 +36,11 @@ OC_ALGEBRA_GENERATE(with, OC_ALGEBRA_WITH_MEMBERS)
 
 OC_ALGEBRA_GENERATE(delete_statement, OC_ALGEBRA_DELETE_MEMBERS)
 
+#define OC_ALGEBRA_SET_MEMBERS(_KLASS_NAME_, F)                                     \
+  F(_KLASS_NAME_, std::vector<std::pair<GQLITE_LIST(member_access_csp, node_csp)>>, expressions)
+
+OC_ALGEBRA_GENERATE(set, OC_ALGEBRA_SET_MEMBERS)
+
 // Values
 
 #define OC_ALGEBRA_GRAPH_NODE_MEMBERS(_KLASS_NAME_, F)          \

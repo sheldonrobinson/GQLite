@@ -23,6 +23,11 @@ namespace gqlite::oc::algebra::details
   {
     return _a.get_node()->equals(_b.get_node());
   }
+  template<typename _T1_, typename _T2_>
+  bool equals(const std::pair<_T1_, _T2_>& _a, const std::pair<_T1_, _T2_>& _b)
+  {
+    return equals(_a.first, _b.first) and equals(_a.second, _b.second);
+  }
   template<typename _T_>
   bool equals(const std::vector<_T_>& _a, const std::vector<_T_>& _b)
   {
