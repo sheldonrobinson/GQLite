@@ -186,8 +186,18 @@ algebra::node_csp parser::data::parse_set()
   get_next_token();
   while(tok.type != token_type::END_OF_FILE)
   {
-    is_of_type(token_type::IDENTIFIER);
-    std::string name = tok.string;
+    std::string name;
+    if(tok.type == token_type::STARTBRACKET)
+    {
+      get_next_token();
+      is_of_type(token_type::IDENTIFIER);
+      name = tok.string;
+      get_next_token();
+      is_of_type(token_type::ENDBRACKET);
+    } else {
+      is_of_type(token_type::IDENTIFIER);
+      name = tok.string;
+    }
     get_next_token();
     std::vector<std::string> path = parse_path();
     is_of_type(token_type::EQUAL);
