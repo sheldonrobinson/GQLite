@@ -43,28 +43,28 @@ module GqliteTest
       label = line[0]
       count = line[1].to_i
       if label == '+nodes'
-        nodes_count = count
+        nodes_count += count
       end
       if label == '+relationships'
-        edges_count = count
+        edges_count += count
       end
       if label == '+labels'
-        labels_count = count
+        labels_count += count
       end
       if label == '+properties'
-        properties_count = count
+        properties_count += count
       end
       if label == '-nodes'
-        nodes_count = -count
+        nodes_count -= count
       end
       if label == '-relationships'
-        edges_count = -count
+        edges_count -= count
       end
       if label == '-labels'
-        labels_count = -count
+        labels_count -= count
       end
       if label == '-properties'
-        properties_count = -count
+        properties_count -= count
       end
     end
     return SideEffect.new nodes_count, edges_count, labels_count, properties_count

@@ -45,6 +45,13 @@ void sqlite_data::throwLastError(const std::string& _query)
 
 gqlite::value sqlite_data::execute_sql(const std::string& _query, const std::map<int, value>& _bindings)
 {
+#if 0
+  std::cout << "Executing query: '" << _query << "' with bindings:" << std::endl;
+  for(auto const& [k,v] : _bindings)
+  {
+    std::cout << " [" << k << "] = " << v.to_json() << std::endl;
+  }
+#endif
   sqlite3_stmt* ps;
   const char* ptr = _query.data();
   const char* ptr_end = _query.data() + _query.size();
@@ -982,13 +989,6 @@ namespace gqlite::backends::sqlite_oc_executor
           mc.sql_conditions = (mc.count == 1 ? " WHERE TRUE " : " ON TRUE ") + mc.sql_conditions;
         }
         std::string sql_query = "SELECT " + mc.sql_variables + " FROM " + mc.sql_tables + mc.sql_conditions;
-  #if 0
-        std::cout << sql_query << std::endl;
-        for(auto const& [k,v] : mc.bindings)
-        {
-          std::cout << " [" << k << "] = " << v.to_json() << std::endl;
-        }
-  #endif
         gqlite::value r = exec_c.data->execute_sql(sql_query, mc.bindings);
 
         // 4) Store the results
@@ -1074,6 +1074,64 @@ namespace gqlite::backends::sqlite_oc_executor
         {
           exec_value ev =eval_v.start(rv);
           std::visit(deleter{this, _ds->get_detach()}, ev);
+        }
+      }
+      return value();
+    }
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // set
+    value visit(algebra::set_csp _set) override
+    {
+      evaluation_context eval_c;
+      eval_c.table = table;
+      evaluator_visitor eval_v;
+      eval_v.exec_c = &exec_c;
+      eval_v.eval_c = &eval_c;
+
+      struct deleter
+      {
+        statement_visitor* self;
+        std::vector<std::string> path;
+        exec_value new_value;
+        void execute(const std::string& _query, int _node_id)
+        {
+          std::string path_string = "$";
+          for(const std::string& pe : path)
+          {
+            path_string += "." + pe;
+          }
+          self->exec_c.data->execute_sql(_query, {{1, _node_id}, {2, path_string}, {3, self->exec_c.get_value(new_value)}});
+        }
+        void operator()(const node_ref_sp& _node)
+        {
+          _node->cache = gqlite::value(); // Invalidate cache
+          execute(sqlite_queries::node_set_properties(self->exec_c.graph_name), _node->id);
+        }
+        void operator()(const edge_ref_sp& _edge)
+        {
+          _edge->cache = gqlite::value(); // Invalidate cache
+          execute(sqlite_queries::edge_set_properties(self->exec_c.graph_name), _edge->id);
+        }
+        void operator()(const value& _value)
+        {
+          std::cout << _value.to_json() << std::endl;
+          throw exception("Only node/edge can be set.");
+        }
+        void operator()(const empty&)
+        {
+          throw exception("Try to set a null value.");
+        }
+      };
+
+      for(int i = 0; i < table.get_rows_count(); ++i)
+      {
+        value_vector row;
+        eval_c.prepare_current_row(table, i, false);
+        for(const auto& [member, value] : _set->get_expressions())
+        {
+          exec_value ev = eval_v.start(value);
+          exec_value target = eval_c.get_variable(member->get_left());
+          std::visit(deleter{this, member->get_path(), ev}, target);
         }
       }
       return value();

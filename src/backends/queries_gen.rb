@@ -8,6 +8,7 @@ sqlite_queries = [
   ['edge_delete(const std::string& _graph_name)', 'edge_delete.sql'],
   ['edge_delete_by_node(const std::string& _graph_name)', 'edge_delete_by_node.sql'],
   ['edge_get_label_properties(const std::string& _graph_name)', 'edge_get_label_properties.sql'],
+  ['edge_set_properties(const std::string& _graph_name)', 'edge_set_properties.sql'],
   ['get_debug_stats(const std::string& _graph_name)', 'get_debug_stats.sql'],
   ['graph_create(const std::string& _graph_name)', 'graph_create.sql'],
   ['graph_has(const std::string& _graph_name)', 'graph_has.sql'],
@@ -20,6 +21,7 @@ sqlite_queries = [
   ['node_map_to_label(const std::string& _graph_name)', 'node_map_to_label.sql'],
   ['node_get_labels(const std::string& _graph_name)', 'node_get_labels.sql'],
   ['node_get_properties(const std::string& _graph_name)', 'node_get_properties.sql'],
+  ['node_set_properties(const std::string& _graph_name)', 'node_set_properties.sql'],
   ['table_has()', 'table_has.sql']
 ]
 
