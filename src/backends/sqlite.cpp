@@ -705,6 +705,33 @@ namespace gqlite::backends::sqlite_oc_executor
       };
       return std::visit(member_access{this, _node}, value);
     }
+    bool is_numeric(value_type _vt)
+    {
+      return _vt == value_type::integer or _vt == value_type::number;
+    }
+    exec_value visit(algebra::addition_csp _node) override
+    {
+      exec_value left_ev = start(_node->get_left());
+      exec_value right_ev = start(_node->get_right());
+      errors::check_condition(std::holds_alternative<value>(left_ev), "Binary operations must be done on null values.");
+      errors::check_condition(std::holds_alternative<value>(right_ev), "Binary operations must be done on null values.");
+      value left_val = std::get<value>(left_ev);
+      value right_val = std::get<value>(right_ev);
+      if(left_val.get_type() == value_type::string and right_val.get_type() == value_type::string)
+      {
+        return left_val.to_string() + right_val.to_string();
+      } else if(is_numeric(left_val.get_type()) and is_numeric(right_val.get_type()))
+      {
+        if(left_val.get_type() == value_type::integer and right_val.get_type() == value_type::integer)
+        {
+          return left_val.to_integer() + right_val.to_integer();
+        } else {
+          return left_val.to_double() + right_val.to_double();
+        }
+      } else {
+        throw exception("Cannot add {} with {}.", left_val.to_json(), right_val.to_json());
+      }
+    }
     exec_value visit(algebra::function_call_csp _node) override
     {
       std::vector<value> args;
@@ -1282,7 +1309,7 @@ gqlite::value sqlite::execute_oc_query(oc::algebra::node_csp _node, const value_
     return val;
   } catch(const exception& _ex)
   {
-    d->execute_sql("ROLLBACK");
+    d->execute_sql("COMMIT");
     throw _ex;
   }
 }
