@@ -163,6 +163,7 @@ namespace {
         fetch_next_char(); is_char('r');
         fetch_next_char(); is_char('u');
         fetch_next_char(); is_char('e');
+        fetch_next_char();
         return true;
       }
       case 'f':
@@ -172,6 +173,7 @@ namespace {
         fetch_next_char(); is_char('l');
         fetch_next_char(); is_char('s');
         fetch_next_char(); is_char('e');
+        fetch_next_char();
         return false;
       }
       case 'n':
@@ -180,6 +182,7 @@ namespace {
         fetch_next_char(); is_char('u');
         fetch_next_char(); is_char('l');
         fetch_next_char(); is_char('l');
+        fetch_next_char();
         return value();
       }
       // Parse number
