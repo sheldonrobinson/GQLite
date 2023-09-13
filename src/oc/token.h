@@ -35,6 +35,7 @@ namespace gqlite::oc
     STAR, ///< *
     DIVIDE, ///< /
     EXCLAMATION, ///< !
+    PLUS_EQUAL, ///< +=
   // Constants
     IDENTIFIER,
     STRING,

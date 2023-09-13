@@ -1,0 +1,1 @@
+DELETE FROM gqlite_/%= _graph_name %/_labels WHERE label = ?001 AND node_id = ?002

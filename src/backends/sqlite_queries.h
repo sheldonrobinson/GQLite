@@ -3,6 +3,19 @@
 
 namespace gqlite::backends::sqlite_queries
 {
+  std::string edge_add_properties(const std::string& _graph_name)
+  {
+    std::stringstream stream;
+    #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_add_properties.sql"
+stream << "UPDATE gqlite_";
+#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_add_properties.sql"
+stream << ( _graph_name );
+#line 2 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_add_properties.sql"
+stream << "_edges SET properties=json_set(properties, ?002, json_patch(json_extract(properties, ?002) , ?003) ) WHERE id=?001\n"
+"";
+
+    return stream.str();
+  }
   std::string edge_count_by_node(const std::string& _graph_name)
   {
     std::stringstream stream;
@@ -63,15 +76,27 @@ stream << "_edges WHERE id = ?001";
 
     return stream.str();
   }
-  std::string edge_set_properties(const std::string& _graph_name)
+  std::string edge_set_property(const std::string& _graph_name)
   {
     std::stringstream stream;
-    #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_set_properties.sql"
+    #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_set_property.sql"
 stream << "UPDATE gqlite_";
-#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_set_properties.sql"
+#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_set_property.sql"
 stream << ( _graph_name );
-#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_set_properties.sql"
+#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_set_property.sql"
 stream << "_edges SET properties=json_set(properties, ?002, ?003) WHERE id=?001";
+
+    return stream.str();
+  }
+  std::string edge_remove_property(const std::string& _graph_name)
+  {
+    std::stringstream stream;
+    #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_remove_property.sql"
+stream << "UPDATE gqlite_";
+#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_remove_property.sql"
+stream << ( _graph_name );
+#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_remove_property.sql"
+stream << "_edges SET properties=json_remove(properties, ?002) WHERE id=?001";
 
     return stream.str();
   }
@@ -226,6 +251,31 @@ stream << "INSERT INTO gqlite_labels(label) VALUES (?001)";
 
     return stream.str();
   }
+  std::string node_add_label(const std::string& _graph_name)
+  {
+    std::stringstream stream;
+    #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_add_label.sql"
+stream << "INSERT INTO gqlite_";
+#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_add_label.sql"
+stream << ( _graph_name );
+#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_add_label.sql"
+stream << "_labels   (label, node_id) VALUES (?001, ?002)";
+
+    return stream.str();
+  }
+  std::string node_add_properties(const std::string& _graph_name)
+  {
+    std::stringstream stream;
+    #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_add_properties.sql"
+stream << "UPDATE gqlite_";
+#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_add_properties.sql"
+stream << ( _graph_name );
+#line 2 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_add_properties.sql"
+stream << "_nodes SET properties=json_set(properties, ?002, json_patch(json_extract(properties, ?002) , ?003) ) WHERE id=?001\n"
+"";
+
+    return stream.str();
+  }
   std::string node_create(const std::string& _graph_name)
   {
     std::stringstream stream;
@@ -255,18 +305,6 @@ stream << "_nodes WHERE id=?001";
 
     return stream.str();
   }
-  std::string node_map_to_label(const std::string& _graph_name)
-  {
-    std::stringstream stream;
-    #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_map_to_label.sql"
-stream << "INSERT INTO gqlite_";
-#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_map_to_label.sql"
-stream << ( _graph_name );
-#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_map_to_label.sql"
-stream << "_labels   (label, node_id) VALUES (?001, ?002)";
-
-    return stream.str();
-  }
   std::string node_get_labels(const std::string& _graph_name)
   {
     std::stringstream stream;
@@ -291,14 +329,38 @@ stream << "_nodes WHERE id = ?001";
 
     return stream.str();
   }
-  std::string node_set_properties(const std::string& _graph_name)
+  std::string node_remove_label(const std::string& _graph_name)
   {
     std::stringstream stream;
-    #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_set_properties.sql"
-stream << "UPDATE gqlite_";
-#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_set_properties.sql"
+    #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_remove_label.sql"
+stream << "DELETE FROM gqlite_";
+#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_remove_label.sql"
 stream << ( _graph_name );
-#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_set_properties.sql"
+#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_remove_label.sql"
+stream << "_labels WHERE label = ?001 AND node_id = ?002";
+
+    return stream.str();
+  }
+  std::string node_remove_property(const std::string& _graph_name)
+  {
+    std::stringstream stream;
+    #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_remove_property.sql"
+stream << "UPDATE gqlite_";
+#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_remove_property.sql"
+stream << ( _graph_name );
+#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_remove_property.sql"
+stream << "_nodes SET properties=json_remove(properties, ?002) WHERE id=?001";
+
+    return stream.str();
+  }
+  std::string node_set_property(const std::string& _graph_name)
+  {
+    std::stringstream stream;
+    #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_set_property.sql"
+stream << "UPDATE gqlite_";
+#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_set_property.sql"
+stream << ( _graph_name );
+#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_set_property.sql"
 stream << "_nodes SET properties=json_set(properties, ?002, ?003) WHERE id=?001";
 
     return stream.str();

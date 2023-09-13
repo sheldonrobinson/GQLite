@@ -3,12 +3,14 @@
 require 'tempfile'
 
 sqlite_queries = [
+  ['edge_add_properties(const std::string& _graph_name)', 'edge_add_properties.sql'],
   ['edge_count_by_node(const std::string& _graph_name)', 'edge_count_by_node.sql'],
   ['edge_create(const std::string& _graph_name)', 'edge_create.sql'],
   ['edge_delete(const std::string& _graph_name)', 'edge_delete.sql'],
   ['edge_delete_by_node(const std::string& _graph_name)', 'edge_delete_by_node.sql'],
   ['edge_get_label_properties(const std::string& _graph_name)', 'edge_get_label_properties.sql'],
-  ['edge_set_properties(const std::string& _graph_name)', 'edge_set_properties.sql'],
+  ['edge_set_property(const std::string& _graph_name)', 'edge_set_property.sql'],
+  ['edge_remove_property(const std::string& _graph_name)', 'edge_remove_property.sql'],
   ['get_debug_stats(const std::string& _graph_name)', 'get_debug_stats.sql'],
   ['graph_create(const std::string& _graph_name)', 'graph_create.sql'],
   ['graph_has(const std::string& _graph_name)', 'graph_has.sql'],
@@ -16,12 +18,15 @@ sqlite_queries = [
   ['label_get_from_id()', 'label_get_from_id.sql'],
   ['label_get_from_name()', 'label_get_from_name.sql'],
   ['label_insert()', 'label_insert.sql'],
+  ['node_add_label(const std::string& _graph_name)', 'node_add_label.sql'],
+  ['node_add_properties(const std::string& _graph_name)', 'node_add_properties.sql'],
   ['node_create(const std::string& _graph_name)', 'node_create.sql'],
   ['node_delete(const std::string& _graph_name)', 'node_delete.sql'],
-  ['node_map_to_label(const std::string& _graph_name)', 'node_map_to_label.sql'],
   ['node_get_labels(const std::string& _graph_name)', 'node_get_labels.sql'],
   ['node_get_properties(const std::string& _graph_name)', 'node_get_properties.sql'],
-  ['node_set_properties(const std::string& _graph_name)', 'node_set_properties.sql'],
+  ['node_remove_label(const std::string& _graph_name)', 'node_remove_label.sql'],
+  ['node_remove_property(const std::string& _graph_name)', 'node_remove_property.sql'],
+  ['node_set_property(const std::string& _graph_name)', 'node_set_property.sql'],
   ['table_has()', 'table_has.sql']
 ]
 

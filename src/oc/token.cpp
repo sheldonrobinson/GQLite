@@ -68,6 +68,8 @@ const char* gqlite::oc::token_type_to_string(token_type _type)
       return "/";
     case EXCLAMATION:
       return "!";
+    case PLUS_EQUAL:
+      return "+=";
     case IDENTIFIER:
       return "identifier";
     case STRING:

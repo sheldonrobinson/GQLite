@@ -156,7 +156,7 @@ token lexer::next_token()
     CHAR_IS_TOKEN( '|', PIPE );
     CHAR_IS_TOKEN( ',', COMMA );
     CHAR_IS_TOKEN( '=', EQUAL );
-    CHAR_IS_TOKEN( '+', PLUS );
+    CHAR_IS_TOKEN_OR_TOKEN( '+', '=', PLUS, PLUS_EQUAL );
     CHAR_IS_TOKEN( '*', STAR );
     CHAR_IS_TOKEN( '/', DIVIDE );
     CHAR_IS_TOKEN_OR_TOKEN( '!', '=', EXCLAMATION, DIFFERENT)

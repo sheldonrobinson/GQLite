@@ -1,0 +1,1 @@
+UPDATE gqlite_/%= _graph_name %/_edges SET properties=json_remove(properties, ?002) WHERE id=?001

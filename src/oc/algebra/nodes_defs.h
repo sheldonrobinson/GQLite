@@ -13,10 +13,10 @@ OC_ALGEBRA_GENERATE(match, OC_ALGEBRA_MATCH_NODES_MEMBERS)
 
 // Statements
 
-#define OC_ALGEBRA_STATEMENTS_MEMBERS(_KLASS_NAME_, F) \
+#define OC_ALGEBRA_NODES_LIST_MEMBERS(_KLASS_NAME_, F) \
   F(_KLASS_NAME_, std::vector<node_csp>, nodes)
 
-OC_ALGEBRA_GENERATE(statements, OC_ALGEBRA_STATEMENTS_MEMBERS)
+OC_ALGEBRA_GENERATE(statements, OC_ALGEBRA_NODES_LIST_MEMBERS)
 
 #define OC_ALGEBRA_RETURN_MEMBERS(_KLASS_NAME_, F)                \
   F(_KLASS_NAME_, bool, all)                                      \
@@ -36,10 +36,35 @@ OC_ALGEBRA_GENERATE(with, OC_ALGEBRA_WITH_MEMBERS)
 
 OC_ALGEBRA_GENERATE(delete_statement, OC_ALGEBRA_DELETE_MEMBERS)
 
-#define OC_ALGEBRA_SET_MEMBERS(_KLASS_NAME_, F)                                     \
-  F(_KLASS_NAME_, std::vector<std::pair<GQLITE_LIST(member_access_csp, node_csp)>>, expressions)
+OC_ALGEBRA_GENERATE(set, OC_ALGEBRA_NODES_LIST_MEMBERS)
+OC_ALGEBRA_GENERATE(remove, OC_ALGEBRA_NODES_LIST_MEMBERS)
 
-OC_ALGEBRA_GENERATE(set, OC_ALGEBRA_SET_MEMBERS)
+// Set/remove Expressions
+
+#define OC_ALGEBRA_SET_ADD_VALUE_MEMBERS(_KLASS_NAME_, F)                 \
+  F(_KLASS_NAME_, member_access_csp, target)                              \
+  F(_KLASS_NAME_, node_csp, expression)
+
+OC_ALGEBRA_GENERATE(set_property, OC_ALGEBRA_SET_ADD_VALUE_MEMBERS)
+
+
+#define OC_ALGEBRA_SET_EQUAL_MEMBERS(_KLASS_NAME_, F)                     \
+  F(_KLASS_NAME_, member_access_csp, target)                              \
+  F(_KLASS_NAME_, nocde_csp, expression)
+
+OC_ALGEBRA_GENERATE(add_property, OC_ALGEBRA_SET_ADD_VALUE_MEMBERS)
+
+#define OC_ALGEBRA_REMOVE_PROPERTY_MEMBERS(_KLASS_NAME_, F)                   \
+  F(_KLASS_NAME_, member_access_csp, target)
+
+OC_ALGEBRA_GENERATE(remove_property, OC_ALGEBRA_REMOVE_PROPERTY_MEMBERS)
+
+#define OC_ALGEBRA_EDIT_LABELS_MEMBERS(_KLASS_NAME_, F)                   \
+  F(_KLASS_NAME_, std::string, target)                                    \
+  F(_KLASS_NAME_, std::vector<std::string>, labels)
+
+OC_ALGEBRA_GENERATE(edit_labels, OC_ALGEBRA_EDIT_LABELS_MEMBERS)
+
 
 // Values
 
@@ -132,3 +157,5 @@ OC_ALGEBRA_GENERATE(division, OC_ALGEBRA_BINARY_MEMBERS)
 
 OC_ALGEBRA_GENERATE(logical_negation, OC_ALGEBRA_UNARY_MEMBERS)
 OC_ALGEBRA_GENERATE(negation, OC_ALGEBRA_UNARY_MEMBERS)
+OC_ALGEBRA_GENERATE(is_null, OC_ALGEBRA_UNARY_MEMBERS)
+OC_ALGEBRA_GENERATE(is_not_null, OC_ALGEBRA_UNARY_MEMBERS)

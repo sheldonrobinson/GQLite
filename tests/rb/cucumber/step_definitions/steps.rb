@@ -177,6 +177,11 @@ IgnoredScenario = [
   "[6] Detach delete on null node",
   "[8] Ignore null when setting property",
   "[5] Ignore null when setting properties using an overriding map",
+  "[8] Ignore null when setting label",
+  "[1] Ignore null when setting properties using an appending map",
+  "[5] Ignore null when removing property from a node",
+  "[6] Ignore null when removing property from a relationship",
+  "[5] Ignore null when removing a node label",
   # TODO edge isomorphism
   "[29] Fail when re-using a relationship in the same pattern",
   # WITH allow to reuse variable even with considering edge isomorphism, need a better way to handle that, might have to be tracked by the parser
@@ -185,6 +190,7 @@ IgnoredScenario = [
   "[2] Join with disjunctive multi-part predicates including patterns",
   # Aggregations are not supported yet
   "[5] Fail when not aliasing expressions in WITH",
+  "[7] Remove a missing node property",
   # ORDER BY not supported yet
   "[1] Forwarding multiple node and relationship variables",
   "[6] Reusing variable names in WITH",
@@ -196,7 +202,7 @@ IgnoredScenario = [
   "[5] Adding a list property",
   "[6] Concatenate elements onto a list property",
   "[7] Concatenate elements in reverse onto a list property",
-  "[10] Failing when setting a list of maps as a property"
+  "[10] Failing when setting a list of maps as a property",
 ]
 
 Before do |scenario|

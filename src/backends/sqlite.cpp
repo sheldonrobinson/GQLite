@@ -615,6 +615,14 @@ namespace gqlite::backends::sqlite_oc_executor
     }
     FILTER_VISITOR_UNARY_OP(logical_negation, "!")
     FILTER_VISITOR_UNARY_OP(negation, "-")
+    std::string visit(algebra::is_not_null_csp _node) override
+    {
+      return format_string("({} IS NOT NULL)", start(_node->get_value()));
+    }
+    std::string visit(algebra::is_null_csp _node) override
+    {
+      return format_string("({} IS NULL)", start(_node->get_value()));
+    }
   };
   /**
    * Visitor to evaluate expressions.
@@ -732,6 +740,18 @@ namespace gqlite::backends::sqlite_oc_executor
         throw exception("Cannot add {} with {}.", left_val.to_json(), right_val.to_json());
       }
     }
+    exec_value visit(algebra::is_not_null_csp _node) override
+    {
+      exec_value left_ev = start(_node->get_value());
+      return not std::holds_alternative<empty>(left_ev)
+            and (not std::holds_alternative<value>(left_ev) or std::get<value>(left_ev).get_type() != value_type::invalid);
+    }
+    exec_value visit(algebra::is_null_csp _node) override
+    {
+      exec_value left_ev = start(_node->get_value());
+      return std::holds_alternative<empty>(left_ev)
+            or (std::holds_alternative<value>(left_ev) and std::get<value>(left_ev).get_type() == value_type::invalid);;
+    }
     exec_value visit(algebra::function_call_csp _node) override
     {
       std::vector<value> args;
@@ -776,7 +796,7 @@ namespace gqlite::backends::sqlite_oc_executor
       int row_id = exec_c.data->last_row_id();
       for(const std::string& label : _node->get_labels())
       {
-        exec_c.data->execute_sql(sqlite_queries::node_map_to_label(exec_c.graph_name), {{1, exec_c.data->id_for_label(label)}, {2, row_id}});
+        exec_c.data->execute_sql(sqlite_queries::node_add_label(exec_c.graph_name), {{1, exec_c.data->id_for_label(label)}, {2, row_id}});
       }
       node_ref_sp nr = std::make_shared<node_ref>(node_ref{
           row_id,
@@ -1115,7 +1135,7 @@ namespace gqlite::backends::sqlite_oc_executor
       eval_v.exec_c = &exec_c;
       eval_v.eval_c = &eval_c;
 
-      struct deleter
+      struct property_setter_adder_base
       {
         statement_visitor* self;
         std::vector<std::string> path;
@@ -1129,15 +1149,119 @@ namespace gqlite::backends::sqlite_oc_executor
           }
           self->exec_c.data->execute_sql(_query, {{1, _node_id}, {2, path_string}, {3, self->exec_c.get_value(new_value)}});
         }
+        void operator()(const value& _value)
+        {
+          std::cout << _value.to_json() << std::endl;
+          throw exception("Only node/edge can be set.");
+        }
+        void operator()(const empty&)
+        {
+          throw exception("Try to set a null value.");
+        }
+
+      };
+
+      struct property_setter : property_setter_adder_base
+      {
+        using property_setter_adder_base::operator();
         void operator()(const node_ref_sp& _node)
         {
           _node->cache = gqlite::value(); // Invalidate cache
-          execute(sqlite_queries::node_set_properties(self->exec_c.graph_name), _node->id);
+          execute(sqlite_queries::node_set_property(self->exec_c.graph_name), _node->id);
         }
         void operator()(const edge_ref_sp& _edge)
         {
           _edge->cache = gqlite::value(); // Invalidate cache
-          execute(sqlite_queries::edge_set_properties(self->exec_c.graph_name), _edge->id);
+          execute(sqlite_queries::edge_set_property(self->exec_c.graph_name), _edge->id);
+        }
+      };
+      struct property_adder : property_setter_adder_base
+      {
+        using property_setter_adder_base::operator();
+        void operator()(const node_ref_sp& _node)
+        {
+          _node->cache = gqlite::value(); // Invalidate cache
+          execute(sqlite_queries::node_add_properties(self->exec_c.graph_name), _node->id);
+        }
+        void operator()(const edge_ref_sp& _edge)
+        {
+          _edge->cache = gqlite::value(); // Invalidate cache
+          execute(sqlite_queries::node_add_properties(self->exec_c.graph_name), _edge->id);
+        }
+      };
+
+      struct set_visitor : public gqlite::oc::algebra::default_node_visitor<void>
+      {
+        statement_visitor* self;
+        evaluation_context* eval_c;
+        evaluator_visitor* eval_v;
+        void visit_default(algebra::node_csp _node) override
+        {
+          throw gqlite::exception("Unimplemented statement node {} in set_visitor", oc::algebra::node_type_name(_node->get_type()));
+        }
+        void visit(algebra::set_property_csp _property)
+        {
+          exec_value target = eval_c->get_variable(_property->get_target()->get_left());
+          exec_value ev = eval_v->start(_property->get_expression());
+          std::visit(property_setter{self, _property->get_target()->get_path(), ev}, target);
+          
+        }
+        void visit(algebra::add_property_csp _property)
+        {
+          exec_value target = eval_c->get_variable(_property->get_target()->get_left());
+          exec_value ev = eval_v->start(_property->get_expression());
+          std::visit(property_adder{self, _property->get_target()->get_path(), ev}, target);
+          
+        }
+        void visit(algebra::edit_labels_csp _property)
+        {
+          exec_value target = eval_c->get_variable(_property->get_target());
+          errors::check_condition(std::holds_alternative<node_ref_sp>(target), "Can only add labels to nodes.");
+          node_ref_sp target_nd = std::get<node_ref_sp>(target);
+          for(const std::string& label : _property->get_labels())
+          {
+            self->exec_c.data->execute_sql(sqlite_queries::node_add_label(self->exec_c.graph_name), {{2, target_nd->id}, {1, self->exec_c.data->id_for_label(label)}});
+          }
+        }
+      };
+
+      set_visitor set_v;
+      set_v.self = this;
+      set_v.eval_c = &eval_c;
+      set_v.eval_v = &eval_v;
+      for(int i = 0; i < table.get_rows_count(); ++i)
+      {
+        value_vector row;
+        eval_c.prepare_current_row(table, i, false);
+        for(const algebra::node_csp& node : _set->get_nodes())
+        {
+          set_v.start(node);
+        }
+      }
+      return value();
+    }
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // remove
+    value visit(algebra::remove_csp _set) override
+    {
+      evaluation_context eval_c;
+      eval_c.table = table;
+      evaluator_visitor eval_v;
+      eval_v.exec_c = &exec_c;
+      eval_v.eval_c = &eval_c;
+
+      struct property_remover
+      {
+        statement_visitor* self;
+        std::vector<std::string> path;
+        void execute(const std::string& _query, int _node_id)
+        {
+          std::string path_string = "$";
+          for(const std::string& pe : path)
+          {
+            path_string += "." + pe;
+          }
+          self->exec_c.data->execute_sql(_query, {{1, _node_id}, {2, path_string}});
         }
         void operator()(const value& _value)
         {
@@ -1148,17 +1272,57 @@ namespace gqlite::backends::sqlite_oc_executor
         {
           throw exception("Try to set a null value.");
         }
+        void operator()(const node_ref_sp& _node)
+        {
+          _node->cache = gqlite::value(); // Invalidate cache
+          execute(sqlite_queries::node_remove_property(self->exec_c.graph_name), _node->id);
+        }
+        void operator()(const edge_ref_sp& _edge)
+        {
+          _edge->cache = gqlite::value(); // Invalidate cache
+          execute(sqlite_queries::edge_remove_property(self->exec_c.graph_name), _edge->id);
+        }
       };
 
+      struct remove_visitor : public gqlite::oc::algebra::default_node_visitor<void>
+      {
+        statement_visitor* self;
+        evaluation_context* eval_c;
+        evaluator_visitor* eval_v;
+        void visit_default(algebra::node_csp _node) override
+        {
+          throw gqlite::exception("Unimplemented statement node {} in set_visitor", oc::algebra::node_type_name(_node->get_type()));
+        }
+        void visit(algebra::remove_property_csp _property)
+        {
+          exec_value target = eval_c->get_variable(_property->get_target()->get_left());
+          std::visit(property_remover{self, _property->get_target()->get_path()}, target);
+          
+        }
+        void visit(algebra::edit_labels_csp _property)
+        {
+          exec_value target = eval_c->get_variable(_property->get_target());
+          errors::check_condition(std::holds_alternative<node_ref_sp>(target), "Can only add labels to nodes.");
+          node_ref_sp target_nd = std::get<node_ref_sp>(target);
+          for(const std::string& label : _property->get_labels())
+          {
+            self->exec_c.data->execute_sql(sqlite_queries::node_remove_label(self->exec_c.graph_name), {{2, target_nd->id}, {1, self->exec_c.data->id_for_label(label)}});
+          }
+        }
+
+      };
+
+      remove_visitor set_v;
+      set_v.self = this;
+      set_v.eval_c = &eval_c;
+      set_v.eval_v = &eval_v;
       for(int i = 0; i < table.get_rows_count(); ++i)
       {
         value_vector row;
         eval_c.prepare_current_row(table, i, false);
-        for(const auto& [member, value] : _set->get_expressions())
+        for(const algebra::node_csp& node : _set->get_nodes())
         {
-          exec_value ev = eval_v.start(value);
-          exec_value target = eval_c.get_variable(member->get_left());
-          std::visit(deleter{this, member->get_path(), ev}, target);
+          set_v.start(node);
         }
       }
       return value();
