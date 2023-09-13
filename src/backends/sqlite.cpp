@@ -1309,7 +1309,7 @@ gqlite::value sqlite::execute_oc_query(oc::algebra::node_csp _node, const value_
     return val;
   } catch(const exception& _ex)
   {
-    d->execute_sql("COMMIT");
+    d->execute_sql("ROLLBACK");
     throw _ex;
   }
 }
