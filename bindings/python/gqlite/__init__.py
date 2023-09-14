@@ -1,4 +1,4 @@
-import gqlite.__c_gqlite as capi
+import __c_gqlite as capi
 import json
 
 class Error(Exception):

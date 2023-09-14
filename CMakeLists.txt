@@ -207,11 +207,11 @@ if(Python3_FOUND AND PYTHON3_CFFI_FOUND)
   set(PYTHON_SITE_PACKAGES_INSTALL_DIR ${INSTALL_LIB_DIR}/python${Python3_SHORT_VERSION}/dist-packages/)
 
   add_custom_target(python3_ffi_lib ALL
-      COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/bindings/python/build.py ${CMAKE_CURRENT_SOURCE_DIR}
+      COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/bindings/python/build-ffi.py ${CMAKE_CURRENT_SOURCE_DIR}
       WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-      DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/bindings/python/build.py
+      DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/bindings/python/build-ffi.py
   )
-  install(FILES ${CMAKE_CURRENT_BINARY_DIR}/__c_gqlite.cpython-${Python3_VERSION_MAJOR}${Python3_VERSION_MINOR}-x86_64-linux-gnu.so DESTINATION ${PYTHON_SITE_PACKAGES_INSTALL_DIR}/gqlite)
+  install(FILES ${CMAKE_CURRENT_BINARY_DIR}/__c_gqlite.cpython-${Python3_VERSION_MAJOR}${Python3_VERSION_MINOR}-x86_64-linux-gnu.so DESTINATION ${PYTHON_SITE_PACKAGES_INSTALL_DIR}/)
   install(DIRECTORY bindings/python/gqlite DESTINATION ${PYTHON_SITE_PACKAGES_INSTALL_DIR})
 endif()
 
@@ -249,22 +249,34 @@ foreach(DF ${FOUND_FILES})
   file(RELATIVE_PATH RELATIVEF ${CMAKE_CURRENT_SOURCE_DIR} ${DF})
   cmake_path(GET RELATIVEF PARENT_PATH RELATIVEF_DIR)
   file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/${RELATIVEF_DIR})
-  file(CREATE_LINK ${DF} ${CMAKE_CURRENT_BINARY_DIR}/${RELATIVEF} SYMBOLIC)
+  file(CREATE_LINK ${DF} ${CMAKE_CURRENT_BINARY_DIR}/${RELATIVEF})
 endforeach()
 
-file(CREATE_LINK ${CMAKE_CURRENT_SOURCE_DIR}/include/gqlite.h ${CMAKE_CURRENT_BINARY_DIR}/dists/ruby/ext/gqlite/gqlite.h SYMBOLIC)
-file(CREATE_LINK ${CMAKE_CURRENT_SOURCE_DIR}/include/gqlite-c.h ${CMAKE_CURRENT_BINARY_DIR}/dists/ruby/ext/gqlite/gqlite-c.h SYMBOLIC)
+# For Ruby
+
+file(CREATE_LINK ${CMAKE_CURRENT_SOURCE_DIR}/include/gqlite.h ${CMAKE_CURRENT_BINARY_DIR}/dists/ruby/ext/gqlite/gqlite.h)
+file(CREATE_LINK ${CMAKE_CURRENT_SOURCE_DIR}/include/gqlite-c.h ${CMAKE_CURRENT_BINARY_DIR}/dists/ruby/ext/gqlite/gqlite-c.h)
 
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/dists/ruby/lib)
-file(CREATE_LINK ${CMAKE_CURRENT_SOURCE_DIR}/bindings/ruby/gqlite.rb ${CMAKE_CURRENT_BINARY_DIR}/dists/ruby/lib/gqlite.rb SYMBOLIC)
+file(CREATE_LINK ${CMAKE_CURRENT_SOURCE_DIR}/bindings/ruby/gqlite.rb ${CMAKE_CURRENT_BINARY_DIR}/dists/ruby/lib/gqlite.rb)
 
-if(RUBY_FOUND)
+# For Python
+
+file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/dists/python/src/gqlite)
+file(CREATE_LINK ${CMAKE_CURRENT_SOURCE_DIR}/bindings/python/gqlite/__init__.py ${CMAKE_CURRENT_BINARY_DIR}/dists/python/gqlite/__init__.py)
+file(CREATE_LINK ${CMAKE_CURRENT_SOURCE_DIR}/bindings/python/build-ffi.py ${CMAKE_CURRENT_BINARY_DIR}/dists/python/build-ffi.py)
+file(CREATE_LINK ${CMAKE_CURRENT_SOURCE_DIR}/include/gqlite.h ${CMAKE_CURRENT_BINARY_DIR}/dists/python/src/gqlite.h)
+file(CREATE_LINK ${CMAKE_CURRENT_SOURCE_DIR}/include/gqlite-c.h ${CMAKE_CURRENT_BINARY_DIR}/dists/python/src/gqlite-c.h)
+
+##########################
+# Generate amalgamate
+if(Ruby_EXECUTABLE)
   add_custom_target(gqlite_amalgamate ALL
     COMMAND ${Ruby_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/dists/create_amalgamate.rb ${CMAKE_CURRENT_SOURCE_DIR}
+    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/dists/gqlite-amalgamate.cpp ${CMAKE_CURRENT_BINARY_DIR}/dists/ruby/ext/gqlite/gqlite-amalgamate.cpp
+    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/dists/gqlite-amalgamate.cpp ${CMAKE_CURRENT_BINARY_DIR}/dists/python/src/gqlite-amalgamate.cpp
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/dists/
     DEPENDS ${GQLITE_SRCS})
-  file(CREATE_LINK ${CMAKE_CURRENT_BINARY_DIR}/dists/gqlite-amalgamate.cpp ${CMAKE_CURRENT_BINARY_DIR}/dists/ruby/ext/gqlite/gqlite-amalgamate.cpp SYMBOLIC)
-
 endif()
 
 ########################
