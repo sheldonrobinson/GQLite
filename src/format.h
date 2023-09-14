@@ -4,6 +4,12 @@
 
 #include <string>
 
+namespace std
+{
+  const char* to_string(gqlite::value_type _type);
+}
+
+
 #ifdef GQLITE_HAVE_CLOG
 
 #include <fmt>

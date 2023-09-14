@@ -230,6 +230,14 @@ if(READLINE_FOUND)
 endif()
 
 ########################
+## Build examples
+
+add_executable(gqlite_c_example examples/main.c)
+target_link_libraries(gqlite_c_example PRIVATE gqlite)
+add_executable(gqlite_cpp_example examples/main.cpp)
+target_link_libraries(gqlite_cpp_example PRIVATE gqlite)
+
+########################
 ## Build tests
 
 add_executable(gqlite_cpp_tests tests/cpp/catch_amalgamated.cpp tests/cpp/test_table.cpp)
