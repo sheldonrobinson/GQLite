@@ -4,8 +4,6 @@
 
 #include "node_p.h"
 
-using namespace gqlite::oc::algebra;
-
 namespace gqlite::oc::algebra::details
 {
   template<typename _T_>
@@ -50,6 +48,8 @@ namespace gqlite::oc::algebra::details
     return true;
   }
 }
+
+using namespace gqlite::oc::algebra;
 
 #define OC_ALGEBRA_GENERATE_PRIVATE_MEMBER(_KLASS_NAME_, _TYPE_, _NAME_) \
   _TYPE_ m_ ## _NAME_;
@@ -101,3 +101,5 @@ void _KLASS_NAME_::accept(details::abstract_node_visitor_adaptor* _visitor_adapt
 }
 
 #include "nodes_defs.h"
+
+#undef OC_ALGEBRA_GENERATE

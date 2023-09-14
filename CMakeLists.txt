@@ -171,23 +171,25 @@ endif()
 
 configure_file(src/config.h.in src/config.h)
 
-add_library(gqlite SHARED
-  src/backend.cpp
-  src/connection.cpp
-  src/exception.cpp
-  src/gqlite-c.cpp
-  src/value.cpp
-  src/oc/lexer.cpp
-  src/oc/token.cpp
-  src/oc/parser.cpp
-  src/oc/algebra/abstract_node_visitor.cpp
-  src/oc/algebra/node.cpp
-  src/oc/algebra/node_type.cpp
-  src/oc/algebra/nodes.cpp
-  src/oc/algebra/visitors/print.cpp
-  src/backends/functions.cpp
-  src/backends/sqlite.cpp
+set(GQLITE_SRCS
+    src/backend.cpp
+    src/connection.cpp
+    src/exception.cpp
+    src/gqlite-c.cpp
+    src/value.cpp
+    src/oc/lexer.cpp
+    src/oc/token.cpp
+    src/oc/parser.cpp
+    src/oc/algebra/abstract_node_visitor.cpp
+    src/oc/algebra/node.cpp
+    src/oc/algebra/node_type.cpp
+    src/oc/algebra/nodes.cpp
+    src/oc/algebra/visitors/print.cpp
+    src/backends/functions.cpp
+    src/backends/sqlite.cpp
   )
+
+add_library(gqlite SHARED ${GQLITE_SRCS})
 
 target_link_libraries(gqlite PRIVATE ${SQLITE3_LIBRARY})
 
@@ -236,6 +238,34 @@ add_executable(gqlite_c_example examples/main.c)
 target_link_libraries(gqlite_c_example PRIVATE gqlite)
 add_executable(gqlite_cpp_example examples/main.cpp)
 target_link_libraries(gqlite_cpp_example PRIVATE gqlite)
+
+###########################
+## COPY dists to binary dir
+
+file(GLOB_RECURSE DISTS_FILES dists/*)
+list(APPEND FOUND_FILES ${DISTS_FILES})
+foreach(DF ${FOUND_FILES})
+  cmake_path(GET DF RELATIVE_PART TRUNCF)
+  file(RELATIVE_PATH RELATIVEF ${CMAKE_CURRENT_SOURCE_DIR} ${DF})
+  cmake_path(GET RELATIVEF PARENT_PATH RELATIVEF_DIR)
+  file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/${RELATIVEF_DIR})
+  file(CREATE_LINK ${DF} ${CMAKE_CURRENT_BINARY_DIR}/${RELATIVEF} SYMBOLIC)
+endforeach()
+
+file(CREATE_LINK ${CMAKE_CURRENT_SOURCE_DIR}/include/gqlite.h ${CMAKE_CURRENT_BINARY_DIR}/dists/ruby/ext/gqlite/gqlite.h SYMBOLIC)
+file(CREATE_LINK ${CMAKE_CURRENT_SOURCE_DIR}/include/gqlite-c.h ${CMAKE_CURRENT_BINARY_DIR}/dists/ruby/ext/gqlite/gqlite-c.h SYMBOLIC)
+
+file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/dists/ruby/lib)
+file(CREATE_LINK ${CMAKE_CURRENT_SOURCE_DIR}/bindings/ruby/gqlite.rb ${CMAKE_CURRENT_BINARY_DIR}/dists/ruby/lib/gqlite.rb SYMBOLIC)
+
+if(RUBY_FOUND)
+  add_custom_target(gqlite_amalgamate ALL
+    COMMAND ${Ruby_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/dists/create_amalgamate.rb ${CMAKE_CURRENT_SOURCE_DIR}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/dists/
+    DEPENDS ${GQLITE_SRCS})
+  file(CREATE_LINK ${CMAKE_CURRENT_BINARY_DIR}/dists/gqlite-amalgamate.cpp ${CMAKE_CURRENT_BINARY_DIR}/dists/ruby/ext/gqlite/gqlite-amalgamate.cpp SYMBOLIC)
+
+endif()
 
 ########################
 ## Build tests

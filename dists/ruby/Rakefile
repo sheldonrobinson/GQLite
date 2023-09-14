@@ -1,0 +1,49 @@
+require 'rake'
+
+# extconf
+require "rake/extensiontask"
+
+# Gem
+require 'rubygems'
+require 'rubygems/package_task'
+
+
+
+# Gemspec
+
+GEMSPEC = Gem::Specification.new do |s|
+  s.name = "gqlite"
+  s.version = "0.9"
+  s.summary = "Ruby bindings for GQLite, a Graph Query library."
+  s.description = <<-DESC
+  GQLite aims to be the equivalent to SQLite for graph database: an easy to embedd query engine, with the data stored in a single file. To achieve that, GQLite uses SQLite to store data, and come as a library implementing a translation between graph query languages and SQL.
+
+  This is an experimental release.
+DESC
+  s.authors     = ["Cyrille Berger"]
+  s.files       = %w[lib/gqlite.rb ext/gqlite/gqlite.h ext/gqlite/gqlite-c.h ext/gqlite/gqlite-amalgamate.cpp]
+  s.homepage    = "https://gitlab.com/cyloncore/gqlite"
+  s.license     = "MIT"
+  s.add_dependency "ffi", "~> 1.15"
+  s.extensions = %w[ext/gqlite/extconf.rb]
+end
+
+# Tasks
+
+Rake::ExtensionTask.new "gqlite" do |ext|
+  ext.lib_dir = "lib/gqlite"
+end
+
+task prepare: [] do |t|
+  
+end
+
+Gem::PackageTask.new(GEMSPEC) do |pkg|
+  # Hack to trick GEM into following the symlinks while packaging instead of adding symlink to tarfile
+  class File
+    def File.lstat fn
+      return File.stat fn
+    end
+  end
+end
+

@@ -130,4 +130,3 @@ void print::visit(_KLASS_NAME_ ## _csp _node)                           \
 #include "../nodes_defs.h"
 
 #undef OC_ALGEBRA_GENERATE
-
