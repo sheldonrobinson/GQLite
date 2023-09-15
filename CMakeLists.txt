@@ -262,7 +262,8 @@ file(CREATE_LINK ${CMAKE_CURRENT_SOURCE_DIR}/bindings/ruby/gqlite.rb ${CMAKE_CUR
 
 # For Python
 
-file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/dists/python/src/gqlite)
+file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/dists/python/gqlite)
+file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/dists/python/src)
 file(CREATE_LINK ${CMAKE_CURRENT_SOURCE_DIR}/bindings/python/gqlite/__init__.py ${CMAKE_CURRENT_BINARY_DIR}/dists/python/gqlite/__init__.py)
 file(CREATE_LINK ${CMAKE_CURRENT_SOURCE_DIR}/bindings/python/build-ffi.py ${CMAKE_CURRENT_BINARY_DIR}/dists/python/build-ffi.py)
 file(CREATE_LINK ${CMAKE_CURRENT_SOURCE_DIR}/include/gqlite.h ${CMAKE_CURRENT_BINARY_DIR}/dists/python/src/gqlite.h)

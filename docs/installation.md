@@ -9,3 +9,17 @@ lrs-pkg get --repo cyloncore-core https://gitlab.com/cyloncore/lrs-pkg-core-repo
 lrs-pkg get gqlite
 lrs-pkg build
 ```
+
+Using pip
+---------
+
+```bash
+pip install gqlitedb
+```
+
+Using gem
+---------
+
+```bash
+gem install gqlite
+```

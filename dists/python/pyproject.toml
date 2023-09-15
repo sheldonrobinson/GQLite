@@ -2,9 +2,20 @@
 requires = ["setuptools>=61.0", "cffi>=1.0.0"]
 build-backend = "setuptools.build_meta"
 
+[external]
+build-requires = [
+  "virtual:compiler/cpp",
+]
+requires = [
+  "cffi",
+]
+host-requires = [
+  "pkg:generic/sqlite3",
+]
+
 [project]
-name = "gqlite"
-version = "0.9.0"
+name = "gqlitedb"
+version = "0.9.1"
 authors = [
   { name="Cyrille Berger" },
 ]
@@ -16,6 +27,7 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
+dependencies = ["cffi>=1.0.0"]
 
 [project.urls]
 "Homepage" = "https://gitlab.com/cyloncore/gqlite"
