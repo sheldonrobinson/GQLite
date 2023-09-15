@@ -20,12 +20,12 @@ module GQLite
     attach_function :gqlite_value_destroy, [:pointer, :pointer], :void
     attach_function :gqlite_value_to_json, [:pointer, :pointer], :string
     attach_function :gqlite_value_is_valid, [:pointer, :pointer], :bool
-    ApiError = CApi.gqlite_api_context_create()
+    ApiContext = CApi.gqlite_api_context_create()
     def CApi.call_function(fname, *args)
-      r = CApi.send fname, ApiError, *args
-      if CApi.gqlite_api_context_has_error(ApiError)
-        err = CApi.gqlite_api_context_get_message ApiError
-        CApi.gqlite_api_context_clear_error ApiError
+      r = CApi.send fname, ApiContext, *args
+      if CApi.gqlite_api_context_has_error(ApiContext)
+        err = CApi.gqlite_api_context_get_message ApiContext
+        CApi.gqlite_api_context_clear_error ApiContext
         raise Error.new err
       end
       return r
@@ -48,7 +48,7 @@ module GQLite
       if CApi.call_function(:gqlite_value_is_valid, ret)
         val = JSON.parse CApi.call_function :gqlite_value_to_json, ret
       else
-        ret = nil
+        val = nil
       end
       CApi.call_function :gqlite_value_destroy, ret
       return val

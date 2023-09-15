@@ -157,6 +157,15 @@ set_package_properties(PYTHON3_CFFI PROPERTIES
     PURPOSE "Used for python3 bindings.")
 
 ########################
+## Find Crystal
+
+find_package(Crystal)
+set_package_properties(Crystal PROPERTIES
+    DESCRIPTION ""
+    TYPE OPTIONAL
+    PURPOSE "Used for running the crsytal test suite.")
+
+########################
 ## Build library
 
 include_directories(include ${CMAKE_CURRENT_BINARY_DIR}/src)
@@ -286,8 +295,16 @@ endif()
 add_executable(gqlite_cpp_tests tests/cpp/catch_amalgamated.cpp tests/cpp/test_table.cpp)
 target_link_libraries(gqlite_cpp_tests PRIVATE gqlite)
 
+if(Crystal_FOUND)
+  add_custom_target(gqlite-cr-spec ALL
+  COMMAND ${CMAKE_COMMAND} -E env CRYSTAL_PATH=${CMAKE_CURRENT_SOURCE_DIR}/bindings/crystal/:${Crystal_PATH} ${Crystal_EXECUTABLE} build --link-flags "-L${CMAKE_CURRENT_BINARY_DIR}" ${CMAKE_CURRENT_SOURCE_DIR}/tests/cr/gqlite-spec.cr -o gqlite-cr-spec
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    DEPENDS gqlite ${CMAKE_CURRENT_SOURCE_DIR}/tests/cr/gqlite-spec.cr ${CMAKE_CURRENT_SOURCE_DIR}/bindings/crystal/gqlite.cr
+  )
+endif()
+
 ########################
-## Run teststests
+## Run tests
 
 add_test(NAME gqlite-cpp COMMAND ${CMAKE_CURRENT_BINARY_DIR}/gqlite_cpp_tests)
 
@@ -301,4 +318,8 @@ endif()
 
 if(Python3_FOUND AND PYTHON3_CFFI_FOUND)
   add_test(NAME gqlite-py COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/py/python-unittest.py)
+endif()
+
+if(Crystal_FOUND)
+  add_test(NAME gqlite-cr-spec COMMAND ${CMAKE_CURRENT_BINARY_DIR}/gqlite-cr-spec )
 endif()
