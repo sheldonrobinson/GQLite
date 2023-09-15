@@ -202,9 +202,9 @@ add_library(gqlite SHARED ${GQLITE_SRCS})
 
 target_link_libraries(gqlite PRIVATE ${SQLITE3_LIBRARY})
 
-install(TARGETS gqlite EXPORT gqliteTargets ${INSTALL_TARGETS_DEFAULT_ARGS} )
+install(TARGETS gqlite EXPORT GQLiteTargets ${INSTALL_TARGETS_DEFAULT_ARGS} )
 
-install(FILES include/gqlite-c.h
+install(FILES include/gqlite-c.h include/gqlite.h
       DESTINATION ${INSTALL_INCLUDE_DIR}/)
 
 ########################
@@ -237,7 +237,7 @@ if(READLINE_FOUND)
   target_link_libraries(gqlite_cmd PRIVATE gqlite ${Readline_LIBRARY})
   set_property(TARGET gqlite_cmd PROPERTY OUTPUT_NAME gqlite)
 
-  install(TARGETS gqlite_cmd EXPORT gqliteTargets ${INSTALL_TARGETS_DEFAULT_ARGS} )
+  install(TARGETS gqlite_cmd EXPORT GQLiteTargets ${INSTALL_TARGETS_DEFAULT_ARGS} )
 endif()
 
 ########################
@@ -323,3 +323,30 @@ endif()
 if(Crystal_FOUND)
   add_test(NAME gqlite-cr-spec COMMAND ${CMAKE_CURRENT_BINARY_DIR}/gqlite-cr-spec )
 endif()
+
+########################
+## Config files
+
+export(TARGETS ${PROJECT_EXPORTED_TARGETS}
+FILE "${PROJECT_BINARY_DIR}/GQLiteTargets.cmake")
+
+include(CMakePackageConfigHelpers)
+configure_package_config_file(GQLiteConfig.cmake.in "${PROJECT_BINARY_DIR}/GQLiteConfig.cmake"
+  INSTALL_DESTINATION ${INSTALL_CMAKE_DIR}
+  PATH_VARS INSTALL_INCLUDE_DIR
+  )
+write_basic_package_version_file("${PROJECT_BINARY_DIR}/GQLiteConfigVersion.cmake" VERSION ${GQLITE_VERSION} COMPATIBILITY SameMajorVersion)
+
+# Install the GQLiteConfig.cmake and GQLiteConfigVersion.cmake
+install(FILES
+"${PROJECT_BINARY_DIR}/GQLiteConfig.cmake"
+"${PROJECT_BINARY_DIR}/GQLiteConfigVersion.cmake"
+DESTINATION "${INSTALL_CMAKE_DIR}" COMPONENT dev)
+
+# Install the export set for use with the install-tree
+install(EXPORT GQLiteTargets DESTINATION "${INSTALL_CMAKE_DIR}" COMPONENT dev)
+
+########################
+## Feature summary
+
+feature_summary(WHAT ALL FATAL_ON_MISSING_REQUIRED_PACKAGES)
