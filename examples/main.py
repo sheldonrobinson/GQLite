@@ -4,7 +4,7 @@ import gqlite
 import sys
 
 if len(sys.argv) != 3:
-  print('gqlite_rb_example [database] [query]')
+  print('gqlite_py_example [database] [query]')
   sys.exit(-1)
 
 try:

@@ -1,22 +1,26 @@
 GQLite
 ======
 
-GQLite aims to be the equivalent to SQLite for graph database: an easy to embedd query engine, with the data stored in a single file. To achieve that, GQLite uses SQLite to store data, and come as a library implementing a translation between graph query languages and SQL. The library is written in C++, but also provides a C API 
+GQLite is a C++-language library, with a C interface, that implements a small, fast, self-contained, high-reliability, full-featured, Graph Query database engine. The data is stored in a SQLite database, which the fasted and most used SQL database. This enable to achieve high performance and for application to combine Graph queries with traditional SQL queries.
+
+GQLite source code is license under the [MIT License](LICENSE) and is free to everyone to use for any purpose. 
 
 The official repositories contains bindings/APIs for C, C++, Python and Ruby.
 
 The library is still in its early stage, but it is now fully functional. Development effort has now slowed down and new features are added on a by-need basis. It supports a subset of [OpenCypher](https://opencypher.org/), and the intent is to also support ISO GQL in the future when it become available.
+
+Installation
+------------
+
+To build from source, GQLite requires the [cmake](https://cmake.org/) build system. For development, it might be necesserary to install [ruby](https://www.ruby-lang.org/en/) (for the test suite and updating SQL queries) and [ptc](https://www.ruby-lang.org/en/) (for updating SQL queries).
+
+Specific installation instructions can be found in the [installation](docs/installation.md) section of the documentation.
 
 Documentation
 -------------
 
 * [GQLite official documentation](docs/main.md)
 * [OpenCypher](https://opencypher.org/) is the main query language for GQLite
-
-License
--------
-
-The GQLite library is released under the [MIT License](LICENSE).
 
 Contributions
 -------------
