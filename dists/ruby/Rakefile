@@ -32,7 +32,7 @@ require 'gqlite'
 
 begin
   # Create a database on the file "test.db"
-  connection = Gqlite::Connection.new sqlite_filename: "test.db"
+  connection = GQLite::Connection.new sqlite_filename: "test.db"
 
   # Execute a simple query to create a node and return all the nodes
   value = connection.execute_oc_query("CREATE () MATCH (n) RETURN n")
@@ -43,7 +43,7 @@ begin
   else
     puts "Results are #{value.to_s}"
   end
-rescue Gqlite::Error => ex
+rescue GQLite::Error => ex
   # Report any error
   puts "An error has occured: #{ex.message}"
 end

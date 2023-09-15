@@ -8,7 +8,7 @@ import gqlite
 class TestConnection(ut.TestCase):
   def test_simple_queries(self):
     fp = tempfile.NamedTemporaryFile()
-    conn = gqlite.Connection(fp.name)
+    conn = gqlite.connect(fp.name)
     # Test one node creation
     self.assertEqual(conn.execute_oc_query("CREATE (n)"), None)
     # Test return

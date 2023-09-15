@@ -25,19 +25,19 @@ class SideEffect
   end
 end
 
-module GqliteTest
+module GQLiteTest
   module CApi
     extend FFI::Library
     ffi_lib 'gqlite'
     attach_function :gqlite_private_test_stats, [:pointer], :pointer
   end
-  def GqliteTest.get_stats(handle)
+  def GQLiteTest.get_stats(handle)
     ret = CApi.gqlite_private_test_stats handle.dbhandle
-    val = JSON.parse Gqlite::CApi.call_function :gqlite_value_to_json, ret
-    Gqlite::CApi.call_function :gqlite_value_destroy, ret
+    val = JSON.parse GQLite::CApi.call_function :gqlite_value_to_json, ret
+    GQLite::CApi.call_function :gqlite_value_destroy, ret
     return SideEffect.new val["nodes_count"], val["edges_count"], val["labels_assignment_nodes_count"], val["properties_count"]
   end
-  def GqliteTest.parse_side_effect_table(table)
+  def GQLiteTest.parse_side_effect_table(table)
     nodes_count = 0; edges_count = 0; labels_count = 0; properties_count = 0
     table.raw.each do |line|
       label = line[0]
@@ -69,7 +69,7 @@ module GqliteTest
     end
     return SideEffect.new nodes_count, edges_count, labels_count, properties_count
   end
-  def GqliteTest.parse_results(results)
+  def GQLiteTest.parse_results(results)
     return nil if results.nil?
     return results.map do |c|
       c.map { |v|
@@ -80,7 +80,7 @@ module GqliteTest
       }
     end
   end
-  def GqliteTest.parse_results_table(table)
+  def GQLiteTest.parse_results_table(table)
     table = table.raw
     r_node = /\((\w*)((:\w*)*)(\s*{.*})?\)/
     return table.map do |c|
@@ -218,7 +218,7 @@ end
 Given(/^any graph$/) do
   if @handle.nil?
     file = Tempfile.new('testdb')
-    @handle = Gqlite::Connection.new(sqlite_filename: file.path)
+    @handle = GQLite::Connection.new(sqlite_filename: file.path)
   end
 end
 
@@ -230,16 +230,16 @@ end
 Given(/^an empty graph$/) do
   pending if @ignored_scenario
   file = Tempfile.new('testdb')
-  @handle = Gqlite::Connection.new(sqlite_filename: file.path)
+  @handle = GQLite::Connection.new(sqlite_filename: file.path)
 end
 
 When(/^executing query:$/) do |string|
   pending if @ignored_scenario
   begin
-    @stats_before = GqliteTest.get_stats @handle
-    @query_result = GqliteTest.parse_results(@handle.execute_oc_query string)
-    @stats_after = GqliteTest.get_stats @handle
-  rescue Gqlite::Error => exp
+    @stats_before = GQLiteTest.get_stats @handle
+    @query_result = GQLiteTest.parse_results(@handle.execute_oc_query string)
+    @stats_after = GQLiteTest.get_stats @handle
+  rescue GQLite::Error => exp
     @exception = exp
   end
 end
@@ -247,8 +247,8 @@ end
 When(/^executing control query:$/) do |string|
   pending if @ignored_scenario
   begin
-    @query_result = GqliteTest.parse_results(@handle.execute_oc_query string)
-  rescue Gqlite::Error => exp
+    @query_result = GQLiteTest.parse_results(@handle.execute_oc_query string)
+  rescue GQLite::Error => exp
     @exception = exp
   end
 end
@@ -256,7 +256,7 @@ end
 Then(/^the side effects should be:$/) do |table|
   pending if @ignored_scenario
   diff_stats = @stats_after .diff_to @stats_before
-  ref_stats = GqliteTest.parse_side_effect_table table
+  ref_stats = GQLiteTest.parse_side_effect_table table
   expect(diff_stats).to eq(ref_stats)
 end
 
@@ -276,14 +276,14 @@ Then(/^the result should be, in any order:$/) do |table|
   pending if @ignored_scenario
   expect(@exception).to be_nil
   expect(@query_result).not_to be_nil
-  expect(@query_result).to eq_in_any_order(GqliteTest.parse_results_table table)
+  expect(@query_result).to eq_in_any_order(GQLiteTest.parse_results_table table)
 end
 
 Then(/^the result should be, in order:$/) do |table|
   pending if @ignored_scenario
   expect(@exception).to be_nil
   expect(@query_result).not_to be_nil
-  expect(@query_result).to eq(GqliteTest.parse_results_table table)
+  expect(@query_result).to eq(GQLiteTest.parse_results_table table)
 end
 
 Then(/^a SyntaxError should be raised at compile time: VariableAlreadyBound$/) do

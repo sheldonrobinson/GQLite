@@ -9,7 +9,7 @@ end
 
 begin
   # Create a database on the file given in argv[0]
-  connection = Gqlite::Connection.new sqlite_filename: ARGV[0]
+  connection = GQLite::Connection.new sqlite_filename: ARGV[0]
 
   # Execute the query from argv[1]
   value = connection.execute_oc_query ARGV[1]
@@ -20,7 +20,7 @@ begin
   else
     puts "Results are #{value.to_s}"
   end
-rescue Gqlite::Error => ex
+rescue GQLite::Error => ex
   # Report any error
   puts "An error has occured: #{ex.message}"
 end

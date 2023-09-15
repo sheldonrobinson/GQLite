@@ -9,7 +9,7 @@ if len(sys.argv) != 3:
 
 try:
   # Create a database on the file given in argv[1]
-  connection = gqlite.Connection(sys.argv[1])
+  connection = gqlite.connect(sys.argv[1])
 
   # Execute the query from argv[2]
   value = connection.execute_oc_query(sys.argv[2])

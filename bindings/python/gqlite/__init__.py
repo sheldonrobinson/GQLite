@@ -30,3 +30,6 @@ class Connection(object):
       capi.lib.gqlite_api_context_clear_error(api_context)
       raise Error(err)
     return ret
+
+def connect(*args):
+  return Connection(*args)

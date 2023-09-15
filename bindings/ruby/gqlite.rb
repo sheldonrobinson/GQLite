@@ -2,7 +2,7 @@ require 'ffi'
 require 'objspace'
 require 'json'
 
-module Gqlite
+module GQLite
   class Error < StandardError
   end
   module CApi

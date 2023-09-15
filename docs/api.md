@@ -21,6 +21,7 @@ The Python API is imported with `import gqlite` and it contains two classes:
 * `gqlite.Connection` is the main class for connection to the database.
   * `gqlite.Connection(filename)` is used to create a new connection to a gqlite database stored in a sqlite database
   * `execute_oc_query(query, parameters)` is used to query the database, `parameters` is an optional map.
+* `gqlite.connection(filename)` can be used to create a connection to a GQLite database.
 
 An example of use is [main.py](../examples/main.py).
 

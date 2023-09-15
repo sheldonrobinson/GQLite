@@ -14,7 +14,7 @@ import gqlite
 
 try:
   # Create a database on the file "test.db"
-  connection = gqlite.Connection("test.db")
+  connection = gqlite.connect("test.db")
 
   # Execute a simple query to create a node and return all the nodes
   value = connection.execute_oc_query("CREATE () MATCH (n) RETURN n")
