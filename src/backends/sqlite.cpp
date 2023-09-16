@@ -452,8 +452,8 @@ namespace gqlite::backends::sqlite_oc_executor
           define_variable(_node->get_variable());
         }, [this](const algebra::graph_edge_csp _edge)
         {
-          define_variable(_edge->get_variable());
           define_variable_if_needed(_edge->get_source()->get_variable());
+          define_variable(_edge->get_variable());
           define_variable_if_needed(_edge->get_destination()->get_variable());
         });
       }
@@ -1151,7 +1151,6 @@ namespace gqlite::backends::sqlite_oc_executor
         }
         void operator()(const value& _value)
         {
-          std::cout << _value.to_json() << std::endl;
           throw exception("Only node/edge can be set.");
         }
         void operator()(const empty&)
@@ -1265,7 +1264,6 @@ namespace gqlite::backends::sqlite_oc_executor
         }
         void operator()(const value& _value)
         {
-          std::cout << _value.to_json() << std::endl;
           throw exception("Only node/edge can be set.");
         }
         void operator()(const empty&)
@@ -1407,7 +1405,8 @@ namespace gqlite::backends::sqlite_oc_executor
           eval_c.prepare_current_row(table, i, false);
           for(const algebra::named_expression_csp& rv : rs->get_expressions())
           {
-            row.push_back(exec_c.get_value(eval_v.start(rv->get_expression())));
+            exec_value ev = eval_v.start(rv->get_expression());
+            row.push_back(exec_c.get_value(ev));
           }
           results_rows.push_back(row);
         }

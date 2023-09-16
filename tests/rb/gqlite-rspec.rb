@@ -8,14 +8,26 @@ def create_node(id, labels, properties)
   {"type" => "node", "id" => id, "labels" => labels, "properties" => properties}
 end
 
+def create_edge(id, label, properties)
+  {"type" => "edge", "id" => id, "label" => label, "properties" => properties}
+end
+
 def add_node(list, id, labels, properties)
   node = create_node(id, labels, properties)
   list.push node
   return node
 end
 
+def add_edge(list, id_1, labels_1, properties_1, id_e, label_e, properites_e, id_2, labels_2, properties_2)
+  list.push [create_node(id_1, labels_1, properties_1), create_edge(id_e, label_e, properites_e), create_node(id_2, labels_2, properties_2)]
+end
+
 def make_results(gc)
   [["nodes"]] + gc.map { |x| [x]}
+end
+
+def make_results_edges(gc)
+  [["a", "b", "c"]] + gc
 end
 
 RSpec.describe "connection" do
@@ -82,6 +94,7 @@ RSpec.describe "connection" do
     db.execute_oc_query "CREATE (n1), (n2) CREATE (n1)-[:RELTYPE]->(n2)"
     add_node gc, 1, [], {}
     add_node gc, 2, [], {}
+    add_edge gc_edges, 1, [], {}, 1, "RELTYPE", {}, 2, [], {}
     nodes = db.execute_oc_query "MATCH (nodes) RETURN nodes"
     expect(nodes).to eq(make_results(gc))
     edges = db.execute_oc_query "MATCH (edges)-[]->() RETURN edges"
@@ -90,8 +103,12 @@ RSpec.describe "connection" do
     db.execute_oc_query "CREATE (n1)-[:RELTYPE]->(n2)"
     add_node gc, 3, [], {}
     add_node gc, 4, [], {}
+    add_edge gc_edges, 3, [], {}, 2, "RELTYPE", {}, 4, [], {}
     nodes = db.execute_oc_query "MATCH (nodes) RETURN nodes"
     expect(nodes).to eq(make_results(gc))
+
+    nodes_edges = db.execute_oc_query "MATCH (a)-[b]->(c) RETURN a, b, c"
+    expect(nodes_edges).to eq(make_results_edges(gc_edges))
 
     # Create with match
     db.execute_oc_query "CREATE (:X), (:Y)"
