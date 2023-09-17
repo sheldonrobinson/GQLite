@@ -39,7 +39,6 @@ features = [
 
 features = features.map { |file| 'openCypher/tck/features/clauses/' + file }
 args = features.concat %w(--require cucumber/step_definitions/ --fail-fast)
-# args = %w(cucumber/features)
 
 begin
   Cucumber::Cli::Main.new(args).execute!
