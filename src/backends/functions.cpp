@@ -17,6 +17,7 @@ namespace gqlite::backends::functions
     static gqlite::value labels(const std::vector<value>& _arguments);
     static gqlite::value size(const std::vector<value>& _arguments);
     static gqlite::value keys(const std::vector<value>& _arguments);
+    static gqlite::value id(const std::vector<value>& _arguments);
     std::unordered_map<std::string, std::function<value(const std::vector<value>&)>> functions;
   };
 
@@ -71,6 +72,27 @@ namespace gqlite::backends::functions
     }
   }
   /**
+   * @return the id of a node/edge
+   */
+  value static_data::id(const std::vector<value>& _arguments)
+  {
+    errors::check_arguments_size("id", _arguments, 1);
+    value arg0 = _arguments[0];
+    if(arg0.get_type() == value_type::map)
+    {
+      value_map map = arg0.to_map();
+      auto it = map.find("id");
+      if(it == map.end())
+      {
+        return value();
+      } else {
+        return it->second;
+      }
+    } else {
+      return value();
+    }
+  }
+  /**
    * @return the keys of a map
    */
   value static_data::keys(const std::vector<value>& _arguments)
@@ -110,6 +132,7 @@ namespace gqlite::backends::functions
     functions["labels"] = &static_data::labels;
     functions["size"] = &static_data::size;
     functions["keys"] = &static_data::keys;
+    functions["id"] = &static_data::id;
   }
 
   value call(const std::string& _name, const std::vector<value>& _arguments)
