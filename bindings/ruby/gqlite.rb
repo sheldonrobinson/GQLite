@@ -19,6 +19,7 @@ module GQLite
     attach_function :gqlite_value_create, [:pointer], :pointer
     attach_function :gqlite_value_destroy, [:pointer, :pointer], :void
     attach_function :gqlite_value_to_json, [:pointer, :pointer], :string
+    attach_function :gqlite_value_from_json, [:pointer, :string], :pointer
     attach_function :gqlite_value_is_valid, [:pointer, :pointer], :bool
     ApiContext = CApi.gqlite_api_context_create()
     def CApi.call_function(fname, *args)
@@ -44,7 +45,14 @@ module GQLite
       }
     end
     def execute_oc_query(query, bindings: nil)
-      ret = CApi.call_function :gqlite_connection_oc_query, @dbhandle, query, nil
+      b = nil
+      if bindings
+        b = CApi.call_function :gqlite_value_from_json, bindings.to_json 
+      end
+      ret = CApi.call_function :gqlite_connection_oc_query, @dbhandle, query, b
+      if b
+        CApi.call_function :gqlite_value_destroy, b
+      end
       if CApi.call_function(:gqlite_value_is_valid, ret)
         val = JSON.parse CApi.call_function :gqlite_value_to_json, ret
       else

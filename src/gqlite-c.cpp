@@ -130,6 +130,14 @@ extern "C"
     END_CHECK
     return nullptr;
   }
+  gqlite_value_t gqlite_value_from_json(gqlite_api_context_t _context, const char* _json)
+  {
+    BEGIN_CHECK
+    return new gqlite_value{gqlite::value::from_json(_json)};
+    END_CHECK
+    return nullptr;
+  }
+
   bool gqlite_value_is_valid(gqlite_api_context_t, gqlite_value_t _value)
   {
     return _value and _value->value.get_type() != gqlite::value_type::invalid;

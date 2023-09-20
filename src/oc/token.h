@@ -37,6 +37,7 @@ namespace gqlite::oc
     EXCLAMATION, ///< !
     PLUS_EQUAL, ///< +=
   // Constants
+    PARAMETER,
     IDENTIFIER,
     STRING,
     INTEGER,

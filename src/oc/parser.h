@@ -8,7 +8,7 @@ namespace gqlite::oc
   class parser
   {
   public:
-    parser(lexer* _lexer);
+    parser(lexer* _lexer, const value_map& _bindings);
     ~parser();
     algebra::node_csp parse();
   private:

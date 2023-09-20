@@ -161,8 +161,6 @@ IgnoredScenario = [
   "[25] Matching twice with an additional node label",
   "[26] Matching twice with a duplicate predicate",
   "[30] Fail when using a list or nodes as a node",
-  # bindings ($) not implemented
-  "[8] Fail when using parameter as relationship predicate in MATCH",
   # <--> is considered an error, unclear if it is equivalent to -- (aka no specified direction,
   # to me it should indicate that there are two edges between the node, in each direction, but
   # is not the case according to the test case)
@@ -237,7 +235,7 @@ When(/^executing query:$/) do |string|
   pending if @ignored_scenario
   begin
     @stats_before = GQLiteTest.get_stats @handle
-    @query_result = GQLiteTest.parse_results(@handle.execute_oc_query string)
+    @query_result = GQLiteTest.parse_results(@handle.execute_oc_query string, bindings: @bindings)
     @stats_after = GQLiteTest.get_stats @handle
   rescue GQLite::Error => exp
     @exception = exp
@@ -319,7 +317,7 @@ end
 Then(/^a SyntaxError should be raised at compile time: InvalidParameterUse$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
-  expect(@exception.message).to match(/^\d+:\d+:Expected token \) got .*$/)
+  expect(@exception.message).to match(/^\d+:\d+:Unknown parameter '\$.*'.$/)
 end
 
 Then(/^a SyntaxError should be raised at compile time: VariableTypeConflict$/) do
@@ -356,4 +354,11 @@ Then(/^a SyntaxError should be raised at compile time: InvalidDelete$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
   expect(@exception.message).to match(/^Invalid delete expression.$/)
+end
+
+Given(/^parameters are:$/) do |table|
+  @bindings = {}
+  table.raw.each() do |row|
+    @bindings["$" + row[0]] = eval(row[1])
+  end
 end

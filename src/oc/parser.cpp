@@ -14,6 +14,7 @@ using namespace gqlite::oc;
 struct parser::data
 {
   lexer* lex;
+  value_map bindings;
   token tok;
 
   algebra::node_csp parse_create();
@@ -350,7 +351,7 @@ std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>> pars
     }
     // Properties
     algebra::map_csp properties;
-    if(tok.type == token_type::STARTBRACE)
+    if(tok.type == token_type::STARTBRACE or tok.type == token_type::PARAMETER)
     {
       properties = std::make_shared<algebra::map>(parse_properties());
     }
@@ -441,7 +442,7 @@ std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>> pars
         } else if(_require_one_label) {
           is_of_type(token_type::COLON); //
         }
-        if(tok.type == token_type::STARTBRACE)
+        if(tok.type == token_type::STARTBRACE or tok.type == token_type::PARAMETER)
         {
           current_edge.properties = std::make_shared<algebra::map>(parse_properties());
         }
@@ -485,30 +486,53 @@ std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>> pars
 
 std::unordered_map<std::string, algebra::node_csp> parser::data::parse_properties()
 {
-  std::unordered_map<std::string, algebra::node_csp> p;
-  is_of_type(token_type::STARTBRACE);
-  get_next_token();
-  while(tok.type != token_type::ENDBRACE)
+  switch(tok.type)
   {
-    if(tok.type != token_type::STRING and tok.type != token_type::IDENTIFIER)
+    case token_type::STARTBRACE:
     {
-      report_unexpected(tok);
-    }
-    std::string key = tok.string;
-    get_next_token();
-    is_of_type(token_type::COLON);
-    get_next_token();
-    p[key] = parse_expression();
-    if(tok.type == token_type::COMMA)
-    {
+      std::unordered_map<std::string, algebra::node_csp> p;
       get_next_token();
-    } else {
-      break;
+      while(tok.type != token_type::ENDBRACE)
+      {
+        if(tok.type != token_type::STRING and tok.type != token_type::IDENTIFIER)
+        {
+          report_unexpected(tok);
+        }
+        std::string key = tok.string;
+        get_next_token();
+        is_of_type(token_type::COLON);
+        get_next_token();
+        p[key] = parse_expression();
+        if(tok.type == token_type::COMMA)
+        {
+          get_next_token();
+        } else {
+          break;
+        }
+      }
+      is_of_type(token_type::ENDBRACE);
+      get_next_token();
+      return p;
     }
+    case token_type::PARAMETER:
+    {
+      auto it = bindings.find(tok.string);
+      if(it == bindings.end())
+      {
+        report_error(tok, "Unknown parameter '{}'.", tok.string);
+      }
+      get_next_token();
+      std::unordered_map<std::string, algebra::node_csp> p;
+      
+      for(auto const& [k, v] : it->second.to_map())
+      {
+        p[k] = std::make_shared<algebra::value>(v);
+      }
+      return p;
+    }
+    default:
+      report_unexpected(tok);
   }
-  is_of_type(token_type::ENDBRACE);
-  get_next_token();
-  return p;
 }
 
 algebra::node_csp parser::data::parse_terminal_expression()
@@ -592,6 +616,16 @@ algebra::node_csp parser::data::parse_terminal_expression()
   case token_type::STARTBOXBRACKET:
   {
     return parse_expression_list();
+  }
+  case token_type::PARAMETER:
+  {
+    auto it = bindings.find(tok.string);
+    if(it == bindings.end())
+    {
+      report_error(tok, "Unknown parameter '{}'.", tok.string);
+    }
+    get_next_token();
+    return std::make_shared<algebra::value>(it->second);
   }
   default:
     report_unexpected(tok);
@@ -810,9 +844,10 @@ bool parser::data::is_of_type(token_type _type)
   return is_of_type(tok, _type);
 }
 
-parser::parser(lexer* _lexer) : d(new data)
+parser::parser(lexer* _lexer, const value_map& _bindings) : d(new data)
 {
   d->lex = _lexer;
+  d->bindings = _bindings;
 }
 
 parser::~parser()

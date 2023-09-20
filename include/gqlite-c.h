@@ -81,6 +81,11 @@ void gqlite_value_destroy(gqlite_api_context_t, gqlite_value_t);
 const char* gqlite_value_to_json(gqlite_api_context_t, gqlite_value_t);
 
 /**
+ * Create value from json.
+ */
+gqlite_value_t gqlite_value_from_json(gqlite_api_context_t, const char*);
+
+/**
  * Check if the value is valid.
  */
 bool gqlite_value_is_valid(gqlite_api_context_t, gqlite_value_t);

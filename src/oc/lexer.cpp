@@ -114,7 +114,11 @@ token lexer::next_token()
     return commenttoken;
   }
   // if it is alpha, it's an identifier or a keyword
-  if(std::isalpha(lastChar) or lastChar == '_')
+  if(lastChar == '$')
+  {
+    identifierStr = get_identifier(lastChar);
+    return token(token_type::PARAMETER, identifierStr, line(), initial_col);
+  } else if(std::isalpha(lastChar) or lastChar == '_')
   {
     identifierStr = get_identifier(lastChar);
 #define TOKEN_KEYWORD(_K_) IDENTIFIER_IS_KEYWORD(# _K_, _K_)
