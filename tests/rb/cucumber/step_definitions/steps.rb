@@ -26,15 +26,8 @@ class SideEffect
 end
 
 module GQLiteTest
-  module CApi
-    extend FFI::Library
-    ffi_lib 'gqlite'
-    attach_function :gqlite_private_test_stats, [:pointer], :pointer
-  end
   def GQLiteTest.get_stats(handle)
-    ret = CApi.gqlite_private_test_stats handle.dbhandle
-    val = JSON.parse GQLite::CApi.call_function :gqlite_value_to_json, ret
-    GQLite::CApi.call_function :gqlite_value_destroy, ret
+    val = handle.execute_oc_query "CALL gqlite.internal.stats()"
     return SideEffect.new val["nodes_count"], val["edges_count"], val["labels_assignment_nodes_count"], val["properties_count"]
   end
   def GQLiteTest.parse_side_effect_table(table)

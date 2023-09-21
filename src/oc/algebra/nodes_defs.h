@@ -39,6 +39,13 @@ OC_ALGEBRA_GENERATE(delete_statement, OC_ALGEBRA_DELETE_MEMBERS)
 OC_ALGEBRA_GENERATE(set, OC_ALGEBRA_NODES_LIST_MEMBERS)
 OC_ALGEBRA_GENERATE(remove, OC_ALGEBRA_NODES_LIST_MEMBERS)
 
+#define OC_ALGEBRA_CALL_MEMBERS(_KLASS_NAME_, F)    \
+  F(_KLASS_NAME_, std::string, name)                \
+  F(_KLASS_NAME_, std::vector<node_csp>, arguments) \
+  F(_KLASS_NAME_, std::vector<std::string>, yield)
+
+OC_ALGEBRA_GENERATE(call, OC_ALGEBRA_CALL_MEMBERS)
+
 // Set/remove Expressions
 
 #define OC_ALGEBRA_SET_ADD_VALUE_MEMBERS(_KLASS_NAME_, F)                 \

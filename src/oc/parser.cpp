@@ -17,6 +17,7 @@ struct parser::data
   value_map bindings;
   token tok;
 
+  algebra::node_csp parse_call();
   algebra::node_csp parse_create();
   algebra::node_csp parse_match();
   algebra::node_csp parse_return();
@@ -86,6 +87,57 @@ void parser::data::validate(algebra::graph_edge_csp _node)
   if(_node->get_labels().empty() and not _node->get_properties()) return;
   if(_node->equals(it->second)) return;
   report_error(tok, "Variable {} is already bound.", _node->get_variable());
+}
+
+algebra::node_csp parser::data::parse_call()
+{
+  get_next_token();
+  std::string name;
+  while(tok.type != token_type::END_OF_FILE)
+  {
+    is_of_type(token_type::IDENTIFIER);
+    name += tok.string;
+    get_next_token();
+    if(tok.type == token_type::DOT)
+    {
+      name += ".";
+      get_next_token();
+    } else {
+      break;
+    }
+  }
+  std::vector<algebra::node_csp> arguments;
+  is_of_type(token_type::STARTBRACKET);
+  get_next_token();
+  while(tok.type != token_type::ENDBRACKET)
+  {
+    arguments.push_back(parse_expression());
+    if(tok.type == token_type::COMMA)
+    {
+      get_next_token();
+    } else {
+      break;
+    }
+  }
+  is_of_type(token_type::ENDBRACKET);
+  get_next_token();
+  std::vector<std::string> yields;
+  if(tok.type == token_type::YIELD)
+  {
+    get_next_token();
+    while(tok.type != token_type::END_OF_FILE)
+    {
+      is_of_type(token_type::IDENTIFIER);
+      yields.push_back(tok.string);
+      if(tok.type == token_type::COMMA)
+      {
+        get_next_token();
+      } else {
+        break;
+      }
+    }
+  }
+  return std::make_shared<algebra::call>(name, arguments, yields);
 }
 
 algebra::node_csp parser::data::parse_create()
@@ -885,6 +937,9 @@ algebra::node_csp parser::parse()
     case token_type::RETURN:
       nodes.push_back(d->parse_return());
       d->is_of_type(token_type::END_OF_FILE);
+      break;
+    case token_type::CALL:
+      nodes.push_back(d->parse_call());
       break;
     default:
       d->report_unexpected(d->tok);

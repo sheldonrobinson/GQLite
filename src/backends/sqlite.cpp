@@ -23,6 +23,8 @@ namespace gqlite::backends
     std::unordered_map<int, std::string> id_to_label = {{0, std::string()}};
     std::unordered_map<std::string, int> label_to_id = {{std::string(), 0}};
 
+    std::unordered_map<std::string, std::function<value(const value_vector&)>> procedures;
+
     void throwLastError(const std::string& _query);
     void graph_create(const std::string& _name);
     bool graph_has(const std::string& _name);
@@ -1414,6 +1416,19 @@ namespace gqlite::backends::sqlite_oc_executor
       }
     }
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // Call
+    value visit(algebra::call_csp rs) override
+    {
+      if(rs->get_arguments().size() != 0) throw exception("Arguments to call are not supported");
+      if(rs->get_yield().size() != 0) throw exception("Yields to call are not supported");
+      auto it = exec_c.data->procedures.find(rs->get_name());
+      if(it == exec_c.data->procedures.end())
+      {
+        throw exception("No procedure called {}", rs->get_name());
+      }
+      return it->second(value_vector());
+    }
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Statements
     value visit(algebra::statements_csp _node) override
     {
@@ -1442,6 +1457,21 @@ sqlite::sqlite(void* _db) : d(new data)
   {
     d->graph_create("default");
   }
+
+  d->procedures["gqlite.internal.stats"] = [this](const value_vector&)
+  {
+    gqlite::value result = d->execute_sql(sqlite_queries::get_debug_stats("default"));
+    value_vector rows = result.to_vector();
+    errors::check_condition(rows.size() == 7, "Invalid number of debug stats got {} expected 7.", rows.size());
+    value_map stats;
+    stats["nodes_count"] = rows[0].to_vector()[0].to_integer();
+    stats["edges_count"] = rows[1].to_vector()[0].to_integer();
+    stats["labels_assignment_count"] = rows[2].to_vector()[0].to_integer();
+    stats["properties_count"] = rows[3].to_vector()[0].to_integer() + rows[4].to_vector()[0].to_integer();
+    stats["labels_count"] = rows[5].to_vector()[0].to_integer();
+    stats["labels_assignment_nodes_count"] = rows[6].to_vector()[0].to_integer();
+    return stats;
+  };
 }
 
 sqlite::~sqlite()
@@ -1475,19 +1505,4 @@ gqlite::value sqlite::execute_oc_query(oc::algebra::node_csp _node, const value_
     d->execute_sql("ROLLBACK");
     throw _ex;
   }
-}
-
-gqlite::value sqlite::get_debug_stats() const
-{
-  gqlite::value result = d->execute_sql(sqlite_queries::get_debug_stats("default"));
-  value_vector rows = result.to_vector();
-  errors::check_condition(rows.size() == 7, "Invalid number of debug stats got {} expected 7.", rows.size());
-  value_map stats;
-  stats["nodes_count"] = rows[0].to_vector()[0].to_integer();
-  stats["edges_count"] = rows[1].to_vector()[0].to_integer();
-  stats["labels_assignment_count"] = rows[2].to_vector()[0].to_integer();
-  stats["properties_count"] = rows[3].to_vector()[0].to_integer() + rows[4].to_vector()[0].to_integer();
-  stats["labels_count"] = rows[5].to_vector()[0].to_integer();
-  stats["labels_assignment_nodes_count"] = rows[6].to_vector()[0].to_integer();
-  return stats;
 }

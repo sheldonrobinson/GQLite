@@ -56,8 +56,3 @@ value connection::execute_oc_query(const std::string& _string, const value_map& 
   oc::algebra::node_csp node = parser.parse();
   return d->backend_->execute_oc_query(node, _bindings);
 }
-
-gqlite::value connection::get_debug_stats() const
-{
-  return d->backend_->get_debug_stats();
-}

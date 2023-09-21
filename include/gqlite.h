@@ -135,11 +135,6 @@ namespace gqlite
      * Create a sqlite connection from a file.
      */
     static connection create_from_sqlite_file(const std::string& _filename, const value& _options = value());
-    /**
-     * @internal
-     * Part of the private API, what is returned by this function may change at any time.
-     */
-    gqlite::value get_debug_stats() const;
   public:
     /**
      * Execute a query.
