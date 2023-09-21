@@ -54,7 +54,6 @@ gqlite::value sqlite_data::execute_sql(const std::string& _query, const std::map
     std::cout << " [" << k << "] = " << v.to_json() << std::endl;
   }
 #endif
-  sqlite3_stmt* ps;
   const char* ptr = _query.data();
   const char* ptr_end = _query.data() + _query.size();
   value_vector q_rs;
@@ -698,6 +697,7 @@ namespace gqlite::backends::sqlite_oc_executor
         }
         gqlite::value operator()(const gqlite::value& _v, bool _allow_array = true)
         {
+          GQLITE_UNUSED(_allow_array);
           switch(_v.get_type())
           {
             case gqlite::value_type::map:
@@ -1105,7 +1105,7 @@ namespace gqlite::backends::sqlite_oc_executor
         {
           self->exec_c.data->execute_sql(sqlite_queries::edge_delete(self->exec_c.graph_name), {{1, _edge->id}});
         }
-        void operator()(const value& _value)
+        void operator()(const value&)
         {
           throw exception("Cannot delete a value.");
         }
@@ -1115,7 +1115,7 @@ namespace gqlite::backends::sqlite_oc_executor
         }
       };
 
-      for(int i = 0; i < table.get_rows_count(); ++i)
+      for(std::size_t i = 0; i < table.get_rows_count(); ++i)
       {
         value_vector row;
         eval_c.prepare_current_row(table, i, false);
@@ -1151,7 +1151,7 @@ namespace gqlite::backends::sqlite_oc_executor
           }
           self->exec_c.data->execute_sql(_query, {{1, _node_id}, {2, path_string}, {3, self->exec_c.get_value(new_value)}});
         }
-        void operator()(const value& _value)
+        void operator()(const value&)
         {
           throw exception("Only node/edge can be set.");
         }
@@ -1230,7 +1230,7 @@ namespace gqlite::backends::sqlite_oc_executor
       set_v.self = this;
       set_v.eval_c = &eval_c;
       set_v.eval_v = &eval_v;
-      for(int i = 0; i < table.get_rows_count(); ++i)
+      for(std::size_t i = 0; i < table.get_rows_count(); ++i)
       {
         value_vector row;
         eval_c.prepare_current_row(table, i, false);
@@ -1264,7 +1264,7 @@ namespace gqlite::backends::sqlite_oc_executor
           }
           self->exec_c.data->execute_sql(_query, {{1, _node_id}, {2, path_string}});
         }
-        void operator()(const value& _value)
+        void operator()(const value&)
         {
           throw exception("Only node/edge can be set.");
         }
@@ -1316,7 +1316,7 @@ namespace gqlite::backends::sqlite_oc_executor
       set_v.self = this;
       set_v.eval_c = &eval_c;
       set_v.eval_v = &eval_v;
-      for(int i = 0; i < table.get_rows_count(); ++i)
+      for(std::size_t i = 0; i < table.get_rows_count(); ++i)
       {
         value_vector row;
         eval_c.prepare_current_row(table, i, false);
@@ -1352,7 +1352,7 @@ namespace gqlite::backends::sqlite_oc_executor
         out_table.add_column(rv->get_name());
       }
       std::size_t max_iter = first_statement ? 1 : table.get_rows_count();
-      for(int i = 0; i < max_iter; ++i)
+      for(std::size_t i = 0; i < max_iter; ++i)
       {
         std::vector<exec_value> row;
         eval_c.prepare_current_row(table, i, first_statement);
@@ -1376,7 +1376,7 @@ namespace gqlite::backends::sqlite_oc_executor
         for(const std::string&  c : table.get_columns_names()) { labels.push_back(c); }
         value_vector results_rows;
         results_rows.push_back(labels);
-        for(int i = 0; i < table.get_rows_count(); ++i)
+        for(std::size_t i = 0; i < table.get_rows_count(); ++i)
         {
           value_vector row;
           for(const exec_value& ev : table.get_row(i))
@@ -1401,7 +1401,7 @@ namespace gqlite::backends::sqlite_oc_executor
         }
         value_vector results_rows;
         results_rows.push_back(labels);
-        for(int i = 0; i < table.get_rows_count(); ++i)
+        for(std::size_t i = 0; i < table.get_rows_count(); ++i)
         {
           value_vector row;
           eval_c.prepare_current_row(table, i, false);
@@ -1490,7 +1490,7 @@ sqlite* sqlite::from_file(const std::string& _filename)
   return new sqlite(handle);
 }
 
-gqlite::value sqlite::execute_oc_query(oc::algebra::node_csp _node, const value_map& _bindings)
+gqlite::value sqlite::execute_oc_query(oc::algebra::node_csp _node)
 {
   d->execute_sql("BEGIN");
   try

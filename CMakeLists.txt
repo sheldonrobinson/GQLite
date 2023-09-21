@@ -69,6 +69,13 @@ include(FeatureSummary)
 
 set(CMAKE_CXX_STANDARD 20)
 
+##########################
+# Enable all warnings
+
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror -Wall -Wextra")
+endif()
+
 ########################
 ## Find SQLite
 
@@ -79,15 +86,6 @@ set_package_properties(SQLite PROPERTIES
     URL "http://www.sqlite.org"
     TYPE OPTIONAL
     PURPOSE "Required for sqlite module.")
-
-########################
-## Find clog
-
-find_package(clog)
-set_package_properties(sqlite PROPERTIES
-    DESCRIPTION "clog library."
-    TYPE OPTIONAL
-    PURPOSE "Used for debug messages")
 
 ########################
 ## Find readline
@@ -172,10 +170,6 @@ include_directories(include ${CMAKE_CURRENT_BINARY_DIR}/src)
 
 if(SQLITE_FOUND)
 set(GQLITE_HAVE_SQLITE 1)
-endif()
-
-if(GQLITE_FOUND)
-set(GQLITE_HAVE_CLOG 1)
 endif()
 
 configure_file(src/config.h.in src/config.h)

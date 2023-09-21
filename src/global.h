@@ -1,6 +1,6 @@
 #pragma once
 
-#define GQLITE_UNUSED (void*)
+#define GQLITE_UNUSED (void)
 
 //BEGIN gqlite Foreach
 

@@ -7,7 +7,7 @@
 
 using namespace gqlite;
 
-const char* std::to_string(value_type _type)
+const char* gqlite::to_string(value_type _type)
 {
   switch(_type)
   {
@@ -23,10 +23,16 @@ const char* std::to_string(value_type _type)
   return "unknown value type";
 }
 
+std::string gqlite::to_string(const value& _value)
+{
+  return _value.to_json();
+}
+
 struct value::data
 {
+  struct invalid { bool operator==(const invalid&) const { return true; } };
   value_type type;
-  std::variant<bool, int, double, std::string, value_map, value_vector> value_container;
+  std::variant<invalid, bool, int, double, std::string, value_map, value_vector> value_container;
 
   void to_json(std::stringstream& _stream);
 };
@@ -227,6 +233,9 @@ void value::data::to_json(std::stringstream& _stream)
   bool first = true;
   switch(type)
   {
+  case value_type::boolean:
+    _stream << (std::get<bool>(value_container) ? "true" : "false");
+    break;
   case value_type::integer:
     _stream << std::get<int>(value_container);
     break;
@@ -270,7 +279,7 @@ void value::data::to_json(std::stringstream& _stream)
   }
 }
 
-value::value() : d(new data{value_type::invalid})
+value::value() : d(new data{value_type::invalid, data::invalid{}})
 {}
 
 value::value(const value& _rhs) : d(_rhs.d)
@@ -379,6 +388,6 @@ std::string value::to_json() const
 
 value value::from_json(const std::string& _json)
 {
-  json_reader reader{std::stringstream(_json)};
+  json_reader reader{std::stringstream(_json), 0};
   return reader.start();
 }

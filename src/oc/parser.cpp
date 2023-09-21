@@ -50,7 +50,7 @@ struct parser::data
   std::unordered_map<std::string, algebra::node_csp> bounded_variables;
 };
 
-namespace gqlite::details
+namespace gqlite
 {
   template<>
   inline std::string to_string<token_type>(const token_type& _v)
@@ -648,7 +648,7 @@ algebra::node_csp parser::data::parse_terminal_expression()
     try
     {
       return std::make_shared<algebra::value>(std::stoi(t.string));
-    } catch(std::out_of_range)
+    } catch(const std::out_of_range&)
     {
       throw gqlite::exception("Integer {} is too large.", t.string);
     }

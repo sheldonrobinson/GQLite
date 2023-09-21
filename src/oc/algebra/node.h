@@ -80,4 +80,20 @@ namespace gqlite::oc::algebra
   };
 }
 
+namespace gqlite
+{
+  inline const char* to_string(oc::algebra::edge_directivity _v)
+  {
+    switch(_v)
+    {
+      using enum oc::algebra::edge_directivity;
+      case directed:
+        return "directed";
+      case undirected:
+        return "undirected";
+    }
+    return "unknown";
+  }
+}
+
 #endif

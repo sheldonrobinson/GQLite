@@ -16,11 +16,7 @@ namespace
   template<typename _T_, typename... _TOther_>
   static void print_h(const std::string& _indentation, const std::string& _message, _T_ const& _v, _TOther_... _other)
   {
-#ifdef GQLITE_HAVE_CLOG
-    print_h(_indentation, fmt::format(_message, _v, _other...));
-#else
-    print_h(_indentation, "Missing clog.");
-#endif
+    print_h(_indentation, gqlite::format_string(_message, _v, _other...));
   }
 }
 
@@ -93,6 +89,23 @@ namespace gqlite::oc::algebra::visitors::details
       for(const _T_& t : _t)
       {
         print_helper<_T_>::call(_visitor, _indentation, "null", t);
+      }
+      print_h(_indentation, "]");
+    }
+  };
+  template<typename _K_, typename _V_>
+  struct print_helper<std::unordered_map<_K_, _V_>, void>
+  {
+    static void call(print* _visitor, std::string& _indentation, const char* _name, const std::unordered_map<_K_, _V_>& _t)
+    {
+      print_h(_indentation, "{} ({}): [", _name, _t.size());
+      for(auto const& [k,v] : _t)
+      {
+        print_helper<_K_>::call(_visitor, _indentation, "null", k);
+        std::string indentation = _indentation;
+        _indentation += "  ";
+        print_helper<_V_>::call(_visitor, _indentation, "null", v);
+        _indentation = indentation;
       }
       print_h(_indentation, "]");
     }

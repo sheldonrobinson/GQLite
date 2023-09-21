@@ -4,31 +4,14 @@
 
 #include "config.h"
 
-#ifdef GQLITE_HAVE_CLOG
-
-#include <clog>
-
-#define gqlite_error(...) clog_error(__VA_ARGS__)
-#define gqlite_warning(...) clog_warning(__VA_ARGS__)
-#define gqlite_debug(...) clog_debug(__VA_ARGS__)
-#define gqlite_info(...) clog_info(__VA_ARGS__)
-#define gqlite_fatal(...) clog_fatal(__VA_ARGS__)
-
-#define gqlite_debug_vn(...) clog_debug_vn(__VA_ARGS__)
-
-#define gqlite_assert(...) clog_assert(__VA_ARGS__)
-#define gqlite_assert_msg(...) clog_assert_msg(__VA_ARGS__)
-
-
-#else
-
 #include <iostream>
+#include "format.h"
 
-#define gqlite_error(msg, ...) std::cerr << "ERROR: " __FILE__ ":" << __LINE__ << ": " << msg << std::endl;
-#define gqlite_warning(msg, ...) std::cerr << "WARNING: " __FILE__ ":" << __LINE__ << ": " << msg << std::endl;
-#define gqlite_debug(msg, ...) std::cerr << "DEBUG: " __FILE__ ":" << __LINE__ << ": " << msg << std::endl;
-#define gqlite_info(msg, ...) std::cerr << "INFO: " __FILE__ ":" << __LINE__ << ": " << msg << std::endl;
-#define gqlite_fatal(msg, ...) std::cerr << "FATAL ERROR" __FILE__ ":" << __LINE__ << ": " << msg << std::endl; std::abort()
+#define gqlite_error(msg, ...) std::cerr << "ERROR: " __FILE__ ":" << __LINE__ << ": " << gqlite::format_string(msg __VA_OPT__(,) __VA_ARGS__) << std::endl;
+#define gqlite_warning(msg, ...) std::cerr << "WARNING: " __FILE__ ":" << __LINE__ << ": " << gqlite::format_string(msg __VA_OPT__(,) __VA_ARGS__) << std::endl;
+#define gqlite_debug(msg, ...) std::cerr << "DEBUG: " __FILE__ ":" << __LINE__ << ": " << gqlite::format_string(msg __VA_OPT__(,) __VA_ARGS__) << std::endl;
+#define gqlite_info(msg, ...) std::cerr << "INFO: " __FILE__ ":" << __LINE__ << ": " << gqlite::format_string(msg __VA_OPT__(,) __VA_ARGS__) << std::endl;
+#define gqlite_fatal(msg, ...) std::cerr << "FATAL ERROR" __FILE__ ":" << __LINE__ << ": " << gqlite::format_string(msg __VA_OPT__(,) __VA_ARGS__) << std::endl; std::abort()
 
 #define gqlite_debug_vn(...) clog_debug_vn(__VA_ARGS__)
 
@@ -67,7 +50,5 @@
     }                                                                                                     \
   }
 
-
-#endif
 
 #endif

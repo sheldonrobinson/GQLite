@@ -228,8 +228,6 @@ bool lexer::ignore_comment(token& _token, int _lastChar )
 {
   if( _lastChar == '/' )
   {
-    int initial_line = line();
-    int initial_col = column();
     int nextChar = get_next_char();
     if( nextChar == '/' )
     { // Mono line comment

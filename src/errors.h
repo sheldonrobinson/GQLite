@@ -11,7 +11,7 @@ namespace gqlite::errors
     }
   }
   template<typename _T_>
-  inline void check_arguments_size(const char* _fname, const std::vector<_T_>& _arguments, int _size)
+  inline void check_arguments_size(const char* _fname, const std::vector<_T_>& _arguments, std::size_t _size)
   {
     check_condition(_arguments.size() == _size, "'{}' function expect {} arguments, got {}", _fname, _size, _arguments.size());
   }

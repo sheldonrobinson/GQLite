@@ -76,6 +76,10 @@ const char* gqlite::oc::token_type_to_string(token_type _type)
       return "identifier";
     case STRING:
       return "string";
+    case FLOATING_POINT:
+      return "floating point";
+    case INTEGER:
+      return "integer";
 #define TOKEN_KEYWORD(_K_)  \
     case _K_:               \
       return # _K_;

@@ -9,7 +9,7 @@ namespace gqlite::backends
     virtual ~sqlite();
     static sqlite* from_file(const std::string& _filename);
   public:
-    value execute_oc_query(oc::algebra::node_csp _node, const value_map& _variant) override;
+    value execute_oc_query(oc::algebra::node_csp _node) override;
   private:
     struct data;
     data* const d;

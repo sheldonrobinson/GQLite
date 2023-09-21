@@ -30,7 +30,7 @@ namespace gqlite::oc::algebra::details
   bool equals(const std::vector<_T_>& _a, const std::vector<_T_>& _b)
   {
     if(_a.size() != _b.size()) return false;
-    for(int i = 0; i < _a.size(); ++i)
+    for(std::size_t i = 0; i < _a.size(); ++i)
     {
       if(not equals(_a[i], _b[i])) return false;
     }

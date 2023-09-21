@@ -9,6 +9,6 @@ namespace gqlite
   public:
     virtual ~backend();
   public:
-    virtual value execute_oc_query(oc::algebra::node_csp _node, const value_map& _bindings) = 0;
+    virtual value execute_oc_query(oc::algebra::node_csp _node) = 0;
   };
 }

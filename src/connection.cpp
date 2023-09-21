@@ -54,5 +54,5 @@ value connection::execute_oc_query(const std::string& _string, const value_map& 
   oc::lexer l(&ss);
   oc::parser parser(&l, _bindings);
   oc::algebra::node_csp node = parser.parse();
-  return d->backend_->execute_oc_query(node, _bindings);
+  return d->backend_->execute_oc_query(node);
 }
