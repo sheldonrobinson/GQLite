@@ -586,6 +586,14 @@ namespace gqlite::backends::sqlite_oc_executor
           throw gqlite::exception("type expect an edge for variable {}", arg0_var->get_identifier());
         }
         return gqlite::format_string("(SELECT label FROM gqlite_labels WHERE id = {})", info.sql_label_var);
+      } else if(_node->get_name() == "id")
+      {
+        errors::check_arguments_size("id", _node->get_arguments(), 1);
+        algebra::node_csp arg0 = _node->get_arguments().front();
+        errors::check_argument_type("id", arg0->get_type(), algebra::node_type::variable);
+        algebra::variable_csp arg0_var = std::static_pointer_cast<const algebra::variable>(arg0);
+        match_context::var_info& info = mc->get_variable_info(arg0_var->get_identifier());
+        return info.sql_var;
       } else {
         throw gqlite::exception("unknown function {}", _node->get_name());
       }
