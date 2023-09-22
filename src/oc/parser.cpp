@@ -32,6 +32,7 @@ struct parser::data
   algebra::node_csp parse_multiplicative_expression();
   algebra::node_csp parse_additive_expression();
   algebra::node_csp parse_relational_expression();
+  algebra::node_csp parse_conditional_or_expression();
   algebra::node_csp parse_conditional_and_expression();
   algebra::node_csp parse_member_expression();
   algebra::node_csp parse_terminal_expression();
@@ -703,6 +704,17 @@ algebra::node_csp parser::data::parse_expression_list()
   report_unexpected(tok);
 }
 
+algebra::node_csp parser::data::parse_conditional_or_expression()
+{
+  algebra::node_csp node = parse_conditional_and_expression();
+  if(tok.type == token_type::OR)
+  {
+    get_next_token();
+    return std::make_shared<algebra::logical_or>(node, parse_expression());
+  } else {
+    return node;
+  }
+}
 algebra::node_csp parser::data::parse_conditional_and_expression()
 {
   algebra::node_csp node = parse_relational_expression();
@@ -848,13 +860,15 @@ algebra::node_csp parser::data::parse_member_expression()
 
 algebra::node_csp parser::data::parse_expression()
 {
-  algebra::node_csp node = parse_conditional_and_expression();
-  if(tok.type == token_type::OR)
+  if(tok.type == token_type::STARTBRACKET)
   {
     get_next_token();
-    return std::make_shared<algebra::logical_or>(node, parse_expression());
+    algebra::node_csp no = parse_expression();
+    is_of_type(token_type::ENDBRACKET);
+    get_next_token();
+    return no;
   } else {
-    return node;
+    return parse_conditional_or_expression();
   }
 }
 
