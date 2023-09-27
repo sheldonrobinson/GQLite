@@ -379,7 +379,7 @@ namespace gqlite::backends::sqlite_oc_executor
       {
         std::fill_n(current_row.begin(), current_row.size(), empty{});
       } else {
-        exec_value_table::row_view row_init = _table.get_row(_i);
+        exec_value_table::const_row_view row_init = _table.get_row(_i);
         std::copy(row_init.begin(), row_init.end(), current_row.begin());
         std::fill_n(current_row.begin() + row_init.size(), current_row.size() - row_init.size(), empty{});
       }
@@ -1054,7 +1054,7 @@ namespace gqlite::backends::sqlite_oc_executor
         std::size_t start_new_values = 0;
         if(not first_statement)
         {
-          exec_value_table::row_view row_init = table.get_row(i);
+          exec_value_table::const_row_view row_init = table.get_row(i);
           std::copy(row_init.begin(), row_init.end(), values.begin());
           start_new_values = row_init.size();
         }
