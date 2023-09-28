@@ -182,6 +182,10 @@ IgnoredScenario = [
   # Aggregations are not supported yet
   "[5] Fail when not aliasing expressions in WITH",
   "[7] Remove a missing node property",
+  "[3] Sort on aggregated function",
+  "[6] Count star should count everything in scope",
+  "[7] Ordering with aggregation",
+  "[11] Aggregates ordered by arithmetics",
   # ORDER BY not supported yet
   "[1] Forwarding multiple node and relationship variables",
   "[6] Reusing variable names in WITH",
@@ -194,6 +198,12 @@ IgnoredScenario = [
   "[6] Concatenate elements onto a list property",
   "[7] Concatenate elements in reverse onto a list property",
   "[10] Failing when setting a list of maps as a property",
+  # Distinct is not supported
+  "[4] Support sort and distinct",
+  "[5] Support ordering by a property after being distinct-ified",
+  "[9] Using aliased DISTINCT expression in ORDER BY",
+  "[10] Returned columns do not change from using ORDER BY",
+  "[13] Fail when sorting on variable removed by DISTINCT"
 ]
 
 Before do |scenario|

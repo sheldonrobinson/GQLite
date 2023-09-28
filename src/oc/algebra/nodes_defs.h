@@ -20,13 +20,15 @@ OC_ALGEBRA_GENERATE(statements, OC_ALGEBRA_NODES_LIST_MEMBERS)
 
 #define OC_ALGEBRA_RETURN_MEMBERS(_KLASS_NAME_, F)                \
   F(_KLASS_NAME_, bool, all)                                      \
-  F(_KLASS_NAME_, std::vector<named_expression_csp>, expressions)
+  F(_KLASS_NAME_, std::vector<named_expression_csp>, expressions) \
+  F(_KLASS_NAME_, modifiers_csp, modifiers)
 
 OC_ALGEBRA_GENERATE(return_statement, OC_ALGEBRA_RETURN_MEMBERS)
 
 #define OC_ALGEBRA_WITH_MEMBERS(_KLASS_NAME_, F)                  \
   F(_KLASS_NAME_, bool, all)                                      \
-  F(_KLASS_NAME_, std::vector<named_expression_csp>, expressions)
+  F(_KLASS_NAME_, std::vector<named_expression_csp>, expressions) \
+  F(_KLASS_NAME_, modifiers_csp, modifiers)
 
 OC_ALGEBRA_GENERATE(with, OC_ALGEBRA_WITH_MEMBERS)
 
@@ -45,6 +47,19 @@ OC_ALGEBRA_GENERATE(remove, OC_ALGEBRA_NODES_LIST_MEMBERS)
   F(_KLASS_NAME_, std::vector<std::string>, yield)
 
 OC_ALGEBRA_GENERATE(call, OC_ALGEBRA_CALL_MEMBERS)
+
+#define OC_ALGEBRA_ORDER_BY_MEMBERS(_KLASS_NAME_, F)  \
+  F(_KLASS_NAME_, bool, asc)                          \
+  F(_KLASS_NAME_, std::vector<node_csp>, expressions)
+
+OC_ALGEBRA_GENERATE(order_by, OC_ALGEBRA_ORDER_BY_MEMBERS)
+
+#define OC_ALGEBRA_MODIFIERS_MEMBERS(_KLASS_NAME_, F) \
+  F(_KLASS_NAME_, node_csp, skip)                     \
+  F(_KLASS_NAME_, node_csp, limit)                    \
+  F(_KLASS_NAME_, order_by_csp, order_by)
+
+OC_ALGEBRA_GENERATE(modifiers, OC_ALGEBRA_MODIFIERS_MEMBERS)
 
 // Set/remove Expressions
 

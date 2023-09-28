@@ -74,6 +74,7 @@ namespace gqlite
     template<typename _T_>
     value(const std::vector<_T_>& _v);
     bool operator==(const value& _rhs) const;
+    bool operator<(const value& _rhs) const;
   public:
     /**
      * @return the type hold by this value

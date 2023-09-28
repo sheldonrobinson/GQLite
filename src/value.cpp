@@ -4,6 +4,7 @@
 #include <variant>
 
 #include "gqlite_p.h"
+#include "errors.h"
 
 using namespace gqlite;
 
@@ -27,10 +28,12 @@ std::string gqlite::to_string(const value& _value)
 {
   return _value.to_json();
 }
-
 struct value::data
 {
-  struct invalid { bool operator==(const invalid&) const { return true; } };
+  struct invalid
+  {
+    bool operator==(const invalid&) const { return true; }
+  };
   value_type type;
   std::variant<invalid, bool, int, double, std::string, value_map, value_vector> value_container;
 
@@ -95,10 +98,7 @@ namespace {
             string += char(last_char);
           }
         }
-        if(not stream.good())
-        {
-          throw gqlite::exception("Unifinished string: {}", string);
-        }
+        errors::check_condition(stream.good(), "Unifinished string: {}", string);
         fetch_next_char();
       }
       fetch_next_char(); // eat the '"'
@@ -107,10 +107,7 @@ namespace {
     /// @brief throw an exception if last_char different from @param _c 
     void is_char(int _c)
     {
-      if(last_char != _c)
-      {
-        throw gqlite::exception("Expected '{}' but got '{}'", char(_c), char(last_char));
-      }
+      errors::check_condition(last_char == _c, "Expected '{}' but got '{}'", char(_c), char(last_char));
     }
     /// @brief read the next value
     /// @return and return it
@@ -320,6 +317,26 @@ bool value::operator==(const value& _rhs) const
   return d->type == _rhs.d->type and d->value_container == _rhs.d->value_container;
 }
 
+bool value::operator<(const value& _rhs) const
+{
+  errors::check_condition(d->type == _rhs.d->type, "Value of different types are not comparable with '<'");
+  switch(d->type)
+  {
+  case value_type::boolean:
+    return to_bool() < _rhs.to_bool();
+  case value_type::integer:
+    return to_integer() < _rhs.to_integer();
+  case value_type::number:
+    return to_double() < _rhs.to_double();
+  case value_type::string:
+    return to_string() < _rhs.to_string();
+  case value_type::vector:
+    return to_vector() < _rhs.to_vector();
+  default:
+    throw exception("Cannot compare {} and {} with inferior operator", *this, _rhs);
+  }
+}
+
 bool value::to_bool() const
 {
   switch(d->type)
@@ -363,19 +380,19 @@ double value::to_double() const
 
 std::string value::to_string() const
 {
-  if(d->type != value_type::string) throw exception(format_string("Value is not a string, it is {}", d->type));
+  errors::check_condition(d->type == value_type::string, "Value is not a string, it is {}", d->type);
   return std::get<std::string>(d->value_container);
 }
 
 value_map value::to_map() const
 {
-  if(d->type != value_type::map) throw exception(format_string("Value is not a map, it is {}", d->type));
+  errors::check_condition(d->type == value_type::map, "Value is not a map, it is {}", d->type);
   return std::get<value_map>(d->value_container);
 }
 
 value_vector value::to_vector() const
 {
-  if(d->type != value_type::vector) throw exception(format_string("Value is not a vector, it is {}", d->type));
+  errors::check_condition(d->type == value_type::vector, "Value is not a vector, it is {}", d->type);
   return std::get<value_vector>(d->value_container);
 }
 

@@ -25,6 +25,7 @@ struct parser::data
   algebra::node_csp parse_delete();
   algebra::node_csp parse_set();
   algebra::node_csp parse_remove();
+  algebra::modifiers_csp parse_modifiers();
   std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>> parse_patterns(bool _allow_undirected_edge, bool _allow_multiple_edge_labels, bool _require_one_label);
   std::unordered_map<std::string, algebra::node_csp> parse_properties();
   algebra::node_csp parse_expression();
@@ -204,9 +205,10 @@ algebra::node_csp parser::data::parse_with()
   if(tok.type == token_type::STAR)
   {
     get_next_token();
-    return std::make_shared<algebra::with>(true, std::vector<algebra::named_expression_csp>());
+    return std::make_shared<algebra::with>(true, std::vector<algebra::named_expression_csp>(), parse_modifiers());
   }
-  return std::make_shared<algebra::with>(false, parse_named_expressions());
+  std::vector<algebra::named_expression_csp> named_expressions = parse_named_expressions();
+  return std::make_shared<algebra::with>(false, named_expressions, parse_modifiers());
 }
 
 algebra::node_csp parser::data::parse_delete()
@@ -359,9 +361,10 @@ algebra::node_csp parser::data::parse_return()
   if(tok.type == token_type::STAR)
   {
     get_next_token();
-    return std::make_shared<algebra::return_statement>(true, std::vector<algebra::named_expression_csp>());
+    return std::make_shared<algebra::return_statement>(true, std::vector<algebra::named_expression_csp>(), parse_modifiers());
   }
-  return std::make_shared<algebra::return_statement>(false, parse_named_expressions());
+  std::vector<algebra::named_expression_csp> named_expressions = parse_named_expressions();
+  return std::make_shared<algebra::return_statement>(false, named_expressions, parse_modifiers());
 }
 
 namespace
@@ -375,6 +378,67 @@ namespace
     std::vector<std::string> labels;
     algebra::map_csp properties;
   };
+}
+
+algebra::modifiers_csp parser::data::parse_modifiers()
+{
+  algebra::node_csp skip, limit;
+  algebra::order_by_csp order_by;
+
+  while(tok.type == token_type::SKIP or tok.type == token_type::LIMIT or tok.type == token_type::ORDER)
+  {
+    switch(tok.type)
+    {
+      case token_type::SKIP:
+        if(skip) report_unexpected(tok);
+        get_next_token();
+        skip = parse_expression();
+        break;
+      case token_type::LIMIT:
+        if(limit) report_unexpected(tok);
+        get_next_token();
+        limit = parse_expression();
+        break;
+      case token_type::ORDER:
+      {
+        if(order_by) report_unexpected(tok);
+        get_next_token();
+        is_of_type(token_type::BY);
+        get_next_token();
+        bool asc = true;
+        std::vector<algebra::node_csp> expressions;
+        while(true)
+        {
+          expressions.push_back(parse_expression());
+          if(tok.type == token_type::COMMA)
+          {
+            get_next_token();
+          } else {
+            break;
+          }
+        }
+        if(tok.type == token_type::ASC)
+        {
+          get_next_token();
+        } else if(tok.type == token_type::DESC)
+        {
+          asc = false;
+          get_next_token();
+        }
+        order_by = std::make_shared<algebra::order_by>(asc, expressions);
+        break;
+      }
+      default:
+        report_unexpected(tok);
+    }
+  }
+
+  if(skip or limit or order_by)
+  {
+    return std::make_shared<algebra::modifiers>(skip, limit, order_by);
+  } else {
+    return nullptr;
+  }
 }
 
 std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>> parser::data::parse_patterns(bool _allow_undirected_edge, bool _allow_multiple_edge_labels, bool _require_one_label)

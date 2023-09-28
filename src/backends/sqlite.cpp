@@ -750,6 +750,23 @@ namespace gqlite::backends::sqlite_oc_executor
         throw exception("Cannot add {} with {}.", left_val.to_json(), right_val.to_json());
       }
     }
+    exec_value visit(algebra::negation_csp _node) override
+    {
+      exec_value left_ev = start(_node->get_value());
+      errors::check_condition(std::holds_alternative<value>(left_ev), "Unary operations must be done on null values.");
+      value left_val = std::get<value>(left_ev);
+      if(is_numeric(left_val.get_type()))
+      {
+        if(left_val.get_type() == value_type::integer)
+        {
+          return -left_val.to_integer();
+        } else {
+          return -left_val.to_double();
+        }
+      } else {
+        throw exception("Cannot negate {}.", left_val.to_json());
+      }
+    }
     exec_value visit(algebra::is_not_null_csp _node) override
     {
       exec_value left_ev = start(_node->get_value());
@@ -1336,6 +1353,101 @@ namespace gqlite::backends::sqlite_oc_executor
       return value();
     }
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // filter table
+    void filter_table(exec_value_table* _table, algebra::modifiers_csp _modifiers)
+    {
+      if(_modifiers)
+      {
+        if(_modifiers->get_order_by())
+        {
+          std::vector<std::size_t> columns;
+          std::vector<std::string> expr_columns;
+          for(algebra::node_csp node : _modifiers->get_order_by()->get_expressions())
+          {
+            if(node->get_type() == algebra::node_type::variable)
+            {
+              columns.push_back(_table->get_column_index(std::static_pointer_cast<const algebra::variable>(node)->get_identifier()));
+            } else {
+              columns.push_back(_table->get_columns_count() + expr_columns.size());
+              expr_columns.push_back(format_string("__gqlite_{}", expr_columns.size()));
+            }
+          }
+          if(not expr_columns.empty())
+          {
+            std::size_t first_index = _table->get_columns_count();
+            _table->add_columns(expr_columns);
+            evaluation_context eval_c;
+            eval_c.table = *_table;
+            evaluator_visitor eval_v;
+            eval_v.exec_c = &exec_c;
+            eval_v.eval_c = &eval_c;
+            for(std::size_t i = 0; i < _table->get_rows_count(); ++i)
+            {
+              eval_c.prepare_current_row(*_table, i, false);
+              exec_value_table::row_view rv = _table->get_row(i); 
+              std::size_t idx = first_index;
+              for(algebra::node_csp node : _modifiers->get_order_by()->get_expressions())
+              {
+                if(node->get_type() != algebra::node_type::variable)
+                {
+                  rv[idx++] = eval_v.start(node);
+                }
+              }
+            }
+          }
+          struct diff_op
+          {
+            bool operator()(const exec_value& _v1, const exec_value& _v2) const
+            {
+              if(std::holds_alternative<value>(_v1) and std::holds_alternative<value>(_v2))
+              {
+                return std::get<value>(_v1) != std::get<value>(_v2);
+              }
+              throw exception("Only values can be used in order by expression.");
+            }
+          };
+          struct less_op
+          {
+            bool operator()(const exec_value& _v1, const exec_value& _v2) const
+            {
+              if(std::holds_alternative<value>(_v1) and std::holds_alternative<value>(_v2))
+              {
+                return std::get<value>(_v1) < std::get<value>(_v2);
+              }
+              throw exception("Only values can be used in order by expression.");
+            }
+          };
+          struct greater_op
+          {
+            bool operator()(const exec_value& _v1, const exec_value& _v2) const
+            {
+              if(std::holds_alternative<value>(_v1) and std::holds_alternative<value>(_v2))
+              {
+                return std::get<value>(_v2) < std::get<value>(_v1);
+              }
+              throw exception("Only values can be used in order by expression.");
+            }
+          };
+          if(_modifiers->get_order_by()->get_asc())
+          {
+            _table->sort(columns, diff_op(), less_op());
+          } else {
+            _table->sort(columns, diff_op(), greater_op());
+          }
+        }
+        if(_modifiers->get_skip())
+        {
+          evaluator_visitor ev;
+          _table->offset(exec_c.get_value(ev.start(_modifiers->get_skip())).to_integer());
+        }
+        if(_modifiers->get_limit())
+        {
+          evaluator_visitor ev;
+          _table->offset(exec_c.get_value(ev.start(_modifiers->get_limit())).to_integer());
+        }
+      }
+    }
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // with
     value visit(algebra::with_csp w) override
     {
@@ -1371,6 +1483,7 @@ namespace gqlite::backends::sqlite_oc_executor
         out_table.add_row(row);
       }
       table = out_table;
+      filter_table(&table, w->get_modifiers());
       return value();
     }
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1396,6 +1509,8 @@ namespace gqlite::backends::sqlite_oc_executor
         return results_rows;
 
       } else {
+        filter_table(&table, rs->get_modifiers());
+
         evaluation_context eval_c;
         eval_c.table = table;
         evaluator_visitor eval_v;

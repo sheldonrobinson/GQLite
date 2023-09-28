@@ -139,6 +139,8 @@ namespace gqlite
      * Sort the table according to @p _rows. Using quick sort algorithm.
      */
     void sort(const std::vector<std::size_t>& _rows);
+    template<typename _CompareDifferent_, typename _CompareOrder_>
+    void sort(const std::vector<std::size_t>& _rows, _CompareDifferent_ _cdiff, _CompareOrder_ _corder);
     /**
      * Sort in descending order the table according to @p _rows. Using quick sort algorithm.
      */
@@ -265,41 +267,36 @@ namespace gqlite
     }
   }
   template<typename _T_>
-  inline void table<_T_>::sort(const std::vector<std::size_t>& _rows)
+  template<typename _CompareDifferent_, typename _CompareOrder_>
+  void table<_T_>::sort(const std::vector<std::size_t>& _rows, _CompareDifferent_ _cdiff, _CompareOrder_ _corder)
   {
     // cannot use std::sort, as it requires iterator to support movable, which table can't since they return a span
-    quick_sort([_rows](const const_row_view& it1, const const_row_view& it2)
+    quick_sort([_rows, _cdiff, _corder](const const_row_view& it1, const const_row_view& it2)
     {
       for(std::size_t r : _rows)
       {
         errors::check_condition(r < it1.size(), "Invalid row index {}", r);
         const _T_& v1 = it1[r];
         const _T_& v2 = it2[r];
-        if(v1 != v2)
+        if(_cdiff(v1, v2))
         {
-          return v1 < v2;
+          return _corder(v1, v2);
         }
       }
       return false;
     }, 0, get_rows_count() - 1);
   }
   template<typename _T_>
+  inline void table<_T_>::sort(const std::vector<std::size_t>& _rows)
+  {
+    // cannot use std::sort, as it requires iterator to support movable, which table can't since they return a span
+    return sort(_rows, std::not_equal_to(), std::less());
+  }
+  template<typename _T_>
   inline void table<_T_>::reverse_sort(const std::vector<std::size_t>& _rows)
   {
     // cannot use std::sort, as it requires iterator to support movable, which table can't since they return a span
-    quick_sort([_rows](const const_row_view& it1, const const_row_view& it2)
-    {
-      for(std::size_t r : _rows)
-      {
-        const _T_& v1 = it1[r];
-        const _T_& v2 = it2[r];
-        if(v1 != v2)
-        {
-          return v1 > v2;
-        }
-      }
-      return false;
-    }, 0, get_rows_count() - 1);
+    return sort(_rows, std::not_equal_to(), std::greater());
   }
   template<typename _T_>
   inline void table<_T_>::add_column(const std::string& _column, const _T_& _val)
