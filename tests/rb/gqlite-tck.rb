@@ -34,10 +34,14 @@ features = [
   # RETURN ORDER BY
   'return-orderby/ReturnOrderBy2.feature', 'return-orderby/ReturnOrderBy3.feature', 'return-orderby/ReturnOrderBy4.feature',
   # RETURN SKIP LIMIT
-  'return-skip-limit/ReturnSkipLimit1.feature', 'return-skip-limit/ReturnSkipLimit2.feature', 'return-skip-limit/ReturnSkipLimit3.feature'
+  'return-skip-limit/ReturnSkipLimit1.feature', 'return-skip-limit/ReturnSkipLimit2.feature', 'return-skip-limit/ReturnSkipLimit3.feature',
+  # RETURN ORDER BY
+  'with-orderBy/WithOrderBy2.feature',
+  # RETURN SKIP LIMIT
+  'with-skip-limit/WithSkipLimit1.feature', 'with-skip-limit/WithSkipLimit2.feature', 'with-skip-limit/WithSkipLimit3.feature'
 ]
 # In progress
-# features = ['create/Create5.feature', 'match/Match6.feature', 'match-where/MatchWhere5.feature', 'set/Set3.feature', 'set/Set5.feature', 'remove/Remove3.feature' ]
+# features = ['with-orderBy/WithOrderBy3.feature', 'with-orderBy/WithOrderBy4.feature', 'create/Create5.feature', 'match/Match6.feature', 'match-where/MatchWhere5.feature', 'set/Set3.feature', 'set/Set5.feature', 'remove/Remove3.feature' ]
 # Current dev
 # features = []
 

@@ -135,6 +135,7 @@ IgnoredScenario = [
   "[24] Fail when creating a relationship using undefined variable in pattern",
   # Path assignment is not implemented yet
   "[4] Forwarding a path variable",
+  "[14] Fail when filtering path with property predicate",
   # Path assignment and variable length path are not implemented
   "[8] Fail when a path has the same variable in a preceding MATCH",
   "[9] Fail when a relationship has the same variable in the same pattern",
@@ -187,6 +188,10 @@ IgnoredScenario = [
   "[7] Ordering with aggregation",
   "[11] Aggregates ordered by arithmetics",
   "[1] Sort on aggregate function and normal property",
+  "[22] Sort by an expression that is only partially orderable on a non-distinct binding table, but used as a grouping key",
+  "[23] Sort by an expression that is only partially orderable on a non-distinct binding table, but used in parts as a grouping key",
+  "[2] Ordering and skipping on aggregate",
+  "[4] Ordering and limiting on aggregate",
   # ORDER BY not supported yet
   "[1] Forwarding multiple node and relationship variables",
   "[6] Reusing variable names in WITH",
@@ -205,6 +210,8 @@ IgnoredScenario = [
   "[9] Using aliased DISTINCT expression in ORDER BY",
   "[10] Returned columns do not change from using ORDER BY",
   "[13] Fail when sorting on variable removed by DISTINCT",
+  "[24] Sort by an expression that is only partially orderable on a non-distinct binding table, but made distinct",
+  "[1] Handle dependencies across WITH with SKIP",
   # UNWIND not supported yet
   "[1] ORDER BY of a column introduced in RETURN should return salient results in ascending order",
   "[3] SKIP with an expression that does not depend on variables",
@@ -214,7 +221,23 @@ IgnoredScenario = [
   # return modifiers (e.g. order by) must be done after computing expressions https://gitlab.com/cyloncore/GQLite/-/issues/2
   "[7] Limit to more rows than actual results 1",
   "[8] Limit to more rows than actual results 2",
-  "[15] Floating point parameter for LIMIT with ORDER BY should fail"
+  "[15] Floating point parameter for LIMIT with ORDER BY should fail",
+  # Opposite problem from before
+  "[21] Sort by an expression that is only partially orderable on a non-distinct binding table",
+  # Array aren't really supported yet
+  "[9] Sort by a list expression in ascending order",
+  "[10] Sort by a list expression in descending order",
+  # Time not supported
+  "[11] Sort by a date expression in ascending order",
+  "[12] Sort by a date expression in descending order",
+  "[13] Sort by a local time expression in ascending order",
+  "[14] Sort by a local time expression in descending order",
+  "[15] Sort by a time expression in ascending order",
+  "[16] Sort by a time expression in descending order",
+  "[17] Sort by a local date time expression in ascending order",
+  "[18] Sort by a local date time expression in descending order",
+  "[19] Sort by a date time expression in ascending order",
+  "[20] Sort by a date time expression in descending order"
 ]
 
 Before do |scenario|

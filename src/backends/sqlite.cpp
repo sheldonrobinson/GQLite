@@ -727,6 +727,61 @@ namespace gqlite::backends::sqlite_oc_executor
     {
       return _vt == value_type::integer or _vt == value_type::number;
     }
+    exec_value visit(algebra::logical_negation_csp _node) override
+    {
+      exec_value ev = start(_node->get_value());
+      errors::check_condition(std::holds_alternative<value>(ev), "Logical negation must be done on value.");
+      return not std::get<value>(ev).to_bool();
+    }
+    template<typename _TOp_, typename _TNode_>
+    exec_value visit_logical_binary(_TNode_ _node)
+    {
+      exec_value left_ev = start(_node->get_left());
+      exec_value right_ev = start(_node->get_right());
+      errors::check_condition(std::holds_alternative<value>(left_ev), "Binary operations must be done on values.");
+      errors::check_condition(std::holds_alternative<value>(right_ev), "Binary operations must be done on values.");
+      value left_val = std::get<value>(left_ev);
+      value right_val = std::get<value>(right_ev);
+      return _TOp_()(left_val.to_bool(), right_val.to_bool());
+    }
+    exec_value visit(algebra::logical_and_csp _node) override
+    {
+      return visit_logical_binary<std::logical_and<bool>>(_node);
+    }
+    exec_value visit(algebra::logical_or_csp _node) override
+    {
+      return visit_logical_binary<std::logical_or<bool>>(_node);
+    }
+    template<template<typename> class _TOp_, typename _TNode_>
+    exec_value visit_numerical_binary(_TNode_ _node)
+    {
+      exec_value left_ev = start(_node->get_left());
+      exec_value right_ev = start(_node->get_right());
+      errors::check_condition(std::holds_alternative<value>(left_ev), "Binary operations must be done on values.");
+      errors::check_condition(std::holds_alternative<value>(right_ev), "Binary operations must be done on values.");
+      value left_val = std::get<value>(left_ev);
+      value right_val = std::get<value>(right_ev);
+      if(is_numeric(left_val.get_type()) and is_numeric(right_val.get_type()))
+      {
+        if(left_val.get_type() == value_type::integer and right_val.get_type() == value_type::integer)
+        {
+          return _TOp_<int>()(left_val.to_integer(), right_val.to_integer());
+        } else {
+          return _TOp_<double>()(left_val.to_double(), right_val.to_double());
+        }
+      } else {
+        throw exception("Cannot compute binary operationb between {} and {}.", left_val.to_json(), right_val.to_json());
+      }
+    }
+    exec_value visit(algebra::multiplication_csp _node) override
+    {
+      return visit_numerical_binary<std::multiplies>(_node);
+    }
+    exec_value visit(algebra::division_csp _node) override
+    {
+      return visit_numerical_binary<std::divides>(_node);
+    }
+
     exec_value visit(algebra::addition_csp _node) override
     {
       exec_value left_ev = start(_node->get_left());

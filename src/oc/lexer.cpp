@@ -126,7 +126,8 @@ token lexer::next_token()
     #include "token_keywords.h"
 #undef TOKEN_KEYWORD
 #undef TOKEN_KEYWORD2
-
+    IDENTIFIER_IS_KEYWORD("ASCENDING", ASC)
+    IDENTIFIER_IS_KEYWORD("DESCENDING", DESC)
     return token(token_type::IDENTIFIER, identifierStr, line(), initial_col);
   } else if(lastChar == '"' or lastChar == '\'' ) {
     return get_string(lastChar);

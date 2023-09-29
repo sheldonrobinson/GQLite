@@ -657,6 +657,14 @@ algebra::node_csp parser::data::parse_terminal_expression()
   token t = tok;
   switch (tok.type)
   {
+  case token_type::STARTBRACKET:
+  {
+    get_next_token();
+    algebra::node_csp no = parse_expression();
+    is_of_type(token_type::ENDBRACKET);
+    get_next_token();
+    return no;
+  }
   case token_type::NULL_TOKEN:
     get_next_token();
     return std::make_shared<algebra::value>(gqlite::value());
@@ -774,7 +782,7 @@ algebra::node_csp parser::data::parse_conditional_or_expression()
   if(tok.type == token_type::OR)
   {
     get_next_token();
-    return std::make_shared<algebra::logical_or>(node, parse_expression());
+    return std::make_shared<algebra::logical_or>(node, parse_conditional_or_expression());
   } else {
     return node;
   }
@@ -785,7 +793,7 @@ algebra::node_csp parser::data::parse_conditional_and_expression()
   if(tok.type == token_type::AND)
   {
     get_next_token();
-    return std::make_shared<algebra::logical_and>(node, parse_expression());
+    return std::make_shared<algebra::logical_and>(node, parse_conditional_and_expression());
   } else {
     return node;
   }
@@ -813,22 +821,22 @@ algebra::node_csp parser::data::parse_relational_expression()
     }
     case token_type::EQUAL:
       get_next_token();
-      return std::make_shared<algebra::relational_equal>(node, parse_additive_expression());
+      return std::make_shared<algebra::relational_equal>(node, parse_relational_expression());
     case token_type::DIFFERENT:
       get_next_token();
-      return std::make_shared<algebra::relational_different>(node, parse_additive_expression());
+      return std::make_shared<algebra::relational_different>(node, parse_relational_expression());
     case token_type::INFERIOR:
       get_next_token();
-      return std::make_shared<algebra::relational_inferior>(node, parse_additive_expression());
+      return std::make_shared<algebra::relational_inferior>(node, parse_relational_expression());
     case token_type::SUPERIOR:
       get_next_token();
-      return std::make_shared<algebra::relational_superior>(node, parse_additive_expression());
+      return std::make_shared<algebra::relational_superior>(node, parse_relational_expression());
     case token_type::INFERIOR_EQUAL:
       get_next_token();
-      return std::make_shared<algebra::relational_inferior_equal>(node, parse_additive_expression());
+      return std::make_shared<algebra::relational_inferior_equal>(node, parse_relational_expression());
     case token_type::SUPERIOR_EQUAL:
       get_next_token();
-      return std::make_shared<algebra::relational_superior_equal>(node, parse_additive_expression());
+      return std::make_shared<algebra::relational_superior_equal>(node, parse_relational_expression());
     case token_type::IN:
       get_next_token();
       return std::make_shared<algebra::relational_in>(node, parse_expression_list());
@@ -851,10 +859,10 @@ algebra::node_csp parser::data::parse_additive_expression()
   {
     case token_type::PLUS:
       get_next_token();
-      return std::make_shared<algebra::addition>(node, parse_multiplicative_expression());
+      return std::make_shared<algebra::addition>(node, parse_additive_expression());
     case token_type::MINUS:
       get_next_token();
-      return std::make_shared<algebra::substraction>(node, parse_multiplicative_expression());
+      return std::make_shared<algebra::substraction>(node, parse_additive_expression());
     default:
       return node;
   }
@@ -867,10 +875,10 @@ algebra::node_csp parser::data::parse_multiplicative_expression()
   {
     case token_type::STAR:
       get_next_token();
-      return std::make_shared<algebra::multiplication>(node, parse_unary_expression());
+      return std::make_shared<algebra::multiplication>(node, parse_multiplicative_expression());
     case token_type::DIVIDE:
       get_next_token();
-      return std::make_shared<algebra::division>(node, parse_unary_expression());
+      return std::make_shared<algebra::division>(node, parse_multiplicative_expression());
     default:
       return node;
   }
@@ -880,6 +888,7 @@ algebra::node_csp parser::data::parse_unary_expression()
 {
   switch(tok.type)
   {
+    case token_type::NOT:
     case token_type::EXCLAMATION:
       get_next_token();
       return std::make_shared<algebra::logical_negation>(parse_member_expression());
@@ -924,16 +933,7 @@ algebra::node_csp parser::data::parse_member_expression()
 
 algebra::node_csp parser::data::parse_expression()
 {
-  if(tok.type == token_type::STARTBRACKET)
-  {
-    get_next_token();
-    algebra::node_csp no = parse_expression();
-    is_of_type(token_type::ENDBRACKET);
-    get_next_token();
-    return no;
-  } else {
-    return parse_conditional_or_expression();
-  }
+  return parse_conditional_or_expression();
 }
 
 void parser::data::get_next_token()
