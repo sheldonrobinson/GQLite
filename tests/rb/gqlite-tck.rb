@@ -31,11 +31,13 @@ features = [
   'set/Set1.feature', 'set/Set2.feature', 'set/Set3.feature', 'set/Set4.feature', 'set/Set5.feature',
   # REMOVE
   'remove/Remove1.feature', 'remove/Remove2.feature',
-  # ORDER BY
-  'return-orderby/ReturnOrderBy2.feature'
- ]
+  # RETURN ORDER BY
+  'return-orderby/ReturnOrderBy2.feature', 'return-orderby/ReturnOrderBy3.feature', 'return-orderby/ReturnOrderBy4.feature',
+  # RETURN SKIP LIMIT
+  'return-skip-limit/ReturnSkipLimit1.feature', 'return-skip-limit/ReturnSkipLimit2.feature', 'return-skip-limit/ReturnSkipLimit3.feature'
+]
 # In progress
-# features = ['return-skip-limit/ReturnSkipLimit1.feature', 'create/Create5.feature', 'match/Match6.feature', 'match-where/MatchWhere5.feature', 'set/Set3.feature', 'set/Set5.feature', 'remove/Remove3.feature' ]
+# features = ['create/Create5.feature', 'match/Match6.feature', 'match-where/MatchWhere5.feature', 'set/Set3.feature', 'set/Set5.feature', 'remove/Remove3.feature' ]
 # Current dev
 # features = []
 

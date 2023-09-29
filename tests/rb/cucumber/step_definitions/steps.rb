@@ -186,6 +186,7 @@ IgnoredScenario = [
   "[6] Count star should count everything in scope",
   "[7] Ordering with aggregation",
   "[11] Aggregates ordered by arithmetics",
+  "[1] Sort on aggregate function and normal property",
   # ORDER BY not supported yet
   "[1] Forwarding multiple node and relationship variables",
   "[6] Reusing variable names in WITH",
@@ -203,7 +204,17 @@ IgnoredScenario = [
   "[5] Support ordering by a property after being distinct-ified",
   "[9] Using aliased DISTINCT expression in ORDER BY",
   "[10] Returned columns do not change from using ORDER BY",
-  "[13] Fail when sorting on variable removed by DISTINCT"
+  "[13] Fail when sorting on variable removed by DISTINCT",
+  # UNWIND not supported yet
+  "[1] ORDER BY of a column introduced in RETURN should return salient results in ascending order",
+  "[3] SKIP with an expression that does not depend on variables",
+  "[3] Limiting amount of rows when there are fewer left than the LIMIT argument",
+  "[1] Limit to two hits",
+  "[6] LIMIT with an expression that does not depend on variables",
+  # return modifiers (e.g. order by) must be done after computing expressions https://gitlab.com/cyloncore/GQLite/-/issues/2
+  "[7] Limit to more rows than actual results 1",
+  "[8] Limit to more rows than actual results 2",
+  "[15] Floating point parameter for LIMIT with ORDER BY should fail"
 ]
 
 Before do |scenario|
@@ -232,6 +243,13 @@ Given(/^an empty graph$/) do
   pending if @ignored_scenario
   file = Tempfile.new('testdb')
   @handle = GQLite::Connection.new(sqlite_filename: file.path)
+end
+
+Given(/^parameters are:$/) do |table|
+  @bindings = {}
+  table.raw.each() do |row|
+    @bindings["$" + row[0]] = eval(row[1])
+  end
 end
 
 When(/^executing query:$/) do |string|
@@ -359,9 +377,32 @@ Then(/^a SyntaxError should be raised at compile time: InvalidDelete$/) do
   expect(@exception.message).to match(/^Invalid delete expression.$/)
 end
 
-Given(/^parameters are:$/) do |table|
-  @bindings = {}
-  table.raw.each() do |row|
-    @bindings["$" + row[0]] = eval(row[1])
-  end
+Then(/^a SyntaxError should be raised at compile time: NonConstantExpression$/) do
+  pending if @ignored_scenario
+  expect(@exception).not_to be_nil
+  expect(@exception.message).to match(/^Variable .* is not defined.$/)
+end
+
+Then(/^an ArgumentError should be raised at runtime: NegativeIntegerArgument$/) do
+  pending if @ignored_scenario
+  expect(@exception).not_to be_nil
+  expect(@exception.message).to match(/^Negative (skip)|(limit) .* is not allowed.$/)
+end
+
+Then(/^a SyntaxError should be raised at compile time: NegativeIntegerArgument$/) do
+  pending if @ignored_scenario
+  expect(@exception).not_to be_nil
+  expect(@exception.message).to match(/^Negative (skip)|(limit) .* is not allowed.$/)
+end
+
+Then(/^a ArgumentError should be raised at runtime: InvalidArgumentType$/) do
+  pending if @ignored_scenario
+  expect(@exception).not_to be_nil
+  expect(@exception.message).to match(/^Non-integer (skip)|(limit) .* is not allowed.$/)
+end
+
+Then(/^a SyntaxError should be raised at compile time: InvalidArgumentType$/) do
+  pending if @ignored_scenario
+  expect(@exception).not_to be_nil
+  expect(@exception.message).to match(/^Non-integer (skip)|(limit) .* is not allowed.$/)
 end

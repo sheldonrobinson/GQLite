@@ -731,8 +731,8 @@ namespace gqlite::backends::sqlite_oc_executor
     {
       exec_value left_ev = start(_node->get_left());
       exec_value right_ev = start(_node->get_right());
-      errors::check_condition(std::holds_alternative<value>(left_ev), "Binary operations must be done on null values.");
-      errors::check_condition(std::holds_alternative<value>(right_ev), "Binary operations must be done on null values.");
+      errors::check_condition(std::holds_alternative<value>(left_ev), "Binary operations must be done on values.");
+      errors::check_condition(std::holds_alternative<value>(right_ev), "Binary operations must be done on values.");
       value left_val = std::get<value>(left_ev);
       value right_val = std::get<value>(right_ev);
       if(left_val.get_type() == value_type::string and right_val.get_type() == value_type::string)
@@ -1437,13 +1437,28 @@ namespace gqlite::backends::sqlite_oc_executor
         }
         if(_modifiers->get_skip())
         {
-          evaluator_visitor ev;
-          _table->offset(exec_c.get_value(ev.start(_modifiers->get_skip())).to_integer());
+          evaluation_context eval_c;
+          evaluator_visitor eval_v;
+          eval_v.exec_c = &exec_c;
+          eval_v.eval_c = &eval_c;
+          value skip_v = exec_c.get_value(eval_v.start(_modifiers->get_skip()));
+          errors::check_condition(skip_v.get_type() == value_type::integer, "Non-integer skip {} is not allowed.", skip_v);
+          int skip = skip_v.to_integer();
+          errors::check_condition(skip >= 0, "Negative skip {} is not allowed.", skip);
+          _table->offset(skip);
         }
         if(_modifiers->get_limit())
         {
+          evaluation_context eval_c;
+          evaluator_visitor eval_v;
+          eval_v.exec_c = &exec_c;
+          eval_v.eval_c = &eval_c;
           evaluator_visitor ev;
-          _table->offset(exec_c.get_value(ev.start(_modifiers->get_limit())).to_integer());
+          value limit_v = exec_c.get_value(eval_v.start(_modifiers->get_limit()));
+          errors::check_condition(limit_v.get_type() == value_type::integer, "Non-integer limit {} is not allowed.", limit_v);
+          int limit = limit_v.to_integer();
+          errors::check_condition(limit >= 0, "Negative limit {} is not allowed.", limit);
+          _table->limit(limit);
         }
       }
     }
