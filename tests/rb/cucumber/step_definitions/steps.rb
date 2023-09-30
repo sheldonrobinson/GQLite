@@ -199,6 +199,9 @@ IgnoredScenario = [
   "[15] Sort by an aliased aggregate projection does allow subsequent matching",
   "[16] Handle constants and parameters inside an order by item which contains an aggregation expression",
   "[19] Fail if not projected variables are used inside an order by item which contains an aggregation expression",
+  "[4] Unwinding a collected unwound expression",
+  "[5] Unwinding a collected expression",
+  "[12] Unwind does not remove variables from scope",
   # ORDER BY not supported yet
   "[1] Forwarding multiple node and relationship variables",
   "[6] Reusing variable names in WITH",
@@ -247,6 +250,9 @@ IgnoredScenario = [
   "[18] Sort by a local date time expression in descending order",
   "[19] Sort by a date time expression in ascending order",
   "[20] Sort by a date time expression in descending order",
+  # MERGE not supported
+  "[6] Creating nodes from an unwound parameter list",
+  "[14] Unwind with merge"
 ]
 
 Before do |scenario|

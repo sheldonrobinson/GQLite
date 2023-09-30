@@ -32,6 +32,12 @@ OC_ALGEBRA_GENERATE(return_statement, OC_ALGEBRA_RETURN_MEMBERS)
 
 OC_ALGEBRA_GENERATE(with, OC_ALGEBRA_WITH_MEMBERS)
 
+#define OC_ALGEBRA_UNWIND_MEMBERS(_KLASS_NAME_, F)  \
+  F(_KLASS_NAME_, std::string, name)                \
+  F(_KLASS_NAME_, node_csp, expression)
+
+OC_ALGEBRA_GENERATE(unwind, OC_ALGEBRA_UNWIND_MEMBERS)
+
 #define OC_ALGEBRA_DELETE_MEMBERS(_KLASS_NAME_, F)  \
   F(_KLASS_NAME_, bool, detach)                     \
   F(_KLASS_NAME_, std::vector<node_csp>, expressions)

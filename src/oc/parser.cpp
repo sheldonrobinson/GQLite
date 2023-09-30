@@ -22,6 +22,7 @@ struct parser::data
   algebra::node_csp parse_match();
   algebra::node_csp parse_return();
   algebra::node_csp parse_with();
+  algebra::node_csp parse_unwind();
   algebra::node_csp parse_delete();
   algebra::node_csp parse_set();
   algebra::node_csp parse_remove();
@@ -209,6 +210,18 @@ algebra::node_csp parser::data::parse_with()
   }
   std::vector<algebra::named_expression_csp> named_expressions = parse_named_expressions();
   return std::make_shared<algebra::with>(false, named_expressions, parse_modifiers());
+}
+
+algebra::node_csp parser::data::parse_unwind()
+{
+  get_next_token();
+  algebra::node_csp expr = parse_expression();
+  is_of_type(token_type::AS);
+  get_next_token();
+  is_of_type(token_type::IDENTIFIER);
+  std::string name = tok.string;
+  get_next_token();
+  return std::make_shared<algebra::unwind>(name, expr);
 }
 
 algebra::node_csp parser::data::parse_delete()
@@ -762,6 +775,12 @@ algebra::node_csp parser::data::parse_expression_list()
 {
   std::vector<algebra::node_csp> nodes;
   get_next_token();
+  if(tok.type == token_type::ENDBOXBRACKET)
+  {
+    get_next_token();
+    // empty list
+    return std::make_shared<algebra::array>(nodes);
+  }
   while(tok.type != token_type::END_OF_FILE)
   {
     nodes.push_back(parse_expression());
@@ -1005,6 +1024,9 @@ algebra::node_csp parser::parse()
       break;
     case token_type::WITH:
       nodes.push_back(d->parse_with());
+      break;
+    case token_type::UNWIND:
+      nodes.push_back(d->parse_unwind());
       break;
     case token_type::DELETE:
     case token_type::DETACH:

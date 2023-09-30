@@ -38,7 +38,9 @@ features = [
   # WITH ORDER BY
   'with-orderBy/WithOrderBy2.feature', 'with-orderBy/WithOrderBy3.feature', 'with-orderBy/WithOrderBy4.feature',
   # WITH SKIP LIMIT
-  'with-skip-limit/WithSkipLimit1.feature', 'with-skip-limit/WithSkipLimit2.feature', 'with-skip-limit/WithSkipLimit3.feature'
+  'with-skip-limit/WithSkipLimit1.feature', 'with-skip-limit/WithSkipLimit2.feature', 'with-skip-limit/WithSkipLimit3.feature',
+  # UNWIND
+  'unwind/Unwind1.feature',
 ]
 # In progress
 # features = ['create/Create5.feature', 'match/Match6.feature', 'match-where/MatchWhere5.feature', 'set/Set3.feature', 'set/Set5.feature', 'remove/Remove3.feature' ]

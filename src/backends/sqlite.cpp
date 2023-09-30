@@ -807,6 +807,12 @@ namespace gqlite::backends::sqlite_oc_executor
       if(left_val.get_type() == value_type::string and right_val.get_type() == value_type::string)
       {
         return left_val.to_string() + right_val.to_string();
+      } else if(left_val.get_type() == value_type::vector and right_val.get_type() == value_type::vector)
+      {
+        value_vector vl = left_val.to_vector();
+        value_vector vr = right_val.to_vector();
+        vl.insert(vl.end(), vr.begin(), vr.end());
+        return vl;
       } else if(is_numeric(left_val.get_type()) and is_numeric(right_val.get_type()))
       {
         if(left_val.get_type() == value_type::integer and right_val.get_type() == value_type::integer)
@@ -1569,6 +1575,41 @@ namespace gqlite::backends::sqlite_oc_executor
       filter_table(&table, w->get_modifiers());
       return value();
     }
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // unwind
+    value visit(algebra::unwind_csp uw) override
+    {
+      evaluation_context eval_c;
+      eval_c.table = table;
+      evaluator_visitor eval_v;
+      eval_v.exec_c = &exec_c;
+      eval_v.eval_c = &eval_c;
+
+      exec_value_table out_table;
+      out_table.add_columns(table.get_columns_names());
+      out_table.add_column(uw->get_name());
+      std::size_t max_iter = first_statement ? 1 : table.get_rows_count();
+      for(std::size_t i = 0; i < max_iter; ++i)
+      {
+        eval_c.prepare_current_row(table, i, first_statement);
+        gqlite::value val = exec_c.get_value(eval_v.start(uw->get_expression()));
+        if(val.get_type() != value_type::invalid)
+        {
+          errors::check_condition(val.get_type() == value_type::vector, "Unwind expect an array.");
+          gqlite::value_vector valv = val.to_vector();
+          std::vector<exec_value> row = eval_c.current_row;
+          row.push_back(exec_value());
+          for(std::size_t j = 0; j < valv.size(); ++j)
+          {
+            row[row.size() - 1] = valv[j];
+            out_table.add_row(row);
+          }
+        }
+      }
+      table = out_table;
+      return value();
+    }
+
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Return
     value visit(algebra::return_statement_csp rs) override

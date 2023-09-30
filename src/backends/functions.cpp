@@ -13,11 +13,12 @@ namespace gqlite::backends::functions
 
     static void check_value_is_map(const char* _fname, const value& _value);
 
-    static gqlite::value type(const std::vector<value>& _arguments);
-    static gqlite::value labels(const std::vector<value>& _arguments);
-    static gqlite::value size(const std::vector<value>& _arguments);
-    static gqlite::value keys(const std::vector<value>& _arguments);
-    static gqlite::value id(const std::vector<value>& _arguments);
+    static value type(const std::vector<value>& _arguments);
+    static value labels(const std::vector<value>& _arguments);
+    static value size(const std::vector<value>& _arguments);
+    static value keys(const std::vector<value>& _arguments);
+    static value id(const std::vector<value>& _arguments);
+    static value range(const std::vector<value>& _arguments);
     std::unordered_map<std::string, std::function<value(const std::vector<value>&)>> functions;
   };
 
@@ -126,6 +127,18 @@ namespace gqlite::backends::functions
       return value();
     }
   }
+  /**
+   * @return an array of value between start and end
+   */
+  value static_data::range(const std::vector<value>& _arguments)
+  {
+    errors::check_arguments_size("range", _arguments, 2);
+    int start = _arguments[0].to_integer();
+    int end = _arguments[1].to_integer();
+    value_vector v;
+    for(int i = start; i <= end; ++i) v.push_back(i);
+    return v;
+  }
   static_data::static_data()
   {
     functions["type"] = &static_data::type;
@@ -133,6 +146,7 @@ namespace gqlite::backends::functions
     functions["size"] = &static_data::size;
     functions["keys"] = &static_data::keys;
     functions["id"] = &static_data::id;
+    functions["range"] = &static_data::range;
   }
 
   value call(const std::string& _name, const std::vector<value>& _arguments)
