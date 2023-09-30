@@ -405,11 +405,20 @@ algebra::modifiers_csp parser::data::parse_modifiers()
         get_next_token();
         is_of_type(token_type::BY);
         get_next_token();
-        bool asc = true;
-        std::vector<algebra::node_csp> expressions;
+        std::vector<algebra::order_by_expression_csp> expressions;
         while(true)
         {
-          expressions.push_back(parse_expression());
+          bool asc = true;
+          algebra::node_csp expression = parse_expression();
+          if(tok.type == token_type::ASC)
+          {
+            get_next_token();
+          } else if(tok.type == token_type::DESC)
+          {
+            asc = false;
+            get_next_token();
+          }
+          expressions.push_back(std::make_shared<algebra::order_by_expression>(asc, expression));
           if(tok.type == token_type::COMMA)
           {
             get_next_token();
@@ -417,15 +426,7 @@ algebra::modifiers_csp parser::data::parse_modifiers()
             break;
           }
         }
-        if(tok.type == token_type::ASC)
-        {
-          get_next_token();
-        } else if(tok.type == token_type::DESC)
-        {
-          asc = false;
-          get_next_token();
-        }
-        order_by = std::make_shared<algebra::order_by>(asc, expressions);
+        order_by = std::make_shared<algebra::order_by>(expressions);
         break;
       }
       default:
@@ -879,6 +880,9 @@ algebra::node_csp parser::data::parse_multiplicative_expression()
     case token_type::DIVIDE:
       get_next_token();
       return std::make_shared<algebra::division>(node, parse_multiplicative_expression());
+    case token_type::PERCENT:
+      get_next_token();
+      return std::make_shared<algebra::modulo>(node, parse_multiplicative_expression());
     default:
       return node;
   }

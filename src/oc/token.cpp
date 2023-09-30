@@ -70,6 +70,8 @@ const char* gqlite::oc::token_type_to_string(token_type _type)
       return "!";
     case PLUS_EQUAL:
       return "+=";
+    case PERCENT:
+      return "%";
     case PARAMETER:
       return "parameter";
     case IDENTIFIER:

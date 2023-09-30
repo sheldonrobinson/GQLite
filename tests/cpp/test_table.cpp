@@ -144,6 +144,7 @@ TEST_CASE( "Table", "[table]" )
 TEST_CASE( "Table Sortering", "[table]" )
 {
   using table = gqlite::table<int>;
+  using eci = table::sort_column_info;
   {
     table t;
     t.add_columns({"a", "b", "c"});
@@ -157,14 +158,14 @@ TEST_CASE( "Table Sortering", "[table]" )
                 0, 1, 3,
                 0, 3, 3});
     
-    t.sort({1,2});
+    t.sort({{eci::ascending, 1}, {eci::ascending, 2}});
     for(std::size_t r = 1; r < t.get_rows_count(); ++r)
     {
       table::const_row_view r0 = t.get_row(r-1);
       table::const_row_view r1 = t.get_row(r);
       CHECK( (r0[1] < r1[1] or (r0[1] == r1[1] and r0[2] <= r1[2] )) );
     }
-    t.reverse_sort({0,2});
+    t.sort({{eci::descending, 0}, {eci::descending, 2}});
     for(std::size_t r = 1; r < t.get_rows_count(); ++r)
     {
       table::const_row_view r0 = t.get_row(r-1);
@@ -192,36 +193,58 @@ TEST_CASE( "Table Sortering", "[table]" )
       }
       t.add_row(row);
     }
-    std::vector<std::size_t> sv;
+    std::vector<eci> sv;
     for(std::size_t c = 0; c < rand() % cols; ++c)
     {
-      sv.push_back(rand() % cols);
+      sv.push_back({eci::ascending, rand() % cols});
     }
     t.sort(sv);
     for(std::size_t r = 1; r < t.get_rows_count(); ++r)
     {
       table::const_row_view r0 = t.get_row(r-1);
       table::const_row_view r1 = t.get_row(r);
-      for(std::size_t ri : sv)
+      for(eci ri : sv)
       {
-        CHECK(r0[ri] <= r1[ri]);
-        if(r0[ri] <= r1[ri]) break;
+        CHECK(r0[ri.column] <= r1[ri.column]);
+        if(r0[ri.column] < r1[ri.column]) break;
       }
     }
     sv.clear();
     for(std::size_t c = 0; c < rand() % cols; ++c)
     {
-      sv.push_back(rand() % cols);
+      sv.push_back({eci::descending, rand() % cols});
     }
-    t.reverse_sort(sv);
+    t.sort(sv);
     for(std::size_t r = 1; r < t.get_rows_count(); ++r)
     {
       table::const_row_view r0 = t.get_row(r-1);
       table::const_row_view r1 = t.get_row(r);
-      for(std::size_t ri : sv)
+      for(eci ri : sv)
       {
-        CHECK(r0[ri] >= r1[ri]);
-        if(r0[ri] >= r1[ri]) break;
+        CHECK(r0[ri.column] >= r1[ri.column]);
+        if(r0[ri.column] > r1[ri.column]) break;
+      }
+    }
+    sv.clear();
+    for(std::size_t c = 0; c < rand() % cols; ++c)
+    {
+      sv.push_back({rand() % 2 ? eci::descending : eci::ascending, rand() % cols});
+    }
+    t.sort(sv);
+    for(std::size_t r = 1; r < t.get_rows_count(); ++r)
+    {
+      table::const_row_view r0 = t.get_row(r-1);
+      table::const_row_view r1 = t.get_row(r);
+      for(eci ri : sv)
+      {
+        if(ri.direction == eci::ascending)
+        {
+          CHECK(r0[ri.column] <= r1[ri.column]);
+          if(r0[ri.column] < r1[ri.column]) break;
+        } else {
+          CHECK(r0[ri.column] >= r1[ri.column]);
+          if(r0[ri.column] > r1[ri.column]) break;
+        }
       }
     }
   }

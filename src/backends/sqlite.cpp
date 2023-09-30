@@ -690,7 +690,6 @@ namespace gqlite::backends::sqlite_oc_executor
     exec_value visit(algebra::member_access_csp _node) override
     {
       exec_value value = eval_c->get_variable(_node->get_left());
-
       struct member_access
       {
         evaluator_visitor* self;
@@ -703,9 +702,8 @@ namespace gqlite::backends::sqlite_oc_executor
         {
           return self->get_property(self->get_properties(_v), node->get_path());
         }
-        gqlite::value operator()(const gqlite::value& _v, bool _allow_array = true)
+        gqlite::value operator()(const gqlite::value& _v)
         {
-          GQLITE_UNUSED(_allow_array);
           switch(_v.get_type())
           {
             case gqlite::value_type::map:
@@ -781,6 +779,22 @@ namespace gqlite::backends::sqlite_oc_executor
     {
       return visit_numerical_binary<std::divides>(_node);
     }
+    exec_value visit(algebra::modulo_csp _node) override
+    {
+      exec_value left_ev = start(_node->get_left());
+      exec_value right_ev = start(_node->get_right());
+      errors::check_condition(std::holds_alternative<value>(left_ev), "Binary operations must be done on values.");
+      errors::check_condition(std::holds_alternative<value>(right_ev), "Binary operations must be done on values.");
+      value left_val = std::get<value>(left_ev);
+      value right_val = std::get<value>(right_ev);
+      if(left_val.get_type() == value_type::integer and right_val.get_type() == value_type::integer)
+      {
+        return left_val.to_integer() % right_val.to_integer();
+      } else {
+        throw exception("Cannot compute modulo binary operation between {} and {}.", left_val.to_json(), right_val.to_json());
+      }
+    }
+
 
     exec_value visit(algebra::addition_csp _node) override
     {
@@ -1426,15 +1440,19 @@ namespace gqlite::backends::sqlite_oc_executor
       {
         if(_modifiers->get_order_by())
         {
-          std::vector<std::size_t> columns;
+          std::vector<exec_value_table::sort_column_info> columns;
           std::vector<std::string> expr_columns;
-          for(algebra::node_csp node : _modifiers->get_order_by()->get_expressions())
+          for(algebra::order_by_expression_csp node : _modifiers->get_order_by()->get_expressions())
           {
-            if(node->get_type() == algebra::node_type::variable)
+            using eci = exec_value_table::sort_column_info;
+            algebra::node_csp node_exp = node->get_expression();
+            if(node_exp->get_type() == algebra::node_type::variable)
             {
-              columns.push_back(_table->get_column_index(std::static_pointer_cast<const algebra::variable>(node)->get_identifier()));
+              columns.push_back({node->get_asc() ? eci::ascending : eci::descending, 
+                _table->get_column_index(std::static_pointer_cast<const algebra::variable>(node_exp)->get_identifier())});
             } else {
-              columns.push_back(_table->get_columns_count() + expr_columns.size());
+              columns.push_back({node->get_asc() ? eci::ascending : eci::descending,
+                _table->get_columns_count() + expr_columns.size()});
               expr_columns.push_back(format_string("__gqlite_{}", expr_columns.size()));
             }
           }
@@ -1452,11 +1470,11 @@ namespace gqlite::backends::sqlite_oc_executor
               eval_c.prepare_current_row(*_table, i, false);
               exec_value_table::row_view rv = _table->get_row(i); 
               std::size_t idx = first_index;
-              for(algebra::node_csp node : _modifiers->get_order_by()->get_expressions())
+              for(algebra::order_by_expression_csp node : _modifiers->get_order_by()->get_expressions())
               {
-                if(node->get_type() != algebra::node_type::variable)
+                if(node->get_expression()->get_type() != algebra::node_type::variable)
                 {
-                  rv[idx++] = eval_v.start(node);
+                  rv[idx++] = eval_v.start(node->get_expression());
                 }
               }
             }
@@ -1483,23 +1501,7 @@ namespace gqlite::backends::sqlite_oc_executor
               throw exception("Only values can be used in order by expression.");
             }
           };
-          struct greater_op
-          {
-            bool operator()(const exec_value& _v1, const exec_value& _v2) const
-            {
-              if(std::holds_alternative<value>(_v1) and std::holds_alternative<value>(_v2))
-              {
-                return std::get<value>(_v2) < std::get<value>(_v1);
-              }
-              throw exception("Only values can be used in order by expression.");
-            }
-          };
-          if(_modifiers->get_order_by()->get_asc())
-          {
-            _table->sort(columns, diff_op(), less_op());
-          } else {
-            _table->sort(columns, diff_op(), greater_op());
-          }
+          _table->sort(columns, diff_op(), less_op());
         }
         if(_modifiers->get_skip())
         {

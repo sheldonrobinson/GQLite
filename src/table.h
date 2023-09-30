@@ -135,16 +135,17 @@ namespace gqlite
      * Resize to maximum @p _limit rows.
      */
     void limit(std::size_t _limit);
+    struct sort_column_info
+    {
+      enum { ascending, descending } direction;
+      std::size_t column;
+    };
     /**
      * Sort the table according to @p _rows. Using quick sort algorithm.
      */
-    void sort(const std::vector<std::size_t>& _rows);
+    void sort(const std::vector<sort_column_info>& _columns);
     template<typename _CompareDifferent_, typename _CompareOrder_>
-    void sort(const std::vector<std::size_t>& _rows, _CompareDifferent_ _cdiff, _CompareOrder_ _corder);
-    /**
-     * Sort in descending order the table according to @p _rows. Using quick sort algorithm.
-     */
-    void reverse_sort(const std::vector<std::size_t>& _rows);
+    void sort(const std::vector<sort_column_info>& _columns, _CompareDifferent_ _cdiff, _CompareOrder_ _corder);
     /**
      * Add a single column. Adding column to a table with data is a costly operation.
      */
@@ -186,7 +187,7 @@ namespace gqlite
      * @return the value at column \p _column and row \p _j
      */
     const _T_& get_value(const std::string& _column, std::size_t _j) const;
-    bool operator==(const table& _rhs)
+    bool operator==(const table& _rhs) const
     {
       return m_columns == _rhs.m_columns and m_rows == _rhs.m_rows and m_labels == _rhs.m_labels and m_values == _rhs.m_values;
     }
@@ -268,35 +269,34 @@ namespace gqlite
   }
   template<typename _T_>
   template<typename _CompareDifferent_, typename _CompareOrder_>
-  void table<_T_>::sort(const std::vector<std::size_t>& _rows, _CompareDifferent_ _cdiff, _CompareOrder_ _corder)
+  void table<_T_>::sort(const std::vector<sort_column_info>& _columns, _CompareDifferent_ _cdiff, _CompareOrder_ _corder)
   {
     // cannot use std::sort, as it requires iterator to support movable, which table can't since they return a span
-    quick_sort([_rows, _cdiff, _corder](const const_row_view& it1, const const_row_view& it2)
+    quick_sort([_columns, _cdiff, _corder](const const_row_view& it1, const const_row_view& it2)
     {
-      for(std::size_t r : _rows)
+      for(sort_column_info r : _columns)
       {
-        errors::check_condition(r < it1.size(), "Invalid row index {}", r);
-        const _T_& v1 = it1[r];
-        const _T_& v2 = it2[r];
+        errors::check_condition(r.column < it1.size(), "Invalid column index {}", r.column);
+        const _T_& v1 = it1[r.column];
+        const _T_& v2 = it2[r.column];
         if(_cdiff(v1, v2))
         {
-          return _corder(v1, v2);
+          switch(r.direction)
+          {
+            case sort_column_info::ascending:
+              return _corder(v1, v2);
+            case sort_column_info::descending:
+              return _corder(v2, v1);
+          }
         }
       }
       return false;
     }, 0, get_rows_count() - 1);
   }
   template<typename _T_>
-  inline void table<_T_>::sort(const std::vector<std::size_t>& _rows)
+  inline void table<_T_>::sort(const std::vector<sort_column_info>& _columns)
   {
-    // cannot use std::sort, as it requires iterator to support movable, which table can't since they return a span
-    return sort(_rows, std::not_equal_to(), std::less());
-  }
-  template<typename _T_>
-  inline void table<_T_>::reverse_sort(const std::vector<std::size_t>& _rows)
-  {
-    // cannot use std::sort, as it requires iterator to support movable, which table can't since they return a span
-    return sort(_rows, std::not_equal_to(), std::greater());
+    return sort(_columns, std::not_equal_to(), std::less());
   }
   template<typename _T_>
   inline void table<_T_>::add_column(const std::string& _column, const _T_& _val)
@@ -381,7 +381,7 @@ namespace gqlite
   inline const _T_& table<_T_>::get_value(const std::string& _column, std::size_t _j) const
   {
     auto it = m_labels.find(_column);
-    if(it == m_labels.end()) throw gqlite::exception("Unknown column {}", _column);
+    errors::check_condition(it != m_labels.end(), "Unknown column {}", _column);
     return get_value(it->second, _j);
   }
   template<typename _T_>

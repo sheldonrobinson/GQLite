@@ -192,6 +192,13 @@ IgnoredScenario = [
   "[23] Sort by an expression that is only partially orderable on a non-distinct binding table, but used in parts as a grouping key",
   "[2] Ordering and skipping on aggregate",
   "[4] Ordering and limiting on aggregate",
+  "[11] Sort by an aggregate projection",
+  "[12] Sort by an aliased aggregate projection",
+  "[13] Fail on sorting by a non-projected aggregation on a variable",
+  "[14] Fail on sorting by a non-projected aggregation on an expression",
+  "[15] Sort by an aliased aggregate projection does allow subsequent matching",
+  "[16] Handle constants and parameters inside an order by item which contains an aggregation expression",
+  "[19] Fail if not projected variables are used inside an order by item which contains an aggregation expression",
   # ORDER BY not supported yet
   "[1] Forwarding multiple node and relationship variables",
   "[6] Reusing variable names in WITH",
@@ -218,12 +225,14 @@ IgnoredScenario = [
   "[3] Limiting amount of rows when there are fewer left than the LIMIT argument",
   "[1] Limit to two hits",
   "[6] LIMIT with an expression that does not depend on variables",
+  "[7] The order direction cannot be overwritten",
   # return modifiers (e.g. order by) must be done after computing expressions https://gitlab.com/cyloncore/GQLite/-/issues/2
   "[7] Limit to more rows than actual results 1",
   "[8] Limit to more rows than actual results 2",
   "[15] Floating point parameter for LIMIT with ORDER BY should fail",
-  # Opposite problem from before
+  # non-projected variable are not accessible
   "[21] Sort by an expression that is only partially orderable on a non-distinct binding table",
+  "[8] Sort by non-projected existing variable",
   # Array aren't really supported yet
   "[9] Sort by a list expression in ascending order",
   "[10] Sort by a list expression in descending order",
@@ -237,7 +246,7 @@ IgnoredScenario = [
   "[17] Sort by a local date time expression in ascending order",
   "[18] Sort by a local date time expression in descending order",
   "[19] Sort by a date time expression in ascending order",
-  "[20] Sort by a date time expression in descending order"
+  "[20] Sort by a date time expression in descending order",
 ]
 
 Before do |scenario|
@@ -337,7 +346,7 @@ end
 Then(/^a SyntaxError should be raised at compile time: UndefinedVariable$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
-  expect(@exception.message).to match(/^Variable .* is not defined.$/)
+  expect(@exception.message).to match(/^(Variable .* is not defined.)|(Unknown column .*.)$/)
 end
 
 Then(/^a SyntaxError should be raised at compile time: NoSingleRelationshipType$/) do

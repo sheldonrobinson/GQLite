@@ -36,6 +36,7 @@ namespace gqlite::oc
     DIVIDE, ///< /
     EXCLAMATION, ///< !
     PLUS_EQUAL, ///< +=
+    PERCENT, ///< %
   // Constants
     PARAMETER,
     IDENTIFIER,

@@ -54,7 +54,7 @@ module GQLite
         CApi.call_function :gqlite_value_destroy, b
       end
       if CApi.call_function(:gqlite_value_is_valid, ret)
-        val = JSON.parse CApi.call_function :gqlite_value_to_json, ret
+        val = JSON.parse(CApi.call_function :gqlite_value_to_json, ret)
       else
         val = nil
       end

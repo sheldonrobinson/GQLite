@@ -48,9 +48,9 @@ OC_ALGEBRA_GENERATE(remove, OC_ALGEBRA_NODES_LIST_MEMBERS)
 
 OC_ALGEBRA_GENERATE(call, OC_ALGEBRA_CALL_MEMBERS)
 
-#define OC_ALGEBRA_ORDER_BY_MEMBERS(_KLASS_NAME_, F)  \
-  F(_KLASS_NAME_, bool, asc)                          \
-  F(_KLASS_NAME_, std::vector<node_csp>, expressions)
+
+#define OC_ALGEBRA_ORDER_BY_MEMBERS(_KLASS_NAME_, F)                  \
+  F(_KLASS_NAME_, std::vector<order_by_expression_csp>, expressions)
 
 OC_ALGEBRA_GENERATE(order_by, OC_ALGEBRA_ORDER_BY_MEMBERS)
 
@@ -60,6 +60,14 @@ OC_ALGEBRA_GENERATE(order_by, OC_ALGEBRA_ORDER_BY_MEMBERS)
   F(_KLASS_NAME_, order_by_csp, order_by)
 
 OC_ALGEBRA_GENERATE(modifiers, OC_ALGEBRA_MODIFIERS_MEMBERS)
+
+// Order By Expression
+
+#define OC_ALGEBRA_ORDER_BY_EXPRESSION_MEMBERS(_KLASS_NAME_, F)  \
+  F(_KLASS_NAME_, bool, asc)                          \
+  F(_KLASS_NAME_, node_csp, expression)
+
+OC_ALGEBRA_GENERATE(order_by_expression, OC_ALGEBRA_ORDER_BY_EXPRESSION_MEMBERS)
 
 // Set/remove Expressions
 
@@ -173,6 +181,7 @@ OC_ALGEBRA_GENERATE(addition, OC_ALGEBRA_BINARY_MEMBERS)
 OC_ALGEBRA_GENERATE(substraction, OC_ALGEBRA_BINARY_MEMBERS)
 OC_ALGEBRA_GENERATE(multiplication, OC_ALGEBRA_BINARY_MEMBERS)
 OC_ALGEBRA_GENERATE(division, OC_ALGEBRA_BINARY_MEMBERS)
+OC_ALGEBRA_GENERATE(modulo, OC_ALGEBRA_BINARY_MEMBERS)
 
 #define OC_ALGEBRA_UNARY_MEMBERS(_KLASS_NAME_, F) \
   F(_KLASS_NAME_, node_csp, value)

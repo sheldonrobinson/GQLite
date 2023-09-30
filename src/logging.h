@@ -13,8 +13,6 @@
 #define gqlite_info(msg, ...) std::cerr << "INFO: " __FILE__ ":" << __LINE__ << ": " << gqlite::format_string(msg __VA_OPT__(,) __VA_ARGS__) << std::endl;
 #define gqlite_fatal(msg, ...) std::cerr << "FATAL ERROR" __FILE__ ":" << __LINE__ << ": " << gqlite::format_string(msg __VA_OPT__(,) __VA_ARGS__) << std::endl; std::abort()
 
-#define gqlite_debug_vn(...) clog_debug_vn(__VA_ARGS__)
-
 #if NDEBUG
 
 #define gqlite_assert(assrt) do { } while ((false) && (assrt))
