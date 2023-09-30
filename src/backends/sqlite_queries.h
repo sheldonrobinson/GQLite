@@ -361,7 +361,7 @@ stream << "UPDATE gqlite_";
 #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_set_property.sql"
 stream << ( _graph_name );
 #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_set_property.sql"
-stream << "_nodes SET properties=json_set(properties, ?002, ?003) WHERE id=?001";
+stream << "_nodes SET properties=json_set(properties, ?002, json(?003)) WHERE id=?001";
 
     return stream.str();
   }

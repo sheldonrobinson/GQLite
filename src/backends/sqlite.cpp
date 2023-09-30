@@ -1222,14 +1222,25 @@ namespace gqlite::backends::sqlite_oc_executor
         statement_visitor* self;
         std::vector<std::string> path;
         exec_value new_value;
-        void execute(const std::string& _query, int _node_id)
+        void execute(const std::string& _set_query, const std::string& _remove_query, int _node_id)
         {
           std::string path_string = "$";
           for(const std::string& pe : path)
           {
             path_string += "." + pe;
           }
-          self->exec_c.data->execute_sql(_query, {{1, _node_id}, {2, path_string}, {3, self->exec_c.get_value(new_value)}});
+          value nv = self->exec_c.get_value(new_value);
+          if(nv.get_type() == value_type::invalid)
+          {
+            if(not _remove_query.empty())
+            {
+              self->exec_c.data->execute_sql(_remove_query, {{1, _node_id}, {2, path_string}});
+            } else {
+              throw exception("Cannot add null property.");
+            }
+          } else {
+            self->exec_c.data->execute_sql(_set_query, {{1, _node_id}, {2, path_string}, {3, nv.to_json()}});
+          }
         }
         void operator()(const value&)
         {
@@ -1248,12 +1259,12 @@ namespace gqlite::backends::sqlite_oc_executor
         void operator()(const node_ref_sp& _node)
         {
           _node->cache = gqlite::value(); // Invalidate cache
-          execute(sqlite_queries::node_set_property(self->exec_c.graph_name), _node->id);
+          execute(sqlite_queries::node_set_property(self->exec_c.graph_name), sqlite_queries::node_remove_property(self->exec_c.graph_name), _node->id);
         }
         void operator()(const edge_ref_sp& _edge)
         {
           _edge->cache = gqlite::value(); // Invalidate cache
-          execute(sqlite_queries::edge_set_property(self->exec_c.graph_name), _edge->id);
+          execute(sqlite_queries::edge_set_property(self->exec_c.graph_name), sqlite_queries::edge_remove_property(self->exec_c.graph_name), _edge->id);
         }
       };
       struct property_adder : property_setter_adder_base
@@ -1262,12 +1273,12 @@ namespace gqlite::backends::sqlite_oc_executor
         void operator()(const node_ref_sp& _node)
         {
           _node->cache = gqlite::value(); // Invalidate cache
-          execute(sqlite_queries::node_add_properties(self->exec_c.graph_name), _node->id);
+          execute(sqlite_queries::node_add_properties(self->exec_c.graph_name), std::string(), _node->id);
         }
         void operator()(const edge_ref_sp& _edge)
         {
           _edge->cache = gqlite::value(); // Invalidate cache
-          execute(sqlite_queries::node_add_properties(self->exec_c.graph_name), _edge->id);
+          execute(sqlite_queries::node_add_properties(self->exec_c.graph_name), std::string(), _edge->id);
         }
       };
 

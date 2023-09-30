@@ -1,1 +1,1 @@
-UPDATE gqlite_/%= _graph_name %/_nodes SET properties=json_set(properties, ?002, ?003) WHERE id=?001
+UPDATE gqlite_/%= _graph_name %/_nodes SET properties=json_set(properties, ?002, json(?003)) WHERE id=?001
