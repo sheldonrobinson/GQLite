@@ -240,7 +240,16 @@ void value::data::to_json(std::stringstream& _stream)
     _stream << std::get<double>(value_container);
     break;
   case value_type::string:
-    _stream << '"' << std::get<std::string>(value_container) << '"';
+  {
+    std::string string = std::get<std::string>(value_container);
+    std::size_t start_pos = 0;
+    while((start_pos = string.find("\"", start_pos)) != std::string::npos)
+    {
+      string.replace(start_pos, 1, "\\\"");
+      start_pos += 2;
+    }
+    _stream << '"' << string << '"';
+  }
     break;
   case value_type::map:
     _stream << '{';
