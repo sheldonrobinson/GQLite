@@ -1,8 +1,8 @@
 find_package(Ruby)
 
-if(RUBY_FOUND)
+if(Ruby_EXECUTABLE)
 
-execute_process(COMMAND ${RUBY_EXECUTABLE} -e "require 'rspec'" RESULT_VARIABLE RSPEC_RESULT_VARIABLE )
+execute_process(COMMAND ${Ruby_EXECUTABLE} -e "require 'rspec'" RESULT_VARIABLE RSPEC_RESULT_VARIABLE )
 
 if(RSPEC_RESULT_VARIABLE EQUAL 0)
 set(RSPEC_FOUND TRUE)

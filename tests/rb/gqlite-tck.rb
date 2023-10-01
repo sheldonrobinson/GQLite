@@ -50,8 +50,9 @@ features = [
 features = features.map { |file| 'openCypher/tck/features/clauses/' + file }
 args = features.concat %w(--require cucumber/step_definitions/ --fail-fast)
 
-begin
-  Cucumber::Cli::Main.new(args).execute!
-rescue SystemExit
-  puts "Cucumber calls @kernel.exit(), killing your script unless you rescue"
-end
+# begin
+Cucumber::Cli::Main.new(args).execute!
+# rescue SystemExit => se
+#   puts se.status
+#   puts "Cucumber calls @kernel.exit(), killing your script unless you rescue"
+# end

@@ -109,6 +109,9 @@ set_package_properties(Python3 PROPERTIES
 ## Find Ruby
 
 find_package(Ruby)
+if(Ruby_EXECUTABLE)
+set(Ruby_FOUND 1)
+endif()
 set_package_properties(Ruby PROPERTIES
     DESCRIPTION ""
     TYPE OPTIONAL
