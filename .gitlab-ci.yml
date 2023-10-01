@@ -1,0 +1,36 @@
+before_script:
+  - echo "Installing packages..."
+  - apt-get -qq update && apt-get -qq install cmake ruby ruby-ffi python3-cffi python3-dev
+  - gem install rspec cucumber
+
+stages:          # List of stages for jobs, and their order of execution
+  - build
+  - test
+
+build-job:       # This job runs in the build stage, which runs first.
+  stage: build
+  script:
+    - mkdir build
+    - pushd build
+    - cmake .. -DCMAKE_INSTALL_PREFIX=../inst
+    - make -j8 install
+    - popd
+  artifacts:
+    paths:
+      - build/
+      - inst/
+
+unit-test-job:   # This job runs in the test stage.
+  stage: test    # It only starts when the job in the build stage completes successfully.
+  script:
+    - pwd
+    - ls
+    - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:`pwd`/inst/lib
+    - export RUBYLIB=$RUBYLIB:`pwd`/inst/lib/ruby
+    - export PYTHON3_VERSION=`python3 -c "import sys; print(str(sys.version_info.major) + '.' + str(sys.version_info.minor), end='');"`
+    - export PYTHONPATH=$PYTHONPATH:`pwd`/inst/lib/python$PYTHON3_VERSION/dist-packages
+    - echo $RUBYLIB
+    - echo $PYTHONPATH
+    - pushd build
+    - make test
+    - popd
