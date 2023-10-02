@@ -301,10 +301,16 @@ value& value::operator=(const value& _rhs)
 value::~value()
 {}
 
+value::value(bool _v) : d(new data{value_type::boolean, _v})
+{}
+
 value::value(int _v) : d(new data{value_type::integer, _v})
 {}
 
 value::value(double _v) : d(new data{value_type::number, _v})
+{}
+
+value::value(const char* _v) : value(std::string(_v))
 {}
 
 value::value(const std::string& _v) : d(new data{value_type::string, _v})
@@ -342,7 +348,7 @@ bool value::operator<(const value& _rhs) const
   case value_type::vector:
     return to_vector() < _rhs.to_vector();
   default:
-    throw exception("Cannot compare {} and {} with inferior operator", *this, _rhs);
+    throw exception("Cannot compare {} and {} with inferior operator.", *this, _rhs);
   }
 }
 
@@ -350,14 +356,14 @@ bool value::to_bool() const
 {
   switch(d->type)
   {
-    case value_type::boolean:
-      return std::get<bool>(d->value_container);
-    case value_type::integer:
-      return std::get<int>(d->value_container) != 0;
-    case value_type::number:
-      return std::get<double>(d->value_container) != 0.0;
-    default:
-      throw exception(format_string("Value is not a bool, it is {}", d->type));
+  case value_type::boolean:
+    return std::get<bool>(d->value_container);
+  case value_type::integer:
+    return std::get<int>(d->value_container) != 0;
+  case value_type::number:
+    return std::get<double>(d->value_container) != 0.0;
+  default:
+    throw exception("Value is not a bool, it is {}.", d->type);
   }
 }
 
@@ -370,7 +376,7 @@ int value::to_integer() const
     case value_type::number:
       return std::get<double>(d->value_container);
     default:
-      throw exception(format_string("Value is not a number, it is {}", d->type));
+      throw exception(format_string("Value is not a number, it is {}.", d->type));
   }
 }
 

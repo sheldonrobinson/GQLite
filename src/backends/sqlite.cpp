@@ -553,7 +553,7 @@ namespace gqlite::backends::sqlite_oc_executor
     match_context* mc;
     std::string visit_default(algebra::node_csp _node) override
     {
-      throw gqlite::exception("Unimplemented statement node {} in sql_filter_visitor", oc::algebra::node_type_name(_node->get_type()));
+      throw gqlite::exception("Unimplemented sql filter node {} in sql_filter_visitor", oc::algebra::node_type_name(_node->get_type()));
     }
     std::string visit(algebra::variable_csp _node) override
     {
@@ -605,6 +605,7 @@ namespace gqlite::backends::sqlite_oc_executor
     }
     FILTER_VISITOR_BINARY_OP(logical_and, "AND")
     FILTER_VISITOR_BINARY_OP(logical_or, "OR")
+    FILTER_VISITOR_BINARY_OP(logical_xor, "XOR")
     FILTER_VISITOR_BINARY_OP(relational_equal, "=")
     FILTER_VISITOR_BINARY_OP(relational_different, "!=")
     FILTER_VISITOR_BINARY_OP(relational_inferior, "<")
@@ -622,7 +623,7 @@ namespace gqlite::backends::sqlite_oc_executor
     {                                                                   \
       return format_string("(" _OP_ " {})", start(_node->get_value())); \
     }
-    FILTER_VISITOR_UNARY_OP(logical_negation, "!")
+    FILTER_VISITOR_UNARY_OP(logical_negation, "NOT")
     FILTER_VISITOR_UNARY_OP(negation, "-")
     std::string visit(algebra::is_not_null_csp _node) override
     {
@@ -642,7 +643,7 @@ namespace gqlite::backends::sqlite_oc_executor
     evaluation_context* eval_c;
     exec_value visit_default(algebra::node_csp _node) override
     {
-      throw gqlite::exception("Unimplemented statement node {} in evaluator_visitor", oc::algebra::node_type_name(_node->get_type()));
+      throw gqlite::exception("Unimplemented node {} in evaluator_visitor", oc::algebra::node_type_name(_node->get_type()));
     }
     value get_properties(const std::unordered_map<std::string, algebra::node_csp>& _properties)
     {
@@ -729,7 +730,14 @@ namespace gqlite::backends::sqlite_oc_executor
     {
       exec_value ev = start(_node->get_value());
       errors::check_condition(std::holds_alternative<value>(ev), "Logical negation must be done on value.");
-      return not std::get<value>(ev).to_bool();
+      value ev_val = std::get<value>(ev);
+      switch(ev_val.get_type())
+      {
+        case value_type::invalid: return value();
+        case value_type::boolean: return not ev_val.to_bool();
+        default:
+          throw exception("InvalidArgumentType: expected boolean got {}", ev_val);
+      }
     }
     template<typename _TOp_, typename _TNode_>
     exec_value visit_logical_binary(_TNode_ _node)
@@ -740,7 +748,22 @@ namespace gqlite::backends::sqlite_oc_executor
       errors::check_condition(std::holds_alternative<value>(right_ev), "Binary operations must be done on values.");
       value left_val = std::get<value>(left_ev);
       value right_val = std::get<value>(right_ev);
-      return _TOp_()(left_val.to_bool(), right_val.to_bool());
+      if(left_val.get_type() == value_type::invalid or right_val.get_type() == value_type::invalid)
+      {
+        if(left_val.get_type() == right_val.get_type())
+        {
+          return value();
+        } else if(left_val.get_type() == value_type::boolean or right_val.get_type() == value_type::boolean) {
+          return false;
+        } else {
+          throw exception("InvalidArgumentType: binary comparison between non-bool {} and {}.", left_val, right_val);
+        }
+      } else if(left_val.get_type() == value_type::boolean and right_val.get_type() == value_type::boolean)
+      {
+        return _TOp_()(left_val.to_bool(), right_val.to_bool());
+      } else {
+        throw exception("InvalidArgumentType: binary comparison between non-bool {} and {}.", left_val, right_val);
+      }
     }
     exec_value visit(algebra::logical_and_csp _node) override
     {
@@ -749,6 +772,28 @@ namespace gqlite::backends::sqlite_oc_executor
     exec_value visit(algebra::logical_or_csp _node) override
     {
       return visit_logical_binary<std::logical_or<bool>>(_node);
+    }
+    exec_value visit(algebra::logical_xor_csp _node) override
+    {
+      return visit_logical_binary<std::not_equal_to<bool>>(_node);
+    }
+    template<typename _TNode_>
+    exec_value visit_comparison_binary(_TNode_ _node, const std::function<bool(const value&, const value&)>& _op)
+    {
+      exec_value left_ev = start(_node->get_left());
+      exec_value right_ev = start(_node->get_right());
+      errors::check_condition(std::holds_alternative<value>(left_ev), "Binary operations must be done on values.");
+      errors::check_condition(std::holds_alternative<value>(right_ev), "Binary operations must be done on values.");
+      value left_val = std::get<value>(left_ev);
+      value right_val = std::get<value>(right_ev);
+      return _op(left_val, right_val);
+    }
+    exec_value visit(algebra::relational_equal_csp _node) override
+    {
+      return visit_comparison_binary(_node, [](const value& _lhs, const value& _rhs)
+      {
+        return _lhs == _rhs;
+      });
     }
     template<template<typename> class _TOp_, typename _TNode_>
     exec_value visit_numerical_binary(_TNode_ _node)
@@ -1309,7 +1354,7 @@ namespace gqlite::backends::sqlite_oc_executor
         evaluator_visitor* eval_v;
         void visit_default(algebra::node_csp _node) override
         {
-          throw gqlite::exception("Unimplemented statement node {} in set_visitor", oc::algebra::node_type_name(_node->get_type()));
+          throw gqlite::exception("Unimplemented node {} in set_visitor", oc::algebra::node_type_name(_node->get_type()));
         }
         void visit(algebra::set_property_csp _property)
         {
@@ -1402,7 +1447,7 @@ namespace gqlite::backends::sqlite_oc_executor
         evaluator_visitor* eval_v;
         void visit_default(algebra::node_csp _node) override
         {
-          throw gqlite::exception("Unimplemented statement node {} in set_visitor", oc::algebra::node_type_name(_node->get_type()));
+          throw gqlite::exception("Unimplemented node {} in set_visitor", oc::algebra::node_type_name(_node->get_type()));
         }
         void visit(algebra::remove_property_csp _property)
         {
@@ -1516,7 +1561,7 @@ namespace gqlite::backends::sqlite_oc_executor
           eval_v.exec_c = &exec_c;
           eval_v.eval_c = &eval_c;
           value skip_v = exec_c.get_value(eval_v.start(_modifiers->get_skip()));
-          errors::check_condition(skip_v.get_type() == value_type::integer, "Non-integer skip {} is not allowed.", skip_v);
+          errors::check_condition(skip_v.get_type() == value_type::integer, "InvalidArgumentType: Non-integer skip {} is not allowed.", skip_v);
           int skip = skip_v.to_integer();
           errors::check_condition(skip >= 0, "Negative skip {} is not allowed.", skip);
           _table->offset(skip);
@@ -1529,7 +1574,7 @@ namespace gqlite::backends::sqlite_oc_executor
           eval_v.eval_c = &eval_c;
           evaluator_visitor ev;
           value limit_v = exec_c.get_value(eval_v.start(_modifiers->get_limit()));
-          errors::check_condition(limit_v.get_type() == value_type::integer, "Non-integer limit {} is not allowed.", limit_v);
+          errors::check_condition(limit_v.get_type() == value_type::integer, "InvalidArgumentType: Non-integer limit {} is not allowed.", limit_v);
           int limit = limit_v.to_integer();
           errors::check_condition(limit >= 0, "Negative limit {} is not allowed.", limit);
           _table->limit(limit);
@@ -1648,10 +1693,11 @@ namespace gqlite::backends::sqlite_oc_executor
         }
         value_vector results_rows;
         results_rows.push_back(labels);
-        for(std::size_t i = 0; i < table.get_rows_count(); ++i)
+        std::size_t max_iter = first_statement ? 1 : table.get_rows_count();
+        for(std::size_t i = 0; i < max_iter; ++i)
         {
           value_vector row;
-          eval_c.prepare_current_row(table, i, false);
+          eval_c.prepare_current_row(table, i, first_statement);
           for(const algebra::named_expression_csp& rv : rs->get_expressions())
           {
             exec_value ev = eval_v.start(rv->get_expression());

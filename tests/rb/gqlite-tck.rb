@@ -42,13 +42,22 @@ features = [
   # UNWIND
   'unwind/Unwind1.feature',
 ]
+
+expressions = [
+  # boolean
+  'boolean/Boolean1.feature', 'boolean/Boolean2.feature', 'boolean/Boolean3.feature', 'boolean/Boolean4.feature', 'boolean/Boolean5.feature'
+]
+
 # In progress
 # features = ['create/Create5.feature', 'match/Match6.feature', 'match-where/MatchWhere5.feature', 'set/Set3.feature', 'set/Set5.feature', 'remove/Remove3.feature' ]
 # Current dev
 # features = []
+# expressions = []
+
+expressions = expressions.map { |file| 'openCypher/tck/features/expressions/' + file }
 
 features = features.map { |file| 'openCypher/tck/features/clauses/' + file }
-args = features.concat %w(--require cucumber/step_definitions/ --fail-fast)
+args = (features + expressions).concat %w(--require cucumber/step_definitions/ --fail-fast)
 
 # begin
 Cucumber::Cli::Main.new(args).execute!

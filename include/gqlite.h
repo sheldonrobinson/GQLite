@@ -62,8 +62,10 @@ namespace gqlite
     value& operator=(const value& _rhs);
     ~value();
   public:
+    value(bool _v);
     value(int _v);
     value(double _v);
+    value(const char* _v);
     value(const std::string& _v);
     value(const value_map& _v);
     /// not part of the public API

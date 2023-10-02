@@ -252,7 +252,17 @@ IgnoredScenario = [
   "[20] Sort by a date time expression in descending order",
   # MERGE not supported
   "[6] Creating nodes from an unwound parameter list",
-  "[14] Unwind with merge"
+  "[14] Unwind with merge",
+  # WITH WHERE not supported
+  "[5] Conjunction is commutative on null",
+  "[7] Conjunction is associative on null",
+  "[5] Disjunction is commutative on null",
+  "[7] Disjunction is associative on null",
+  "[5] Exclusive disjunction is commutative on null",
+  "[7] Exclusive disjunction is associative on null",
+  "[2] Disjunction is distributive over conjunction on null",
+  "[4] Conjunction is distributive over disjunction on null",
+  "[6] Conjunction is not distributive over exclusive disjunction on null"
 ]
 
 Before do |scenario|
@@ -442,5 +452,5 @@ end
 Then(/^a SyntaxError should be raised at compile time: InvalidArgumentType$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
-  expect(@exception.message).to match(/^Non-integer (skip)|(limit) .* is not allowed.$/)
+  expect(@exception.message).to match(/^InvalidArgumentType: .*$/)
 end

@@ -34,6 +34,7 @@ struct parser::data
   algebra::node_csp parse_multiplicative_expression();
   algebra::node_csp parse_additive_expression();
   algebra::node_csp parse_relational_expression();
+  algebra::node_csp parse_conditional_xor_expression();
   algebra::node_csp parse_conditional_or_expression();
   algebra::node_csp parse_conditional_and_expression();
   algebra::node_csp parse_member_expression();
@@ -43,7 +44,7 @@ struct parser::data
   std::vector<algebra::named_expression_csp> parse_named_expressions();
   void validate(algebra::graph_node_csp);
   void validate(algebra::graph_edge_csp);
-  void get_next_token();
+  void get_next_token(int _flags = lexer::mode::normal);
   template<typename... _T_>
   [[noreturn]] void report_error(const token& _token, const std::string& _errorMsg, const _T_&... _values);
   [[noreturn]] void report_unexpected(const token& _token);
@@ -622,7 +623,7 @@ std::unordered_map<std::string, algebra::node_csp> parser::data::parse_propertie
     case token_type::STARTBRACE:
     {
       std::unordered_map<std::string, algebra::node_csp> p;
-      get_next_token();
+      get_next_token(lexer::mode::disable_keywords);
       while(tok.type != token_type::ENDBRACE)
       {
         if(tok.type != token_type::STRING and tok.type != token_type::IDENTIFIER)
@@ -636,7 +637,7 @@ std::unordered_map<std::string, algebra::node_csp> parser::data::parse_propertie
         p[key] = parse_expression();
         if(tok.type == token_type::COMMA)
         {
-          get_next_token();
+          get_next_token(lexer::mode::disable_keywords);
         } else {
           break;
         }
@@ -796,6 +797,18 @@ algebra::node_csp parser::data::parse_expression_list()
   report_unexpected(tok);
 }
 
+algebra::node_csp parser::data::parse_conditional_xor_expression()
+{
+  algebra::node_csp node = parse_conditional_or_expression();
+  if(tok.type == token_type::XOR)
+  {
+    get_next_token();
+    return std::make_shared<algebra::logical_or>(node, parse_conditional_xor_expression());
+  } else {
+    return node;
+  }
+}
+
 algebra::node_csp parser::data::parse_conditional_or_expression()
 {
   algebra::node_csp node = parse_conditional_and_expression();
@@ -807,6 +820,7 @@ algebra::node_csp parser::data::parse_conditional_or_expression()
     return node;
   }
 }
+
 algebra::node_csp parser::data::parse_conditional_and_expression()
 {
   algebra::node_csp node = parse_relational_expression();
@@ -914,7 +928,7 @@ algebra::node_csp parser::data::parse_unary_expression()
     case token_type::NOT:
     case token_type::EXCLAMATION:
       get_next_token();
-      return std::make_shared<algebra::logical_negation>(parse_member_expression());
+      return std::make_shared<algebra::logical_negation>(parse_unary_expression());
     case token_type::MINUS:
       get_next_token();
       return std::make_shared<algebra::negation>(parse_member_expression());
@@ -956,12 +970,12 @@ algebra::node_csp parser::data::parse_member_expression()
 
 algebra::node_csp parser::data::parse_expression()
 {
-  return parse_conditional_or_expression();
+  return parse_conditional_xor_expression();
 }
 
-void parser::data::get_next_token()
+void parser::data::get_next_token(int _flags)
 {
-  tok = lex->next_token();
+  tok = lex->next_token(_flags);
 }
 
 template<typename... _T_>

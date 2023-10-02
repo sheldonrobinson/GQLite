@@ -7,10 +7,16 @@ class token;
 class lexer
 {
   public:
+    struct mode
+    {
+      static constexpr int normal = 0x0;
+      static constexpr int disable_keywords = 0x1;
+    };
+  public:
     lexer(std::istream* sstream);
     ~lexer();
   public:
-    token next_token();
+    token next_token(int _flags = mode::normal);
     void unget(const token& _token);
   protected:
     bool ignore_comment(token& _token, int _lastChar);

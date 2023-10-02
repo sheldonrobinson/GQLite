@@ -94,7 +94,7 @@ void lexer::unget(const token& _token)
   d->ungotten.push_back(_token);
 }
 
-token lexer::next_token()
+token lexer::next_token(int _flags)
 {
   if(not d->ungotten.empty())
   {
@@ -121,14 +121,21 @@ token lexer::next_token()
   } else if(std::isalpha(lastChar) or lastChar == '_')
   {
     identifierStr = get_identifier(lastChar);
+    if((_flags & mode::disable_keywords) != mode::disable_keywords)
+    {
 #define TOKEN_KEYWORD(_K_) IDENTIFIER_IS_KEYWORD(# _K_, _K_)
 #define TOKEN_KEYWORD2(_K_, _S_) IDENTIFIER_IS_KEYWORD(_S_, _K_)
-    #include "token_keywords.h"
+      #include "token_keywords.h"
 #undef TOKEN_KEYWORD
 #undef TOKEN_KEYWORD2
-    IDENTIFIER_IS_KEYWORD("ASCENDING", ASC)
-    IDENTIFIER_IS_KEYWORD("DESCENDING", DESC)
+      IDENTIFIER_IS_KEYWORD("ASCENDING", ASC)
+      IDENTIFIER_IS_KEYWORD("DESCENDING", DESC)
+    }
     return token(token_type::IDENTIFIER, identifierStr, line(), initial_col);
+  } else if(lastChar == '`') {
+    gqlite::oc::token tok = get_string(lastChar);
+    tok.type = token_type::IDENTIFIER;
+    return tok;
   } else if(lastChar == '"' or lastChar == '\'' ) {
     return get_string(lastChar);
   } else if(lastChar >= '0' and lastChar <= '9') {
