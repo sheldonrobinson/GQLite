@@ -63,7 +63,7 @@ namespace gqlite
     ~value();
   public:
     value(bool _v);
-    value(int _v);
+    value(int64_t _v);
     value(double _v);
     value(const char* _v);
     value(const std::string& _v);
@@ -89,7 +89,7 @@ namespace gqlite
     /**
      * Attempt to return an integer. Throw an exception if not possible.
      */
-    int to_integer() const;
+    int64_t to_integer() const;
     /**
      * Attempt to return a double. Throw an exception if not possible.
      */

@@ -35,7 +35,7 @@ struct value::data
     bool operator==(const invalid&) const { return true; }
   };
   value_type type;
-  std::variant<invalid, bool, int, double, std::string, value_map, value_vector> value_container;
+  std::variant<invalid, bool, int64_t, double, std::string, value_map, value_vector> value_container;
 
   void to_json(std::stringstream& _stream);
 };
@@ -213,7 +213,7 @@ namespace {
         }
         if(is_integer)
         {
-          return std::stoi(number);
+          return int64_t(std::stoll(number));
         } else {
           return std::stod(number);
         }
@@ -234,7 +234,7 @@ void value::data::to_json(std::stringstream& _stream)
     _stream << (std::get<bool>(value_container) ? "true" : "false");
     break;
   case value_type::integer:
-    _stream << std::get<int>(value_container);
+    _stream << std::get<int64_t>(value_container);
     break;
   case value_type::number:
     _stream << std::get<double>(value_container);
@@ -304,7 +304,7 @@ value::~value()
 value::value(bool _v) : d(new data{value_type::boolean, _v})
 {}
 
-value::value(int _v) : d(new data{value_type::integer, _v})
+value::value(int64_t _v) : d(new data{value_type::integer, _v})
 {}
 
 value::value(double _v) : d(new data{value_type::number, _v})
@@ -359,7 +359,7 @@ bool value::to_bool() const
   case value_type::boolean:
     return std::get<bool>(d->value_container);
   case value_type::integer:
-    return std::get<int>(d->value_container) != 0;
+    return std::get<int64_t>(d->value_container) != 0;
   case value_type::number:
     return std::get<double>(d->value_container) != 0.0;
   default:
@@ -367,12 +367,12 @@ bool value::to_bool() const
   }
 }
 
-int value::to_integer() const
+int64_t value::to_integer() const
 {
   switch(d->type)
   {
     case value_type::integer:
-      return std::get<int>(d->value_container);
+      return std::get<int64_t>(d->value_container);
     case value_type::number:
       return std::get<double>(d->value_container);
     default:
@@ -385,7 +385,7 @@ double value::to_double() const
   switch(d->type)
   {
     case value_type::integer:
-      return std::get<int>(d->value_container);
+      return std::get<int64_t>(d->value_container);
     case value_type::number:
       return std::get<double>(d->value_container);
     default:

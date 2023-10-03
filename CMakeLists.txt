@@ -169,7 +169,7 @@ set_package_properties(Crystal PROPERTIES
 ########################
 ## Build library
 
-include_directories(include ${CMAKE_CURRENT_BINARY_DIR}/src)
+include_directories(BEFORE include ${CMAKE_CURRENT_BINARY_DIR}/src)
 
 if(SQLITE_FOUND)
 set(GQLITE_HAVE_SQLITE 1)

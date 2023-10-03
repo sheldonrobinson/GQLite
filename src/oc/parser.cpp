@@ -747,10 +747,15 @@ algebra::node_csp parser::data::parse_terminal_expression()
     get_next_token();
     try
     {
-      return std::make_shared<algebra::value>(std::stoi(t.string));
+      long long i = std::stoll(t.string);
+      if(i > std::numeric_limits<int64_t>::max() or i < std::numeric_limits<int64_t>::min())
+      {
+        throw gqlite::exception("IntegerOverflow: {} is too large.", t.string);
+      }
+      return std::make_shared<algebra::value>(value(int64_t(i)));
     } catch(const std::out_of_range&)
     {
-      throw gqlite::exception("Integer {} is too large.", t.string);
+      throw gqlite::exception("IntegerOverflow: {} is too large.", t.string);
     }
   case token_type::FLOATING_POINT:
     get_next_token();
@@ -942,8 +947,33 @@ algebra::node_csp parser::data::parse_unary_expression()
       get_next_token();
       return std::make_shared<algebra::logical_negation>(parse_unary_expression());
     case token_type::MINUS:
+    {
       get_next_token();
-      return std::make_shared<algebra::negation>(parse_indexed_access_expression());
+      token t = tok;
+      switch(tok.type)
+      {
+        // This needs to be here to properly parse -9223372036854775808
+      case token_type::INTEGER:
+        get_next_token();
+        try
+        {
+          long long i = std::stoll("-" + t.string);
+          if(i > std::numeric_limits<int64_t>::max() or i < std::numeric_limits<int64_t>::min())
+          {
+            throw gqlite::exception("IntegerOverflow: -{} is too large.", t.string);
+          }
+          return std::make_shared<algebra::value>(value(int64_t(i)));
+        } catch(const std::out_of_range&)
+        {
+          throw gqlite::exception("IntegerOverflow: -{} is too large.", t.string);
+        }
+      case token_type::FLOATING_POINT:
+        get_next_token();
+        return std::make_shared<algebra::value>(std::stod("-" + t.string));
+      default:
+        return std::make_shared<algebra::negation>(parse_indexed_access_expression());
+      }
+    }
     case token_type::PLUS:
       get_next_token();
       [[fallthrough]];
@@ -974,7 +1004,7 @@ algebra::node_csp parser::data::parse_indexed_access_expression()
     algebra::node_csp index;
     if(tok.type == token_type::DOTDOT)
     {
-      index = std::make_shared<algebra::value>(0);
+      index = std::make_shared<algebra::value>(int64_t(0));
     } else {
       index = parse_expression();
     }
@@ -1031,9 +1061,9 @@ void parser::data::report_unexpected(const token& _token)
 {
   if(_token.string.empty())
   {
-    report_error(_token, "Unexpected token {}", _token.type);
+    report_error(_token, "UnexpectedSyntax: Unexpected token {}", _token.type);
   } else {
-    report_error(_token, "Unexpected token {} ({})", _token.type, _token.string);
+    report_error(_token, "UnexpectedSyntax: Unexpected token {} ({})", _token.type, _token.string);
   }
 }
 
@@ -1042,9 +1072,9 @@ bool parser::data::is_of_type(const token& _token, token_type _type)
   if(_token.type == _type) return true;
   if(_token.string.empty())
   {
-    report_error(_token, "Expected token {} got {}", _type, _token.type);
+    report_error(_token, "UnexpectedSyntax: Expected token {} got {}", _type, _token.type);
   } else {
-    report_error(_token, "Expected token {} got {} ({})", _type, _token.type, _token.string);
+    report_error(_token, "UnexpectedSyntax: Expected token {} got {} ({})", _type, _token.type, _token.string);
   }
   return false;
 }

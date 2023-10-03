@@ -164,10 +164,10 @@ namespace gqlite::backends::functions
   value static_data::range(const std::vector<value>& _arguments)
   {
     errors::check_arguments_size("range", _arguments, 2);
-    int start = _arguments[0].to_integer();
-    int end = _arguments[1].to_integer();
+    int64_t start = _arguments[0].to_integer();
+    int64_t end = _arguments[1].to_integer();
     value_vector v;
-    for(int i = start; i <= end; ++i) v.push_back(i);
+    for(int64_t i = start; i <= end; ++i) v.push_back(i);
     return v;
   }
   value static_data::coalesce(const std::vector<value>& _arguments)
@@ -191,7 +191,7 @@ namespace gqlite::backends::functions
       case value_type::integer:
         return val;
       case value_type::number:
-        return int(val.to_double());
+        return int64_t(val.to_double());
       default:
         errors::invalid_argument_type("toInteger expect a number got {}", val);
     }

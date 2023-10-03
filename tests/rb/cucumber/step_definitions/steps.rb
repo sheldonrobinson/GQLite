@@ -129,10 +129,6 @@ RSpec::Matchers.matcher :eq_in_any_order do |expected|
 end
 
 IgnoredScenario = [
-  # gqlite does not support large integer, as, sqlite does not, and added support for bignumber would add extra complexity withou a sqlite extension
-  "[12] CREATE does not lose precision on large integers",
-  "[3] Return the largest integer",
-  "[8] Return the smallest integer",
   # Triggers a different error first, as MATCH (a) return an empty list, it fails in creation
   "[24] Fail when creating a relationship using undefined variable in pattern",
   # Path assignment is not implemented yet
@@ -376,7 +372,7 @@ end
 Then(/^a SyntaxError should be raised at compile time: VariableAlreadyBound$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
-  expect(@exception.message).to match(/^(\d+:\d+:|)Variable .* is already bound.|\d+:\d+:Expected token : got \]$/)
+  expect(@exception.message).to match(/^(\d+:\d+:|)Variable .* is already bound.|\d+:\d+:UnexpectedSyntax: Expected token : got \]$/)
 end
 
 Then(/^a SyntaxError should be raised at compile time: UndefinedVariable$/) do
@@ -388,7 +384,7 @@ end
 Then(/^a SyntaxError should be raised at compile time: NoSingleRelationshipType$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
-  expect(@exception.message).to match(/^(\d+:\d+:Expected token \[ got .*)|(\d+:\d+:Expected token \] got .*)$/)
+  expect(@exception.message).to match(/^(\d+:\d+:UnexpectedSyntax: .*)$/)
 end
 
 Then(/^a SyntaxError should be raised at compile time: RequiresDirectedRelationship$/) do
@@ -400,7 +396,7 @@ end
 Then(/^a SyntaxError should be raised at compile time: CreatingVarLength$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
-  expect(@exception.message).to match(/^\d+:\d+:Expected token \] got .*$/)
+  expect(@exception.message).to match(/^\d+:\d+:UnexpectedSyntax: Expected token \] got .*$/)
 end
 
 Then(/^a SyntaxError should be raised at compile time: InvalidParameterUse$/) do
@@ -485,4 +481,22 @@ Then(/^a TypeError should be raised at any time: \*$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
   expect(@exception.message).to match(/^InvalidArgumentType: .*$/)
+end
+
+Then(/^a SyntaxError should be raised at compile time: IntegerOverflow$/) do
+  pending if @ignored_scenario
+  expect(@exception).not_to be_nil
+  expect(@exception.message).to match(/^IntegerOverflow: .*$/)
+end
+
+Then(/^a SyntaxError should be raised at compile time: InvalidNumberLiteral$/) do
+  pending if @ignored_scenario
+  expect(@exception).not_to be_nil
+  expect(@exception.message).to match(/^.*Expected token end of file got identifier.*$/)
+end
+
+Then(/^a SyntaxError should be raised at compile time: UnexpectedSyntax$/) do
+  pending if @ignored_scenario
+  expect(@exception).not_to be_nil
+  expect(@exception.message).to match(/^\d+:\d+:UnexpectedSyntax: .*$/)
 end

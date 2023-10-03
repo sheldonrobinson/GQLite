@@ -21,8 +21,8 @@ namespace gqlite::backends
   struct sqlite_data
   {
     sqlite3* handle;
-    std::unordered_map<int, std::string> id_to_label = {{0, std::string()}};
-    std::unordered_map<std::string, int> label_to_id = {{std::string(), 0}};
+    std::unordered_map<int64_t, std::string> id_to_label = {{0, std::string()}};
+    std::unordered_map<std::string, int64_t> label_to_id = {{std::string(), 0}};
 
     std::unordered_map<std::string, std::function<value(const value_vector&)>> procedures;
 
@@ -33,8 +33,8 @@ namespace gqlite::backends
 
     value execute_sql(const std::string& _query, const std::map<int, value>& _bindings = {});
     uint64_t last_row_id();
-    int id_for_label(const std::string& _string);
-    std::string label_for_id(int _id);
+    int64_t id_for_label(const std::string& _string);
+    std::string label_for_id(int64_t _id);
   };
 }
 
@@ -74,7 +74,7 @@ gqlite::value sqlite_data::execute_sql(const std::string& _query, const std::map
           sqlite3_bind_null(ps, key);
           break;
         case value_type::integer:
-          sqlite3_bind_int(ps, key, value.to_integer());
+          sqlite3_bind_int64(ps, key, value.to_integer());
           break;
         case value_type::number:
           sqlite3_bind_double(ps, key, value.to_double());
@@ -105,7 +105,7 @@ gqlite::value sqlite_data::execute_sql(const std::string& _query, const std::map
         switch(sqlite3_column_type(ps, i))
         {
           case SQLITE_INTEGER:
-            row.push_back(sqlite3_column_int(ps, i));
+            row.push_back(int64_t(sqlite3_column_int64(ps, i)));
             break;
           case SQLITE_FLOAT:
             row.push_back(sqlite3_column_double(ps, i));
@@ -174,7 +174,7 @@ uint64_t sqlite_data::last_row_id()
   return sqlite3_last_insert_rowid(handle);
 }
 
-int sqlite_data::id_for_label(const std::string& _string)
+int64_t sqlite_data::id_for_label(const std::string& _string)
 {
   auto it = label_to_id.find(_string);
   if(it == label_to_id.end())
@@ -198,7 +198,7 @@ int sqlite_data::id_for_label(const std::string& _string)
   }
 }
 
-std::string sqlite_data::label_for_id(int _id)
+std::string sqlite_data::label_for_id(int64_t _id)
 {
   auto it = id_to_label.find(_id);
   if(it == id_to_label.end())
@@ -228,7 +228,7 @@ namespace gqlite::backends::sqlite_oc_executor
    */
   struct node_ref
   {
-    int id; ///< database id for the node
+    int64_t id; ///< database id for the node
     value cache; ///< cache of the labels/properties
   };
 
@@ -238,7 +238,7 @@ namespace gqlite::backends::sqlite_oc_executor
    */
   struct edge_ref
   {
-    int id; ///< database id for the edge
+    int64_t id; ///< database id for the edge
     value cache; ///< cache of the label/properties
   };
   struct empty {};
@@ -886,7 +886,7 @@ namespace gqlite::backends::sqlite_oc_executor
       {
         if(left_val.get_type() == value_type::integer and right_val.get_type() == value_type::integer)
         {
-          return _TOp_<int>()(left_val.to_integer(), right_val.to_integer());
+          return _TOp_<int64_t>()(left_val.to_integer(), right_val.to_integer());
         } else {
           return _TOp_<double>()(left_val.to_double(), right_val.to_double());
         }
@@ -1069,7 +1069,7 @@ namespace gqlite::backends::sqlite_oc_executor
       }
       std::string json_properties = props.to_json();
       exec_c.data->execute_sql(sqlite_queries::node_create(exec_c.graph_name), {{1, json_properties}});
-      int row_id = exec_c.data->last_row_id();
+      int64_t row_id = exec_c.data->last_row_id();
       for(const std::string& label : _node->get_labels())
       {
         exec_c.data->execute_sql(sqlite_queries::node_add_label(exec_c.graph_name), {{1, exec_c.data->id_for_label(label)}, {2, row_id}});
@@ -1093,7 +1093,7 @@ namespace gqlite::backends::sqlite_oc_executor
       node_ref_sp source = has_node_ref(_ev, _edge->get_source()) ? _ev->eval_c->get_node_ref(_ev->eval_c->get_variable(_edge->get_source()->get_variable())) : create_node(_ev, _edge->get_source());
       node_ref_sp destination = has_node_ref(_ev, _edge->get_destination()) ? _ev->eval_c->get_node_ref(_ev->eval_c->get_variable(_edge->get_destination()->get_variable())) : create_node(_ev, _edge->get_destination());
       std::string label = _edge->get_labels().empty() ? std::string() : _edge->get_labels().front();
-      int label_id = exec_c.data->id_for_label(label);
+      int64_t label_id = exec_c.data->id_for_label(label);
       
       value props;
       if(_edge->get_properties())
@@ -1103,7 +1103,7 @@ namespace gqlite::backends::sqlite_oc_executor
         props = value_map();
       }
       exec_c.data->execute_sql(sqlite_queries::edge_create(exec_c.graph_name), {{1, label_id}, {2, props.to_json()}, {3, source->id}, {4, destination->id}});
-      int row_id = exec_c.data->last_row_id();
+      int64_t row_id = exec_c.data->last_row_id();
       edge_ref_sp nr = std::make_shared<edge_ref>(edge_ref{
           row_id,
           value{
@@ -1416,7 +1416,7 @@ namespace gqlite::backends::sqlite_oc_executor
         statement_visitor* self;
         std::vector<std::string> path;
         exec_value new_value;
-        void execute(const std::string& _set_query, const std::string& _remove_query, int _node_id)
+        void execute(const std::string& _set_query, const std::string& _remove_query, int64_t _node_id)
         {
           std::string path_string = "$";
           for(const std::string& pe : path)
@@ -1540,7 +1540,7 @@ namespace gqlite::backends::sqlite_oc_executor
       {
         statement_visitor* self;
         std::vector<std::string> path;
-        void execute(const std::string& _query, int _node_id)
+        void execute(const std::string& _query, int64_t _node_id)
         {
           std::string path_string = "$";
           for(const std::string& pe : path)
