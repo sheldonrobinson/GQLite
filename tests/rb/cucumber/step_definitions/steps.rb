@@ -131,6 +131,8 @@ end
 IgnoredScenario = [
   # gqlite does not support large integer, as, sqlite does not, and added support for bignumber would add extra complexity withou a sqlite extension
   "[12] CREATE does not lose precision on large integers",
+  "[3] Return the largest integer",
+  "[8] Return the smallest integer",
   # Triggers a different error first, as MATCH (a) return an empty list, it fails in creation
   "[24] Fail when creating a relationship using undefined variable in pattern",
   # Path assignment is not implemented yet

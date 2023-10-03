@@ -691,6 +691,7 @@ algebra::node_csp parser::data::parse_terminal_expression()
     get_next_token();
     return no;
   }
+  case token_type::NULL_CAPS:
   case token_type::NULL_TOKEN:
     get_next_token();
     return std::make_shared<algebra::value>(gqlite::value());

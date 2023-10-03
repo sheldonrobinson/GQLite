@@ -18,53 +18,55 @@ end
 # Validated
 features = [
   # Create
-  'create/Create1.feature', 'create/Create2.feature',
+  'create/Create1', 'create/Create2',
   # Match
-  'match/Match1.feature', 'match/Match2.feature', 'match/Match3.feature',
+  'match/Match1', 'match/Match2', 'match/Match3',
   # MatchWhere
-  'match-where/MatchWhere1.feature', 'match-where/MatchWhere2.feature', 'match-where/MatchWhere3.feature', 'match-where/MatchWhere4.feature',
+  'match-where/MatchWhere1', 'match-where/MatchWhere2', 'match-where/MatchWhere3', 'match-where/MatchWhere4',
   # WITH
-  'with/With1.feature', 'with/With2.feature', 'with/With3.feature', 'with/With4.feature',
+  'with/With1', 'with/With2', 'with/With3', 'with/With4',
   # DELETE
-  'delete/Delete1.feature',
+  'delete/Delete1',
   # SET
-  'set/Set1.feature', 'set/Set2.feature', 'set/Set3.feature', 'set/Set4.feature', 'set/Set5.feature',
+  'set/Set1', 'set/Set2', 'set/Set3', 'set/Set4', 'set/Set5',
   # REMOVE
-  'remove/Remove1.feature', 'remove/Remove2.feature',
+  'remove/Remove1', 'remove/Remove2',
   # RETURN ORDER BY
-  'return-orderby/ReturnOrderBy2.feature', 'return-orderby/ReturnOrderBy3.feature', 'return-orderby/ReturnOrderBy4.feature',
+  'return-orderby/ReturnOrderBy2', 'return-orderby/ReturnOrderBy3', 'return-orderby/ReturnOrderBy4',
   # RETURN SKIP LIMIT
-  'return-skip-limit/ReturnSkipLimit1.feature', 'return-skip-limit/ReturnSkipLimit2.feature', 'return-skip-limit/ReturnSkipLimit3.feature',
+  'return-skip-limit/ReturnSkipLimit1', 'return-skip-limit/ReturnSkipLimit2', 'return-skip-limit/ReturnSkipLimit3',
   # WITH ORDER BY
-  'with-orderBy/WithOrderBy2.feature', 'with-orderBy/WithOrderBy3.feature', 'with-orderBy/WithOrderBy4.feature',
+  'with-orderBy/WithOrderBy2', 'with-orderBy/WithOrderBy3', 'with-orderBy/WithOrderBy4',
   # WITH SKIP LIMIT
-  'with-skip-limit/WithSkipLimit1.feature', 'with-skip-limit/WithSkipLimit2.feature', 'with-skip-limit/WithSkipLimit3.feature',
+  'with-skip-limit/WithSkipLimit1', 'with-skip-limit/WithSkipLimit2', 'with-skip-limit/WithSkipLimit3',
   # UNWIND
-  'unwind/Unwind1.feature',
+  'unwind/Unwind1',
 ]
 
 expressions = [
   # boolean
-  'boolean/Boolean1.feature', 'boolean/Boolean2.feature', 'boolean/Boolean3.feature', 'boolean/Boolean4.feature', 'boolean/Boolean5.feature',
+  'boolean/Boolean1', 'boolean/Boolean2', 'boolean/Boolean3', 'boolean/Boolean4', 'boolean/Boolean5',
   # conditonal
-  'conditional/Conditional1.feature', 'conditional/Conditional2.feature',
+  'conditional/Conditional1', 'conditional/Conditional2',
   # graph
-  'graph/Graph1.feature', 'graph/Graph2.feature', 'graph/Graph3.feature', 'graph/Graph4.feature', 'graph/Graph5.feature', 'graph/Graph7.feature', 'graph/Graph9.feature',
+  'graph/Graph1', 'graph/Graph2', 'graph/Graph3', 'graph/Graph4', 'graph/Graph5', 'graph/Graph7', 'graph/Graph9',
   # list
-  'list/List1.feature', 'list/List2.feature', 'list/List3.feature', 'list/List4.feature', 'list/List5.feature', 'list/List6.feature', 'list/List7.feature',  'list/List8.feature',  'list/List9.feature'
+  'list/List1', 'list/List2', 'list/List3', 'list/List4', 'list/List5', 'list/List6', 'list/List7',  'list/List8',  'list/List9',
+  # literals
+  'literals/Literals1', 'literals/Literals2'
 ]
 
 # In progress
-# features = ['create/Create5.feature', 'match/Match6.feature', 'match-where/MatchWhere5.feature', 'set/Set3.feature', 'set/Set5.feature', 'remove/Remove3.feature' ]
-# expressions = ['comparison/Comparison1.feature']
+# features = ['create/Create5', 'match/Match6', 'match-where/MatchWhere5', 'set/Set3', 'set/Set5', 'remove/Remove3' ]
+# expressions = ['comparison/Comparison1']
 # Current dev
 # features = []
 # expressions = []
 
 # Build arguments
 
-expressions = expressions.map { |file| 'openCypher/tck/features/expressions/' + file }
-features = features.map { |file| 'openCypher/tck/features/clauses/' + file }
+expressions = expressions.map { |file| 'openCypher/tck/features/expressions/' + file + '.feature' }
+features = features.map { |file| 'openCypher/tck/features/clauses/' + file + '.feature' }
 args = (features + expressions).concat %w(--require cucumber/step_definitions/ --fail-fast)
 
 # begin
