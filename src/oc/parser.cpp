@@ -46,14 +46,15 @@ struct parser::data
   void validate(algebra::graph_node_csp);
   void validate(algebra::graph_edge_csp);
   std::string generate_anonymous_variable();
+  std::unordered_map<std::string, algebra::node_csp> bounded_variables;
   void get_next_token(int _flags = lexer::mode::normal);
   template<typename... _T_>
   [[noreturn]] void report_error(const token& _token, const std::string& _errorMsg, const _T_&... _values);
   [[noreturn]] void report_unexpected(const token& _token);
   bool is_of_type(const token& _token, token_type _type);
   bool is_of_type(token_type _type);
+  int64_t string_to_integer(std::string _string);
 
-  std::unordered_map<std::string, algebra::node_csp> bounded_variables;
 };
 
 namespace gqlite
@@ -98,6 +99,36 @@ void parser::data::validate(algebra::graph_edge_csp _node)
 std::string parser::data::generate_anonymous_variable()
 {
   return "__gqlite_anon_" + std::to_string(id++);
+}
+
+int64_t parser::data::string_to_integer(std::string _string)
+{
+  if(_string == "0x" or _string == "-0x" or _string == "0o" or _string == "-0o")
+  {
+    throw gqlite::exception("InvalidNumberLiteral: '{}' is not a valid string literal", _string);
+  }
+  try
+  {
+    int base = 10;
+    if(_string.size() > 2 and (_string[1] == 'x' or (_string[0] == '-' and _string[2] == 'x')))
+    {
+      base = 16;
+    } else if(_string.size() > 2 and (_string[1] == 'o' or (_string[0] == '-' and _string[2] == 'o')))
+    {
+      base = 8;
+      if(_string[0] == '-') _string = '-' + _string.substr(3);
+      else _string = _string.substr(2);
+    }
+    long long i = std::stoll(_string, 0, base);
+    if(i > std::numeric_limits<int64_t>::max() or i < std::numeric_limits<int64_t>::min())
+    {
+      throw gqlite::exception("IntegerOverflow: {} is too large.", _string);
+    }
+    return i;
+  } catch(const std::out_of_range&)
+  {
+    throw gqlite::exception("IntegerOverflow: {} is too large.", _string);
+  }
 }
 
 algebra::node_csp parser::data::parse_call()
@@ -745,18 +776,7 @@ algebra::node_csp parser::data::parse_terminal_expression()
     return std::make_shared<algebra::value>(t.string);
   case token_type::INTEGER:
     get_next_token();
-    try
-    {
-      long long i = std::stoll(t.string);
-      if(i > std::numeric_limits<int64_t>::max() or i < std::numeric_limits<int64_t>::min())
-      {
-        throw gqlite::exception("IntegerOverflow: {} is too large.", t.string);
-      }
-      return std::make_shared<algebra::value>(value(int64_t(i)));
-    } catch(const std::out_of_range&)
-    {
-      throw gqlite::exception("IntegerOverflow: {} is too large.", t.string);
-    }
+    return std::make_shared<algebra::value>(string_to_integer(t.string));
   case token_type::FLOATING_POINT:
     get_next_token();
     return std::make_shared<algebra::value>(std::stod(t.string));
@@ -955,18 +975,7 @@ algebra::node_csp parser::data::parse_unary_expression()
         // This needs to be here to properly parse -9223372036854775808
       case token_type::INTEGER:
         get_next_token();
-        try
-        {
-          long long i = std::stoll("-" + t.string);
-          if(i > std::numeric_limits<int64_t>::max() or i < std::numeric_limits<int64_t>::min())
-          {
-            throw gqlite::exception("IntegerOverflow: -{} is too large.", t.string);
-          }
-          return std::make_shared<algebra::value>(value(int64_t(i)));
-        } catch(const std::out_of_range&)
-        {
-          throw gqlite::exception("IntegerOverflow: -{} is too large.", t.string);
-        }
+        return std::make_shared<algebra::value>(string_to_integer("-" + t.string));
       case token_type::FLOATING_POINT:
         get_next_token();
         return std::make_shared<algebra::value>(std::stod("-" + t.string));

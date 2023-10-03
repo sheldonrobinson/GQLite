@@ -146,8 +146,16 @@ token lexer::next_token(int _flags)
     number += char(lastChar);
     lastChar = get_next_char();
     bool is_integer = true;
-    while((lastChar >= '0' and lastChar <= '9') or (lastChar == '.' and is_integer) or lastChar == 'e' or lastChar == '+' or lastChar == '-')
+    bool is_hexa = false;
+    while((lastChar >= '0' and lastChar <= '9')
+       or (is_hexa and (lastChar >= 'A' and lastChar <= 'F'))
+       or (is_hexa and (lastChar >= 'a' and lastChar <= 'f'))
+       or (lastChar == '.' and is_integer and not is_hexa)
+       or lastChar == 'e' or lastChar == '+' or lastChar == '-'
+       or (lastChar == 'x' and number.size() == 1 and number[0] == '0')
+       or (lastChar == 'o' and number.size() == 1 and number[0] == '0'))
     {
+      is_hexa = is_hexa or (lastChar == 'x') or (lastChar == 'o');
       is_integer = is_integer and (lastChar != '.' and lastChar != 'e');
       number += char(lastChar);
       lastChar = get_next_char();

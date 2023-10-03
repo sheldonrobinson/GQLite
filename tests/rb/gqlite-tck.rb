@@ -53,7 +53,7 @@ expressions = [
   # list
   'list/List1', 'list/List2', 'list/List3', 'list/List4', 'list/List5', 'list/List6', 'list/List7',  'list/List8',  'list/List9',
   # literals
-  'literals/Literals1', 'literals/Literals2'
+  'literals/Literals1', 'literals/Literals2', 'literals/Literals3', 'literals/Literals4', 
 ]
 
 # In progress
