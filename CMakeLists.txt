@@ -196,6 +196,8 @@ set(GQLITE_SRCS
   )
 
 add_library(gqlite SHARED ${GQLITE_SRCS})
+set_target_properties(gqlite PROPERTIES VERSION ${GQLITE_VERSION}
+                                           SOVERSION ${GQLITE_MAJOR_VERSION})
 
 target_link_libraries(gqlite PRIVATE ${SQLITE3_LIBRARY})
 
