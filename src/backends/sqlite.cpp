@@ -1663,15 +1663,30 @@ namespace gqlite::backends::sqlite_oc_executor
       {
         errors::check_condition(rs->get_expressions().empty(), "Unimplemented RETURN *, expressions");
         value_vector labels;
-        for(const std::string&  c : table.get_columns_names()) { labels.push_back(c); }
+        std::vector<bool> include;
+        for(const std::string&  c : table.get_columns_names())
+        {
+          if(not c.starts_with("__gqlite_anon_"))
+          {
+            labels.push_back(c);
+            include.push_back(true);
+          } else {
+            include.push_back(false);
+          }
+        }
         value_vector results_rows;
         results_rows.push_back(labels);
         for(std::size_t i = 0; i < table.get_rows_count(); ++i)
         {
           value_vector row;
-          for(const exec_value& ev : table.get_row(i))
+          exec_value_table::row_view source = table.get_row(i);
+          for(std::size_t j = 0; j < include.size(); ++j)
           {
-            row.push_back(exec_c.get_value(ev));
+            const exec_value& ev = source[j];
+            if(include[j])
+            {
+              row.push_back(exec_c.get_value(ev));
+            }
           }
           results_rows.push_back(row);
         }

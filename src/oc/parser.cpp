@@ -16,7 +16,7 @@ struct parser::data
   lexer* lex;
   value_map bindings;
   token tok;
-
+  int id = 0;
   algebra::node_csp parse_call();
   algebra::node_csp parse_create();
   algebra::node_csp parse_match();
@@ -44,6 +44,7 @@ struct parser::data
   std::vector<algebra::named_expression_csp> parse_named_expressions();
   void validate(algebra::graph_node_csp);
   void validate(algebra::graph_edge_csp);
+  std::string generate_anonymous_variable();
   void get_next_token(int _flags = lexer::mode::normal);
   template<typename... _T_>
   [[noreturn]] void report_error(const token& _token, const std::string& _errorMsg, const _T_&... _values);
@@ -91,6 +92,11 @@ void parser::data::validate(algebra::graph_edge_csp _node)
   if(_node->get_labels().empty() and not _node->get_properties()) return;
   if(_node->equals(it->second)) return;
   report_error(tok, "Variable {} is already bound.", _node->get_variable());
+}
+
+std::string parser::data::generate_anonymous_variable()
+{
+  return "__gqlite_anon_" + std::to_string(id++);
 }
 
 algebra::node_csp parser::data::parse_call()
@@ -471,6 +477,8 @@ std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>> pars
     { 
       variable = tok.string;
       get_next_token();
+    } else {
+      variable = generate_anonymous_variable();
     }
     // Labels
     std::vector<std::string> labels;
@@ -542,6 +550,8 @@ std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>> pars
         { // identifier
           current_edge.variable = tok.string;
           get_next_token();
+        } else {
+          current_edge.variable = generate_anonymous_variable();
         }
         if(tok.type == token_type::COLON)
         { // label
