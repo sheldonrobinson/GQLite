@@ -19,6 +19,8 @@ namespace gqlite::backends::functions
     static value keys(const std::vector<value>& _arguments);
     static value id(const std::vector<value>& _arguments);
     static value range(const std::vector<value>& _arguments);
+    static value coalesce(const std::vector<value>& _arguments);
+    static value properties(const std::vector<value>& _arguments);
     std::unordered_map<std::string, std::function<value(const std::vector<value>&)>> functions;
   };
 
@@ -40,6 +42,7 @@ namespace gqlite::backends::functions
     if(arg0.get_type() == value_type::map)
     {
       value_map map = arg0.to_map();
+      errors::check_argument_type_function<std::string>(map["type"].to_string(), "edge", "type");
       auto it = map.find("label");
       if(it == map.end())
       {
@@ -61,6 +64,7 @@ namespace gqlite::backends::functions
     if(arg0.get_type() == value_type::map)
     {
       value_map map = arg0.to_map();
+      errors::check_argument_type_function<std::string>(map["type"].to_string(), "node", "type");
       auto it = map.find("labels");
       if(it == map.end())
       {
@@ -70,6 +74,30 @@ namespace gqlite::backends::functions
       }
     } else {
       return value();
+    }
+  }
+  /**
+   * @return the properties of a node/edge
+   */
+  value static_data::properties(const std::vector<value>& _arguments)
+  {
+    errors::check_arguments_size("properties", _arguments, 1);
+    value arg0 = _arguments[0];
+    if(arg0.get_type() == value_type::map)
+    {
+      value_map map = arg0.to_map();
+      auto it = map.find("properties");
+      if(it == map.end())
+      {
+        return value();
+      } else {
+        return it->second;
+      }
+    } else if(arg0.get_type() == value_type::invalid)
+    {
+      return value();
+    } else {
+      errors::invalid_argument_type("properties function expect node or edge.");
     }
   }
   /**
@@ -139,6 +167,17 @@ namespace gqlite::backends::functions
     for(int i = start; i <= end; ++i) v.push_back(i);
     return v;
   }
+  value static_data::coalesce(const std::vector<value>& _arguments)
+  {
+    for(const value& v : _arguments)
+    {
+      if(v.get_type() != value_type::invalid)
+      {
+        return v;
+      }
+    }
+    return value();
+  }
   static_data::static_data()
   {
     functions["type"] = &static_data::type;
@@ -147,6 +186,8 @@ namespace gqlite::backends::functions
     functions["keys"] = &static_data::keys;
     functions["id"] = &static_data::id;
     functions["range"] = &static_data::range;
+    functions["coalesce"] = &static_data::coalesce;
+    functions["properties"] = &static_data::properties;
   }
 
   value call(const std::string& _name, const std::vector<value>& _arguments)

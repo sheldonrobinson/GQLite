@@ -37,6 +37,7 @@ struct parser::data
   algebra::node_csp parse_conditional_xor_expression();
   algebra::node_csp parse_conditional_or_expression();
   algebra::node_csp parse_conditional_and_expression();
+  algebra::node_csp parse_indexed_access_expression();
   algebra::node_csp parse_member_expression();
   algebra::node_csp parse_terminal_expression();
   algebra::node_csp parse_expression_list();
@@ -941,12 +942,12 @@ algebra::node_csp parser::data::parse_unary_expression()
       return std::make_shared<algebra::logical_negation>(parse_unary_expression());
     case token_type::MINUS:
       get_next_token();
-      return std::make_shared<algebra::negation>(parse_member_expression());
+      return std::make_shared<algebra::negation>(parse_indexed_access_expression());
     case token_type::PLUS:
       get_next_token();
       [[fallthrough]];
     default:
-      return parse_member_expression();
+      return parse_indexed_access_expression();
   }
 }
 
@@ -961,6 +962,20 @@ std::vector<std::string> parser::data::parse_path()
     get_next_token();
   }
   return path;
+}
+
+algebra::node_csp parser::data::parse_indexed_access_expression()
+{
+  algebra::node_csp left = parse_member_expression();
+  if(tok.type == token_type::STARTBOXBRACKET)
+  {
+    get_next_token();
+    algebra::node_csp index = parse_expression();
+    is_of_type(token_type::ENDBOXBRACKET);
+    get_next_token();
+    return std::make_shared<algebra::indexed_access>(left, index);
+  }
+  return left;
 }
 
 algebra::node_csp parser::data::parse_member_expression()

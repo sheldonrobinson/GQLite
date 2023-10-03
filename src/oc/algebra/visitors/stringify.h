@@ -43,6 +43,10 @@ namespace gqlite::oc::algebra::visitors
     {
       return format_string("{}.{}", _var->get_left(), string::join(_var->get_path(), ","));
     }
+    std::string visit(algebra::indexed_access_csp _var) override
+    {
+      return format_string("{}[{}]", start(_var->get_left()), start(_var->get_index()));
+    }
 #define GQLITE_STRINGIFY_BIN_OP(_NAME_, _OP_)                                     \
     std::string visit(algebra::_NAME_ ## _csp _var) override                      \
     {                                                                             \

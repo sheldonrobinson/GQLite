@@ -578,7 +578,7 @@ namespace gqlite::backends::sqlite_oc_executor
       {
         errors::check_arguments_size("type", _node->get_arguments(), 1);
         algebra::node_csp arg0 = _node->get_arguments().front();
-        errors::check_argument_type("type", arg0->get_type(), algebra::node_type::variable);
+        errors::check_argument_type_function(arg0->get_type(), algebra::node_type::variable, "type");
         algebra::variable_csp arg0_var = std::static_pointer_cast<const algebra::variable>(arg0);
         match_context::var_info& info = mc->get_variable_info(arg0_var->get_identifier());
         if(info.is_node)
@@ -590,7 +590,7 @@ namespace gqlite::backends::sqlite_oc_executor
       {
         errors::check_arguments_size("id", _node->get_arguments(), 1);
         algebra::node_csp arg0 = _node->get_arguments().front();
-        errors::check_argument_type("id", arg0->get_type(), algebra::node_type::variable);
+        errors::check_argument_type(arg0->get_type(), algebra::node_type::variable, "id");
         algebra::variable_csp arg0_var = std::static_pointer_cast<const algebra::variable>(arg0);
         match_context::var_info& info = mc->get_variable_info(arg0_var->get_identifier());
         return info.sql_var;
@@ -722,6 +722,44 @@ namespace gqlite::backends::sqlite_oc_executor
       };
       return std::visit(member_access{this, _node}, value);
     }
+    exec_value visit(algebra::indexed_access_csp _node) override
+    {
+      exec_value value = exec_c->get_value(start(_node->get_left()));
+      gqlite::value index =exec_c->get_value(start(_node->get_index()));
+      struct member_access
+      {
+        gqlite::value index;
+        gqlite::value operator()(const node_ref_sp&)
+        {
+          throw gqlite::exception("Invalid value type, expected an array, got a node.");
+        }
+        gqlite::value operator()(const edge_ref_sp&)
+        {
+          throw gqlite::exception("Invalid value type, expected an array, got an edge.");
+        }
+        gqlite::value operator()(const gqlite::value& _v)
+        {
+          switch(_v.get_type())
+          {
+            case gqlite::value_type::vector:
+            {
+              return _v.to_vector()[index.to_integer()];
+            }
+            case gqlite::value_type::map:
+            {
+              return _v.to_map()[index.to_string()];
+            }
+            default:
+              throw gqlite::exception("Invalid value type, expected an array, got {}.", _v);
+          }
+        }
+        gqlite::value operator()(const empty&)
+        {
+          return gqlite::value();
+        }
+      };
+      return std::visit(member_access{index}, value);
+    }
     bool is_numeric(value_type _vt)
     {
       return _vt == value_type::integer or _vt == value_type::number;
@@ -736,7 +774,7 @@ namespace gqlite::backends::sqlite_oc_executor
         case value_type::invalid: return value();
         case value_type::boolean: return not ev_val.to_bool();
         default:
-          throw exception("InvalidArgumentType: expected boolean got {}", ev_val);
+          errors::invalid_argument_type("expected boolean got {}", ev_val);
       }
     }
     template<typename _TOp_, typename _TNode_>
@@ -756,13 +794,13 @@ namespace gqlite::backends::sqlite_oc_executor
         } else if(left_val.get_type() == value_type::boolean or right_val.get_type() == value_type::boolean) {
           return false;
         } else {
-          throw exception("InvalidArgumentType: binary comparison between non-bool {} and {}.", left_val, right_val);
+          errors::invalid_argument_type("binary comparison between non-bool {} and {}.", left_val, right_val);
         }
       } else if(left_val.get_type() == value_type::boolean and right_val.get_type() == value_type::boolean)
       {
         return _TOp_()(left_val.to_bool(), right_val.to_bool());
       } else {
-        throw exception("InvalidArgumentType: binary comparison between non-bool {} and {}.", left_val, right_val);
+        errors::invalid_argument_type("binary comparison between non-bool {} and {}.", left_val, right_val);
       }
     }
     exec_value visit(algebra::logical_and_csp _node) override
@@ -907,6 +945,30 @@ namespace gqlite::backends::sqlite_oc_executor
         args.push_back(exec_c->get_value(start(arg)));
       }
       return functions::call(_node->get_name(), args);
+    }
+    exec_value visit(algebra::has_labels_csp _node) override
+    {
+      exec_value ev = eval_c->get_variable(_node->get_left());
+      errors::check_condition(std::holds_alternative<node_ref_sp>(ev) or std::holds_alternative<edge_ref_sp>(ev), "InvalidArgumentType: has_labels expression expect a node or an edge.");
+      value_map val = exec_c->get_value(ev).to_map();
+      std::vector<std::string> labels;
+      if(val["type"].to_string() == "node")
+      {
+        for(const value& v : val["labels"].to_vector())
+        {
+          labels.push_back(v.to_string());
+        }
+      } else {
+        labels.push_back(val["label"].to_string());
+      }
+      for(const std::string& l : _node->get_labels())
+      {
+        if(std::find(labels.begin(), labels.end(), l) == labels.end())
+        {
+          return false;
+        }
+      }
+      return true;
     }
   };
   /**
@@ -1561,7 +1623,7 @@ namespace gqlite::backends::sqlite_oc_executor
           eval_v.exec_c = &exec_c;
           eval_v.eval_c = &eval_c;
           value skip_v = exec_c.get_value(eval_v.start(_modifiers->get_skip()));
-          errors::check_condition(skip_v.get_type() == value_type::integer, "InvalidArgumentType: Non-integer skip {} is not allowed.", skip_v);
+          errors::check_argument_type(skip_v.get_type(), value_type::integer, "Non-integer skip {} is not allowed.", skip_v);
           int skip = skip_v.to_integer();
           errors::check_condition(skip >= 0, "Negative skip {} is not allowed.", skip);
           _table->offset(skip);
@@ -1574,7 +1636,7 @@ namespace gqlite::backends::sqlite_oc_executor
           eval_v.eval_c = &eval_c;
           evaluator_visitor ev;
           value limit_v = exec_c.get_value(eval_v.start(_modifiers->get_limit()));
-          errors::check_condition(limit_v.get_type() == value_type::integer, "InvalidArgumentType: Non-integer limit {} is not allowed.", limit_v);
+          errors::check_argument_type(limit_v.get_type(), value_type::integer, "Non-integer limit {} is not allowed.", limit_v);
           int limit = limit_v.to_integer();
           errors::check_condition(limit >= 0, "Negative limit {} is not allowed.", limit);
           _table->limit(limit);

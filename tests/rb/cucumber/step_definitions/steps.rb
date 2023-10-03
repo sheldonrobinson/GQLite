@@ -136,6 +136,7 @@ IgnoredScenario = [
   # Path assignment is not implemented yet
   "[4] Forwarding a path variable",
   "[14] Fail when filtering path with property predicate",
+  "[8] `labels()` failing on a path",
   # Path assignment and variable length path are not implemented
   "[8] Fail when a path has the same variable in a preceding MATCH",
   "[9] Fail when a relationship has the same variable in the same pattern",
@@ -174,6 +175,13 @@ IgnoredScenario = [
   "[5] Ignore null when removing property from a node",
   "[6] Ignore null when removing property from a relationship",
   "[5] Ignore null when removing a node label",
+  "[7] `labels()` on null node",
+  "[3] `type()` on null relationship",
+  "[4] `type()` on mixed null and non-null relationships",
+  "[5] Label expression on null",
+  "[2] Statically access a property of a optional non-null node",
+  "[3] Statically access a property of a null node",
+  "[3] `properties()` on null",
   # TODO edge isomorphism
   "[29] Fail when re-using a relationship in the same pattern",
   # WITH allow to reuse variable even with considering edge isomorphism, need a better way to handle that, might have to be tracked by the parser
@@ -262,7 +270,11 @@ IgnoredScenario = [
   "[7] Exclusive disjunction is associative on null",
   "[2] Disjunction is distributive over conjunction on null",
   "[4] Conjunction is distributive over disjunction on null",
-  "[6] Conjunction is not distributive over exclusive disjunction on null"
+  "[6] Conjunction is not distributive over exclusive disjunction on null",
+  # CASE WHEN THEN
+  "[1] Simple cases over integers",
+  # No compile time argument check
+  "[7] Failing when using `type()` on a node"
 ]
 
 Before do |scenario|

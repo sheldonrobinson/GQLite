@@ -45,17 +45,23 @@ features = [
 
 expressions = [
   # boolean
-  'boolean/Boolean1.feature', 'boolean/Boolean2.feature', 'boolean/Boolean3.feature', 'boolean/Boolean4.feature', 'boolean/Boolean5.feature'
+  'boolean/Boolean1.feature', 'boolean/Boolean2.feature', 'boolean/Boolean3.feature', 'boolean/Boolean4.feature', 'boolean/Boolean5.feature',
+  # conditonal
+  'conditional/Conditional1.feature', 'conditional/Conditional2.feature',
+  # graph
+  'graph/Graph1.feature', 'graph/Graph2.feature', 'graph/Graph3.feature', 'graph/Graph4.feature', 'graph/Graph5.feature', 'graph/Graph7.feature', 'graph/Graph9.feature'
 ]
 
 # In progress
 # features = ['create/Create5.feature', 'match/Match6.feature', 'match-where/MatchWhere5.feature', 'set/Set3.feature', 'set/Set5.feature', 'remove/Remove3.feature' ]
+# expressions = ['comparison/Comparison1.feature']
 # Current dev
 # features = []
 # expressions = []
 
-expressions = expressions.map { |file| 'openCypher/tck/features/expressions/' + file }
+# Build arguments
 
+expressions = expressions.map { |file| 'openCypher/tck/features/expressions/' + file }
 features = features.map { |file| 'openCypher/tck/features/clauses/' + file }
 args = (features + expressions).concat %w(--require cucumber/step_definitions/ --fail-fast)
 
