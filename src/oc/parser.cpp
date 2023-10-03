@@ -884,14 +884,14 @@ algebra::node_csp parser::data::parse_relational_expression()
       return std::make_shared<algebra::relational_superior_equal>(node, parse_relational_expression());
     case token_type::IN:
       get_next_token();
-      return std::make_shared<algebra::relational_in>(node, parse_expression_list());
+      return std::make_shared<algebra::relational_in>(node, parse_expression());
     case token_type::NOT:
       get_next_token();
       if(is_of_type(tok, token_type::IN))
       {
         get_next_token();
       }
-      return std::make_shared<algebra::relational_not_in>(node, parse_expression_list());
+      return std::make_shared<algebra::relational_not_in>(node, parse_expression());
     default:
       return node;
   }
@@ -967,13 +967,30 @@ std::vector<std::string> parser::data::parse_path()
 algebra::node_csp parser::data::parse_indexed_access_expression()
 {
   algebra::node_csp left = parse_member_expression();
-  if(tok.type == token_type::STARTBOXBRACKET)
+  while(tok.type == token_type::STARTBOXBRACKET)
   {
     get_next_token();
-    algebra::node_csp index = parse_expression();
+    algebra::node_csp index;
+    if(tok.type == token_type::DOTDOT)
+    {
+      index = std::make_shared<algebra::value>(0);
+    } else {
+      index = parse_expression();
+    }
+    algebra::node_csp end = nullptr;
+    if(tok.type == token_type::DOTDOT)
+    {
+      get_next_token();
+      if(tok.type == token_type::ENDBOXBRACKET)
+      {
+        end = std::make_shared<algebra::end_of_list>();
+      } else {
+        end = parse_expression();
+      }
+    }
     is_of_type(token_type::ENDBOXBRACKET);
     get_next_token();
-    return std::make_shared<algebra::indexed_access>(left, index);
+    left = std::make_shared<algebra::indexed_access>(left, index, end);
   }
   return left;
 }

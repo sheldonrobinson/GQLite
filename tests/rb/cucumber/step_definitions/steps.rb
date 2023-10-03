@@ -137,6 +137,7 @@ IgnoredScenario = [
   "[4] Forwarding a path variable",
   "[14] Fail when filtering path with property predicate",
   "[8] `labels()` failing on a path",
+  "[5] Fail for `size()` on paths",
   # Path assignment and variable length path are not implemented
   "[8] Fail when a path has the same variable in a preceding MATCH",
   "[9] Fail when a relationship has the same variable in the same pattern",
@@ -274,7 +275,12 @@ IgnoredScenario = [
   # CASE WHEN THEN
   "[1] Simple cases over integers",
   # No compile time argument check
-  "[7] Failing when using `type()` on a node"
+  "[7] Failing when using `type()` on a node",
+  # pattern comprehension are not supported
+  "[7] Using size of pattern comprehension to test existence",
+  "[8] Get node degree via size of pattern comprehension",
+  "[9] Get node degree via size of pattern comprehension that specifies a relationship type",
+  "[10] Get node degree via size of pattern comprehension that specifies multiple relationship types",
 ]
 
 Before do |scenario|
@@ -462,6 +468,18 @@ Then(/^a ArgumentError should be raised at runtime: InvalidArgumentType$/) do
 end
 
 Then(/^a SyntaxError should be raised at compile time: InvalidArgumentType$/) do
+  pending if @ignored_scenario
+  expect(@exception).not_to be_nil
+  expect(@exception.message).to match(/^InvalidArgumentType: .*$/)
+end
+
+Then(/^a TypeError should be raised at any time: InvalidArgumentType$/) do
+  pending if @ignored_scenario
+  expect(@exception).not_to be_nil
+  expect(@exception.message).to match(/^InvalidArgumentType: .*$/)
+end
+
+Then(/^a TypeError should be raised at any time: \*$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
   expect(@exception.message).to match(/^InvalidArgumentType: .*$/)

@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "token.h"
+#include "../logging.h"
 
 using namespace gqlite::oc;
 
@@ -143,13 +144,19 @@ token lexer::next_token(int _flags)
     number += char(lastChar);
     lastChar = get_next_char();
     bool is_integer = true;
-    while((lastChar >= '0' and lastChar <= '9') or lastChar == '.' or lastChar == 'e' or lastChar == '+' or lastChar == '-')
+    while((lastChar >= '0' and lastChar <= '9') or (lastChar == '.' and is_integer) or lastChar == 'e' or lastChar == '+' or lastChar == '-')
     {
       is_integer = is_integer and (lastChar != '.' and lastChar != 'e');
       number += char(lastChar);
       lastChar = get_next_char();
     }
     unget();
+    if(*std::prev(number.end()) == '.')
+    {
+      unget();
+      is_integer = true;
+      number = number.substr(0, number.size() - 1);
+    }
     if(is_integer)
     {
       return token(token_type::INTEGER, number, line(), initial_col);
@@ -158,7 +165,7 @@ token lexer::next_token(int _flags)
     }
   } else {
     CHAR_IS_TOKEN(';', SEMI );
-    CHAR_IS_TOKEN('.', DOT );
+    CHAR_IS_TOKEN_OR_TOKEN('.', '.', DOT, DOTDOT);
     CHAR_IS_TOKEN( '{', STARTBRACE );
     CHAR_IS_TOKEN( '}', ENDBRACE );
     CHAR_IS_TOKEN( '(', STARTBRACKET );

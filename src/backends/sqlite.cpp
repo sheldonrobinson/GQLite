@@ -2,6 +2,7 @@
 
 #include <list>
 #include <map>
+#include <optional>
 #include <sqlite3.h>
 #include <variant>
 
@@ -725,10 +726,25 @@ namespace gqlite::backends::sqlite_oc_executor
     exec_value visit(algebra::indexed_access_csp _node) override
     {
       exec_value value = exec_c->get_value(start(_node->get_left()));
-      gqlite::value index =exec_c->get_value(start(_node->get_index()));
-      struct member_access
+      gqlite::value index = exec_c->get_value(start(_node->get_index()));
+      if(index.get_type() == value_type::invalid) return gqlite::value();
+      std::optional<gqlite::value> end;
+      bool end_of_list = false;
+      if(_node->get_end())
+      {
+        if(_node->get_end()->get_type() == algebra::node_type::end_of_list)
+        {
+          end_of_list = true;
+        } else {
+          end = exec_c->get_value(start(_node->get_end()));
+          if(end->get_type() == value_type::invalid) return gqlite::value();
+        }
+      }
+      struct indexed_access
       {
         gqlite::value index;
+        std::optional<gqlite::value> end;
+        bool end_of_list;
         gqlite::value operator()(const node_ref_sp&)
         {
           throw gqlite::exception("Invalid value type, expected an array, got a node.");
@@ -743,14 +759,38 @@ namespace gqlite::backends::sqlite_oc_executor
           {
             case gqlite::value_type::vector:
             {
-              return _v.to_vector()[index.to_integer()];
+              errors::check_argument_type(index.get_type(), value_type::integer, "index of array should be an integer not {}", index);
+              int idx = index.to_integer();
+              value_vector vv = _v.to_vector();
+              if(end or end_of_list)
+              {
+                while(idx < 0) idx += vv.size();
+                int end_idx;
+                if(end_of_list)
+                {
+                  end_idx = vv.size();
+                } else {
+                  errors::check_argument_type(end->get_type(), value_type::integer, "end index of array should be an integer not {}", *end);
+                  end_idx = end->to_integer();
+                  if(end_idx > int(vv.size())) end_idx = vv.size();
+                  while(end_idx < 0) end_idx += vv.size();
+                }
+                if(end_idx < idx) end_idx = idx;
+                value_vector vv_out;
+                std::copy(vv.begin() + idx, vv.begin() + end_idx, std::back_inserter(vv_out));
+                return vv_out;
+              } else {
+                std::size_t idx_s = idx;
+                errors::check_condition(idx_s < vv.size(), "Index {} out of bounds {}.", idx, vv.size());
+                return vv[idx_s];
+              }
             }
             case gqlite::value_type::map:
             {
               return _v.to_map()[index.to_string()];
             }
             default:
-              throw gqlite::exception("Invalid value type, expected an array, got {}.", _v);
+              errors::invalid_argument_type("Invalid value type, expected an array, got {}.", _v);
           }
         }
         gqlite::value operator()(const empty&)
@@ -758,7 +798,7 @@ namespace gqlite::backends::sqlite_oc_executor
           return gqlite::value();
         }
       };
-      return std::visit(member_access{index}, value);
+      return std::visit(indexed_access{index, end, end_of_list}, value);
     }
     bool is_numeric(value_type _vt)
     {
@@ -890,11 +930,16 @@ namespace gqlite::backends::sqlite_oc_executor
       if(left_val.get_type() == value_type::string and right_val.get_type() == value_type::string)
       {
         return left_val.to_string() + right_val.to_string();
-      } else if(left_val.get_type() == value_type::vector and right_val.get_type() == value_type::vector)
+      } else if(left_val.get_type() == value_type::vector)
       {
         value_vector vl = left_val.to_vector();
-        value_vector vr = right_val.to_vector();
-        vl.insert(vl.end(), vr.begin(), vr.end());
+        if(right_val.get_type() == value_type::vector)
+        {
+          value_vector vr = right_val.to_vector();
+          vl.insert(vl.end(), vr.begin(), vr.end());
+        } else {
+          vl.push_back(right_val);
+        }
         return vl;
       } else if(is_numeric(left_val.get_type()) and is_numeric(right_val.get_type()))
       {
@@ -907,6 +952,28 @@ namespace gqlite::backends::sqlite_oc_executor
       } else {
         throw exception("Cannot add {} with {}.", left_val.to_json(), right_val.to_json());
       }
+    }
+    template<template<typename _TOp_> class _OP_, typename _T_>
+    exec_value visit_in_not_in(_T_ _node)
+    {
+      exec_value left_ev = start(_node->get_left());
+      exec_value right_ev = start(_node->get_right());
+      errors::check_condition(std::holds_alternative<value>(left_ev), "Binary operations must be done on values.");
+      errors::check_condition(std::holds_alternative<value>(right_ev), "Binary operations must be done on values.");
+      value left_val = std::get<value>(left_ev);
+      value right_val = std::get<value>(right_ev);
+      errors::check_argument_type(right_val.get_type(), value_type::vector, "IN/NOT IN arguments needs to be a list not {}", right_val);
+      if(left_val.get_type() == value_type::invalid or right_val.get_type() == value_type::invalid) return value();
+      value_vector right_val_vec = right_val.to_vector();
+      return _OP_<decltype(right_val_vec.begin())>()(std::find(right_val_vec.begin(), right_val_vec.end(), left_val), right_val_vec.end());
+    }
+    exec_value visit(algebra::relational_in_csp _node) override
+    {
+      return visit_in_not_in<std::not_equal_to>(_node);
+    }
+    exec_value visit(algebra::relational_not_in_csp _node) override
+    {
+      return visit_in_not_in<std::equal_to>(_node);
     }
     exec_value visit(algebra::negation_csp _node) override
     {

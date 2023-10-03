@@ -104,6 +104,10 @@ OC_ALGEBRA_GENERATE(edit_labels, OC_ALGEBRA_EDIT_LABELS_MEMBERS)
 
 // Values
 
+#define OC_ALGEBRA_NO_MEMBERS(_KLASS_NAME_, F)
+
+OC_ALGEBRA_GENERATE(end_of_list, OC_ALGEBRA_NO_MEMBERS)
+
 #define OC_ALGEBRA_GRAPH_NODE_MEMBERS(_KLASS_NAME_, F)          \
   F(_KLASS_NAME_, std::string, variable)                        \
   F(_KLASS_NAME_, std::vector<std::string>, labels)             \
@@ -157,9 +161,10 @@ OC_ALGEBRA_GENERATE(variable, OC_ALGEBRA_VARIABLE_MEMBERS)
 
 OC_ALGEBRA_GENERATE(member_access, OC_ALGEBRA_MEMBER_ACCESS_MEMBERS)
 
-#define OC_ALGEBRA_INDEXED_ACCESS_MEMBERS(_KLASS_NAME_, F) \
-  F(_KLASS_NAME_, node_csp, left)                      \
-  F(_KLASS_NAME_, node_csp, index)
+#define OC_ALGEBRA_INDEXED_ACCESS_MEMBERS(_KLASS_NAME_, F)  \
+  F(_KLASS_NAME_, node_csp, left)                           \
+  F(_KLASS_NAME_, node_csp, index)                          \
+  F(_KLASS_NAME_, node_csp, end)
 
 OC_ALGEBRA_GENERATE(indexed_access, OC_ALGEBRA_INDEXED_ACCESS_MEMBERS)
 

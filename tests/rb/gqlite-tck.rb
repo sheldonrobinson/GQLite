@@ -49,7 +49,9 @@ expressions = [
   # conditonal
   'conditional/Conditional1.feature', 'conditional/Conditional2.feature',
   # graph
-  'graph/Graph1.feature', 'graph/Graph2.feature', 'graph/Graph3.feature', 'graph/Graph4.feature', 'graph/Graph5.feature', 'graph/Graph7.feature', 'graph/Graph9.feature'
+  'graph/Graph1.feature', 'graph/Graph2.feature', 'graph/Graph3.feature', 'graph/Graph4.feature', 'graph/Graph5.feature', 'graph/Graph7.feature', 'graph/Graph9.feature',
+  # list
+  'list/List1.feature', 'list/List2.feature', 'list/List3.feature', 'list/List4.feature', 'list/List5.feature', 'list/List6.feature', 'list/List7.feature',  'list/List8.feature',  'list/List9.feature'
 ]
 
 # In progress

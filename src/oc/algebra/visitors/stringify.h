@@ -55,6 +55,8 @@ namespace gqlite::oc::algebra::visitors
     GQLITE_STRINGIFY_BIN_OP(logical_and, AND)
     GQLITE_STRINGIFY_BIN_OP(logical_or, OR)
     GQLITE_STRINGIFY_BIN_OP(logical_xor, XOR)
+    GQLITE_STRINGIFY_BIN_OP(relational_in, IN)
+    GQLITE_STRINGIFY_BIN_OP(relational_not_in, NOT IN)
 #define GQLITE_STRINGIFY_UNARY_OP(_NAME_, _OP_)                                   \
     std::string visit(algebra::_NAME_ ## _csp _var) override                      \
     {                                                                             \

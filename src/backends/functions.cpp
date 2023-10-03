@@ -21,6 +21,9 @@ namespace gqlite::backends::functions
     static value range(const std::vector<value>& _arguments);
     static value coalesce(const std::vector<value>& _arguments);
     static value properties(const std::vector<value>& _arguments);
+    static value to_integer(const std::vector<value>& _arguments);
+    static value tail(const std::vector<value>& _arguments);
+    static value head(const std::vector<value>& _arguments);
     std::unordered_map<std::string, std::function<value(const std::vector<value>&)>> functions;
   };
 
@@ -146,7 +149,7 @@ namespace gqlite::backends::functions
    */
   value static_data::size(const std::vector<value>& _arguments)
   {
-    errors::check_arguments_size("labels", _arguments, 1);
+    errors::check_arguments_size("size", _arguments, 1);
     value arg0 = _arguments[0];
     if(arg0.get_type() == value_type::vector)
     {
@@ -178,6 +181,50 @@ namespace gqlite::backends::functions
     }
     return value();
   }
+  value static_data::to_integer(const std::vector<value>& _arguments)
+  {
+    errors::check_arguments_size("to_integer", _arguments, 1);
+    value val = _arguments[0];
+    switch(val.get_type())
+    {
+      case value_type::invalid:
+      case value_type::integer:
+        return val;
+      case value_type::number:
+        return int(val.to_double());
+      default:
+        errors::invalid_argument_type("toInteger expect a number got {}", val);
+    }
+  }
+  value static_data::tail(const std::vector<value>& _arguments)
+  {
+    errors::check_arguments_size("tail", _arguments, 1);
+    value arg0 = _arguments[0];
+    if(arg0.get_type() == value_type::vector)
+    {
+      value_vector arg0v = arg0.to_vector();
+      if(arg0v.size() > 1)
+      {
+        return arg0v.back();
+      }
+    }
+    return value();
+  }
+  value static_data::head(const std::vector<value>& _arguments)
+  {
+    errors::check_arguments_size("head", _arguments, 1);
+    value arg0 = _arguments[0];
+    if(arg0.get_type() == value_type::vector)
+    {
+      value_vector arg0v = arg0.to_vector();
+      if(arg0v.size() > 1)
+      {
+        return arg0v.front();
+      }
+    }
+    return value();
+  }
+
   static_data::static_data()
   {
     functions["type"] = &static_data::type;
@@ -188,6 +235,9 @@ namespace gqlite::backends::functions
     functions["range"] = &static_data::range;
     functions["coalesce"] = &static_data::coalesce;
     functions["properties"] = &static_data::properties;
+    functions["toInteger"] = &static_data::to_integer;
+    functions["tail"] = &static_data::tail;
+    functions["head"] = &static_data::head;
   }
 
   value call(const std::string& _name, const std::vector<value>& _arguments)

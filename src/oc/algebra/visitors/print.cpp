@@ -133,6 +133,7 @@ print::~print()
 #define OC_ALGEBRA_GENERATE(_KLASS_NAME_, _MEMBER_DEF_)                 \
 void print::visit(_KLASS_NAME_ ## _csp _node)                           \
 {                                                                       \
+  GQLITE_UNUSED(_node);                                                 \
   print_h(d->indentation, # _KLASS_NAME_);                              \
   std::string oldindentation = d->indentation;                          \
   d->indentation += "  ";                                               \

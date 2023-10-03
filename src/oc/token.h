@@ -29,6 +29,7 @@ namespace gqlite::oc
     SUPERIOR_EQUAL, ///< >=
     INFERIOR_EQUAL, ///< <=
     DOT, ///< .
+    DOTDOT, ///< ..
     LEFT_ARROW, ///< ->
     RIGHT_ARROW, ///< <-
     PLUS, ///< +
