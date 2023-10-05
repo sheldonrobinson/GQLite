@@ -291,7 +291,7 @@ endif()
 ########################
 ## Build tests
 
-add_executable(gqlite_cpp_tests tests/cpp/catch_amalgamated.cpp tests/cpp/test_table.cpp)
+add_executable(gqlite_cpp_tests tests/cpp/catch_amalgamated.cpp tests/cpp/test_table.cpp tests/cpp/test_value.cpp)
 target_link_libraries(gqlite_cpp_tests PRIVATE gqlite)
 
 if(Crystal_FOUND)

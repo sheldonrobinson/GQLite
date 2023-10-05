@@ -840,7 +840,7 @@ algebra::node_csp parser::data::parse_conditional_xor_expression()
   if(tok.type == token_type::XOR)
   {
     get_next_token();
-    return std::make_shared<algebra::logical_or>(node, parse_conditional_xor_expression());
+    return std::make_shared<algebra::logical_xor>(node, parse_conditional_xor_expression());
   } else {
     return node;
   }

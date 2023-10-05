@@ -75,16 +75,15 @@ module GQLiteTest
   end
   def GQLiteTest.parse_results_table(table)
     table = table.raw
-    r_node = /\((\w*)((:\w*)*)(\s*{.*})?\)/
+    r_node = /^\((\w*)((:\w*)*)(\s*{.*})?\)$/
+    r_edge = /^\[(\w*)(:(\w*))?(\s*{.*})?\]$/
+    first_row = true
     return table.map do |c|
-      c.map { |v|
-        if v == 'null'
-          nil
-        elsif v[0] == "'" and v[-1] == "'"
-          v[1..-2]
-        elsif v.is_i?
-          v.to_i
-        else
+      if first_row
+        first_row = false
+        c
+      else
+        c.map do |v|
           arr = v.scan r_node
           if arr.size > 0
             labels = arr[0][1]
@@ -100,31 +99,94 @@ module GQLiteTest
               properties = YAML.load properties
             end
             { "type"=>"node", "properties" => properties, "labels" => labels }
+          elsif v != "[]" && (arr = v.scan(r_edge)).size > 0
+            label = arr[0][2]
+            properties = arr[0][3]
+            unless label.nil? && properties.nil?
+              if properties.nil?
+                properties = {}
+              else
+                properties = YAML.load properties
+              end
+              { "type"=>"edge", "properties" => properties, "label" => label }
+            else
+              YAML.load v
+            end
           else
-            v
+            YAML.load v
           end
         end
-      }
+      end
     end
   end
 end
 
+def compare(a,b)
+  # return a == b
+  return false unless a.class == b.class
+  case a
+  when Float
+    return (a-b).abs() < 1e-12
+  when Array
+    return false unless a.size == b.size
+    a.zip(b) do |va,vb|
+      return false unless compare(va, vb)
+    end
+    return true
+  when Hash
+    return false unless a.keys.sort == b.keys.sort
+    if a.keys.sort == ["labels", "properties", "type"] && a["type"] == "node"
+        return a["labels"].sort == b["labels"].sort && compare(a["properties"], b["properties"])
+    else
+      a.keys.each do |k|
+        return false unless compare(a[k], b[k])
+      end
+      return true
+    end
+  else
+    return a == b
+  end
+  raise "Unhandled comparison between #{a} and #{b}"
+end
+
 RSpec::Matchers.matcher :eq_in_any_order do |expected|
   match do |actual|
-    next false if actual.length != expected.length
-    for i in 0..actual.length
+    if actual.length != expected.length
+      false
+      break
+    end
+    if actual[0] != expected[0]
+      unless actual[0].sort == expected[0].sort
+        false
+        break
+      end
+      sort_order = []
+      actual[0].each do |e|
+        sort_order.push expected[0].index(e)
+      end
+      expected = expected.map do |r|
+        nr = []
+        sort_order.each do |idx|
+          nr.push r[idx]
+        end
+        nr
+      end
+    end
+    success = true
+    for i in 1...actual.length
       match = false
-      for j in 0..actual.length
-        if actual[i] == expected[j]
+      for j in 1...actual.length
+        if compare(actual[i], expected[j])
           match = true
           break
         end
       end
       unless match
-        next false
+        success = false
+        break
       end
     end
-    true
+    success
   end
 end
 
@@ -150,7 +212,6 @@ IgnoredScenario = [
   # WITH not implemented
   "[11] Fail when matching a node variable bound to a value",
   "[7] Matching twice with conflicting relationship types on same relationship",
-  "[13] Fail when matching a relationship variable bound to a value",
   "[24] Matching twice with duplicate relationship types on same relationship",
   "[25] Matching twice with an additional node label",
   "[26] Matching twice with a duplicate predicate",
@@ -279,6 +340,13 @@ IgnoredScenario = [
   "[8] Get node degree via size of pattern comprehension",
   "[9] Get node degree via size of pattern comprehension that specifies a relationship type",
   "[10] Get node degree via size of pattern comprehension that specifies multiple relationship types",
+  # handling of null
+  "[4] Equality between almost equal lists with null should return null",
+  "[7] Equality between almost equal nested lists with null should return null",
+  "[21] IN should return null if LHS and RHS are null - list version",
+  "[29] IN should return null if comparison with null is required, list version",
+  "[31] IN should return null when comparing two so-called identical lists where one element is null",
+  "[34] IN should return null if comparison with null is required, list version 2"
 ]
 
 Before do |scenario|

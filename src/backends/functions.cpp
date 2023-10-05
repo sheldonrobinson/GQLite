@@ -92,7 +92,7 @@ namespace gqlite::backends::functions
       auto it = map.find("properties");
       if(it == map.end())
       {
-        return value();
+        return map;
       } else {
         return it->second;
       }
@@ -134,6 +134,10 @@ namespace gqlite::backends::functions
     if(arg0.get_type() == value_type::map)
     {
       value_map map = arg0.to_map();
+      if(map.find("properties") != map.end() and map.find("type") != map.end()) // TODO need a better way to distinguish between node/edge and actual property map...
+      {
+        map = map["properties"].to_map();
+      }
       value_vector out;
       for(auto it = map.begin(); it != map.end(); ++it)
       {
@@ -153,7 +157,7 @@ namespace gqlite::backends::functions
     value arg0 = _arguments[0];
     if(arg0.get_type() == value_type::vector)
     {
-      return arg0.to_vector();
+      return int64_t(arg0.to_vector().size());
     } else {
       return value();
     }
@@ -205,7 +209,11 @@ namespace gqlite::backends::functions
       value_vector arg0v = arg0.to_vector();
       if(arg0v.size() > 1)
       {
-        return arg0v.back();
+        value_vector out;
+        std::copy(arg0v.begin() + 1, arg0v.end(), std::back_inserter(out));
+        return out;
+      } else {
+        return arg0v;
       }
     }
     return value();

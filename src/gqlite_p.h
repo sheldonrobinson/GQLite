@@ -36,4 +36,42 @@ namespace gqlite
     }
     *this = value(vo);
   }
+  inline value remove_invalid_in_map(const value& _value)
+  {
+    switch(_value.get_type())
+    {
+      using enum value_type;
+      case invalid:
+      case boolean:
+      case integer:
+      case number:
+      case string:
+        return _value;
+      case map:
+      {
+        value_map vm;
+        for(const auto& [k, v] : _value.to_map())
+        {
+          if(v.get_type() != invalid)
+          {
+            vm[k] = remove_invalid_in_map(v);
+          }
+        }
+        return vm;
+      }
+      case vector:
+      {
+        value_vector vv;
+        for(const value& v : _value.to_vector())
+        {
+          if(v.get_type() != invalid)
+          {
+            vv.push_back(remove_invalid_in_map(v));
+          }
+        }
+        return vv;
+      }
+    }
+    throw exception("Internal error, unknown value type for {}", _value);
+  }
 }

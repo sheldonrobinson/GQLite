@@ -50,9 +50,9 @@ namespace {
     std::stringstream stream;
     int last_char;
     /// @brief get the next char
-    void fetch_next_char()
+    void fetch_next_non_space_char()
     {
-      while(std::isspace(last_char = stream.get()))
+      while(std::isspace(fetch_next_char()))
       {
         if(last_char == std::stringstream::traits_type::eof())
         {
@@ -63,12 +63,16 @@ namespace {
         }
       }
     };
+    int fetch_next_char()
+    {
+      return (last_char = stream.get());
+    }
     /// @brief start parsing
     /// @throw gqlite::exception
     /// @return the parsed value
     gqlite::value start()
     {
-      fetch_next_char();
+      fetch_next_non_space_char();
       return read_value();
     }
     /// @brief read a string
@@ -119,43 +123,43 @@ namespace {
       {
         // Parse object
         value_map map;
-        fetch_next_char();
+        fetch_next_non_space_char();
         while(last_char != '}')
         {
           std::string str = read_string();
           is_char(':');
-          fetch_next_char();
+          fetch_next_non_space_char();
           gqlite::value val = read_value();
           map[str] = val;
           if(last_char == ',')
           {
-            fetch_next_char();
+            fetch_next_non_space_char();
           } else {
             break;
           }
         }
         is_char('}');
-        fetch_next_char();
+        fetch_next_non_space_char();
         return map;
       }
       case '[':
       {
         // Parse array
         value_vector vec;
-        fetch_next_char();
+        fetch_next_non_space_char();
         while(last_char != ']')
         {
           gqlite::value val = read_value();
           vec.push_back(val);
           if(last_char == ',')
           {
-            fetch_next_char();
+            fetch_next_non_space_char();
           } else {
             break;
           }
         }
         is_char(']');
-        fetch_next_char();
+        fetch_next_non_space_char();
         return vec;
       }
       case '"':
@@ -163,29 +167,29 @@ namespace {
       case 't':
       {
         // Parse true
-        fetch_next_char(); is_char('r');
-        fetch_next_char(); is_char('u');
-        fetch_next_char(); is_char('e');
-        fetch_next_char();
+        fetch_next_non_space_char(); is_char('r');
+        fetch_next_non_space_char(); is_char('u');
+        fetch_next_non_space_char(); is_char('e');
+        fetch_next_non_space_char();
         return true;
       }
       case 'f':
       {
         // Parse false
-        fetch_next_char(); is_char('a');
-        fetch_next_char(); is_char('l');
-        fetch_next_char(); is_char('s');
-        fetch_next_char(); is_char('e');
-        fetch_next_char();
+        fetch_next_non_space_char(); is_char('a');
+        fetch_next_non_space_char(); is_char('l');
+        fetch_next_non_space_char(); is_char('s');
+        fetch_next_non_space_char(); is_char('e');
+        fetch_next_non_space_char();
         return false;
       }
       case 'n':
       {
         // Parse null
-        fetch_next_char(); is_char('u');
-        fetch_next_char(); is_char('l');
-        fetch_next_char(); is_char('l');
-        fetch_next_char();
+        fetch_next_non_space_char(); is_char('u');
+        fetch_next_non_space_char(); is_char('l');
+        fetch_next_non_space_char(); is_char('l');
+        fetch_next_non_space_char();
         return value();
       }
       // Parse number
@@ -203,13 +207,13 @@ namespace {
       {
         std::string number;
         number += char(last_char);
-        fetch_next_char();
+        fetch_next_non_space_char();
         bool is_integer = true;
         while((last_char >= '0' and last_char <= '9') or last_char == '.' or last_char == 'e' or last_char == '+' or last_char == '-')
         {
           is_integer = is_integer and (last_char != '.' and last_char != 'e');
           number += char(last_char);
-          fetch_next_char();
+          fetch_next_non_space_char();
         }
         if(is_integer)
         {
@@ -414,6 +418,7 @@ value_vector value::to_vector() const
 std::string value::to_json() const
 {
   std::stringstream ss;
+  ss.precision(15);
   d->to_json(ss);
   return ss.str();
 }

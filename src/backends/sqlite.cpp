@@ -725,7 +725,7 @@ namespace gqlite::backends::sqlite_oc_executor
     }
     exec_value visit(algebra::indexed_access_csp _node) override
     {
-      exec_value value = exec_c->get_value(start(_node->get_left()));
+      exec_value value = start(_node->get_left());
       gqlite::value index = exec_c->get_value(start(_node->get_index()));
       if(index.get_type() == value_type::invalid) return gqlite::value();
       std::optional<gqlite::value> end;
@@ -745,13 +745,16 @@ namespace gqlite::backends::sqlite_oc_executor
         gqlite::value index;
         std::optional<gqlite::value> end;
         bool end_of_list;
-        gqlite::value operator()(const node_ref_sp&)
+        execution_context* exec_c;
+        gqlite::value operator()(const node_ref_sp& _node)
         {
-          throw gqlite::exception("Invalid value type, expected an array, got a node.");
+          gqlite::value_map vm = exec_c->get_value(_node).to_map()["properties"].to_map();
+          return vm[index.to_string()];
         }
-        gqlite::value operator()(const edge_ref_sp&)
+        gqlite::value operator()(const edge_ref_sp& _edge)
         {
-          throw gqlite::exception("Invalid value type, expected an array, got an edge.");
+          gqlite::value_map vm = exec_c->get_value(_edge).to_map()["properties"].to_map();
+          return vm[index.to_string()];
         }
         gqlite::value operator()(const gqlite::value& _v)
         {
@@ -764,7 +767,7 @@ namespace gqlite::backends::sqlite_oc_executor
               value_vector vv = _v.to_vector();
               if(end or end_of_list)
               {
-                while(idx < 0) idx += vv.size();
+                if(idx < 0) idx = 0;
                 int end_idx;
                 if(end_of_list)
                 {
@@ -798,7 +801,7 @@ namespace gqlite::backends::sqlite_oc_executor
           return gqlite::value();
         }
       };
-      return std::visit(indexed_access{index, end, end_of_list}, value);
+      return std::visit(indexed_access{index, end, end_of_list, exec_c}, value);
     }
     bool is_numeric(value_type _vt)
     {
@@ -831,8 +834,25 @@ namespace gqlite::backends::sqlite_oc_executor
         if(left_val.get_type() == right_val.get_type())
         {
           return value();
-        } else if(left_val.get_type() == value_type::boolean or right_val.get_type() == value_type::boolean) {
-          return false;
+        } else if(left_val.get_type() == value_type::boolean)
+        {
+          if constexpr (std::same_as<_TOp_, std::logical_and<bool>>)
+          {
+            return left_val.to_bool() ? right_val : left_val;
+          } else if constexpr (std::same_as<_TOp_, std::logical_or<bool>>) {
+            return left_val.to_bool() ? left_val : right_val;
+          } else {
+            return right_val;
+          }
+        } if(right_val.get_type() == value_type::boolean) {
+          if constexpr (std::same_as<_TOp_, std::logical_and<bool>>)
+          {
+            return right_val.to_bool() ? left_val : right_val;
+          } else if constexpr (std::same_as<_TOp_, std::logical_or<bool>>) {
+            return right_val.to_bool() ? right_val : left_val;
+          } else {
+            return left_val; 
+          }
         } else {
           errors::invalid_argument_type("binary comparison between non-bool {} and {}.", left_val, right_val);
         }
@@ -965,7 +985,17 @@ namespace gqlite::backends::sqlite_oc_executor
       errors::check_argument_type(right_val.get_type(), value_type::vector, "IN/NOT IN arguments needs to be a list not {}", right_val);
       if(left_val.get_type() == value_type::invalid or right_val.get_type() == value_type::invalid) return value();
       value_vector right_val_vec = right_val.to_vector();
-      return _OP_<decltype(right_val_vec.begin())>()(std::find(right_val_vec.begin(), right_val_vec.end(), left_val), right_val_vec.end());
+      bool v = _OP_<decltype(right_val_vec.begin())>()(std::find(right_val_vec.begin(), right_val_vec.end(), left_val), right_val_vec.end());
+      if(not v)
+      {
+        if(std::find(right_val_vec.begin(), right_val_vec.end(), value()) != right_val_vec.end()  )
+        {
+          return value();
+        } else {
+          return v;
+        }
+      }
+      return v;
     }
     exec_value visit(algebra::relational_in_csp _node) override
     {
@@ -1416,7 +1446,7 @@ namespace gqlite::backends::sqlite_oc_executor
         statement_visitor* self;
         std::vector<std::string> path;
         exec_value new_value;
-        void execute(const std::string& _set_query, const std::string& _remove_query, int64_t _node_id)
+        void execute(const std::string& _set_query, const std::string& _remove_query, int64_t _node_id, bool _remove_invalid)
         {
           std::string path_string = "$";
           for(const std::string& pe : path)
@@ -1433,6 +1463,10 @@ namespace gqlite::backends::sqlite_oc_executor
               throw exception("Cannot add null property.");
             }
           } else {
+            if(_remove_invalid)
+            {
+              nv = remove_invalid_in_map(nv);
+            }
             self->exec_c.data->execute_sql(_set_query, {{1, _node_id}, {2, path_string}, {3, nv.to_json()}});
           }
         }
@@ -1453,12 +1487,12 @@ namespace gqlite::backends::sqlite_oc_executor
         void operator()(const node_ref_sp& _node)
         {
           _node->cache = gqlite::value(); // Invalidate cache
-          execute(sqlite_queries::node_set_property(self->exec_c.graph_name), sqlite_queries::node_remove_property(self->exec_c.graph_name), _node->id);
+          execute(sqlite_queries::node_set_property(self->exec_c.graph_name), sqlite_queries::node_remove_property(self->exec_c.graph_name), _node->id, true);
         }
         void operator()(const edge_ref_sp& _edge)
         {
           _edge->cache = gqlite::value(); // Invalidate cache
-          execute(sqlite_queries::edge_set_property(self->exec_c.graph_name), sqlite_queries::edge_remove_property(self->exec_c.graph_name), _edge->id);
+          execute(sqlite_queries::edge_set_property(self->exec_c.graph_name), sqlite_queries::edge_remove_property(self->exec_c.graph_name), _edge->id, true);
         }
       };
       struct property_adder : property_setter_adder_base
@@ -1467,12 +1501,12 @@ namespace gqlite::backends::sqlite_oc_executor
         void operator()(const node_ref_sp& _node)
         {
           _node->cache = gqlite::value(); // Invalidate cache
-          execute(sqlite_queries::node_add_properties(self->exec_c.graph_name), std::string(), _node->id);
+          execute(sqlite_queries::node_add_properties(self->exec_c.graph_name), std::string(), _node->id, false);
         }
         void operator()(const edge_ref_sp& _edge)
         {
           _edge->cache = gqlite::value(); // Invalidate cache
-          execute(sqlite_queries::node_add_properties(self->exec_c.graph_name), std::string(), _edge->id);
+          execute(sqlite_queries::node_add_properties(self->exec_c.graph_name), std::string(), _edge->id, false);
         }
       };
 

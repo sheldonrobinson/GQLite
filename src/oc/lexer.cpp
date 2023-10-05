@@ -145,27 +145,38 @@ token lexer::next_token(int _flags)
     std::string number;
     number += char(lastChar);
     lastChar = get_next_char();
+
     bool is_integer = true;
-    bool is_hexa = false;
-    while((lastChar >= '0' and lastChar <= '9')
-       or (is_hexa and (lastChar >= 'A' and lastChar <= 'F'))
-       or (is_hexa and (lastChar >= 'a' and lastChar <= 'f'))
-       or (lastChar == '.' and is_integer and not is_hexa)
-       or lastChar == 'e' or lastChar == '+' or lastChar == '-'
-       or (lastChar == 'x' and number.size() == 1 and number[0] == '0')
-       or (lastChar == 'o' and number.size() == 1 and number[0] == '0'))
+    if(lastChar == 'o' or lastChar == 'x')
     {
-      is_hexa = is_hexa or (lastChar == 'x') or (lastChar == 'o');
-      is_integer = is_integer and (lastChar != '.' and lastChar != 'e');
       number += char(lastChar);
       lastChar = get_next_char();
-    }
-    unget();
-    if(*std::prev(number.end()) == '.')
-    {
+      // Octal or hexa decimal integer
+      while((lastChar >= '0' and lastChar <= '9')
+        or (lastChar >= 'A' and lastChar <= 'F')
+        or (lastChar >= 'a' and lastChar <= 'f'))
+      {
+        number += char(lastChar);
+        lastChar = get_next_char();
+      }
       unget();
-      is_integer = true;
-      number = number.substr(0, number.size() - 1);
+    } else {
+
+      while((lastChar >= '0' and lastChar <= '9')
+        or (lastChar == '.' and is_integer)
+        or lastChar == 'e' or lastChar == '+' or lastChar == '-')
+      {
+        is_integer = is_integer and (lastChar != '.' and lastChar != 'e');
+        number += char(lastChar);
+        lastChar = get_next_char();
+      }
+      unget();
+      if(*std::prev(number.end()) == '.')
+      {
+        unget();
+        is_integer = true;
+        number = number.substr(0, number.size() - 1);
+      }
     }
     if(is_integer)
     {
