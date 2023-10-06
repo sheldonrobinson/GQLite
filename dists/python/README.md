@@ -2,7 +2,7 @@ GQLite is a C++-language library, with a C interface, that implements a small, f
 
 GQLite source code is license under the [MIT License](LICENSE) and is free to everyone to use for any purpose. 
 
-The official repositories contains bindings/APIs for C, C++, Python and Ruby. 
+The official repositories contains bindings/APIs for C, C++, Python, Ruby and Crystal.
 
 The library is still in its early stage, but it is now fully functional. Development effort has now slowed down and new features are added on a by-need basis. It supports a subset of [OpenCypher](https://opencypher.org/), and the intent is to also support ISO GQL in the future when it become available.
 
