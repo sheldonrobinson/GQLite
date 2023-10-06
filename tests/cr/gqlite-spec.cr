@@ -8,7 +8,7 @@ describe GQLite::Connection do
     c.execute_oc_query("CREATE (n)")
     m = c.execute_oc_query("MATCH (n) RETURN n")
     m.should eq [["n"], [{"properties" => {} of String => Nil, "id" => 1, "labels" => [] of String, "type" => "node"}]]
-    expect_raises(GQLite::Error, "1:8:UnexpectedSyntax: Expected token ) got end of file") do
+    expect_raises(GQLite::Error, "CompileTime: UnexpectedSyntax: Expected token ) got end of file at (1, 8).") do
       c.execute_oc_query("MATCH (n")
     end
   end

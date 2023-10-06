@@ -6,13 +6,50 @@
 
 namespace gqlite
 {
-  template<typename _T_, typename... _TOther_>
-  inline exception::exception(const char* _format, const _T_& _value, const _TOther_&... _other) : exception(format_string(_format, _value, _other...))
+  enum class exception_stage
   {
+    unspecified,
+    compiletime,
+    runtime
+  };
+  enum class exception_code
+  {
+    unspecified,
+    // Generic error code
+    internal_error, ///< this should never happen
+    invalid_json, ///< error that occurs when parsing json
+    table_error,
+    value_error, ///< generic error that occurs in the value class
+    unimplemented_error,
+    // OpenCypher error code
+    column_name_conflict = 100,
+    integer_overflow,
+    invalid_argument_type,
+    invalid_number_literal,
+    invalid_number_of_arguments,
+    invalid_parameter_use,
+    negative_integer_argument,
+    parse_error,
+    requires_directed_relationship,
+    undefined_variable,
+    unexpected_syntax,
+    unknown_function,
+    variable_already_bound,
+    variable_type_conflict
+  };
+
+  [[noreturn]] void throw_exception(exception_stage _stage, exception_code _code, const std::string& _error);
+  [[noreturn]] void throw_exception(exception_stage _stage, exception_code _code, const char* _error);
+  [[noreturn]] void rethrow_exception(exception_stage _stage, const exception& _ex);
+  template<typename _T_, typename... _TOther_>
+  [[noreturn]] inline void throw_exception(exception_stage _stage, exception_code _code, const char* _format, const _T_& _value, const _TOther_&... _other)
+  {
+    throw_exception(_stage, _code, format_string(_format, _value, _other...));
   }
   template<typename _T_, typename... _TOther_>
-  inline exception::exception(const std::string& _format, const _T_& _value, const _TOther_&... _other) : exception(format_string(_format, _value, _other...))
+  [[noreturn]] inline void throw_exception(exception_stage _stage, exception_code _code, const std::string& _format, const _T_& _value, const _TOther_&... _other)
   {
+    throw_exception(_stage, _code, format_string(_format, _value, _other...));
   }
 
   template<typename _T_>
@@ -72,6 +109,6 @@ namespace gqlite
         return vv;
       }
     }
-    throw exception("Internal error, unknown value type for {}", _value);
+    throw_exception(exception_stage::unspecified, exception_code::internal_error, "Unknown value type for {}.", _value);
   }
 }

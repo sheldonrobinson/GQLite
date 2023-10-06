@@ -16,7 +16,7 @@ class TestConnection(ut.TestCase):
     # Test failure
     with self.assertRaises(gqlite.Error) as cm:
       conn.execute_oc_query("MATCH (n")
-    self.assertEqual(cm.exception.msg, "1:8:UnexpectedSyntax: Expected token ) got end of file")
+    self.assertEqual(cm.exception.msg, "CompileTime: UnexpectedSyntax: Expected token ) got end of file at (1, 8).")
 
 if __name__ == '__main__':
     ut.main()

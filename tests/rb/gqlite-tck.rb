@@ -67,7 +67,9 @@ expressions = [
 
 expressions = expressions.map { |file| 'openCypher/tck/features/expressions/' + file + '.feature' }
 features = features.map { |file| 'openCypher/tck/features/clauses/' + file + '.feature' }
-args = (features + expressions).concat %w(--require cucumber/step_definitions/ --fail-fast)
+args = (features + expressions).concat %w(--require cucumber/step_definitions/ --format html)
+# To stop at first error
+# args = (features + expressions).concat %w(--require cucumber/step_definitions/ --fail-fast)
 
 # begin
 Cucumber::Cli::Main.new(args).execute!

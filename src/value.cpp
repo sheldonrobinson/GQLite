@@ -59,7 +59,7 @@ namespace {
           return;
         } else if(stream.fail())
         {
-          throw gqlite::exception("Failure in getting json data from stream");
+          throw_exception(exception_stage::unspecified, exception_code::invalid_json, "Failure in getting json data from stream");
         }
       }
     };
@@ -102,7 +102,7 @@ namespace {
             string += char(last_char);
           }
         }
-        errors::check_condition(stream.good(), "Unifinished string: {}", string);
+        errors::check_condition(stream.good(), exception_stage::unspecified, exception_code::invalid_json, "Unfinished string: {}.", string);
         fetch_next_char();
       }
       fetch_next_char(); // eat the '"'
@@ -111,7 +111,7 @@ namespace {
     /// @brief throw an exception if last_char different from @param _c 
     void is_char(int _c)
     {
-      errors::check_condition(last_char == _c, "Expected '{}' but got '{}'", char(_c), char(last_char));
+      errors::check_condition(last_char == _c, exception_stage::unspecified, exception_code::invalid_json, "Expected '{}' but got '{}'.", char(_c), char(last_char));
     }
     /// @brief read the next value
     /// @return and return it
@@ -223,7 +223,7 @@ namespace {
         }
       }
       default:
-        throw gqlite::exception("Unexpected {}", char(last_char));
+        throw_exception(exception_stage::unspecified, exception_code::invalid_json, "Unexpected '{}'.", char(last_char));
       }
     }
   };
@@ -338,7 +338,7 @@ bool value::operator==(const value& _rhs) const
 
 bool value::operator<(const value& _rhs) const
 {
-  errors::check_condition(d->type == _rhs.d->type, "Value of different types are not comparable with '<'");
+  errors::check_condition(d->type == _rhs.d->type, exception_stage::unspecified, exception_code::value_error, "Value of different types are not comparable with '<'");
   switch(d->type)
   {
   case value_type::boolean:
@@ -352,7 +352,7 @@ bool value::operator<(const value& _rhs) const
   case value_type::vector:
     return to_vector() < _rhs.to_vector();
   default:
-    throw exception("Cannot compare {} and {} with inferior operator.", *this, _rhs);
+    throw_exception(exception_stage::unspecified, exception_code::value_error, "Cannot compare {} and {} with inferior operator.", *this, _rhs);
   }
 }
 
@@ -367,7 +367,7 @@ bool value::to_bool() const
   case value_type::number:
     return std::get<double>(d->value_container) != 0.0;
   default:
-    throw exception("Value is not a bool, it is {}.", d->type);
+    throw_exception(exception_stage::unspecified, exception_code::value_error, "Value is not a bool, it is {}.", d->type);
   }
 }
 
@@ -380,7 +380,7 @@ int64_t value::to_integer() const
     case value_type::number:
       return std::get<double>(d->value_container);
     default:
-      throw exception(format_string("Value is not a number, it is {}.", d->type));
+      throw_exception(exception_stage::unspecified, exception_code::value_error, "Value is not a number, it is '{}'.", d->type);
   }
 }
 
@@ -393,25 +393,25 @@ double value::to_double() const
     case value_type::number:
       return std::get<double>(d->value_container);
     default:
-      throw exception(format_string("Value is not a number, it is {}", d->type));
+      throw_exception(exception_stage::unspecified, exception_code::value_error, "Value is not a number, it is '{}'.", d->type);
   }
 }
 
 std::string value::to_string() const
 {
-  errors::check_condition(d->type == value_type::string, "Value is not a string, it is {}", d->type);
+  errors::check_condition(d->type == value_type::string, exception_stage::unspecified, exception_code::value_error, "Value is not a string, it is '{}'.", d->type);
   return std::get<std::string>(d->value_container);
 }
 
 value_map value::to_map() const
 {
-  errors::check_condition(d->type == value_type::map, "Value is not a map, it is {}", d->type);
+  errors::check_condition(d->type == value_type::map, exception_stage::unspecified, exception_code::value_error, "Value is not a map, it is '{}'.", d->type);
   return std::get<value_map>(d->value_container);
 }
 
 value_vector value::to_vector() const
 {
-  errors::check_condition(d->type == value_type::vector, "Value is not a vector, it is {}", d->type);
+  errors::check_condition(d->type == value_type::vector, exception_stage::unspecified, exception_code::value_error, "Value is not a vector, it is '{}'.", d->type);
   return std::get<value_vector>(d->value_container);
 }
 

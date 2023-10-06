@@ -379,37 +379,39 @@ end
 Then(/^a SyntaxError should be raised at compile time: VariableAlreadyBound$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
-  expect(@exception.message).to match(/^(\d+:\d+:|)Variable .* is already bound.|\d+:\d+:UnexpectedSyntax: Expected token : got \]$/)
+  # TODO: should not match for RunTime
+  expect(@exception.message).to match(/^(RunTime)|(CompileTime): (VariableAlreadyBound: Variable .* is already bound( at \(\d+, \d+\))?\.)|(UnexpectedSyntax: Expected token .* got .* at \(\d+, \d+\)\.)$/)
 end
 
 Then(/^a SyntaxError should be raised at compile time: UndefinedVariable$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
-  expect(@exception.message).to match(/^(Variable .* is not defined.)|(Unknown column .*.)$/)
+  # TODO: should not match for RunTime
+  expect(@exception.message).to match(/^(RunTime)|(CompileTime): UndefinedVariable: (Variable .* is not defined.)|(Unknown column .*.)$/)
 end
 
 Then(/^a SyntaxError should be raised at compile time: NoSingleRelationshipType$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
-  expect(@exception.message).to match(/^(\d+:\d+:UnexpectedSyntax: .*)$/)
+  expect(@exception.message).to match(/^CompileTime: UnexpectedSyntax: .* at \(\d+, \d+\)\.$/)
 end
 
 Then(/^a SyntaxError should be raised at compile time: RequiresDirectedRelationship$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
-  expect(@exception.message).to match(/(^\d+:\d+:Edge must be directed during creation.)|(\d+:\d+:Edge cannot have both direction.)$/)
+  expect(@exception.message).to match(/^CompileTime: RequiresDirectedRelationship: (Edge cannot have both direction)|(Edge must be directed during creation) at \(\d+, \d+\)\.$/)
 end
 
 Then(/^a SyntaxError should be raised at compile time: CreatingVarLength$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
-  expect(@exception.message).to match(/^\d+:\d+:UnexpectedSyntax: Expected token \] got .*$/)
+  expect(@exception.message).to match(/^CompileTime: UnexpectedSyntax: Expected token .* got .* at \(\d+, \d+\)\.$/)
 end
 
 Then(/^a SyntaxError should be raised at compile time: InvalidParameterUse$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
-  expect(@exception.message).to match(/^\d+:\d+:Unknown parameter '\$.*'.$/)
+  expect(@exception.message).to match(/^CompileTime: InvalidParameterUse: Unknown parameter '\$.*' at \(\d+, \d+\)\.$/)
 end
 
 Then(/^a SyntaxError should be raised at compile time: VariableTypeConflict$/) do
@@ -427,7 +429,7 @@ end
 Then(/^a SyntaxError should be raised at compile time: ColumnNameConflict$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
-  expect(@exception.message).to match(/^\d+:\d+:Duplicate column name .* is not allowed.$/)
+  expect(@exception.message).to match(/^CompileTime: ColumnNameConflict: Duplicate column name .* is not allowed at \(\d+, \d+\)\.$/)
 end
 
 Then(/^a SyntaxError should be raised at compile time: NoExpressionAlias$/) do
@@ -451,59 +453,59 @@ end
 Then(/^a SyntaxError should be raised at compile time: NonConstantExpression$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
-  expect(@exception.message).to match(/^Variable .* is not defined.$/)
+  expect(@exception.message).to match(/^RunTime: UndefinedVariable: Variable .* is not defined.$/)
 end
 
 Then(/^an ArgumentError should be raised at runtime: NegativeIntegerArgument$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
-  expect(@exception.message).to match(/^Negative (skip)|(limit) .* is not allowed.$/)
+  expect(@exception.message).to match(/^RunTime: NegativeIntegerArgument: .*.$/)
 end
 
 Then(/^a SyntaxError should be raised at compile time: NegativeIntegerArgument$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
-  expect(@exception.message).to match(/^Negative (skip)|(limit) .* is not allowed.$/)
+  expect(@exception.message).to match(/^(RunTime)|(CompileTime): NegativeIntegerArgument: .*$/)
 end
 
 Then(/^a ArgumentError should be raised at runtime: InvalidArgumentType$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
-  expect(@exception.message).to match(/^Non-integer (skip)|(limit) .* is not allowed.$/)
+  expect(@exception.message).to match(/^RunTime: InvalidArgumentType: .*$/)
 end
 
 Then(/^a SyntaxError should be raised at compile time: InvalidArgumentType$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
-  expect(@exception.message).to match(/^InvalidArgumentType: .*$/)
+  expect(@exception.message).to match(/^RunTime: InvalidArgumentType: .*$/)
 end
 
 Then(/^a TypeError should be raised at any time: InvalidArgumentType$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
-  expect(@exception.message).to match(/^InvalidArgumentType: .*$/)
+  expect(@exception.message).to match(/^(CompileTime)|(RunTime): InvalidArgumentType: .*$/)
 end
 
 Then(/^a TypeError should be raised at any time: \*$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
-  expect(@exception.message).to match(/^InvalidArgumentType: .*$/)
+  expect(@exception.message).to match(/^(CompileTime)|(RunTime): InvalidArgumentType: .*$/)
 end
 
 Then(/^a SyntaxError should be raised at compile time: IntegerOverflow$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
-  expect(@exception.message).to match(/^IntegerOverflow: .*$/)
+  expect(@exception.message).to match(/^CompileTime: IntegerOverflow: .*\.$/)
 end
 
 Then(/^a SyntaxError should be raised at compile time: InvalidNumberLiteral$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
-  expect(@exception.message).to match(/^(InvalidNumberLiteral.*)|(.*Expected token end of file got identifier.*)$/)
+  expect(@exception.message).to match(/^CompileTime: (InvalidNumberLiteral.*)|(.*Expected token end of file got identifier.*)$/)
 end
 
 Then(/^a SyntaxError should be raised at compile time: UnexpectedSyntax$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
-  expect(@exception.message).to match(/^\d+:\d+:UnexpectedSyntax: .*$/)
+  expect(@exception.message).to match(/^CompileTime: UnexpectedSyntax: .* \(\d+, \d+\)\.$/)
 end

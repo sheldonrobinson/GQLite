@@ -10,30 +10,28 @@ namespace gqlite
 {
   class backend;
   struct debug_stats;
+  enum class exception_stage;
+  enum class exception_code;
+  struct exception_maker;
   /**
    * Represents an error that occurs during the execution of a query.
    */
   class exception : public std::exception
   {
+    friend class exception_maker;
   public:
-    exception(const std::string& _error) : m_error(_error), m_c_error(m_error.c_str()) {}
-    exception(const char* _error) : m_c_error(_error) {}
-    template<typename _T_, typename... _TOther_>
-    inline exception(const char* _format, const _T_& _value, const _TOther_&... _other);
-    template<typename _T_, typename... _TOther_>
-    inline exception(const std::string& _format, const _T_& _value, const _TOther_&... _other);
+    exception(exception&& _rhs);
     exception(const exception& _rhs);
     exception& operator=(const exception& _rhs);
+    ~exception();
     /**
      * @return the error message
      */
-    const char* what() const throw() override
-    {
-      return m_c_error;
-    }
+    const char* what() const throw() override;
   private:
-    std::string m_error;
-    const char* m_c_error;
+    struct data;
+    exception(data* _d);
+    data* const d;
   };
   /**
    * Represent the value type.

@@ -1,6 +1,7 @@
 #include "../default_node_visitor.h"
 
 #include "../../../format.h"
+#include "../../../gqlite_p.h"
 #include "../../../string.h"
 
 namespace gqlite::oc::algebra::visitors
@@ -9,7 +10,7 @@ namespace gqlite::oc::algebra::visitors
   {
     std::string visit_default(algebra::node_csp _node) override
     {
-      throw gqlite::exception("Unimplemented node {} in stringify", oc::algebra::node_type_name(_node->get_type()));
+      throw_exception(exception_stage::unspecified, exception_code::unimplemented_error, "Unimplemented node {} in stringify", oc::algebra::node_type_name(_node->get_type()));
     }
     std::string visit(algebra::value_csp _var) override
     {

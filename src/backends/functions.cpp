@@ -27,14 +27,6 @@ namespace gqlite::backends::functions
     std::unordered_map<std::string, std::function<value(const std::vector<value>&)>> functions;
   };
 
-  void static_data::check_value_is_map(const char* _fname, const value& _value)
-  {
-    if(_value.get_type() != value_type::map)
-    {
-      throw exception("'{}' expected a map.", _fname);
-    }
-  }
-
   /**
    * @return the type of a relationship, i.e., the label
    */
@@ -100,7 +92,7 @@ namespace gqlite::backends::functions
     {
       return value();
     } else {
-      errors::invalid_argument_type("properties function expect node or edge.");
+      errors::invalid_argument_type(exception_stage::runtime, "'properties' function expect node or edge.");
     }
   }
   /**
@@ -197,7 +189,7 @@ namespace gqlite::backends::functions
       case value_type::number:
         return int64_t(val.to_double());
       default:
-        errors::invalid_argument_type("toInteger expect a number got {}", val);
+        errors::invalid_argument_type(exception_stage::runtime, "'toInteger' expect a number got '{}'.", val);
     }
   }
   value static_data::tail(const std::vector<value>& _arguments)
@@ -254,7 +246,7 @@ namespace gqlite::backends::functions
     auto it = sd.functions.find(_name);
     if(it == sd.functions.end())
     {
-      throw exception("No function {}.", _name);
+      throw_exception(exception_stage::runtime, exception_code::unknown_function, "Unknown function {}.", _name);
     } else {
       return it->second(_arguments);
     }

@@ -4,9 +4,9 @@
 #include <functional>
 #include <memory>
 
-#include <gqlite.h>
 #include "node_type.h"
 #include "../../global.h"
+#include "../../gqlite_p.h"
 
 namespace gqlite::oc::algebra
 {
@@ -74,7 +74,7 @@ namespace gqlite::oc::algebra
       return visit_impl<_TRet_>(_others...);
     }
     template<typename _TRet_>
-    _TRet_ visit_impl() const { throw gqlite::exception("Internal error: no alternative found."); }
+    _TRet_ visit_impl() const { throw_exception(exception_stage::unspecified, exception_code::internal_error, "No alternative found."); }
     node_csp m_node;
     node_type m_type;
   };
@@ -82,7 +82,8 @@ namespace gqlite::oc::algebra
 
 namespace gqlite
 {
-  inline const char* to_string(oc::algebra::edge_directivity _v)
+  template<>
+  inline std::string to_string<oc::algebra::edge_directivity>(const oc::algebra::edge_directivity& _v)
   {
     switch(_v)
     {

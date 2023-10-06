@@ -50,7 +50,7 @@ namespace gqlite
       }
       row_view& operator=(const std::vector<_T_>& _rhs)
       {
-        errors::check_condition(_rhs.size() == this->size(), "Cannot assign a vector of size {} to a row view of size {}", _rhs.size(), this->size());
+        errors::check_condition(_rhs.size() == this->size(), exception_stage::unspecified, exception_code::table_error, "Cannot assign a vector of size {} to a row view of size {}.", _rhs.size(), this->size());
         std::copy(_rhs.begin(), _rhs.end(), this->begin());
         return *this;
       }
@@ -102,12 +102,12 @@ namespace gqlite
       }
       std::ptrdiff_t operator-(const iterator& _rhs) const
       {
-        errors::check_condition(m_table_ptr == _rhs.m_table_ptr, "Iterator arithmetic on iterator for different tables is not allowed.");
+        errors::check_condition(m_table_ptr == _rhs.m_table_ptr, exception_stage::unspecified, exception_code::table_error, "Iterator arithmetic on iterator for different tables is not allowed.");
         return m_row - std::ptrdiff_t(_rhs.m_row);
       }
       bool operator<(const iterator& _rhs) const
       {
-        errors::check_condition(m_table_ptr == _rhs.m_table_ptr, "Iterator arithmetic on iterator for different tables is not allowed.");
+        errors::check_condition(m_table_ptr == _rhs.m_table_ptr, exception_stage::unspecified, exception_code::table_error, "Iterator arithmetic on iterator for different tables is not allowed.");
         return m_row < _rhs.m_row;
       }
     private:
@@ -276,7 +276,7 @@ namespace gqlite
     {
       for(sort_column_info r : _columns)
       {
-        errors::check_condition(r.column < it1.size(), "Invalid column index {}", r.column);
+        errors::check_condition(r.column < it1.size(), exception_stage::unspecified, exception_code::table_error, "Invalid column index {}.", r.column);
         const _T_& v1 = it1[r.column];
         const _T_& v2 = it2[r.column];
         if(_cdiff(v1, v2))
@@ -316,14 +316,14 @@ namespace gqlite
   template<typename _T_>
   inline void table<_T_>::add_row(const std::vector<_T_>& _row)
   {
-    errors::check_condition(_row.size() == get_columns_count(), "Invalid row size, got {}, expected {}", _row.size(), get_columns_count());
+    errors::check_condition(_row.size() == get_columns_count(), exception_stage::unspecified, exception_code::table_error, "Invalid row size, got {}, expected {}.", _row.size(), get_columns_count());
     m_values.insert(m_values.end(), _row.begin(), _row.end());
     ++m_rows;
   }
   template<typename _T_>
   inline void table<_T_>::set_rows(const std::vector<_T_>& _table)
   {
-    errors::check_condition(_table.size() % get_columns_count() == 0, "Invalid table size {}, should be a multiple of columns {}.", _table.size(), get_columns_count());
+    errors::check_condition(_table.size() % get_columns_count() == 0, exception_stage::unspecified, exception_code::table_error, "Invalid table size {}, should be a multiple of columns {}.", _table.size(), get_columns_count());
     m_values = _table;
     m_rows = _table.size() / m_columns;
   }
@@ -337,7 +337,7 @@ namespace gqlite
   {
     auto it = m_labels.find(_column);
     if(it != m_labels.end()) return it->second;
-    throw exception("Unknown column {}");
+    throw_exception(exception_stage::unspecified, exception_code::table_error, "Unknown column {}");
   }
   template<typename _T_>
   inline std::vector<std::string> table<_T_>::get_columns_names() const
@@ -363,13 +363,13 @@ namespace gqlite
   template<typename _T_>
   inline table<_T_>::const_row_view table<_T_>::get_row(std::size_t _j) const
   {
-    errors::check_condition(_j < m_rows, "Invalid index {}, size is {}", _j, m_rows);
+    errors::check_condition(_j < m_rows, exception_stage::unspecified, exception_code::table_error, "Invalid index {}, size is {}", _j, m_rows);
     return const_row_view(m_values.begin() + _j * m_columns, m_values.begin() + (_j+1) * m_columns);
   }
   template<typename _T_>
   inline table<_T_>::row_view table<_T_>::get_row(std::size_t _j)
   {
-    errors::check_condition(_j < m_rows, "Invalid index {}, size is {}", _j, m_rows);
+    errors::check_condition(_j < m_rows, exception_stage::unspecified, exception_code::table_error, "Invalid index {}, size is {}", _j, m_rows);
     return row_view(m_values.begin() + _j * m_columns, m_values.begin() + (_j+1) * m_columns);
   }
   template<typename _T_>
@@ -381,7 +381,7 @@ namespace gqlite
   inline const _T_& table<_T_>::get_value(const std::string& _column, std::size_t _j) const
   {
     auto it = m_labels.find(_column);
-    errors::check_condition(it != m_labels.end(), "Unknown column {}", _column);
+    errors::check_condition(it != m_labels.end(), exception_stage::unspecified, exception_code::table_error, "Unknown column {}", _column);
     return get_value(it->second, _j);
   }
   template<typename _T_>

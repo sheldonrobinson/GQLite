@@ -49,7 +49,7 @@ struct parser::data
   std::unordered_map<std::string, algebra::node_csp> bounded_variables;
   void get_next_token(int _flags = lexer::mode::normal);
   template<typename... _T_>
-  [[noreturn]] void report_error(const token& _token, const std::string& _errorMsg, const _T_&... _values);
+  [[noreturn]] void report_error(const token& _token, exception_code _code, const std::string& _errorMsg, const _T_&... _values);
   [[noreturn]] void report_unexpected(const token& _token);
   bool is_of_type(const token& _token, token_type _type);
   bool is_of_type(token_type _type);
@@ -77,7 +77,7 @@ void parser::data::validate(algebra::graph_node_csp _node)
   }
   if(_node->get_labels().empty() and not _node->get_properties()) return;
   if(_node->equals(it->second)) return;
-  report_error(tok, "Variable {} is already bound.", _node->get_variable());
+  report_error(tok, exception_code::variable_already_bound, "Variable {} is already bound", _node->get_variable());
 }
 
 void parser::data::validate(algebra::graph_edge_csp _node)
@@ -93,7 +93,7 @@ void parser::data::validate(algebra::graph_edge_csp _node)
   }
   if(_node->get_labels().empty() and not _node->get_properties()) return;
   if(_node->equals(it->second)) return;
-  report_error(tok, "Variable {} is already bound.", _node->get_variable());
+  report_error(tok, exception_code::variable_already_bound, "Variable {} is already bound.", _node->get_variable());
 }
 
 std::string parser::data::generate_anonymous_variable()
@@ -105,7 +105,7 @@ int64_t parser::data::string_to_integer(std::string _string)
 {
   if(_string == "0x" or _string == "-0x" or _string == "0o" or _string == "-0o")
   {
-    throw gqlite::exception("InvalidNumberLiteral: '{}' is not a valid string literal", _string);
+    throw_exception(exception_stage::compiletime, exception_code::invalid_number_literal, "'{}' is not a valid string literal", _string);
   }
   try
   {
@@ -122,12 +122,12 @@ int64_t parser::data::string_to_integer(std::string _string)
     long long i = std::stoll(_string, 0, base);
     if(i > std::numeric_limits<int64_t>::max() or i < std::numeric_limits<int64_t>::min())
     {
-      throw gqlite::exception("IntegerOverflow: {} is too large.", _string);
+      throw_exception(exception_stage::compiletime, exception_code::integer_overflow, "'{}' is too large.", _string);
     }
     return i;
   } catch(const std::out_of_range&)
   {
-    throw gqlite::exception("IntegerOverflow: {} is too large.", _string);
+    throw_exception(exception_stage::compiletime, exception_code::integer_overflow, "'{}' is too large.", _string);
   }
 }
 
@@ -225,7 +225,7 @@ std::vector<algebra::named_expression_csp> parser::data::parse_named_expressions
     }
     if(std::find(labels.begin(), labels.end(), name) != labels.end())
     {
-      report_error(tok, "Duplicate column name {} is not allowed.");
+      report_error(tok, exception_code::column_name_conflict, "Duplicate column name {} is not allowed", name);
     }
     labels.push_back(name);
     expressions.push_back(std::make_shared<algebra::named_expression>(name, node));
@@ -629,14 +629,14 @@ std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>> pars
         {
           if(not _allow_undirected_edge)
           {
-            report_error(tok, "Edge must be directed during creation,");
+            report_error(tok, exception_code::requires_directed_relationship, "Edge must be directed during creation");
           }
         }
       } else if(tok.type == token_type::RIGHT_ARROW)
       {
         if(current_edge.directivity == algebra::edge_directivity::directed)
         {
-          report_error(tok, "Edge cannot have both direction.");
+          report_error(tok, exception_code::requires_directed_relationship, "Edge cannot have both direction");
         }
         current_edge.directivity = algebra::edge_directivity::directed;
       } else {
@@ -653,7 +653,7 @@ std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>> pars
   } while(true);
   if(current_edge.active)
   {
-    report_error(tok, "Unfinished edge");
+    report_error(tok, exception_code::parse_error, "Unfinished edge");
   }
   return patterns;
 }
@@ -693,7 +693,7 @@ std::unordered_map<std::string, algebra::node_csp> parser::data::parse_propertie
       auto it = bindings.find(tok.string);
       if(it == bindings.end())
       {
-        report_error(tok, "Unknown parameter '{}'.", tok.string);
+        report_error(tok, exception_code::invalid_parameter_use, "Unknown parameter '{}'", tok.string);
       }
       get_next_token();
       std::unordered_map<std::string, algebra::node_csp> p;
@@ -799,7 +799,7 @@ algebra::node_csp parser::data::parse_terminal_expression()
     auto it = bindings.find(tok.string);
     if(it == bindings.end())
     {
-      report_error(tok, "Unknown parameter '{}'.", tok.string);
+      report_error(tok, exception_code::invalid_parameter_use, "Unknown parameter '{}'", tok.string);
     }
     get_next_token();
     return std::make_shared<algebra::value>(it->second);
@@ -1061,18 +1061,18 @@ void parser::data::get_next_token(int _flags)
 }
 
 template<typename... _T_>
-void parser::data::report_error(const token& _token, const std::string& _errorMsg, const _T_&... _values)
+void parser::data::report_error(const token& _token, exception_code _code, const std::string& _errorMsg, const _T_&... _values)
 {
-  throw gqlite::exception("{}:{}:" + _errorMsg, _token.line, _token.column, _values...);
+  throw_exception(exception_stage::compiletime, _code, _errorMsg + " at ({}, {}).", _values..., _token.line, _token.column);
 }
 
 void parser::data::report_unexpected(const token& _token) 
 {
   if(_token.string.empty())
   {
-    report_error(_token, "UnexpectedSyntax: Unexpected token {}", _token.type);
+    report_error(_token, exception_code::unexpected_syntax, "Unexpected token '{}'", _token.type);
   } else {
-    report_error(_token, "UnexpectedSyntax: Unexpected token {} ({})", _token.type, _token.string);
+    report_error(_token, exception_code::unexpected_syntax, "Unexpected token '{}' ('{}')", _token.type, _token.string);
   }
 }
 
@@ -1081,9 +1081,9 @@ bool parser::data::is_of_type(const token& _token, token_type _type)
   if(_token.type == _type) return true;
   if(_token.string.empty())
   {
-    report_error(_token, "UnexpectedSyntax: Expected token {} got {}", _type, _token.type);
+    report_error(_token, exception_code::unexpected_syntax, "Expected token {} got {}", _type, _token.type);
   } else {
-    report_error(_token, "UnexpectedSyntax: Expected token {} got {} ({})", _type, _token.type, _token.string);
+    report_error(_token, exception_code::unexpected_syntax, "Expected token {} got {} ({})", _type, _token.type, _token.string);
   }
   return false;
 }
@@ -1148,7 +1148,7 @@ algebra::node_csp parser::parse()
   switch(nodes.size())
   {
   case 0:
-    d->report_error(token(), "Empty query.");
+    d->report_error(token(), exception_code::parse_error, "Empty query.");
   case 1:
     return nodes.front();
   default:

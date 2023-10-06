@@ -26,7 +26,7 @@ namespace gqlite::backends
 
     std::unordered_map<std::string, std::function<value(const value_vector&)>> procedures;
 
-    void throwLastError(const std::string& _query);
+    void throw_last_error(const std::string& _query);
     void graph_create(const std::string& _name);
     bool graph_has(const std::string& _name);
     bool table_has(const std::string& _name);
@@ -41,9 +41,9 @@ namespace gqlite::backends
 struct sqlite::data : public sqlite_data
 {};
 
-void sqlite_data::throwLastError(const std::string& _query)
+void sqlite_data::throw_last_error(const std::string& _query)
 {
-  throw gqlite::exception("Error {}, while executing {}", sqlite3_errmsg(handle), _query);
+  throw_exception(exception_stage::runtime, exception_code::internal_error, "Error {}, while executing {}.", sqlite3_errmsg(handle), _query);
 }
 
 gqlite::value sqlite_data::execute_sql(const std::string& _query, const std::map<int, value>& _bindings)
@@ -64,7 +64,7 @@ gqlite::value sqlite_data::execute_sql(const std::string& _query, const std::map
     if(sqlite3_prepare_v2(handle, ptr, ptr_end - ptr, &ps, &ptr) != SQLITE_OK)
     {
       sqlite3_finalize(ps);
-      throwLastError(_query);
+      throw_last_error(_query);
     }
     for(const auto& [key, value] : _bindings)
     {
@@ -112,7 +112,7 @@ gqlite::value sqlite_data::execute_sql(const std::string& _query, const std::map
             break;
           case SQLITE_BLOB:
             sqlite3_finalize(ps);
-            throw gqlite::exception("Blobs are not supported.");
+            throw_exception(exception_stage::runtime, exception_code::internal_error, "Blobs are not supported.");
           case SQLITE_NULL:
             row.push_back(value());
             break;
@@ -132,7 +132,7 @@ gqlite::value sqlite_data::execute_sql(const std::string& _query, const std::map
       q_rs.push_back(rows);
       break;
     default:
-      throwLastError(_query);
+      throw_last_error(_query);
     }
   }
   if(q_rs.size() == 1)
@@ -152,9 +152,9 @@ bool sqlite_data::graph_has(const std::string& _name)
 {
   value r= execute_sql(sqlite_queries::graph_has(_name));
   value_vector v = r.to_vector();
-  errors::check_condition(v.size() == 1, "Should have gotten only one result");
+  errors::check_condition(v.size() == 1, exception_stage::runtime, exception_code::internal_error, "Should have gotten only one result");
   v = v.begin()->to_vector();
-  errors::check_condition(v.size() == 1, "Should have gotten only one result");
+  errors::check_condition(v.size() == 1, exception_stage::runtime, exception_code::internal_error, "Should have gotten only one result");
   return v.begin()->to_bool();
 }
 
@@ -162,9 +162,9 @@ bool sqlite_data::table_has(const std::string& _name)
 {
   value r = execute_sql(sqlite_queries::table_has(), {{1, _name}});
   value_vector v = r.to_vector();
-  errors::check_condition(v.size() == 1, "Should have gotten only one result for table_has.");
+  errors::check_condition(v.size() == 1, exception_stage::runtime, exception_code::internal_error, "Should have gotten only one result for table_has.");
   v = v.begin()->to_vector();
-  errors::check_condition(v.size() == 1, "Should have gotten only one column for table_has.");
+  errors::check_condition(v.size() == 1, exception_stage::runtime, exception_code::internal_error, "Should have gotten only one column for table_has.");
   return v.begin()->to_bool();
 }
 
@@ -190,7 +190,7 @@ int64_t sqlite_data::id_for_label(const std::string& _string)
       return id;
     } else {
       v = v.begin()->to_vector();
-      errors::check_condition(v.size() == 1, "Should have gotten only one column for label_get_from_id.");
+      errors::check_condition(v.size() == 1, exception_stage::runtime, exception_code::internal_error, "Should have gotten only one column for label_get_from_id.");
       return v.begin()->to_integer();
     }
   } else {
@@ -207,10 +207,10 @@ std::string sqlite_data::label_for_id(int64_t _id)
     value_vector v = r.to_vector();
     if(v.size() == 0)
     {
-      throw gqlite::exception("Internal error: unknown label id {}", _id);
+      throw_exception(exception_stage::runtime, exception_code::internal_error, "Unknown label id {}.", _id);
     } else {
       v = v.begin()->to_vector();
-      errors::check_condition(v.size() == 1, "Should have gotten only one column for label_get_from_id.");
+      errors::check_condition(v.size() == 1, exception_stage::runtime, exception_code::internal_error, "Should have gotten only one column for label_get_from_id.");
       return v.begin()->to_string();
     }
   } else {
@@ -272,9 +272,9 @@ namespace gqlite::backends::sqlite_oc_executor
             {
               // Query
               value_vector properties_val_list_vector = exec_c->data->execute_sql(sqlite_queries::node_get_properties(exec_c->graph_name), {{1, _node_ref->id}}).to_vector();
-              errors::check_condition(properties_val_list_vector.size() == 1, "When getting a node, should have received only one node");
+              errors::check_condition(properties_val_list_vector.size() == 1, exception_stage::runtime, exception_code::internal_error, "When getting a node, should have received only one node");
               value_vector properties_row = properties_val_list_vector.front().to_vector();
-              errors::check_condition(properties_row.size() == 1, "When getting a node, properties get should only have given one column");
+              errors::check_condition(properties_row.size() == 1, exception_stage::runtime, exception_code::internal_error, "When getting a node, properties get should only have given one column");
               properties = gqlite::value::from_json(properties_row.front().to_string());
             }
 
@@ -286,7 +286,7 @@ namespace gqlite::backends::sqlite_oc_executor
               for(const gqlite::value& label_row_value : labels_val_list_vector)
               {
                 value_vector label_row = label_row_value.to_vector();
-                errors::check_condition(label_row.size() == 1, "When getting a node, labels get should only have given one column");
+                errors::check_condition(label_row.size() == 1, exception_stage::runtime, exception_code::internal_error, "When getting a node, labels get should only have given one column");
                 labels.push_back(exec_c->data->label_for_id(label_row.front().to_integer()));
               }
             }
@@ -307,9 +307,9 @@ namespace gqlite::backends::sqlite_oc_executor
             {
               // Query
               value_vector properties_val_list_vector = exec_c->data->execute_sql(sqlite_queries::edge_get_label_properties(exec_c->graph_name), {{1, _edge_ref->id}}).to_vector();
-              errors::check_condition(properties_val_list_vector.size() == 1, "When getting an edge, should have received only one edge");
+              errors::check_condition(properties_val_list_vector.size() == 1, exception_stage::runtime, exception_code::internal_error, "When getting an edge, should have received only one edge");
               value_vector properties_row = properties_val_list_vector.front().to_vector();
-              errors::check_condition(properties_row.size() == 2, "When getting an edge, properties get should only have given two column");
+              errors::check_condition(properties_row.size() == 2, exception_stage::runtime, exception_code::internal_error, "When getting an edge, properties get should only have given two column");
               label = exec_c->data->label_for_id(properties_row[0].to_integer());
               properties = gqlite::value::from_json(properties_row[1].to_string());
             }
@@ -406,7 +406,7 @@ namespace gqlite::backends::sqlite_oc_executor
       if(_variable.empty()) return;
       if(table.has_column(_variable))
       {
-        throw exception("Variable {} is already bound.", _variable);
+        throw_exception(exception_stage::runtime, exception_code::variable_already_bound, "Variable {} is already bound.", _variable);
       }
       table.add_column(_variable);
       new_vars.push_back(_variable);
@@ -426,7 +426,7 @@ namespace gqlite::backends::sqlite_oc_executor
       {
         return current_row[table.get_column_index(_variable)];
       } else {
-        throw exception("Variable {} is not defined.", _variable);
+        throw_exception(exception_stage::runtime, exception_code::undefined_variable, "Variable {} is not defined.", _variable);
       }
     }
     void set_variable(const std::string& _variable, const exec_value& _ev)
@@ -443,7 +443,7 @@ namespace gqlite::backends::sqlite_oc_executor
       {
         return std::get<node_ref_sp>(_value);
       }
-      throw exception("Expected a reference to a node.");
+      throw_exception(exception_stage::runtime, exception_code::internal_error, "Expected a reference to a node.");
     }
     void define_variables(const std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>>& _patterns)
     {
@@ -509,7 +509,7 @@ namespace gqlite::backends::sqlite_oc_executor
       auto it = oc_var_to_sql_var.find(_oc_variable);
       if(it == oc_var_to_sql_var.end())
       {
-        throw gqlite::exception("Unknown variable '{}'", _oc_variable);
+        throw_exception(exception_stage::runtime, exception_code::undefined_variable, "Unknown variable '{}'.", _oc_variable);
       }
       return it->second;
     }
@@ -554,7 +554,7 @@ namespace gqlite::backends::sqlite_oc_executor
     match_context* mc;
     std::string visit_default(algebra::node_csp _node) override
     {
-      throw gqlite::exception("Unimplemented sql filter node {} in sql_filter_visitor", oc::algebra::node_type_name(_node->get_type()));
+      throw_exception(exception_stage::runtime, exception_code::unimplemented_error, "Unimplemented sql filter node {} in sql_filter_visitor", oc::algebra::node_type_name(_node->get_type()));
     }
     std::string visit(algebra::variable_csp _node) override
     {
@@ -584,19 +584,19 @@ namespace gqlite::backends::sqlite_oc_executor
         match_context::var_info& info = mc->get_variable_info(arg0_var->get_identifier());
         if(info.is_node)
         {
-          throw gqlite::exception("type expect an edge for variable {}", arg0_var->get_identifier());
+          throw_exception(exception_stage::runtime, exception_code::invalid_argument_type, "Type expect an edge for variable {}.", arg0_var->get_identifier());
         }
         return gqlite::format_string("(SELECT label FROM gqlite_labels WHERE id = {})", info.sql_label_var);
       } else if(_node->get_name() == "id")
       {
         errors::check_arguments_size("id", _node->get_arguments(), 1);
         algebra::node_csp arg0 = _node->get_arguments().front();
-        errors::check_argument_type(arg0->get_type(), algebra::node_type::variable, "id");
+        errors::check_argument_type_function(arg0->get_type(), algebra::node_type::variable, "id");
         algebra::variable_csp arg0_var = std::static_pointer_cast<const algebra::variable>(arg0);
         match_context::var_info& info = mc->get_variable_info(arg0_var->get_identifier());
         return info.sql_var;
       } else {
-        throw gqlite::exception("unknown function {}", _node->get_name());
+        throw_exception(exception_stage::runtime, exception_code::unknown_function, "Unknown function '{}¨'.", _node->get_name());
       }
     }
 #define FILTER_VISITOR_BINARY_OP(_AL_, _OP_)                                                          \
@@ -644,7 +644,7 @@ namespace gqlite::backends::sqlite_oc_executor
     evaluation_context* eval_c;
     exec_value visit_default(algebra::node_csp _node) override
     {
-      throw gqlite::exception("Unimplemented node {} in evaluator_visitor", oc::algebra::node_type_name(_node->get_type()));
+      throw_exception(exception_stage::runtime, exception_code::unimplemented_error, "Unimplemented node '{}' in evaluator_visitor.", oc::algebra::node_type_name(_node->get_type()));
     }
     value get_properties(const std::unordered_map<std::string, algebra::node_csp>& _properties)
     {
@@ -713,7 +713,7 @@ namespace gqlite::backends::sqlite_oc_executor
               return self->get_property(_v.to_map(), node->get_path());
             }
             default:
-              throw gqlite::exception("Invalid value type, expected a map, got {}.", _v.to_json());
+              throw_exception(exception_stage::runtime, exception_code::invalid_argument_type, "Invalid value type, expected a map, got {}.", _v.to_json());
           }
         }
         gqlite::value operator()(const empty&)
@@ -762,7 +762,7 @@ namespace gqlite::backends::sqlite_oc_executor
           {
             case gqlite::value_type::vector:
             {
-              errors::check_argument_type(index.get_type(), value_type::integer, "index of array should be an integer not {}", index);
+              errors::check_argument_type(index.get_type(), value_type::integer, exception_stage::runtime, "index of array should be an integer not {}", index);
               int idx = index.to_integer();
               value_vector vv = _v.to_vector();
               if(end or end_of_list)
@@ -773,7 +773,7 @@ namespace gqlite::backends::sqlite_oc_executor
                 {
                   end_idx = vv.size();
                 } else {
-                  errors::check_argument_type(end->get_type(), value_type::integer, "end index of array should be an integer not {}", *end);
+                  errors::check_argument_type(end->get_type(), value_type::integer, exception_stage::runtime, "end index of array should be an integer not {}", *end);
                   end_idx = end->to_integer();
                   if(end_idx > int(vv.size())) end_idx = vv.size();
                   while(end_idx < 0) end_idx += vv.size();
@@ -784,7 +784,7 @@ namespace gqlite::backends::sqlite_oc_executor
                 return vv_out;
               } else {
                 std::size_t idx_s = idx;
-                errors::check_condition(idx_s < vv.size(), "Index {} out of bounds {}.", idx, vv.size());
+                errors::check_condition(idx_s < vv.size(), exception_stage::runtime, exception_code::unspecified, "Index {} out of bounds {}.", idx, vv.size());
                 return vv[idx_s];
               }
             }
@@ -793,7 +793,7 @@ namespace gqlite::backends::sqlite_oc_executor
               return _v.to_map()[index.to_string()];
             }
             default:
-              errors::invalid_argument_type("Invalid value type, expected an array, got {}.", _v);
+              errors::invalid_argument_type(exception_stage::runtime, "Invalid value type, expected an array or a map, got {}.", _v);
           }
         }
         gqlite::value operator()(const empty&)
@@ -810,14 +810,14 @@ namespace gqlite::backends::sqlite_oc_executor
     exec_value visit(algebra::logical_negation_csp _node) override
     {
       exec_value ev = start(_node->get_value());
-      errors::check_condition(std::holds_alternative<value>(ev), "Logical negation must be done on value.");
+      errors::check_condition(std::holds_alternative<value>(ev), exception_stage::runtime, exception_code::invalid_argument_type, "Logical negation must be done on value.");
       value ev_val = std::get<value>(ev);
       switch(ev_val.get_type())
       {
         case value_type::invalid: return value();
         case value_type::boolean: return not ev_val.to_bool();
         default:
-          errors::invalid_argument_type("expected boolean got {}", ev_val);
+          errors::invalid_argument_type(exception_stage::runtime, "expected boolean got {}", ev_val);
       }
     }
     template<typename _TOp_, typename _TNode_>
@@ -825,8 +825,8 @@ namespace gqlite::backends::sqlite_oc_executor
     {
       exec_value left_ev = start(_node->get_left());
       exec_value right_ev = start(_node->get_right());
-      errors::check_condition(std::holds_alternative<value>(left_ev), "Binary operations must be done on values.");
-      errors::check_condition(std::holds_alternative<value>(right_ev), "Binary operations must be done on values.");
+      errors::check_condition(std::holds_alternative<value>(left_ev), exception_stage::runtime, exception_code::invalid_argument_type, "Binary operations must be done on values.");
+      errors::check_condition(std::holds_alternative<value>(right_ev), exception_stage::runtime, exception_code::invalid_argument_type, "Binary operations must be done on values.");
       value left_val = std::get<value>(left_ev);
       value right_val = std::get<value>(right_ev);
       if(left_val.get_type() == value_type::invalid or right_val.get_type() == value_type::invalid)
@@ -854,13 +854,13 @@ namespace gqlite::backends::sqlite_oc_executor
             return left_val; 
           }
         } else {
-          errors::invalid_argument_type("binary comparison between non-bool {} and {}.", left_val, right_val);
+          errors::invalid_argument_type(exception_stage::runtime, "binary comparison between non-bool {} and {}.", left_val, right_val);
         }
       } else if(left_val.get_type() == value_type::boolean and right_val.get_type() == value_type::boolean)
       {
         return _TOp_()(left_val.to_bool(), right_val.to_bool());
       } else {
-        errors::invalid_argument_type("binary comparison between non-bool {} and {}.", left_val, right_val);
+        errors::invalid_argument_type(exception_stage::runtime, "binary comparison between non-bool {} and {}.", left_val, right_val);
       }
     }
     exec_value visit(algebra::logical_and_csp _node) override
@@ -880,8 +880,8 @@ namespace gqlite::backends::sqlite_oc_executor
     {
       exec_value left_ev = start(_node->get_left());
       exec_value right_ev = start(_node->get_right());
-      errors::check_condition(std::holds_alternative<value>(left_ev), "Binary operations must be done on values.");
-      errors::check_condition(std::holds_alternative<value>(right_ev), "Binary operations must be done on values.");
+      errors::check_condition(std::holds_alternative<value>(left_ev), exception_stage::runtime, exception_code::invalid_argument_type, "Binary operations must be done on values.");
+      errors::check_condition(std::holds_alternative<value>(right_ev), exception_stage::runtime, exception_code::invalid_argument_type, "Binary operations must be done on values.");
       value left_val = std::get<value>(left_ev);
       value right_val = std::get<value>(right_ev);
       return _op(left_val, right_val);
@@ -898,8 +898,8 @@ namespace gqlite::backends::sqlite_oc_executor
     {
       exec_value left_ev = start(_node->get_left());
       exec_value right_ev = start(_node->get_right());
-      errors::check_condition(std::holds_alternative<value>(left_ev), "Binary operations must be done on values.");
-      errors::check_condition(std::holds_alternative<value>(right_ev), "Binary operations must be done on values.");
+      errors::check_condition(std::holds_alternative<value>(left_ev), exception_stage::runtime, exception_code::invalid_argument_type, "Binary operations must be done on values.");
+      errors::check_condition(std::holds_alternative<value>(right_ev), exception_stage::runtime, exception_code::invalid_argument_type, "Binary operations must be done on values.");
       value left_val = std::get<value>(left_ev);
       value right_val = std::get<value>(right_ev);
       if(is_numeric(left_val.get_type()) and is_numeric(right_val.get_type()))
@@ -911,7 +911,7 @@ namespace gqlite::backends::sqlite_oc_executor
           return _TOp_<double>()(left_val.to_double(), right_val.to_double());
         }
       } else {
-        throw exception("Cannot compute binary operationb between {} and {}.", left_val.to_json(), right_val.to_json());
+        throw_exception(exception_stage::runtime, exception_code::invalid_argument_type, "Cannot compute binary operation between '{}' and '{}'.", left_val.to_json(), right_val.to_json());
       }
     }
     exec_value visit(algebra::multiplication_csp _node) override
@@ -926,15 +926,15 @@ namespace gqlite::backends::sqlite_oc_executor
     {
       exec_value left_ev = start(_node->get_left());
       exec_value right_ev = start(_node->get_right());
-      errors::check_condition(std::holds_alternative<value>(left_ev), "Binary operations must be done on values.");
-      errors::check_condition(std::holds_alternative<value>(right_ev), "Binary operations must be done on values.");
+      errors::check_condition(std::holds_alternative<value>(left_ev), exception_stage::runtime, exception_code::invalid_argument_type, "Binary operations must be done on values.");
+      errors::check_condition(std::holds_alternative<value>(right_ev), exception_stage::runtime, exception_code::invalid_argument_type, "Binary operations must be done on values.");
       value left_val = std::get<value>(left_ev);
       value right_val = std::get<value>(right_ev);
       if(left_val.get_type() == value_type::integer and right_val.get_type() == value_type::integer)
       {
         return left_val.to_integer() % right_val.to_integer();
       } else {
-        throw exception("Cannot compute modulo binary operation between {} and {}.", left_val.to_json(), right_val.to_json());
+        throw_exception(exception_stage::runtime, exception_code::invalid_argument_type, "Cannot compute modulo binary operation between {} and {}.", left_val.to_json(), right_val.to_json());
       }
     }
 
@@ -943,8 +943,8 @@ namespace gqlite::backends::sqlite_oc_executor
     {
       exec_value left_ev = start(_node->get_left());
       exec_value right_ev = start(_node->get_right());
-      errors::check_condition(std::holds_alternative<value>(left_ev), "Binary operations must be done on values.");
-      errors::check_condition(std::holds_alternative<value>(right_ev), "Binary operations must be done on values.");
+      errors::check_condition(std::holds_alternative<value>(left_ev), exception_stage::runtime, exception_code::invalid_argument_type, "Binary operations must be done on values.");
+      errors::check_condition(std::holds_alternative<value>(right_ev), exception_stage::runtime, exception_code::invalid_argument_type, "Binary operations must be done on values.");
       value left_val = std::get<value>(left_ev);
       value right_val = std::get<value>(right_ev);
       if(left_val.get_type() == value_type::string and right_val.get_type() == value_type::string)
@@ -970,7 +970,7 @@ namespace gqlite::backends::sqlite_oc_executor
           return left_val.to_double() + right_val.to_double();
         }
       } else {
-        throw exception("Cannot add {} with {}.", left_val.to_json(), right_val.to_json());
+        throw_exception(exception_stage::runtime, exception_code::invalid_argument_type, "Cannot add {} with {}.", left_val.to_json(), right_val.to_json());
       }
     }
     template<template<typename _TOp_> class _OP_, typename _T_>
@@ -978,11 +978,11 @@ namespace gqlite::backends::sqlite_oc_executor
     {
       exec_value left_ev = start(_node->get_left());
       exec_value right_ev = start(_node->get_right());
-      errors::check_condition(std::holds_alternative<value>(left_ev), "Binary operations must be done on values.");
-      errors::check_condition(std::holds_alternative<value>(right_ev), "Binary operations must be done on values.");
+      errors::check_condition(std::holds_alternative<value>(left_ev), exception_stage::runtime, exception_code::invalid_argument_type, "Binary operations must be done on values.");
+      errors::check_condition(std::holds_alternative<value>(right_ev), exception_stage::runtime, exception_code::invalid_argument_type, "Binary operations must be done on values.");
       value left_val = std::get<value>(left_ev);
       value right_val = std::get<value>(right_ev);
-      errors::check_argument_type(right_val.get_type(), value_type::vector, "IN/NOT IN arguments needs to be a list not {}", right_val);
+      errors::check_argument_type(right_val.get_type(), value_type::vector, exception_stage::runtime, "IN/NOT IN arguments needs to be a list not {}", right_val);
       if(left_val.get_type() == value_type::invalid or right_val.get_type() == value_type::invalid) return value();
       value_vector right_val_vec = right_val.to_vector();
       bool v = _OP_<decltype(right_val_vec.begin())>()(std::find(right_val_vec.begin(), right_val_vec.end(), left_val), right_val_vec.end());
@@ -1008,7 +1008,7 @@ namespace gqlite::backends::sqlite_oc_executor
     exec_value visit(algebra::negation_csp _node) override
     {
       exec_value left_ev = start(_node->get_value());
-      errors::check_condition(std::holds_alternative<value>(left_ev), "Unary operations must be done on null values.");
+      errors::check_condition(std::holds_alternative<value>(left_ev), exception_stage::runtime, exception_code::invalid_argument_type, "Unary operations must be done on null values.");
       value left_val = std::get<value>(left_ev);
       if(is_numeric(left_val.get_type()))
       {
@@ -1019,7 +1019,7 @@ namespace gqlite::backends::sqlite_oc_executor
           return -left_val.to_double();
         }
       } else {
-        throw exception("Cannot negate {}.", left_val.to_json());
+        throw_exception(exception_stage::runtime, exception_code::invalid_argument_type, "Cannot negate {}.", left_val.to_json());
       }
     }
     exec_value visit(algebra::is_not_null_csp _node) override
@@ -1046,7 +1046,7 @@ namespace gqlite::backends::sqlite_oc_executor
     exec_value visit(algebra::has_labels_csp _node) override
     {
       exec_value ev = eval_c->get_variable(_node->get_left());
-      errors::check_condition(std::holds_alternative<node_ref_sp>(ev) or std::holds_alternative<edge_ref_sp>(ev), "InvalidArgumentType: has_labels expression expect a node or an edge.");
+      errors::check_condition(std::holds_alternative<node_ref_sp>(ev) or std::holds_alternative<edge_ref_sp>(ev), exception_stage::runtime, exception_code::invalid_argument_type, "'has_labels' expression expect a node or an edge.");
       value_map val = exec_c->get_value(ev).to_map();
       std::vector<std::string> labels;
       if(val["type"].to_string() == "node")
@@ -1080,7 +1080,7 @@ namespace gqlite::backends::sqlite_oc_executor
     // Common functions
     value visit_default(algebra::node_csp _node) override
     {
-      throw gqlite::exception("Unimplemented statement node {} in statement_visitor", oc::algebra::node_type_name(_node->get_type()));
+      throw_exception(exception_stage::runtime, exception_code::unimplemented_error, "Unimplemented statement node {} in statement_visitor", oc::algebra::node_type_name(_node->get_type()));
     }
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Creation functions
@@ -1206,14 +1206,14 @@ namespace gqlite::backends::sqlite_oc_executor
         if(it == _mc->oc_var_to_sql_var.end())
         {
           // Check if it is a new variable and need to be extracted in the SQL statement
-          errors::check_condition(_mc->eval_c->is_new_variable(_oc_var), "only new variable should be defined.");
+          errors::check_condition(_mc->eval_c->is_new_variable(_oc_var), exception_stage::runtime, exception_code::internal_error, "only new variable should be defined.");
           if(not _mc->sql_variables.empty()) _mc->sql_variables += ", ";
           _mc->sql_variables += _sql_var;
           _mc->oc_var_to_sql_var[_oc_var] = {_sql_var, _sql_properties_var, _label_var, _mc->sql_variables_count, _is_node};
           ++_mc->sql_variables_count;
         } else {
           // Generate match
-          if(it->second.is_node != _is_node) throw exception("{} is redefined as a variable of a different type", _oc_var);
+          if(it->second.is_node != _is_node) throw_exception(exception_stage::runtime, exception_code::variable_type_conflict, "{} is redefined as a variable of a different type", _oc_var);
           _mc->sql_conditions += format_string(" AND {} = {} ", _sql_var, it->second.sql_var);
         }
       }
@@ -1357,7 +1357,7 @@ namespace gqlite::backends::sqlite_oc_executor
         for(const gqlite::value& row_value : r.to_vector())
         {
           value_vector row = row_value.to_vector();
-          errors::check_condition(row.size() == mc.eval_c->new_vars.size(), "Wrong number of column return by SQL Query.");
+          errors::check_condition(row.size() == mc.eval_c->new_vars.size(), exception_stage::runtime, exception_code::internal_error, "Wrong number of column return by SQL Query.");
           for(const std::string& k : mc.eval_c->new_vars)
           {
             match_context::var_info vi = mc.oc_var_to_sql_var[k];
@@ -1397,11 +1397,11 @@ namespace gqlite::backends::sqlite_oc_executor
           } else {
             value result = self->exec_c.data->execute_sql(sqlite_queries::edge_count_by_node(self->exec_c.graph_name), {{1, _node->id}});
             value_vector rows = result.to_vector();
-            errors::check_condition(rows.size() == 1, "Invalid number of rows for counting edges got {} expected 1.", rows.size());
+            errors::check_condition(rows.size() == 1, exception_stage::runtime, exception_code::internal_error, "Invalid number of rows for counting edges got {} expected 1.", rows.size());
             value_vector row = rows.front().to_vector();
-            errors::check_condition(row.size() == 1, "Invalid number of columns for counting edges got {} expected 1.", rows.size());
+            errors::check_condition(row.size() == 1, exception_stage::runtime, exception_code::internal_error, "Invalid number of columns for counting edges got {} expected 1.", rows.size());
             int count = row.front().to_integer();
-            errors::check_condition(count == 0, "Cannot delete node with {} relationships.", count);
+            errors::check_condition(count == 0, exception_stage::runtime, exception_code::unspecified, "Cannot delete node with {} relationships.", count);
           }
           self->exec_c.data->execute_sql(sqlite_queries::node_delete(self->exec_c.graph_name), {{1, _node->id}});
         }
@@ -1411,11 +1411,11 @@ namespace gqlite::backends::sqlite_oc_executor
         }
         void operator()(const value&)
         {
-          throw exception("Cannot delete a value.");
+          throw_exception(exception_stage::runtime, exception_code::invalid_argument_type, "Cannot delete a value.");
         }
         void operator()(const empty&)
         {
-          throw exception("Cannot delete an empty value.");
+          throw_exception(exception_stage::runtime, exception_code::invalid_argument_type, "Cannot delete an empty value.");
         }
       };
 
@@ -1460,7 +1460,7 @@ namespace gqlite::backends::sqlite_oc_executor
             {
               self->exec_c.data->execute_sql(_remove_query, {{1, _node_id}, {2, path_string}});
             } else {
-              throw exception("Cannot add null property.");
+              throw_exception(exception_stage::runtime, exception_code::invalid_argument_type, "Cannot add null property.");
             }
           } else {
             if(_remove_invalid)
@@ -1472,11 +1472,11 @@ namespace gqlite::backends::sqlite_oc_executor
         }
         void operator()(const value&)
         {
-          throw exception("Only node/edge can be set.");
+          throw_exception(exception_stage::runtime, exception_code::invalid_argument_type, "Only node/edge can be set.");
         }
         void operator()(const empty&)
         {
-          throw exception("Try to set a null value.");
+          throw_exception(exception_stage::runtime, exception_code::invalid_argument_type, "Try to set a null value.");
         }
 
       };
@@ -1517,7 +1517,7 @@ namespace gqlite::backends::sqlite_oc_executor
         evaluator_visitor* eval_v;
         void visit_default(algebra::node_csp _node) override
         {
-          throw gqlite::exception("Unimplemented node {} in set_visitor", oc::algebra::node_type_name(_node->get_type()));
+          throw_exception(exception_stage::runtime, exception_code::unimplemented_error, "Unimplemented node {} in set_visitor", oc::algebra::node_type_name(_node->get_type()));
         }
         void visit(algebra::set_property_csp _property)
         {
@@ -1536,7 +1536,7 @@ namespace gqlite::backends::sqlite_oc_executor
         void visit(algebra::edit_labels_csp _property)
         {
           exec_value target = eval_c->get_variable(_property->get_target());
-          errors::check_condition(std::holds_alternative<node_ref_sp>(target), "Can only add labels to nodes.");
+          errors::check_condition(std::holds_alternative<node_ref_sp>(target), exception_stage::runtime, exception_code::invalid_argument_type, "Can only add labels to nodes.");
           node_ref_sp target_nd = std::get<node_ref_sp>(target);
           for(const std::string& label : _property->get_labels())
           {
@@ -1585,11 +1585,11 @@ namespace gqlite::backends::sqlite_oc_executor
         }
         void operator()(const value&)
         {
-          throw exception("Only node/edge can be set.");
+          throw_exception(exception_stage::runtime, exception_code::unspecified, "Only node/edge can be set.");
         }
         void operator()(const empty&)
         {
-          throw exception("Try to set a null value.");
+          throw_exception(exception_stage::runtime, exception_code::unspecified, "Try to set a null value.");
         }
         void operator()(const node_ref_sp& _node)
         {
@@ -1610,7 +1610,7 @@ namespace gqlite::backends::sqlite_oc_executor
         evaluator_visitor* eval_v;
         void visit_default(algebra::node_csp _node) override
         {
-          throw gqlite::exception("Unimplemented node {} in set_visitor", oc::algebra::node_type_name(_node->get_type()));
+          throw_exception(exception_stage::runtime, exception_code::unimplemented_error, "Unimplemented node {} in set_visitor", oc::algebra::node_type_name(_node->get_type()));
         }
         void visit(algebra::remove_property_csp _property)
         {
@@ -1621,7 +1621,7 @@ namespace gqlite::backends::sqlite_oc_executor
         void visit(algebra::edit_labels_csp _property)
         {
           exec_value target = eval_c->get_variable(_property->get_target());
-          errors::check_condition(std::holds_alternative<node_ref_sp>(target), "Can only add labels to nodes.");
+          errors::check_condition(std::holds_alternative<node_ref_sp>(target), exception_stage::runtime, exception_code::invalid_argument_type, "Can only add labels to nodes.");
           node_ref_sp target_nd = std::get<node_ref_sp>(target);
           for(const std::string& label : _property->get_labels())
           {
@@ -1701,7 +1701,7 @@ namespace gqlite::backends::sqlite_oc_executor
               {
                 return std::get<value>(_v1) != std::get<value>(_v2);
               }
-              throw exception("Only values can be used in order by expression.");
+              throw_exception(exception_stage::runtime, exception_code::invalid_argument_type, "Only values can be used in order by expression.");
             }
           };
           struct less_op
@@ -1712,7 +1712,7 @@ namespace gqlite::backends::sqlite_oc_executor
               {
                 return std::get<value>(_v1) < std::get<value>(_v2);
               }
-              throw exception("Only values can be used in order by expression.");
+              throw_exception(exception_stage::runtime, exception_code::invalid_argument_type, "Only values can be used in order by expression.");
             }
           };
           _table->sort(columns, diff_op(), less_op());
@@ -1724,9 +1724,9 @@ namespace gqlite::backends::sqlite_oc_executor
           eval_v.exec_c = &exec_c;
           eval_v.eval_c = &eval_c;
           value skip_v = exec_c.get_value(eval_v.start(_modifiers->get_skip()));
-          errors::check_argument_type(skip_v.get_type(), value_type::integer, "Non-integer skip {} is not allowed.", skip_v);
+          errors::check_argument_type(skip_v.get_type(), value_type::integer, exception_stage::runtime, "Non-integer skip {} is not allowed.", skip_v);
           int skip = skip_v.to_integer();
-          errors::check_condition(skip >= 0, "Negative skip {} is not allowed.", skip);
+          errors::check_condition(skip >= 0, exception_stage::runtime, exception_code::negative_integer_argument, "Negative skip {} is not allowed.", skip);
           _table->offset(skip);
         }
         if(_modifiers->get_limit())
@@ -1737,9 +1737,9 @@ namespace gqlite::backends::sqlite_oc_executor
           eval_v.eval_c = &eval_c;
           evaluator_visitor ev;
           value limit_v = exec_c.get_value(eval_v.start(_modifiers->get_limit()));
-          errors::check_argument_type(limit_v.get_type(), value_type::integer, "Non-integer limit {} is not allowed.", limit_v);
+          errors::check_argument_type(limit_v.get_type(), value_type::integer, exception_stage::runtime, "Non-integer limit {} is not allowed.", limit_v);
           int limit = limit_v.to_integer();
-          errors::check_condition(limit >= 0, "Negative limit {} is not allowed.", limit);
+          errors::check_condition(limit >= 0, exception_stage::runtime, exception_code::unspecified, "Negative limit {} is not allowed.", limit);
           _table->limit(limit);
         }
       }
@@ -1754,7 +1754,7 @@ namespace gqlite::backends::sqlite_oc_executor
       }
       if(w->get_all() and not w->get_expressions().empty())
       {
-        throw exception("Unimplemented WITH *, expressions");
+        throw_exception(exception_stage::runtime, exception_code::unspecified, "Unimplemented WITH *, expressions");
       }
       evaluation_context eval_c;
       eval_c.table = table;
@@ -1803,7 +1803,7 @@ namespace gqlite::backends::sqlite_oc_executor
         gqlite::value val = exec_c.get_value(eval_v.start(uw->get_expression()));
         if(val.get_type() != value_type::invalid)
         {
-          errors::check_condition(val.get_type() == value_type::vector, "Unwind expect an array.");
+          errors::check_condition(val.get_type() == value_type::vector, exception_stage::runtime, exception_code::invalid_argument_type, "Unwind expect an array.");
           gqlite::value_vector valv = val.to_vector();
           std::vector<exec_value> row = eval_c.current_row;
           row.push_back(exec_value());
@@ -1824,7 +1824,7 @@ namespace gqlite::backends::sqlite_oc_executor
     {
       if(rs->get_all())
       {
-        errors::check_condition(rs->get_expressions().empty(), "Unimplemented RETURN *, expressions");
+        errors::check_condition(rs->get_expressions().empty(), exception_stage::runtime, exception_code::unimplemented_error, "Unimplemented RETURN *, expressions");
         value_vector labels;
         std::vector<bool> include;
         for(const std::string&  c : table.get_columns_names())
@@ -1890,12 +1890,12 @@ namespace gqlite::backends::sqlite_oc_executor
     // Call
     value visit(algebra::call_csp rs) override
     {
-      if(rs->get_arguments().size() != 0) throw exception("Arguments to call are not supported");
-      if(rs->get_yield().size() != 0) throw exception("Yields to call are not supported");
+      if(rs->get_arguments().size() != 0) throw_exception(exception_stage::runtime, exception_code::unimplemented_error, "Arguments to call are not supported");
+      if(rs->get_yield().size() != 0) throw_exception(exception_stage::runtime, exception_code::unimplemented_error, "Yields to call are not supported");
       auto it = exec_c.data->procedures.find(rs->get_name());
       if(it == exec_c.data->procedures.end())
       {
-        throw exception("No procedure called {}", rs->get_name());
+        throw_exception(exception_stage::runtime, exception_code::unknown_function, "No procedure called {}", rs->get_name());
       }
       return it->second(value_vector());
     }
@@ -1933,7 +1933,7 @@ sqlite::sqlite(void* _db) : d(new data)
   {
     gqlite::value result = d->execute_sql(sqlite_queries::get_debug_stats("default"));
     value_vector rows = result.to_vector();
-    errors::check_condition(rows.size() == 7, "Invalid number of debug stats got {} expected 7.", rows.size());
+    errors::check_condition(rows.size() == 7, exception_stage::runtime, exception_code::internal_error, "Invalid number of debug stats got {} expected 7.", rows.size());
     value_map stats;
     stats["nodes_count"] = rows[0].to_vector()[0].to_integer();
     stats["edges_count"] = rows[1].to_vector()[0].to_integer();
@@ -1974,6 +1974,6 @@ gqlite::value sqlite::execute_oc_query(oc::algebra::node_csp _node)
   } catch(const exception& _ex)
   {
     d->execute_sql("ROLLBACK");
-    throw _ex;
+    rethrow_exception(exception_stage::runtime, _ex);
   }
 }
