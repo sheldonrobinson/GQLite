@@ -1,6 +1,20 @@
 #!/usr/bin/env ruby
 
 require 'cucumber'
+require 'optparse'
+
+options = {
+  :abort_on_first_error => false,
+  :output_html => false,
+  :output_junit => false
+}
+
+OptionParser.new do |opt|
+  opt.on('--abort-on-first-error') { options[:abort_on_first_error] = true }
+  opt.on('--output-html') { options[:output_html] = true }
+  opt.on('--output-junit') { options[:output_junit] = true }
+end.parse!
+
 
 if File.directory?('openCypher')
   last_update = File.open("openCypher_update").read.to_i
@@ -67,8 +81,14 @@ expressions = [
 
 expressions = expressions.map { |file| 'openCypher/tck/features/expressions/' + file + '.feature' }
 features = features.map { |file| 'openCypher/tck/features/clauses/' + file + '.feature' }
-args = (features + expressions).concat %w(--require cucumber/step_definitions/ --format html)
-# To stop at first error
+
+args = (features + expressions).concat %w(--require cucumber/step_definitions/)
+
+args = args.concat %w(--fail-fast)  if options[:abort_on_first_error]
+args = args.concat %w(--format html)  if options[:output_html]
+args = args.concat %w(--format junit)  if options[:output_junit]
+
+# To st|o| op at first error
 # args = (features + expressions).concat %w(--require cucumber/step_definitions/ --fail-fast)
 
 # begin

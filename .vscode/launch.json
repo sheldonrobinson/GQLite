@@ -59,7 +59,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "/usr/bin/ruby",
-            "args": ["${env:LRS_PKG_ROOT}/src/gqlite/tests/rb/gqlite-tck.rb"],
+            "args": ["${env:LRS_PKG_ROOT}/src/gqlite/tests/rb/gqlite-tck.rb", "--abort-on-first-error"],
             "stopAtEntry": false,
             "cwd": "${env:LRS_PKG_ROOT}/src/gqlite/tests/rb",
             "environment": [],
