@@ -13,6 +13,7 @@ OptionParser.new do |opt|
   opt.on('--abort-on-first-error') { options[:abort_on_first_error] = true }
   opt.on('--output-html') { options[:output_html] = true }
   opt.on('--output-junit') { options[:output_junit] = true }
+  opt.on('--output-dir OUT') { |o| options[:output_dir] = o}
 end.parse!
 
 
@@ -86,7 +87,7 @@ args = (features + expressions).concat %w(--require cucumber/step_definitions/)
 
 args = args.concat %w(--fail-fast)  if options[:abort_on_first_error]
 args = args.concat %w(--format html)  if options[:output_html]
-args = args.concat %w(--format junit)  if options[:output_junit]
+args = args.concat(%w(--format junit --out)).concat([options[:output_dir]])  if options[:output_junit]
 
 # To st|o| op at first error
 # args = (features + expressions).concat %w(--require cucumber/step_definitions/ --fail-fast)
