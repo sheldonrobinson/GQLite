@@ -1,30 +1,53 @@
 
 def compare(a,b)
   # return a == b
-  return false unless a.class == b.class
-  case a
-  when Float
-    return (a-b).abs() < 1e-12
-  when Array
-    return false unless a.size == b.size
-    a.zip(b) do |va,vb|
-      return false unless compare(va, vb)
-    end
-    return true
-  when Hash
-    return false unless a.keys.sort == b.keys.sort
-    if a.keys.sort == ["labels", "properties", "type"] && a["type"] == "node"
-        return a["labels"].sort == b["labels"].sort && compare(a["properties"], b["properties"])
-    else
-      a.keys.each do |k|
-        return false unless compare(a[k], b[k])
+  if a.class == b.class
+    case a
+    when Float
+      return (a-b).abs() < 1e-12
+    when Array
+      return false unless a.size == b.size
+      a.zip(b) do |va,vb|
+        return false unless compare(va, vb)
       end
       return true
+    when Hash
+      return false unless a.keys.sort == b.keys.sort
+      if a.keys.sort == ["labels", "properties", "type"] && a["type"] == "node"
+          return a["labels"].sort == b["labels"].sort && compare(a["properties"], b["properties"])
+      else
+        a.keys.each do |k|
+          return false unless compare(a[k], b[k])
+        end
+        return true
+      end
+    else
+      return a == b
     end
+    raise "Unhandled comparison between #{a} and #{b}"
   else
-    return a == b
+    if a.class == Integer 
+      case b
+      when TrueClass
+        return a == 1
+      when FalseClass
+        return a == 0
+      else
+        return false
+      end
+    elsif b.class == Integer
+      case a.class
+      when TrueClass
+        return b == 1
+      when FalseClass
+        return b == 0
+      else
+        return false
+      end
+    else
+      return false
+    end
   end
-  raise "Unhandled comparison between #{a} and #{b}"
 end
 
 def compare_table_in_any_order(actual, expected)

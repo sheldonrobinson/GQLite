@@ -190,6 +190,8 @@ RSpec.describe "compare tables" do
     expect(compare_table_in_any_order([["p"], ["foo"]], [["p"], ["fo0"]])).to be false
     expect(compare_table_in_any_order([["p"], ["foo"]], [["p"]])).to be false
     expect(compare_table_in_any_order([["p"]], [["p"], ["foo"]])).to be false
+    expect(compare_table_in_any_order([["a", "b", "result"], [1, 1, true], [1, 0, true], [0, 1, true], [0, 0, true]],
+                                      [["a", "b", "result"], [true, true, true], [true, false, true], [false, true, true], [false, false, true]])).to be true
   end
   it "in any column order" do
     expect(compare_table_in_any_order([["p", "a"], ["foo", 1]], [["a", "p"], [1, "foo"]])).to be true

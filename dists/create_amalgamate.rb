@@ -9,7 +9,6 @@ src_files = [
   "gqlite_p.h",
   "global.h",
   "errors.h",
-  "table.h",
   "oc/token.h",
   "oc/lexer.h",
   "oc/algebra/node_type.h",
@@ -24,12 +23,11 @@ src_files = [
   "oc/parser.h",
   "backend.h",
   "backends/sqlite_queries.h",
-  "backends/functions.h",
   "backends/sqlite.h",
   
   
   "backend.cpp", "connection.cpp", "exception.cpp", "gqlite-c.cpp", "value.cpp",
-  "backends/functions.cpp", "backends/sqlite.cpp",
+  "backends/sqlite.cpp",
   "oc/lexer.cpp", "oc/parser.cpp", "oc/token.cpp",
   "oc/algebra/abstract_node_visitor.cpp", "oc/algebra/node_type.cpp", "oc/algebra/node.cpp", "oc/algebra/nodes.cpp",
   "oc/algebra/visitors/print.cpp"

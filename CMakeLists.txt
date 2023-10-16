@@ -191,8 +191,8 @@ set(GQLITE_SRCS
     src/oc/algebra/node_type.cpp
     src/oc/algebra/nodes.cpp
     src/oc/algebra/visitors/print.cpp
-    src/backends/functions.cpp
     src/backends/sqlite.cpp
+    src/backends/sqlite_ext.cpp
   )
 
 add_library(gqlite SHARED ${GQLITE_SRCS})
@@ -291,7 +291,7 @@ endif()
 ########################
 ## Build tests
 
-add_executable(gqlite_cpp_tests tests/cpp/catch_amalgamated.cpp tests/cpp/test_table.cpp tests/cpp/test_value.cpp)
+add_executable(gqlite_cpp_tests tests/cpp/catch_amalgamated.cpp tests/cpp/test_value.cpp)
 target_link_libraries(gqlite_cpp_tests PRIVATE gqlite)
 
 if(Crystal_FOUND)

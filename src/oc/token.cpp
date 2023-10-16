@@ -3,6 +3,8 @@
 #include <assert.h>
 #include <iostream>
 
+#include "../logging.h"
+
 using namespace gqlite::oc;
 
 const char* gqlite::oc::token_type_to_string(token_type _type)
@@ -94,8 +96,7 @@ const char* gqlite::oc::token_type_to_string(token_type _type)
 #undef TOKEN_KEYWORD
 #undef TOKEN_KEYWORD2
   }
-  std::cerr << "add the token" << (int)_type << std::endl;
-  std::abort();
+  gqlite_fatal("add the token {} ", (int)_type);
 }
 
 token::token() : type(token_type::UNKNOWN)

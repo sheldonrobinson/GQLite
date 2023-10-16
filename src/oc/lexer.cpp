@@ -208,7 +208,7 @@ token lexer::next_token(int _flags)
   }
   if( lastChar > 128 ) return next_token();
   identifierStr = lastChar;
-  std::cerr << "Unknown token : " << lastChar << " '" << identifierStr << "' at " << initial_line << "," << initial_col << " eof is" << eof() << std::endl;
+  gqlite_error("Unknown token: {} '{}' at {},{} eof status is {} ", lastChar, identifierStr, initial_line, initial_col, eof());
   return token(token_type::UNKNOWN, initial_line, initial_col);
 }
 

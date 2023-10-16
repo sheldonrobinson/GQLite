@@ -13,12 +13,14 @@ namespace gqlite
   enum class exception_stage;
   enum class exception_code;
   struct exception_maker;
+  struct exception_reader;
   /**
    * Represents an error that occurs during the execution of a query.
    */
   class exception : public std::exception
   {
     friend class exception_maker;
+    friend class exception_reader;
   public:
     exception(exception&& _rhs);
     exception(const exception& _rhs);
@@ -36,16 +38,7 @@ namespace gqlite
   /**
    * Represent the value type.
    */
-  enum class value_type
-  {
-    invalid,
-    boolean,
-    integer,
-    number, ///< aka float
-    string,
-    map,
-    vector
-  };
+  enum class value_type;
   class value;
   using value_map = std::unordered_map<std::string, value>;
   using value_vector = std::vector<value>;

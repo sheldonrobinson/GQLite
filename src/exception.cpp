@@ -13,6 +13,30 @@ struct exception::data
   const char* c_error;
 };
 
+struct gqlite::exception_reader
+{
+  const exception& ex;
+  exception_code get_code() const
+  {
+    return ex.d->code;
+  }
+  std::string get_message() const
+  {
+    return ex.d->error;
+  }
+};
+
+exception_code gqlite::get_execption_code(const exception& _exception)
+{
+  return exception_reader{_exception}.get_code();
+}
+
+std::string gqlite::get_execption_message(const exception& _exception)
+{
+  return exception_reader{_exception}.get_message();
+}
+
+
 struct gqlite::exception_maker
 {
   exception operator()(exception_stage _stage, exception_code _code, const std::string& _error)
@@ -108,6 +132,8 @@ const char* exception::what() const throw()
         d->full_error += "InvalidParameterUse: "; break;
       case negative_integer_argument:
         d->full_error += "NegativeIntegerArgument: "; break;
+      case non_constant_expression:
+        d->full_error += "NonConstantExpression: "; break;
       case parse_error:
         d->full_error += "ParseError: "; break;
       case requires_directed_relationship:

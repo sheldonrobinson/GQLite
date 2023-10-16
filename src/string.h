@@ -7,12 +7,14 @@ namespace gqlite::string
    * @internal
    * @return the result of joining the element of a vector with delimiter
    */
-  inline std::string join(const std::vector<std::string>& _v, const std::string& _delimiter)
+  template<class _C_>
+  inline std::string join(const _C_& _v, const std::string& _delimiter)
   {
+    if(_v.empty()) return std::string();
     return std::accumulate(
       std::next(_v.begin()), 
       _v.end(), 
-      _v[0], 
+      *_v.begin(), 
       [_delimiter](std::string a, std::string b) {
           return a + _delimiter + b;
       }

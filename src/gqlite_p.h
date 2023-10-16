@@ -29,6 +29,7 @@ namespace gqlite
     invalid_number_of_arguments,
     invalid_parameter_use,
     negative_integer_argument,
+    non_constant_expression,
     parse_error,
     requires_directed_relationship,
     undefined_variable,
@@ -38,6 +39,8 @@ namespace gqlite
     variable_type_conflict
   };
 
+  exception_code get_execption_code(const exception& _exception);
+  std::string get_execption_message(const exception& _exception);
   [[noreturn]] void throw_exception(exception_stage _stage, exception_code _code, const std::string& _error);
   [[noreturn]] void throw_exception(exception_stage _stage, exception_code _code, const char* _error);
   [[noreturn]] void rethrow_exception(exception_stage _stage, const exception& _ex);
@@ -51,6 +54,19 @@ namespace gqlite
   {
     throw_exception(_stage, _code, format_string(_format, _value, _other...));
   }
+  /**
+   * Represent the value type.
+   */
+  enum class value_type
+  {
+    invalid,
+    boolean,
+    integer,
+    floating_point,
+    string,
+    map,
+    vector
+  };
 
   template<typename _T_>
   inline value::value(const std::initializer_list<typename std::unordered_map<std::string, _T_>::value_type>& _v) : value()
@@ -81,7 +97,7 @@ namespace gqlite
       case invalid:
       case boolean:
       case integer:
-      case number:
+      case floating_point:
       case string:
         return _value;
       case map:

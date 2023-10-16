@@ -1,1 +1,2 @@
-INSERT INTO gqlite_/%= _graph_name %/_nodes (properties) VALUES (?001)
+INSERT INTO gqlite_/%= _graph_name %/_nodes (properties) /%= _values %/
+RETURNING id

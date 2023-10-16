@@ -1,1 +1,2 @@
-INSERT INTO gqlite_/%= _graph_name %/_edges (label, properties, left, right) VALUES (?001, ?002, ?003, ?004)
+INSERT INTO gqlite_/%= _graph_name %/_edges (label, properties, left, right) /%= _values %/
+RETURNING id

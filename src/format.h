@@ -26,10 +26,6 @@ namespace gqlite
     }
     return s;
   }
-  inline std::string format_string(const std::string& _format)
-  {
-    return _format;
-  }
   template<typename _T_>
   struct to_string_impl;
   template<typename _T_>
@@ -79,17 +75,51 @@ namespace gqlite
     std::string v;
     return v += _v;
   }
-  
-  template<typename _T_, typename... _Targs_>
-  inline std::string format_string(const std::string& _format, const _T_& _a, const _Targs_&... _args)
+  namespace details
   {
-    std::size_t start_pos = _format.find("{}");
-    if(start_pos == std::string::npos)
+    inline std::string format_string(std::size_t, const std::string& _format)
     {
       return _format;
     }
-    std::string f = _format;
-    f.replace(start_pos, 2, to_string(_a));
-    return format_string(f, _args...);
+    template<typename _T_, typename... _Targs_>
+    inline std::string format_string(std::size_t _start_pos, const std::string& _format, const _T_& _a, const _Targs_&... _args)
+    {
+      std::size_t start_pos = _format.find("{}", _start_pos);
+      if(start_pos == std::string::npos)
+      {
+        return _format;
+      }
+      std::string f = _format;
+      std::string replacement = to_string(_a);
+      f.replace(start_pos, 2, replacement);
+      return format_string(start_pos + replacement.size(), f, _args...);
+    }
+  }
+  template<typename... _Targs_>
+  inline std::string format_string(const std::string& _format, const _Targs_&... _args)
+  {
+    return details::format_string(0, _format, _args...);
+  }
+  namespace details
+  {
+    template<typename... _Targs_>
+    struct formatter
+    {
+      template<typename _Targ_>
+      formatter<_Targs_..., _Targ_> operator ,(const _Targ_& _arg)
+      {
+        return formatter<_Targs_..., _Targ_>{std::tuple_cat(m_args, std::make_tuple(_arg))};
+      }
+      operator std::string() const
+      {
+        return std::apply(&gqlite::format_string<_Targs_...>, std::tuple_cat(m_args));
+      }
+      std::tuple<std::string, _Targs_...> m_args;
+    };
+  }
+  template<typename _Targ_>
+  inline details::formatter<_Targ_> operator%(const std::string& _format, const _Targ_& _arg)
+  {
+    return details::formatter<_Targ_>{std::make_tuple(_format, _arg)};
   }
 }

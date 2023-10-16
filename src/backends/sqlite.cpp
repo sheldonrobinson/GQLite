@@ -3,21 +3,24 @@
 #include <list>
 #include <map>
 #include <optional>
-#include <sqlite3.h>
 #include <variant>
 
-#include "functions.h"
+#include <sqlite3.h>
+
 #include "sqlite_queries.h"
 
 #include "../oc/algebra/default_node_visitor.h"
+#include "../oc/algebra/visitors/expression_analyser.h"
+#include "../global.h"
 #include "../logging.h"
 #include "../string.h"
-#include "../table.h"
 
+using namespace std::string_literals;
 using namespace gqlite::backends;
 
 namespace gqlite::backends
 {
+  void initialise_sqlite_ext(sqlite3* db);
   struct sqlite_data
   {
     sqlite3* handle;
@@ -32,10 +35,16 @@ namespace gqlite::backends
     bool table_has(const std::string& _name);
 
     value execute_sql(const std::string& _query, const std::map<int, value>& _bindings = {});
+    void clean_up();
     uint64_t last_row_id();
     int64_t id_for_label(const std::string& _string);
     std::string label_for_id(int64_t _id);
   };
+
+  bool is_number(oc::algebra::expression_type _et)
+  {
+    return _et == oc::algebra::expression_type::integer or _et == oc::algebra::expression_type::floating_point;
+  }
 }
 
 struct sqlite::data : public sqlite_data
@@ -43,7 +52,14 @@ struct sqlite::data : public sqlite_data
 
 void sqlite_data::throw_last_error(const std::string& _query)
 {
-  throw_exception(exception_stage::runtime, exception_code::internal_error, "Error {}, while executing {}.", sqlite3_errmsg(handle), _query);
+  std::string err_msg = sqlite3_errmsg(handle);
+  if(err_msg.starts_with("__gqlite_fun: "))
+  {
+    value_map vm = value::from_json(err_msg.substr(sizeof("__gqlite_fun: ")-1)).to_map();
+    throw_exception(exception_stage::runtime, exception_code(vm["code"].to_integer()), vm["message"].to_string());
+  } else {
+    throw_exception(exception_stage::runtime, exception_code::internal_error, "Sqlite error '{}', while executing {}.", err_msg, _query);
+  }
 }
 
 gqlite::value sqlite_data::execute_sql(const std::string& _query, const std::map<int, value>& _bindings)
@@ -73,10 +89,13 @@ gqlite::value sqlite_data::execute_sql(const std::string& _query, const std::map
         case value_type::invalid:
           sqlite3_bind_null(ps, key);
           break;
+        case value_type::boolean:
+          sqlite3_bind_int64(ps, key, value.to_bool() ? 1 : 0);
+          break;
         case value_type::integer:
           sqlite3_bind_int64(ps, key, value.to_integer());
           break;
-        case value_type::number:
+        case value_type::floating_point:
           sqlite3_bind_double(ps, key, value.to_double());
           break;
         default:
@@ -140,6 +159,15 @@ gqlite::value sqlite_data::execute_sql(const std::string& _query, const std::map
     return q_rs[0];
   } else {
     return q_rs;
+  }
+}
+
+void sqlite_data::clean_up()
+{
+  value temp = execute_sql("SELECT name FROM sqlite_temp_master;");
+  for(const value& tv : temp.to_vector())
+  {
+    execute_sql(format_string("DROP TABLE {}", tv.to_vector().front().to_string()));
   }
 }
 
@@ -223,402 +251,447 @@ namespace gqlite::backends::sqlite_oc_executor
   namespace algebra = gqlite::oc::algebra;
 
   /**
-   * @internal
-   * Represent a reference to a node
-   */
-  struct node_ref
-  {
-    int64_t id; ///< database id for the node
-    value cache; ///< cache of the labels/properties
-  };
-
-  /**
-   * @internal
-   * Represent a relationship between nodes
-   */
-  struct edge_ref
-  {
-    int64_t id; ///< database id for the edge
-    value cache; ///< cache of the label/properties
-  };
-  struct empty {};
-  using node_ref_sp = std::shared_ptr<node_ref>;
-  using edge_ref_sp = std::shared_ptr<edge_ref>;
-  using exec_value = std::variant<empty, node_ref_sp, edge_ref_sp, gqlite::value>;
-  using exec_value_table = table<exec_value>;
-
-  /**
    * Global context for the execution of a query.
    */
   struct execution_context
   {
     sqlite_data* data;
     std::string graph_name = "default";
-
-    /**
-     * @return a value representing the executed value from @p _value
-     */
-    gqlite::value get_value(const exec_value& _value)
-    {
-      struct value_getter
-      {
-        execution_context* exec_c;
-        gqlite::value operator()(const node_ref_sp& _node_ref)
-        {
-          if(_node_ref->cache.get_type() == value_type::invalid)
-          {
-            // Retrieve properties
-            gqlite::value properties;
-            {
-              // Query
-              value_vector properties_val_list_vector = exec_c->data->execute_sql(sqlite_queries::node_get_properties(exec_c->graph_name), {{1, _node_ref->id}}).to_vector();
-              errors::check_condition(properties_val_list_vector.size() == 1, exception_stage::runtime, exception_code::internal_error, "When getting a node, should have received only one node");
-              value_vector properties_row = properties_val_list_vector.front().to_vector();
-              errors::check_condition(properties_row.size() == 1, exception_stage::runtime, exception_code::internal_error, "When getting a node, properties get should only have given one column");
-              properties = gqlite::value::from_json(properties_row.front().to_string());
-            }
-
-            // Retrieve labels
-            value_vector labels;
-            {
-              // Query
-              value_vector labels_val_list_vector = exec_c->data->execute_sql(sqlite_queries::node_get_labels(exec_c->graph_name), {{1, _node_ref->id}}).to_vector();
-              for(const gqlite::value& label_row_value : labels_val_list_vector)
-              {
-                value_vector label_row = label_row_value.to_vector();
-                errors::check_condition(label_row.size() == 1, exception_stage::runtime, exception_code::internal_error, "When getting a node, labels get should only have given one column");
-                labels.push_back(exec_c->data->label_for_id(label_row.front().to_integer()));
-              }
-            }
-            // Generate the cache
-            _node_ref->cache = gqlite::value{{
-              {"type", gqlite::value("node")}, {"labels", gqlite::value(labels)}, {"id", gqlite::value(_node_ref->id)}, {"properties", gqlite::value(properties)}
-            }};
-          }
-          return _node_ref->cache;
-        }
-        gqlite::value operator()(const edge_ref_sp& _edge_ref)
-        {
-          if(_edge_ref->cache.get_type() == value_type::invalid)
-          {
-            // Retrieve label/properties
-            std::string label;
-            gqlite::value properties;
-            {
-              // Query
-              value_vector properties_val_list_vector = exec_c->data->execute_sql(sqlite_queries::edge_get_label_properties(exec_c->graph_name), {{1, _edge_ref->id}}).to_vector();
-              errors::check_condition(properties_val_list_vector.size() == 1, exception_stage::runtime, exception_code::internal_error, "When getting an edge, should have received only one edge");
-              value_vector properties_row = properties_val_list_vector.front().to_vector();
-              errors::check_condition(properties_row.size() == 2, exception_stage::runtime, exception_code::internal_error, "When getting an edge, properties get should only have given two column");
-              label = exec_c->data->label_for_id(properties_row[0].to_integer());
-              properties = gqlite::value::from_json(properties_row[1].to_string());
-            }
-            // Generate the cache
-            _edge_ref->cache = gqlite::value{{
-              {"type", gqlite::value("edge")}, {"label", gqlite::value(label)}, {"id", gqlite::value(_edge_ref->id)}, {"properties", gqlite::value(properties)}
-            }};
-          }
-          return _edge_ref->cache;
-        }
-        gqlite::value operator()(const gqlite::value& _value)
-        {
-          return _value;
-        }
-        gqlite::value operator()(const empty&)
-        {
-          return gqlite::value();
-        }
-      };
-      return std::visit(value_getter{this}, _value);
-    }
-    /**
-     * @return a value representing the executed value from @p _value to be used in sql query.
-     * A.k.a. nodes/edges id or the value
-     */
-    gqlite::value get_sql_value(const exec_value& _value)
-    {
-      struct value_getter
-      {
-        execution_context* exec_c;
-        gqlite::value operator()(const node_ref_sp& _node_ref)
-        {
-          return _node_ref->id;
-        }
-        gqlite::value operator()(const edge_ref_sp& _edge_ref)
-        {
-          return _edge_ref->id;
-        }
-        gqlite::value operator()(const gqlite::value& _value)
-        {
-          return _value;
-        }
-        gqlite::value operator()(const empty&)
-        {
-          return gqlite::value();
-        }
-      };
-      return std::visit(value_getter{this}, _value);
-    }
+    int next_view_id = 0;
   };
 
-  /**
-   * Context for the evaluation of one row.
-   */
-  struct evaluation_context
+  struct sql_variable_info
   {
-    exec_value_table table;
-    std::vector<exec_value> current_row;
-    std::vector<std::string> new_vars; ///< i.e. the new variables introduced in this match
+    std::string sql_var_name; ///< name of the sql variable that holds the OC variable
+    oc::algebra::expression_type type;
+    std::string sql_properties_var_name = std::string(); ///< name of the sql variable that holds the the properties of a node or an edge
+    std::string sql_labels_var_name = std::string(); ///< 
+  };
 
-    void prepare_current_row(const exec_value_table& _table, std::size_t _i, bool _first_statement)
+  struct table
+  {
+    std::string view_name;
+    std::unordered_map<std::string, sql_variable_info> variables;
+  };
+  enum class sql_join
+  {
+    inner, left
+  };
+  struct sql_query_builder
+  {
+    std::size_t uid = 0;
+    std::size_t table_count = 0;
+    std::string variables;
+    std::string tables;
+    std::string join_conditions;
+    std::string where_conditions;
+    std::string modifiers;
+    std::map<int, value> bindings;
+    std::size_t next_uid()
     {
-      if(current_row.size() < table.get_columns_count())
-      {
-        current_row.resize(table.get_columns_count());
-      }
-      if(_first_statement)
-      {
-        std::fill_n(current_row.begin(), current_row.size(), empty{});
-      } else {
-        exec_value_table::const_row_view row_init = _table.get_row(_i);
-        std::copy(row_init.begin(), row_init.end(), current_row.begin());
-        std::fill_n(current_row.begin() + row_init.size(), current_row.size() - row_init.size(), empty{});
-      }
+      return uid++;
     }
-    bool has_variable(const std::string& _variable)
+    std::string bind_value(const value& _value)
     {
-      return table.has_column(_variable);
+      std::size_t binding_id = bindings.size() + 1;
+      bindings[binding_id] = _value;
+      return format_string("?{}", to_string_fixed_width(binding_id, 3));
     }
-    bool is_variable_set(const std::string& _variable)
-    {
-      return table.has_column(_variable) and not std::holds_alternative<empty>(current_row[table.get_column_index(_variable)]);
-    }
-    bool is_new_variable(const std::string& _variable)
-    {
-      return std::find(new_vars.begin(), new_vars.end(), _variable) != new_vars.end();
-    }
-    std::size_t get_new_variable_index(const std::string& _variable)
-    {
-      return std::find(new_vars.begin(), new_vars.end(), _variable) - new_vars.begin();
-    }
-    void define_variable(const std::string& _variable)
-    {
-      if(_variable.empty()) return;
-      if(table.has_column(_variable))
-      {
-        throw_exception(exception_stage::runtime, exception_code::variable_already_bound, "Variable {} is already bound.", _variable);
-      }
-      table.add_column(_variable);
-      new_vars.push_back(_variable);
-    }
-    void define_variable_if_needed(const std::string& _variable)
-    {
-      if(_variable.empty()) return;
-      if(not table.has_column(_variable))
-      {
-        table.add_column(_variable);
-        new_vars.push_back(_variable);
-      }
-    }
-    exec_value get_variable(const std::string& _variable)
-    {
-      if(table.has_column(_variable))
-      {
-        return current_row[table.get_column_index(_variable)];
-      } else {
-        throw_exception(exception_stage::runtime, exception_code::undefined_variable, "Variable {} is not defined.", _variable);
-      }
-    }
-    void set_variable(const std::string& _variable, const exec_value& _ev)
-    {
-      current_row[table.get_column_index(_variable)] = _ev;
-    }
-
     /**
-     * @return a node ref or an exception if not a node ref
+     * Add a new variable with a generic name format.
      */
-    node_ref_sp get_node_ref(const exec_value& _value)
+    std::string add_variable(const std::string& _expression, const char* _format = "var_{}")
     {
-      if(std::holds_alternative<node_ref_sp>(_value))
-      {
-        return std::get<node_ref_sp>(_value);
-      }
-      throw_exception(exception_stage::runtime, exception_code::internal_error, "Expected a reference to a node.");
+      std::string name = format_string(_format, next_uid());
+      return add_variable_with_name(_expression, name);
     }
-    void define_variables(const std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>>& _patterns)
+    /**
+     * Add a new variable with the given name.
+     */
+    std::string add_variable_with_name(const std::string& _expression, const std::string& _name)
     {
-      for(const algebra::alternative<algebra::graph_node, algebra::graph_edge>& pattern : _patterns)
+      if(not variables.empty()) variables += ", ";
+      variables += format_string("{} AS {}", _expression, _name);
+      return _name;
+    }
+    std::string add_table(const std::string& _table, sql_join _join, const char* _table_name_format= "tbl_{}")
+    {
+      if(table_count == 0)
       {
-        pattern.visit<void>([this](const algebra::graph_node_csp _node)
+        errors::check_condition(_join == sql_join::inner, exception_stage::runtime, exception_code::internal_error, "Joining with non-inner join on first table.");
+        tables += " FROM ";
+      } else {
+        switch(_join)
         {
-          define_variable(_node->get_variable());
-        }, [this](const algebra::graph_edge_csp _edge)
-        {
-          define_variable_if_needed(_edge->get_source()->get_variable());
-          define_variable(_edge->get_variable());
-          define_variable_if_needed(_edge->get_destination()->get_variable());
-        });
+          case sql_join::inner:
+            tables += " JOIN ";
+            break;
+          case sql_join::left:
+            tables += " LEFT JOIN ";
+            break;
+        }
       }
+      ++table_count;
+      std::string table_name = format_string(_table_name_format, next_uid());
+      tables += format_string(" {} {} ", _table, table_name);
+      return table_name;
+    }
+    template<typename... _T_>
+    void add_join_condition(const std::string& _condition, const _T_&... _args)
+    {
+      if(_condition.empty()) return;
+      if(not join_conditions.empty()) join_conditions += " AND ";
+      join_conditions += format_string(_condition, _args...);
+    }
+    template<typename... _T_>
+    void add_where_condition(const std::string& _condition, const _T_&... _args)
+    {
+      if(_condition.empty()) return;
+      where_conditions += where_conditions.empty() ? " WHERE " : " AND ";
+      where_conditions += format_string(_condition, _args...);
+    }
+    void add_modifier(const std::string& _modifier)
+    {
+      modifiers += _modifier;
+    }
+    std::string assemble()
+    {
+      std::string q = "SELECT ";
+      q += variables.empty() ? " null " : variables;
+      q += tables;
+      if(not join_conditions.empty())
+      {
+        if(table_count == 1)
+        {
+          q += " WHERE ";
+        } else {
+          q += " ON ";
+        }
+        q += join_conditions;
+      }
+      q += where_conditions;
+      q += modifiers;
+      return q;
     }
   };
 
   /**
    * Context for the generation of the sql match query
    */
-  struct match_context
+  struct sql_evaluation_context
   {
     execution_context* exec_c;
-    evaluation_context* eval_c;
-    int count = 0;
-    std::string sql_variables;
-    std::size_t sql_variables_count = 0;
-    std::string sql_tables;
-    std::string sql_conditions;
-    std::map<int, value> bindings;
-    std::vector<std::pair<std::string, std::string>> edge_sql_var_to_oc_var;
-    int label_count = 0;
-    struct var_info
-    {
-      std::string sql_var;
-      std::string sql_properties_var;
-      std::string sql_label_var;
-      std::size_t sql_column;
-      bool is_node;
-    };
-    std::map<std::string, var_info> oc_var_to_sql_var;
-    /**
-     * Generate the SQL join operation needed for matchin labels
-     */
-    std::string generate_labels_match(const std::vector<std::string>& _labels, const std::string& _node_variable, bool _start_with_and)
-    {
-      std::string cond;
-      for(const std::string& label : _labels)
-      {
-        sql_tables += format_string(" JOIN gqlite_{}_labels AS tb_lab{}", exec_c->graph_name, label_count);
-        if(not cond.empty() or _start_with_and) cond += " AND ";
-        std::size_t idx = bind_value(exec_c->data->id_for_label(label));
-        cond += format_string(" {} = tb_lab{}.node_id AND ?{} = tb_lab{}.label ",
-                      _node_variable, label_count, to_string_fixed_width(idx, 3), label_count);
-        ++label_count;
-      }
-      return cond;
-    }
+    sql_query_builder query_builder;
+    std::map<std::string, sql_variable_info> variables;
+    std::string previous_table_ref;
+  
+    // std::string view_name;
+    oc::algebra::visitors::expression_analyser expression_analyser;
 
-    var_info& get_variable_info(const std::string& _oc_variable)
+    table prepare(const table& _table, bool _create_new_table)
     {
-      auto it = oc_var_to_sql_var.find(_oc_variable);
-      if(it == oc_var_to_sql_var.end())
+      expression_analyser.stage = exception_stage::runtime;
+      expression_analyser.variables_f = [this](const std::string& _var_name)
       {
-        throw_exception(exception_stage::runtime, exception_code::undefined_variable, "Unknown variable '{}'.", _oc_variable);
+        return get_variable_info(_var_name).type;
+      };
+      table new_table;
+      if(_create_new_table) new_table.view_name = "__view" + std::to_string(++exec_c->next_view_id);
+      if(not _table.view_name.empty())
+      {
+        previous_table_ref = query_builder.add_table(_table.view_name, sql_join::inner, "pt_{}");
+
+        for(auto const& [k, v] : _table.variables)
+        {
+          std::string sql_var = format_string("{}.{}", previous_table_ref, v.sql_var_name);
+          variables[k] = { sql_var, v.type };
+          if(_create_new_table)
+          {
+            std::string col_name = query_builder.add_variable(sql_var);
+            new_table.variables[k] = { col_name, v.type };
+          }
+        }
+      }
+      return new_table;
+    }
+    sql_variable_info& get_variable_info(const std::string& _oc_variable)
+    {
+      auto it = variables.find(_oc_variable);
+      if(it == variables.end())
+      {
+        errors::undefined_variable(exception_stage::runtime, _oc_variable);
       }
       return it->second;
     }
-
     std::string get_sql_variable(const std::string& _oc_variable)
     {
-      return get_variable_info(_oc_variable).sql_var;
+      return get_variable_info(_oc_variable).sql_var_name;
     }
     std::string get_sql_properties_variable(const std::string& _oc_variable)
     {
-      var_info& info = get_variable_info(_oc_variable);
-      std::string properties_var = info.sql_properties_var;
+      sql_variable_info& info = get_variable_info(_oc_variable);
+      std::string properties_var = info.sql_properties_var_name;
       if(properties_var.empty())
       {
-        properties_var = retrieve_sql_properties(info.sql_var);
-        info.sql_properties_var = properties_var;
+        properties_var = retrieve_sql_properties(info.sql_var_name, info.type);
+        info.sql_properties_var_name = properties_var;
       }
       return properties_var;
     }
-    std::string retrieve_sql_properties(const std::string& _sql_var)
+    /**
+     * Retrieve SQL properties
+     */
+    std::string retrieve_sql_properties(const std::string& _sql_var, algebra::expression_type _et)
     {
-      std::string count_s = std::to_string(count++);
-      std::string properties_var = format_string("tbp{}.properties", count_s);
-      sql_tables += format_string(" JOIN gqlite_{}_nodes AS tbp{} ", exec_c->graph_name, count_s);
-      sql_conditions += format_string(" AND tbp{}.id = {}", count_s, _sql_var);
+      std::string table_suffix = (_et == algebra::expression_type::node) ? "nodes" : "edges";
+      std::string table_ref = query_builder.add_table(format_string("gqlite_{}_{}", exec_c->graph_name, table_suffix), sql_join::inner, "tbp{}");
+      query_builder.add_join_condition("{}.id = {}", table_ref, _sql_var);
+      std::string properties_var = format_string("{}.properties", table_ref);
       return properties_var;
     }
-    std::size_t bind_value(const value& _value)
-    {
-      std::size_t binding_id = bindings.size() + 1;
-      bindings[binding_id] = _value;
-      return binding_id;
-    }
-
   };
 
   /**
    * Visitor to build a sql query
    */
-  struct sql_filter_visitor : public gqlite::oc::algebra::default_node_visitor<std::string>
+  struct sql_expression_visitor : public gqlite::oc::algebra::default_node_visitor<std::string>
   {
-    match_context* mc;
+    sql_evaluation_context* eval_c;
+    sql_expression_visitor(sql_evaluation_context* _ec) : eval_c(_ec)
+    {}
     std::string visit_default(algebra::node_csp _node) override
     {
-      throw_exception(exception_stage::runtime, exception_code::unimplemented_error, "Unimplemented sql filter node {} in sql_filter_visitor", oc::algebra::node_type_name(_node->get_type()));
+      throw_exception(exception_stage::runtime, exception_code::unimplemented_error, "Unimplemented node '{}' in sql_expression_visitor", oc::algebra::node_type_name(_node->get_type()));
     }
     std::string visit(algebra::variable_csp _node) override
     {
-      return mc->get_sql_variable(_node->get_identifier());
+      return eval_c->get_sql_variable(_node->get_identifier());
     }
-    std::string visit(algebra::has_labels_csp _node) override
+    std::string visit(algebra::end_of_list_csp ) override
     {
-      return mc->generate_labels_match(_node->get_labels(), mc->get_sql_variable(_node->get_left()), false);
+      return eval_c->query_builder.bind_value(std::numeric_limits<int64_t>::max());
     }
     std::string visit(algebra::value_csp _node) override
     {
-      std::size_t idx = mc->bind_value(_node->get_value());
-      return "?" + to_string_fixed_width(idx, 3);
+      return eval_c->query_builder.bind_value(_node->get_value());
+    }
+    std::string visit(algebra::has_labels_csp _node) override
+    {
+      oc::algebra::expression_type et = eval_c->get_variable_info(_node->get_left()).type;
+      std::string label_ids;
+      for(const std::string& l : _node->get_labels())
+      {
+        if(not label_ids.empty()) label_ids += ", ";
+        label_ids += std::to_string(eval_c->exec_c->data->id_for_label(l));
+      }
+      switch(et)
+      {
+      case oc::algebra::expression_type::node:
+        {
+          return "(SELECT count(*) == {} FROM gqlite_{}_labels WHERE node_id={} AND label IN ({}) )"s
+              % _node->get_labels().size(), eval_c->exec_c->graph_name, eval_c->get_sql_variable(_node->get_left()), label_ids;
+        }
+      case oc::algebra::expression_type::edge:
+        {
+          std::string label_id;
+          return "(SELECT count(*) > 0 FROM gqlite_{}_edges WHERE id={} AND label IN ({}) )"s
+              % eval_c->exec_c->graph_name, eval_c->get_sql_variable(_node->get_left()), label_ids;
+        }
+      default:
+        errors::invalid_argument_type(exception_stage::runtime, "Can only check labels for nodes and edges.");
+      }
+    }
+    std::string visit(algebra::map_csp _map) override
+    {
+      std::size_t var_uuid = eval_c->query_builder.next_uid();
+      std::string map = ("(SELECT json_group_object(name_{}, val_{}) FROM ("s % var_uuid, var_uuid);
+      bool first = true;
+      for(const auto& [k, v] : _map->get_map())
+      {
+        if(not first)
+        {
+          map += " UNION ";
+        }
+        map += "SELECT " + eval_c->query_builder.bind_value(k);
+        if(first)
+        {
+          map += " AS name_{}"s % var_uuid;
+        }
+        map += ", " + start(v);
+        if(first)
+        {
+          map += " AS val_{}"s % var_uuid;
+        }
+        first = false;
+      }
+      return map + "))";
+    }
+    std::string visit(algebra::array_csp _array) override
+    {
+      std::size_t var_uuid = eval_c->query_builder.next_uid();
+      std::string array = "(SELECT json_group_array(val_{}) FROM ("s % var_uuid;
+      bool first = true;
+      for(algebra::node_csp v : _array->get_array())
+      {
+        if(not first)
+        {
+          array += " UNION ";
+        }
+        array += "SELECT " + start(v);
+        if(first)
+        {
+          array += " AS val_{}"s % var_uuid;
+        }
+        first = false;
+      }
+      return array + "))";
     }
     std::string visit(algebra::member_access_csp _node) override
     {
-      return format_string("json_extract({}, '$.{}')", mc->get_sql_properties_variable(_node->get_left()), string::join(_node->get_path(), "."));
+      std::string path_prefix;
+      algebra::expression_type et = eval_c->expression_analyser.start(_node->get_left()).type;
+      std::string expr;
+      if(et == algebra::expression_type::node or et == algebra::expression_type::edge)
+      {
+        errors::check_condition(_node->get_left()->get_type() == algebra::node_type::variable, exception_stage::runtime, exception_code::internal_error, "Only variable are supported yet for getting properties for node/edge.");
+        expr = eval_c->get_sql_properties_variable(std::static_pointer_cast<const algebra::variable>(_node->get_left())->get_identifier());
+      } else {
+        expr = start(_node->get_left());
+      }
+      return "json_extract({}, '${}.{}')"s % expr, path_prefix, string::join(_node->get_path(), ".");
+    }
+    std::string visit(algebra::indexed_access_csp _node) override
+    {
+      algebra::expression_type et = eval_c->expression_analyser.start(_node->get_left()).type;
+      std::string expr;
+      if(et == algebra::expression_type::node or et == algebra::expression_type::edge)
+      {
+        errors::check_condition(_node->get_left()->get_type() == algebra::node_type::variable, exception_stage::runtime, exception_code::internal_error, "Only variable are supported yet for getting properties for node/edge.");
+        expr = eval_c->get_sql_properties_variable(std::static_pointer_cast<const algebra::variable>(_node->get_left())->get_identifier());
+      } else {
+        expr = start(_node->get_left());
+      }
+      if(_node->get_end())
+      {
+        return "gqlite_range_access({}, {}, {})"s % expr, start(_node->get_index()), start(_node->get_end());
+      } else {
+        return "gqlite_indexed_access({}, {})"s % expr, start(_node->get_index());
+      }
     }
     std::string visit(algebra::function_call_csp _node) override
     {
-      if(_node->get_name() == "type")
+      if(_node->get_name() == "coalesce")
+      {
+        std::string arguments;
+        for(algebra::node_csp arg : _node->get_arguments())
+        {
+          if(not arguments.empty()) arguments += ", ";
+          arguments += start(arg);
+        }
+        return "coalesce(" + arguments + ")";
+      } else if(_node->get_name() == "labels")
+      {
+        errors::check_arguments_size("labels", _node->get_arguments(), 1);
+        std::string arg = start(_node->get_arguments().front());
+        return sqlite_queries::function_labels(eval_c->exec_c->graph_name, arg);
+      } else if(_node->get_name() == "type")
       {
         errors::check_arguments_size("type", _node->get_arguments(), 1);
-        algebra::node_csp arg0 = _node->get_arguments().front();
-        errors::check_argument_type_function(arg0->get_type(), algebra::node_type::variable, "type");
-        algebra::variable_csp arg0_var = std::static_pointer_cast<const algebra::variable>(arg0);
-        match_context::var_info& info = mc->get_variable_info(arg0_var->get_identifier());
-        if(info.is_node)
+        std::string arg = start(_node->get_arguments().front());
+        std::string edges_table_ref = eval_c->query_builder.add_table(format_string("gqlite_{}_edges", eval_c->exec_c->graph_name), sql_join::inner, "tb_edge_{}");
+        std::string labels_table_ref = eval_c->query_builder.add_table("gqlite_labels", sql_join::inner, "tb_lab_{}");
+        eval_c->query_builder.add_join_condition("{}.id = {} AND {}.label = {}.id", edges_table_ref, arg, edges_table_ref, labels_table_ref);
+        return "{}.label"s % labels_table_ref;
+      } else if(_node->get_name() == "range")
+      {
+        std::string args;
+        for(algebra::node_csp arg : _node->get_arguments())
         {
-          throw_exception(exception_stage::runtime, exception_code::invalid_argument_type, "Type expect an edge for variable {}.", arg0_var->get_identifier());
+          if(not args.empty()) args += ", ";
+          args += start(arg);
         }
-        return gqlite::format_string("(SELECT label FROM gqlite_labels WHERE id = {})", info.sql_label_var);
+        return "gqlite_range({})" % args;
+      } else if(_node->get_name() == "properties")
+      {
+        algebra::node_csp arg_0 = _node->get_arguments()[0];
+        algebra::expression_type type_0 = eval_c->expression_analyser.start(arg_0).type;
+        if(type_0 == algebra::expression_type::map)
+        {
+          return start(arg_0);
+        } else {
+          errors::check_condition(arg_0->get_type() == algebra::node_type::variable, exception_stage::runtime, exception_code::internal_error, "Only variable are supported yet for getting properties for node/edge.");
+          return eval_c->get_sql_properties_variable(std::static_pointer_cast<const algebra::variable>(arg_0)->get_identifier());
+        }
+      } else if(_node->get_name() == "toInteger")
+      {
+        return "CAST({} AS INTEGER)"s % start(_node->get_arguments()[0]);
+      } else if(_node->get_name() == "size")
+      {
+        return "json_array_length({})"s % start(_node->get_arguments()[0]);
       } else if(_node->get_name() == "id")
       {
-        errors::check_arguments_size("id", _node->get_arguments(), 1);
-        algebra::node_csp arg0 = _node->get_arguments().front();
-        errors::check_argument_type_function(arg0->get_type(), algebra::node_type::variable, "id");
-        algebra::variable_csp arg0_var = std::static_pointer_cast<const algebra::variable>(arg0);
-        match_context::var_info& info = mc->get_variable_info(arg0_var->get_identifier());
-        return info.sql_var;
-      } else {
-        throw_exception(exception_stage::runtime, exception_code::unknown_function, "Unknown function '{}¨'.", _node->get_name());
+        return start(_node->get_arguments()[0]);
+      } else if(_node->get_name() == "head")
+      {
+        return "json_extract({}, '$[0]')" % start(_node->get_arguments()[0]);
+      } else if(_node->get_name() == "tail")
+      {
+        return "gqlite_tail({})" % start(_node->get_arguments()[0]);
       }
+      throw_exception(exception_stage::runtime, exception_code::unimplemented_error, "Function call to {} is not implemented.", _node->get_name());
     }
 #define FILTER_VISITOR_BINARY_OP(_AL_, _OP_)                                                          \
     std::string visit(algebra::_AL_ ## _csp _node) override                                           \
     {                                                                                                 \
-      return format_string("({} " _OP_ " {})", start(_node->get_left()), start(_node->get_right()));  \
+      return "({} " _OP_ " {})"s % start(_node->get_left()), start(_node->get_right());               \
     }
     FILTER_VISITOR_BINARY_OP(logical_and, "AND")
     FILTER_VISITOR_BINARY_OP(logical_or, "OR")
-    FILTER_VISITOR_BINARY_OP(logical_xor, "XOR")
+    FILTER_VISITOR_BINARY_OP(logical_xor, "<>")
     FILTER_VISITOR_BINARY_OP(relational_equal, "=")
     FILTER_VISITOR_BINARY_OP(relational_different, "!=")
     FILTER_VISITOR_BINARY_OP(relational_inferior, "<")
     FILTER_VISITOR_BINARY_OP(relational_superior, ">")
     FILTER_VISITOR_BINARY_OP(relational_inferior_equal, "<")
     FILTER_VISITOR_BINARY_OP(relational_superior_equal, ">")
-    FILTER_VISITOR_BINARY_OP(relational_in, "IN")
-    FILTER_VISITOR_BINARY_OP(relational_not_in, "NOT IN")
-    FILTER_VISITOR_BINARY_OP(addition, "+")
     FILTER_VISITOR_BINARY_OP(substraction, "-")
     FILTER_VISITOR_BINARY_OP(multiplication, "*")
     FILTER_VISITOR_BINARY_OP(division, "/")
+    FILTER_VISITOR_BINARY_OP(modulo, "%")
+
+    std::string visit(algebra::relational_in_csp _node) override
+    {
+      return "gqlite_contains({}, {})" % start(_node->get_right()), start(_node->get_left());
+    }
+    std::string visit(algebra::relational_not_in_csp _node) override
+    {
+      return "NOT gqlite_contains({}, {})" % start(_node->get_right()), start(_node->get_left());
+    }
+
+    std::string visit(algebra::addition_csp _node) override
+    {
+      algebra::expression_type left_type = eval_c->expression_analyser.start(_node->get_left()).type;
+      algebra::expression_type right_type = eval_c->expression_analyser.start(_node->get_right()).type;
+
+      if(left_type == algebra::expression_type::vector or right_type == algebra::expression_type::vector)
+      {
+        errors::check_argument_types(left_type, {algebra::expression_type::vector, algebra::expression_type::value}, exception_stage::runtime, "Invalid argument for array concatenation.");
+
+        return "gqlite_concat({}, {})"s % start(_node->get_left()), start(_node->get_right());
+      } else if(left_type == algebra::expression_type::string or right_type == algebra::expression_type::string)
+      {
+        errors::check_argument_types(left_type, {algebra::expression_type::string, algebra::expression_type::value}, exception_stage::runtime, "Invalid argument for string concatenation.");
+        errors::check_argument_types(right_type, {algebra::expression_type::string, algebra::expression_type::value}, exception_stage::runtime, "Invalid argument for string concatenation.");
+
+        return "({} || {})"s % start(_node->get_left()), start(_node->get_right());
+      } else if(is_number(left_type) or is_number(right_type))
+      {
+        return "({} + {})"s % start(_node->get_left()), start(_node->get_right());
+      } else {
+        return "gqlite_addition({}, {})"s % start(_node->get_left()), start(_node->get_right());
+      }
+    }
+
 #define FILTER_VISITOR_UNARY_OP(_AL_, _OP_)                             \
     std::string visit(algebra::_AL_ ## _csp _node) override             \
     {                                                                   \
@@ -635,437 +708,37 @@ namespace gqlite::backends::sqlite_oc_executor
       return format_string("({} IS NULL)", start(_node->get_value()));
     }
   };
-  /**
-   * Visitor to evaluate expressions.
-   */
-  struct evaluator_visitor : public gqlite::oc::algebra::default_node_visitor<exec_value>
+  struct sql_match_evaluation_context : public sql_evaluation_context
   {
-    execution_context* exec_c;
-    evaluation_context* eval_c;
-    exec_value visit_default(algebra::node_csp _node) override
+    std::vector<std::pair<std::string, std::string>> edge_sql_var_to_oc_var;
+    /**
+     * Generate the SQL join operation needed for matchin labels
+     */
+    std::string generate_labels_match(const std::vector<std::string>& _labels, const std::string& _node_variable)
     {
-      throw_exception(exception_stage::runtime, exception_code::unimplemented_error, "Unimplemented node '{}' in evaluator_visitor.", oc::algebra::node_type_name(_node->get_type()));
-    }
-    value get_properties(const std::unordered_map<std::string, algebra::node_csp>& _properties)
-    {
-      value_map props;
-      for(auto const& [k,v] : _properties)
+      std::string cond;
+      for(const std::string& label : _labels)
       {
-        props[k] = exec_c->get_value(start(v));
+        std::string tb_lab = query_builder.add_table(format_string("gqlite_{}_labels", exec_c->graph_name), sql_join::inner, "tb_lab{}");
+        std::string label_binding = query_builder.bind_value(exec_c->data->id_for_label(label));
+        if(not cond.empty()) cond += " AND ";
+        cond += format_string(" {} = {}.node_id AND {} = {}.label ", _node_variable, tb_lab, label_binding, tb_lab);
       }
-      return props;
+      return cond;
     }
-    value_map get_properties(const exec_value& _value)
+  };
+  struct sql_match_expression_visitor : public sql_expression_visitor
+  {
+    sql_match_evaluation_context* eval_match_c;
+    sql_match_expression_visitor(sql_match_evaluation_context* _ec) : sql_expression_visitor(_ec), eval_match_c(_ec)
+    {}
+    std::string visit_default(algebra::node_csp _node) override
     {
-      return exec_c->get_value(_value).to_map()["properties"].to_map();
+      throw_exception(exception_stage::runtime, exception_code::unimplemented_error, "Unimplemented node '{}' in sql_expression_visitor", oc::algebra::node_type_name(_node->get_type()));
     }
-    value get_property(const value& _value, const std::vector<std::string>& _path)
+    std::string visit(algebra::has_labels_csp _node) override
     {
-      value cval = _value;
-      for(const std::string& pn : _path)
-      {
-        cval = cval.to_map()[pn];
-     }
-      return cval;
-    }
-    exec_value visit(algebra::value_csp _node) override
-    {
-      return _node->get_value();
-    }
-    exec_value visit(algebra::variable_csp _node) override
-    {
-      return eval_c->get_variable(_node->get_identifier());
-    }
-    exec_value visit(algebra::array_csp _node) override
-    {
-      std::vector<value> values;
-      for(const algebra::node_csp& v : _node->get_array())
-      {
-        values.push_back(exec_c->get_value(start(v)));
-      }
-      return values;
-    }
-    exec_value visit(algebra::map_csp _node) override
-    {
-      return get_properties(_node->get_map());
-    }
-    exec_value visit(algebra::member_access_csp _node) override
-    {
-      exec_value value = eval_c->get_variable(_node->get_left());
-      struct member_access
-      {
-        evaluator_visitor* self;
-        algebra::member_access_csp node;
-        gqlite::value operator()(const node_ref_sp& _v)
-        {
-          return self->get_property(self->get_properties(_v), node->get_path());
-        }
-        gqlite::value operator()(const edge_ref_sp& _v)
-        {
-          return self->get_property(self->get_properties(_v), node->get_path());
-        }
-        gqlite::value operator()(const gqlite::value& _v)
-        {
-          switch(_v.get_type())
-          {
-            case gqlite::value_type::map:
-            {
-              return self->get_property(_v.to_map(), node->get_path());
-            }
-            default:
-              throw_exception(exception_stage::runtime, exception_code::invalid_argument_type, "Invalid value type, expected a map, got {}.", _v.to_json());
-          }
-        }
-        gqlite::value operator()(const empty&)
-        {
-          return gqlite::value();
-        }
-      };
-      return std::visit(member_access{this, _node}, value);
-    }
-    exec_value visit(algebra::indexed_access_csp _node) override
-    {
-      exec_value value = start(_node->get_left());
-      gqlite::value index = exec_c->get_value(start(_node->get_index()));
-      if(index.get_type() == value_type::invalid) return gqlite::value();
-      std::optional<gqlite::value> end;
-      bool end_of_list = false;
-      if(_node->get_end())
-      {
-        if(_node->get_end()->get_type() == algebra::node_type::end_of_list)
-        {
-          end_of_list = true;
-        } else {
-          end = exec_c->get_value(start(_node->get_end()));
-          if(end->get_type() == value_type::invalid) return gqlite::value();
-        }
-      }
-      struct indexed_access
-      {
-        gqlite::value index;
-        std::optional<gqlite::value> end;
-        bool end_of_list;
-        execution_context* exec_c;
-        gqlite::value operator()(const node_ref_sp& _node)
-        {
-          gqlite::value_map vm = exec_c->get_value(_node).to_map()["properties"].to_map();
-          return vm[index.to_string()];
-        }
-        gqlite::value operator()(const edge_ref_sp& _edge)
-        {
-          gqlite::value_map vm = exec_c->get_value(_edge).to_map()["properties"].to_map();
-          return vm[index.to_string()];
-        }
-        gqlite::value operator()(const gqlite::value& _v)
-        {
-          switch(_v.get_type())
-          {
-            case gqlite::value_type::vector:
-            {
-              errors::check_argument_type(index.get_type(), value_type::integer, exception_stage::runtime, "index of array should be an integer not {}", index);
-              int idx = index.to_integer();
-              value_vector vv = _v.to_vector();
-              if(end or end_of_list)
-              {
-                if(idx < 0) idx = 0;
-                int end_idx;
-                if(end_of_list)
-                {
-                  end_idx = vv.size();
-                } else {
-                  errors::check_argument_type(end->get_type(), value_type::integer, exception_stage::runtime, "end index of array should be an integer not {}", *end);
-                  end_idx = end->to_integer();
-                  if(end_idx > int(vv.size())) end_idx = vv.size();
-                  while(end_idx < 0) end_idx += vv.size();
-                }
-                if(end_idx < idx) end_idx = idx;
-                value_vector vv_out;
-                std::copy(vv.begin() + idx, vv.begin() + end_idx, std::back_inserter(vv_out));
-                return vv_out;
-              } else {
-                std::size_t idx_s = idx;
-                errors::check_condition(idx_s < vv.size(), exception_stage::runtime, exception_code::unspecified, "Index {} out of bounds {}.", idx, vv.size());
-                return vv[idx_s];
-              }
-            }
-            case gqlite::value_type::map:
-            {
-              return _v.to_map()[index.to_string()];
-            }
-            default:
-              errors::invalid_argument_type(exception_stage::runtime, "Invalid value type, expected an array or a map, got {}.", _v);
-          }
-        }
-        gqlite::value operator()(const empty&)
-        {
-          return gqlite::value();
-        }
-      };
-      return std::visit(indexed_access{index, end, end_of_list, exec_c}, value);
-    }
-    bool is_numeric(value_type _vt)
-    {
-      return _vt == value_type::integer or _vt == value_type::number;
-    }
-    exec_value visit(algebra::logical_negation_csp _node) override
-    {
-      exec_value ev = start(_node->get_value());
-      errors::check_condition(std::holds_alternative<value>(ev), exception_stage::runtime, exception_code::invalid_argument_type, "Logical negation must be done on value.");
-      value ev_val = std::get<value>(ev);
-      switch(ev_val.get_type())
-      {
-        case value_type::invalid: return value();
-        case value_type::boolean: return not ev_val.to_bool();
-        default:
-          errors::invalid_argument_type(exception_stage::runtime, "expected boolean got {}", ev_val);
-      }
-    }
-    template<typename _TOp_, typename _TNode_>
-    exec_value visit_logical_binary(_TNode_ _node)
-    {
-      exec_value left_ev = start(_node->get_left());
-      exec_value right_ev = start(_node->get_right());
-      errors::check_condition(std::holds_alternative<value>(left_ev), exception_stage::runtime, exception_code::invalid_argument_type, "Binary operations must be done on values.");
-      errors::check_condition(std::holds_alternative<value>(right_ev), exception_stage::runtime, exception_code::invalid_argument_type, "Binary operations must be done on values.");
-      value left_val = std::get<value>(left_ev);
-      value right_val = std::get<value>(right_ev);
-      if(left_val.get_type() == value_type::invalid or right_val.get_type() == value_type::invalid)
-      {
-        if(left_val.get_type() == right_val.get_type())
-        {
-          return value();
-        } else if(left_val.get_type() == value_type::boolean)
-        {
-          if constexpr (std::same_as<_TOp_, std::logical_and<bool>>)
-          {
-            return left_val.to_bool() ? right_val : left_val;
-          } else if constexpr (std::same_as<_TOp_, std::logical_or<bool>>) {
-            return left_val.to_bool() ? left_val : right_val;
-          } else {
-            return right_val;
-          }
-        } if(right_val.get_type() == value_type::boolean) {
-          if constexpr (std::same_as<_TOp_, std::logical_and<bool>>)
-          {
-            return right_val.to_bool() ? left_val : right_val;
-          } else if constexpr (std::same_as<_TOp_, std::logical_or<bool>>) {
-            return right_val.to_bool() ? right_val : left_val;
-          } else {
-            return left_val; 
-          }
-        } else {
-          errors::invalid_argument_type(exception_stage::runtime, "binary comparison between non-bool {} and {}.", left_val, right_val);
-        }
-      } else if(left_val.get_type() == value_type::boolean and right_val.get_type() == value_type::boolean)
-      {
-        return _TOp_()(left_val.to_bool(), right_val.to_bool());
-      } else {
-        errors::invalid_argument_type(exception_stage::runtime, "binary comparison between non-bool {} and {}.", left_val, right_val);
-      }
-    }
-    exec_value visit(algebra::logical_and_csp _node) override
-    {
-      return visit_logical_binary<std::logical_and<bool>>(_node);
-    }
-    exec_value visit(algebra::logical_or_csp _node) override
-    {
-      return visit_logical_binary<std::logical_or<bool>>(_node);
-    }
-    exec_value visit(algebra::logical_xor_csp _node) override
-    {
-      return visit_logical_binary<std::not_equal_to<bool>>(_node);
-    }
-    template<typename _TNode_>
-    exec_value visit_comparison_binary(_TNode_ _node, const std::function<bool(const value&, const value&)>& _op)
-    {
-      exec_value left_ev = start(_node->get_left());
-      exec_value right_ev = start(_node->get_right());
-      errors::check_condition(std::holds_alternative<value>(left_ev), exception_stage::runtime, exception_code::invalid_argument_type, "Binary operations must be done on values.");
-      errors::check_condition(std::holds_alternative<value>(right_ev), exception_stage::runtime, exception_code::invalid_argument_type, "Binary operations must be done on values.");
-      value left_val = std::get<value>(left_ev);
-      value right_val = std::get<value>(right_ev);
-      return _op(left_val, right_val);
-    }
-    exec_value visit(algebra::relational_equal_csp _node) override
-    {
-      return visit_comparison_binary(_node, [](const value& _lhs, const value& _rhs)
-      {
-        return _lhs == _rhs;
-      });
-    }
-    template<template<typename> class _TOp_, typename _TNode_>
-    exec_value visit_numerical_binary(_TNode_ _node)
-    {
-      exec_value left_ev = start(_node->get_left());
-      exec_value right_ev = start(_node->get_right());
-      errors::check_condition(std::holds_alternative<value>(left_ev), exception_stage::runtime, exception_code::invalid_argument_type, "Binary operations must be done on values.");
-      errors::check_condition(std::holds_alternative<value>(right_ev), exception_stage::runtime, exception_code::invalid_argument_type, "Binary operations must be done on values.");
-      value left_val = std::get<value>(left_ev);
-      value right_val = std::get<value>(right_ev);
-      if(is_numeric(left_val.get_type()) and is_numeric(right_val.get_type()))
-      {
-        if(left_val.get_type() == value_type::integer and right_val.get_type() == value_type::integer)
-        {
-          return _TOp_<int64_t>()(left_val.to_integer(), right_val.to_integer());
-        } else {
-          return _TOp_<double>()(left_val.to_double(), right_val.to_double());
-        }
-      } else {
-        throw_exception(exception_stage::runtime, exception_code::invalid_argument_type, "Cannot compute binary operation between '{}' and '{}'.", left_val.to_json(), right_val.to_json());
-      }
-    }
-    exec_value visit(algebra::multiplication_csp _node) override
-    {
-      return visit_numerical_binary<std::multiplies>(_node);
-    }
-    exec_value visit(algebra::division_csp _node) override
-    {
-      return visit_numerical_binary<std::divides>(_node);
-    }
-    exec_value visit(algebra::modulo_csp _node) override
-    {
-      exec_value left_ev = start(_node->get_left());
-      exec_value right_ev = start(_node->get_right());
-      errors::check_condition(std::holds_alternative<value>(left_ev), exception_stage::runtime, exception_code::invalid_argument_type, "Binary operations must be done on values.");
-      errors::check_condition(std::holds_alternative<value>(right_ev), exception_stage::runtime, exception_code::invalid_argument_type, "Binary operations must be done on values.");
-      value left_val = std::get<value>(left_ev);
-      value right_val = std::get<value>(right_ev);
-      if(left_val.get_type() == value_type::integer and right_val.get_type() == value_type::integer)
-      {
-        return left_val.to_integer() % right_val.to_integer();
-      } else {
-        throw_exception(exception_stage::runtime, exception_code::invalid_argument_type, "Cannot compute modulo binary operation between {} and {}.", left_val.to_json(), right_val.to_json());
-      }
-    }
-
-
-    exec_value visit(algebra::addition_csp _node) override
-    {
-      exec_value left_ev = start(_node->get_left());
-      exec_value right_ev = start(_node->get_right());
-      errors::check_condition(std::holds_alternative<value>(left_ev), exception_stage::runtime, exception_code::invalid_argument_type, "Binary operations must be done on values.");
-      errors::check_condition(std::holds_alternative<value>(right_ev), exception_stage::runtime, exception_code::invalid_argument_type, "Binary operations must be done on values.");
-      value left_val = std::get<value>(left_ev);
-      value right_val = std::get<value>(right_ev);
-      if(left_val.get_type() == value_type::string and right_val.get_type() == value_type::string)
-      {
-        return left_val.to_string() + right_val.to_string();
-      } else if(left_val.get_type() == value_type::vector)
-      {
-        value_vector vl = left_val.to_vector();
-        if(right_val.get_type() == value_type::vector)
-        {
-          value_vector vr = right_val.to_vector();
-          vl.insert(vl.end(), vr.begin(), vr.end());
-        } else {
-          vl.push_back(right_val);
-        }
-        return vl;
-      } else if(is_numeric(left_val.get_type()) and is_numeric(right_val.get_type()))
-      {
-        if(left_val.get_type() == value_type::integer and right_val.get_type() == value_type::integer)
-        {
-          return left_val.to_integer() + right_val.to_integer();
-        } else {
-          return left_val.to_double() + right_val.to_double();
-        }
-      } else {
-        throw_exception(exception_stage::runtime, exception_code::invalid_argument_type, "Cannot add {} with {}.", left_val.to_json(), right_val.to_json());
-      }
-    }
-    template<template<typename _TOp_> class _OP_, typename _T_>
-    exec_value visit_in_not_in(_T_ _node)
-    {
-      exec_value left_ev = start(_node->get_left());
-      exec_value right_ev = start(_node->get_right());
-      errors::check_condition(std::holds_alternative<value>(left_ev), exception_stage::runtime, exception_code::invalid_argument_type, "Binary operations must be done on values.");
-      errors::check_condition(std::holds_alternative<value>(right_ev), exception_stage::runtime, exception_code::invalid_argument_type, "Binary operations must be done on values.");
-      value left_val = std::get<value>(left_ev);
-      value right_val = std::get<value>(right_ev);
-      errors::check_argument_type(right_val.get_type(), value_type::vector, exception_stage::runtime, "IN/NOT IN arguments needs to be a list not {}", right_val);
-      if(left_val.get_type() == value_type::invalid or right_val.get_type() == value_type::invalid) return value();
-      value_vector right_val_vec = right_val.to_vector();
-      bool v = _OP_<decltype(right_val_vec.begin())>()(std::find(right_val_vec.begin(), right_val_vec.end(), left_val), right_val_vec.end());
-      if(not v)
-      {
-        if(std::find(right_val_vec.begin(), right_val_vec.end(), value()) != right_val_vec.end()  )
-        {
-          return value();
-        } else {
-          return v;
-        }
-      }
-      return v;
-    }
-    exec_value visit(algebra::relational_in_csp _node) override
-    {
-      return visit_in_not_in<std::not_equal_to>(_node);
-    }
-    exec_value visit(algebra::relational_not_in_csp _node) override
-    {
-      return visit_in_not_in<std::equal_to>(_node);
-    }
-    exec_value visit(algebra::negation_csp _node) override
-    {
-      exec_value left_ev = start(_node->get_value());
-      errors::check_condition(std::holds_alternative<value>(left_ev), exception_stage::runtime, exception_code::invalid_argument_type, "Unary operations must be done on null values.");
-      value left_val = std::get<value>(left_ev);
-      if(is_numeric(left_val.get_type()))
-      {
-        if(left_val.get_type() == value_type::integer)
-        {
-          return -left_val.to_integer();
-        } else {
-          return -left_val.to_double();
-        }
-      } else {
-        throw_exception(exception_stage::runtime, exception_code::invalid_argument_type, "Cannot negate {}.", left_val.to_json());
-      }
-    }
-    exec_value visit(algebra::is_not_null_csp _node) override
-    {
-      exec_value left_ev = start(_node->get_value());
-      return not std::holds_alternative<empty>(left_ev)
-            and (not std::holds_alternative<value>(left_ev) or std::get<value>(left_ev).get_type() != value_type::invalid);
-    }
-    exec_value visit(algebra::is_null_csp _node) override
-    {
-      exec_value left_ev = start(_node->get_value());
-      return std::holds_alternative<empty>(left_ev)
-            or (std::holds_alternative<value>(left_ev) and std::get<value>(left_ev).get_type() == value_type::invalid);;
-    }
-    exec_value visit(algebra::function_call_csp _node) override
-    {
-      std::vector<value> args;
-      for(const algebra::node_csp& arg : _node->get_arguments())
-      {
-        args.push_back(exec_c->get_value(start(arg)));
-      }
-      return functions::call(_node->get_name(), args);
-    }
-    exec_value visit(algebra::has_labels_csp _node) override
-    {
-      exec_value ev = eval_c->get_variable(_node->get_left());
-      errors::check_condition(std::holds_alternative<node_ref_sp>(ev) or std::holds_alternative<edge_ref_sp>(ev), exception_stage::runtime, exception_code::invalid_argument_type, "'has_labels' expression expect a node or an edge.");
-      value_map val = exec_c->get_value(ev).to_map();
-      std::vector<std::string> labels;
-      if(val["type"].to_string() == "node")
-      {
-        for(const value& v : val["labels"].to_vector())
-        {
-          labels.push_back(v.to_string());
-        }
-      } else {
-        labels.push_back(val["label"].to_string());
-      }
-      for(const std::string& l : _node->get_labels())
-      {
-        if(std::find(labels.begin(), labels.end(), l) == labels.end())
-        {
-          return false;
-        }
-      }
-      return true;
+      return eval_match_c->generate_labels_match(_node->get_labels(), eval_c->get_sql_variable(_node->get_left()));
     }
   };
   /**
@@ -1074,108 +747,202 @@ namespace gqlite::backends::sqlite_oc_executor
   struct statement_visitor : public gqlite::oc::algebra::default_node_visitor<value>
   {
     execution_context exec_c;
-    exec_value_table table;
-    bool first_statement = true;
+    table current_table;
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Common functions
     value visit_default(algebra::node_csp _node) override
     {
-      throw_exception(exception_stage::runtime, exception_code::unimplemented_error, "Unimplemented statement node {} in statement_visitor", oc::algebra::node_type_name(_node->get_type()));
+      throw_exception(exception_stage::runtime, exception_code::unimplemented_error, "Unimplemented statement node '{}' in statement_visitor", oc::algebra::node_type_name(_node->get_type()));
     }
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Creation functions
-    bool has_node_ref(evaluator_visitor* _ev, algebra::graph_node_csp _node)
+    value_vector create_node(algebra::graph_node_csp _node)
     {
-      return not _node->get_variable().empty() and _ev->eval_c->is_variable_set(_node->get_variable());
-    }
-    node_ref_sp create_node(evaluator_visitor* _ev, algebra::graph_node_csp _node)
-    {
-      value props;
+      sql_evaluation_context mc;
+      mc.exec_c = &exec_c;
+      mc.prepare(current_table, false);
+      sql_expression_visitor sev{&mc};
+
+      std::string properties_str;
       if(_node->get_properties())
       {
-        props = _ev->get_properties(_node->get_properties()->get_map());
+        properties_str = sev.start(_node->get_properties());
       } else {
-        props = value_map();
+        properties_str = "'{}'";
       }
-      std::string json_properties = props.to_json();
-      exec_c.data->execute_sql(sqlite_queries::node_create(exec_c.graph_name), {{1, json_properties}});
-      int64_t row_id = exec_c.data->last_row_id();
-      for(const std::string& label : _node->get_labels())
+      sev.eval_c->query_builder.add_variable(properties_str);
+      std::string query = sqlite_queries::node_create(
+        sev.eval_c->exec_c->graph_name, sev.eval_c->query_builder.assemble());
+      value res = exec_c.data->execute_sql(query, sev.eval_c->query_builder.bindings);
+      value_vector ret_v;
+      value_vector res_v = res.to_vector();
+      for(std::size_t i = 0; i < res_v.size(); ++i)
       {
-        exec_c.data->execute_sql(sqlite_queries::node_add_label(exec_c.graph_name), {{1, exec_c.data->id_for_label(label)}, {2, row_id}});
+        ret_v.push_back(res_v[i].to_vector()[0]);
       }
-      node_ref_sp nr = std::make_shared<node_ref>(node_ref{
-          row_id,
-          gqlite::value{
-          {
-            {"type", gqlite::value("node")}, {"labels", gqlite::value(_node->get_labels())}, {"id", gqlite::value(row_id)}, {"properties", props}            
-          }}
-        });
-      if(not _node->get_variable().empty())
+      // Add labels
+      if(not _node->get_labels().empty())
       {
-        _ev->eval_c->set_variable(_node->get_variable(), nr);
+        value_vector label_ids;
+        for(const std::string& label : _node->get_labels())
+        {
+          label_ids.push_back(exec_c.data->id_for_label(label));
+        }
+        std::map<int, value> bindings;
+        bindings[1] = label_ids;
+        bindings[2] = ret_v;
+        exec_c.data->execute_sql(sqlite_queries::node_add_label(exec_c.graph_name), bindings);
       }
-      
-      return nr;
+      return ret_v;
     }
-    void create_edge(evaluator_visitor* _ev, algebra::graph_edge_csp _edge)
+    std::tuple<value, bool, std::string> create_node_if_needed(sql_expression_visitor* _sev, algebra::graph_node_csp _node, const std::map<std::string, value_vector>& _new_nodes, const char* _table_name_format)
     {
-      node_ref_sp source = has_node_ref(_ev, _edge->get_source()) ? _ev->eval_c->get_node_ref(_ev->eval_c->get_variable(_edge->get_source()->get_variable())) : create_node(_ev, _edge->get_source());
-      node_ref_sp destination = has_node_ref(_ev, _edge->get_destination()) ? _ev->eval_c->get_node_ref(_ev->eval_c->get_variable(_edge->get_destination()->get_variable())) : create_node(_ev, _edge->get_destination());
+      auto it_var = _sev->eval_c->variables.find(_node->get_variable());
+      if(it_var == _sev->eval_c->variables.end())
+      {
+        auto it = _new_nodes.find(_node->get_variable());
+        gqlite::value node_values;
+        bool new_nodes;
+        if(it == _new_nodes.end())
+        {
+          node_values = create_node(_node);
+          new_nodes = true;
+        } else {
+          node_values = it->second;
+          new_nodes = false;
+        }
+        std::string binding_idx = _sev->eval_c->query_builder.bind_value(node_values);
+        std::string table_name_ref = _sev->eval_c->query_builder.add_table(format_string("json_each({})", binding_idx), sql_join::inner, _table_name_format);
+        return std::make_tuple(node_values, new_nodes, format_string("{}.value", table_name_ref));
+      } else {
+        return std::make_tuple(value(), false, it_var->second.sql_var_name);
+      }
+    }
+    std::tuple<value_vector, value_vector, value_vector> create_edge(algebra::graph_edge_csp _edge, const std::map<std::string, value_vector>& _new_nodes)
+    {
+      sql_evaluation_context mc;
+      mc.exec_c = &exec_c;
+      mc.prepare(current_table, false);
+      sql_expression_visitor sev{&mc};
+
+      // Handle label
       std::string label = _edge->get_labels().empty() ? std::string() : _edge->get_labels().front();
-      int64_t label_id = exec_c.data->id_for_label(label);
-      
-      value props;
+      std::string label_binding_idx = sev.eval_c->query_builder.bind_value(exec_c.data->id_for_label(label));
+      mc.query_builder.add_variable(label_binding_idx, "label_{}");
+
+      // Handle properties
+      std::string properties_str;
       if(_edge->get_properties())
       {
-        props = _ev->get_properties(_edge->get_properties()->get_map());
+        properties_str = sev.start(_edge->get_properties());
       } else {
-        props = value_map();
+        properties_str = "'{}'";
       }
-      exec_c.data->execute_sql(sqlite_queries::edge_create(exec_c.graph_name), {{1, label_id}, {2, props.to_json()}, {3, source->id}, {4, destination->id}});
-      int64_t row_id = exec_c.data->last_row_id();
-      edge_ref_sp nr = std::make_shared<edge_ref>(edge_ref{
-          row_id,
-          value{
-            {{"type", value("edge")}, {"label", value(label)}, {"id", value(row_id)}, {"properties", props}}
-          }
-        });
-      if(not _edge->get_variable().empty())
+      mc.query_builder.add_variable(properties_str, "properties_{}");
+
+      // Handle source
+      auto const&[left_value, new_left_value, left_expr] = create_node_if_needed(&sev, _edge->get_source(), _new_nodes, "source_node_{}");
+      mc.query_builder.add_variable(left_expr, "source_{}");
+
+      // Check if destination == source
+      auto const&[right_value, new_right_value, right_expr]
+        = (_edge->get_source()->get_variable() == _edge->get_destination()->get_variable()) ?
+            std::make_tuple(gqlite::value(), false, left_expr)
+          : create_node_if_needed(&sev, _edge->get_destination(), _new_nodes, "destination_node_{}");
+      mc.query_builder.add_variable(right_expr, "destination_{}");
+
+      // Execute queries
+      std::string query = sqlite_queries::edge_create(exec_c.graph_name, sev.eval_c->query_builder.assemble());
+      value res = sev.eval_c->exec_c->data->execute_sql(query, sev.eval_c->query_builder.bindings);
+
+      // Prepare return
+      value_vector ret_v;
+      value_vector res_v = res.to_vector();
+      for(std::size_t i = 0; i < res_v.size(); ++i)
       {
-        _ev->eval_c->set_variable(_edge->get_variable(), nr);
+        ret_v.push_back(res_v[i].to_vector()[0]);
       }
+
+      // Check if nodes were created during the edge cretion
+      value_vector left_value_ret; if(new_left_value) left_value_ret = left_value.to_vector();
+      value_vector right_value_ret; if(new_right_value) right_value_ret = right_value.to_vector();
+      return {left_value_ret, ret_v, right_value_ret};
     }
     /**
      * Execute the create statement
      */
     value visit(algebra::create_csp _node) override
     {
-      evaluation_context eval_c;
-      eval_c.table.add_columns(table.get_columns_names());
-      evaluator_visitor eval_v;
-      eval_v.exec_c = &exec_c;
-      eval_v.eval_c = &eval_c;
-      std::size_t max_iter = first_statement ? 1 : table.get_rows_count();
-      // Set variables
-      eval_c.define_variables(_node->get_patterns());
-      // Create nodes
-      for(std::size_t i = 0; i < max_iter; ++i)
+      // 1) Create new nodes/edgers
+      std::map<std::string, value_vector> new_nodes, new_edges;
+      bool new_non_anonymous_nodes = false;
+      for(const algebra::alternative<algebra::graph_node, algebra::graph_edge>& pattern : _node->get_patterns())
       {
-        eval_c.prepare_current_row(table, i, first_statement);
-        for(const algebra::alternative<algebra::graph_node, algebra::graph_edge>& pattern : _node->get_patterns())
+        pattern.visit<void>([this, &new_nodes, &new_non_anonymous_nodes](const algebra::graph_node_csp _node)
         {
-          pattern.visit<void>([this, &eval_v](const algebra::graph_node_csp _node)
+          gqlite::value_vector nodes = create_node(_node);
+          if(not _node->get_variable().starts_with("__gqlite_anon_"))
           {
-            create_node(&eval_v, _node);
-          },
-          [this, &eval_v](const algebra::graph_edge_csp _edge)
+            new_nodes[_node->get_variable()] = nodes;
+            new_non_anonymous_nodes = new_non_anonymous_nodes or (not _node->get_variable().starts_with("__gqlite_anon_"));
+          }
+        },
+        [this, &new_nodes, &new_edges, &new_non_anonymous_nodes](const algebra::graph_edge_csp _edge)
+        {
+          auto const& [left_nodes, edges, right_nodes] = create_edge(_edge, new_nodes);
+          if(not left_nodes.empty())
           {
-            create_edge(&eval_v, _edge);
-          });
-        }
-        eval_c.table.add_row(eval_c.current_row);
+            new_nodes[_edge->get_source()->get_variable()] = left_nodes;
+            new_non_anonymous_nodes = new_non_anonymous_nodes or (not _edge->get_source()->get_variable().starts_with("__gqlite_anon_"));
+          }
+          if(not right_nodes.empty())
+          {
+            new_nodes[_edge->get_destination()->get_variable()] = right_nodes;
+            new_non_anonymous_nodes = new_non_anonymous_nodes or (not _edge->get_destination()->get_variable().starts_with("__gqlite_anon_"));
+          }
+          new_edges[_edge->get_variable()] = edges;
+            new_non_anonymous_nodes = new_non_anonymous_nodes or (not _edge->get_variable().starts_with("__gqlite_anon_"));
+
+        });
       }
-      table = eval_c.table;
+
+      if(new_non_anonymous_nodes)
+      {
+        // 2) Create the resulting table
+        sql_evaluation_context mc;
+        mc.exec_c = &exec_c;
+        table new_table = mc.prepare(current_table, true);
+        sql_expression_visitor sev{&mc};
+        std::string first_table_ref;
+        // loop over new things
+        for(const auto& [new_things, type, var_format]
+           : std::initializer_list<std::tuple<std::map<std::string, gqlite::value_vector>, oc::algebra::expression_type, const char*>>
+             {{new_nodes, oc::algebra::expression_type::node, "new_node_{}"}, {new_edges, oc::algebra::expression_type::edge, "new_edge_{}"}})
+        {
+          for(const auto& [k, v] : new_things)
+          {
+            if(not k.starts_with("__gqlite_anon_"))
+            {
+              std::string idx = mc.query_builder.bind_value(v);
+              std::string table_ref = mc.query_builder.add_table(format_string("json_each({})", idx), sql_join::inner, var_format);
+              if(first_table_ref.empty())
+              {
+                first_table_ref = table_ref;
+              } else {
+                mc.query_builder.add_join_condition("{}.key = {}.key", first_table_ref, table_ref);
+              }
+              mc.query_builder.add_variable_with_name(format_string(" {}.value ", table_ref), table_ref);
+              new_table.variables[k] = {table_ref, type};
+            }
+          }
+        }
+        if(not mc.previous_table_ref.empty())
+        {
+          mc.query_builder.add_join_condition("{}.rowid = {}.key + 1", mc.previous_table_ref, first_table_ref);
+        }
+        exec_c.data->execute_sql("CREATE TEMPORARY TABLE " + new_table.view_name + " AS " + mc.query_builder.assemble(), mc.query_builder.bindings);
+        current_table = new_table;
+      }
       return value{};
     }
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1183,198 +950,178 @@ namespace gqlite::backends::sqlite_oc_executor
     /**
      * Generate a filter expression for a map
      */
-    std::string generate_filter(const algebra::map_csp& _map, const std::string& _path, sql_filter_visitor* _filter_visitor)
+    std::string generate_filter(const algebra::node_csp& _map, const std::string& _path, sql_expression_visitor* _filter_visitor)
     {
-      std::string r;
-      for(const auto& [k, v] : _map->get_map())
+      switch(_map->get_type())
       {
-        std::string path = _path + "." + k;
-        if(v->get_type() == algebra::node_type::map)
+        case algebra::node_type::map:
         {
-          r += generate_filter(std::static_pointer_cast<const algebra::map>(_map), path, _filter_visitor);
-        } else {
-          r += format_string(" AND json_extract({}') = {} ", path, _filter_visitor->start(v));
+          
+          std::string r;
+          algebra::map_csp m = std::static_pointer_cast<const algebra::map>(_map);
+          for(const auto& [k, v] : m->get_map())
+          {
+            std::string path = _path + "." + k;
+            if(not r.empty())
+            {
+              r += " AND ";
+            }
+            if(v->get_type() == algebra::node_type::map)
+            {
+              r += generate_filter(v, path, _filter_visitor);
+            } else {
+              r += format_string(" json_extract({}') = {} ", path, _filter_visitor->start(v));
+            }
+          }
+          return r;
         }
+        case algebra::node_type::value:
+        {
+          value val = std::static_pointer_cast<const algebra::value>(_map)->get_value();
+          switch(val.get_type())
+          {
+          case value_type::map:
+          {
+            // special case for map, as this can't be an equal comparison, since for matching, only a subset of the key might be explicitly defined
+            std::string r;
+            for(const auto& [k, v] : val.to_map())
+            {
+              std::string path = _path + "." + k;
+              if(not r.empty())
+              {
+                r += " AND ";
+              }
+              r += generate_filter(std::make_shared<algebra::value>(v), path, _filter_visitor); // TODO use a seperate function
+            }
+            return r;
+          }
+          case value_type::vector:
+            {
+              std::string id = _filter_visitor->eval_c->query_builder.bind_value(val.to_json());
+              return (" json_extract({}') = json({}) "s % _path, id);
+            }
+          default:
+            {
+              std::string id = _filter_visitor->eval_c->query_builder.bind_value(val);
+              return (" json_extract({}') = {} "s % _path, id);
+            }
+          }
+        }
+        default:
+          throw_exception(exception_stage::runtime, exception_code::internal_error, "Properties is neither algebra::map nor value_map, this should have been caught by the parser.");
       }
-      return r;
     }
-    void generate_var_match(match_context* _mc, const std::string& _oc_var, const std::string& _sql_var, const std::string& _sql_properties_var, const std::string& _label_var, bool _is_node)
+    void generate_var_match(sql_match_evaluation_context* _mc, table* _table, const std::string& _oc_var, const std::string& _sql_var, const std::string& _sql_properties_var, const std::string& _label_var, oc::algebra::expression_type _variable_type)
     {
       if(not _oc_var.empty())
       {
-        auto it = _mc->oc_var_to_sql_var.find(_oc_var);
-        if(it == _mc->oc_var_to_sql_var.end())
+        auto it = _mc->variables.find(_oc_var);
+        if(it == _mc->variables.end())
         {
-          // Check if it is a new variable and need to be extracted in the SQL statement
-          errors::check_condition(_mc->eval_c->is_new_variable(_oc_var), exception_stage::runtime, exception_code::internal_error, "only new variable should be defined.");
-          if(not _mc->sql_variables.empty()) _mc->sql_variables += ", ";
-          _mc->sql_variables += _sql_var;
-          _mc->oc_var_to_sql_var[_oc_var] = {_sql_var, _sql_properties_var, _label_var, _mc->sql_variables_count, _is_node};
-          ++_mc->sql_variables_count;
+          std::string var_name = _mc->query_builder.add_variable(_sql_var, "new_match_{}");
+          _table->variables[_oc_var] = {var_name, _variable_type};
+          _mc->variables[_oc_var] = {_sql_var, _variable_type, _sql_properties_var, _label_var};
         } else {
+          errors::check_variable_type(it->second.type, _variable_type, exception_stage::runtime, _oc_var);
           // Generate match
-          if(it->second.is_node != _is_node) throw_exception(exception_stage::runtime, exception_code::variable_type_conflict, "{} is redefined as a variable of a different type", _oc_var);
-          _mc->sql_conditions += format_string(" AND {} = {} ", _sql_var, it->second.sql_var);
+          _mc->query_builder.add_join_condition(" {} = {} ", _sql_var, it->second.sql_var_name);
         }
       }
     }
     value visit(algebra::match_csp _node) override
     {
-      evaluation_context eval_c;
-      eval_c.table.add_columns(table.get_columns_names());
-      evaluator_visitor eval_v;
-      eval_v.exec_c = &exec_c;
-      eval_v.eval_c = &eval_c;
-
-      match_context mc;
+      sql_match_evaluation_context mc;
       mc.exec_c = &exec_c;
-      mc.eval_c = &eval_c;
-      sql_filter_visitor fil_vis;
-      fil_vis.mc = &mc;
+      table new_table = mc.prepare(current_table, true);
+      sql_match_expression_visitor sev{&mc};
 
-      std::size_t max_iter = first_statement ? 1 : table.get_rows_count();
-      // Set variables
-      eval_c.define_variables(_node->get_patterns());
-
-      for(std::size_t i = 0; i < max_iter; ++i)
+      // 1) Go through the patterns
+      for(const algebra::alternative<algebra::graph_node, algebra::graph_edge>& pattern : _node->get_patterns())
       {
-        eval_c.prepare_current_row(table, i, first_statement);
-
-        // 0) Bind the values
+        pattern.visit<void>([this, &mc, &sev, &new_table](const algebra::graph_node_csp _node)
         {
-          std::size_t column_index = 0;
-          for(const std::string& column : table.get_columns_names())
+          std::string table_ref = sev.eval_c->query_builder.add_table(format_string("gqlite_{}_nodes", exec_c.graph_name), sql_join::inner, "node_{}");
+          std::string sql_var = format_string("{}.id", table_ref);
+          std::string sql_properties_var = format_string("{}.properties", table_ref);
+          mc.query_builder.add_join_condition(mc.generate_labels_match(_node->get_labels(), format_string("{}.id", table_ref)));
+          if(_node->get_properties())
           {
-            // It is a value, bind it.
-            int idx = mc.bind_value(mc.exec_c->get_sql_value(mc.eval_c->get_variable(column)));
-            std::string binding = format_string("?{}", to_string_fixed_width(idx, 3));
-            mc.oc_var_to_sql_var[column] = {binding, std::string(), std::string(), std::size_t(-1), std::holds_alternative<node_ref_sp>(eval_c.current_row[column_index])};
+            mc.query_builder.add_where_condition(generate_filter(_node->get_properties(), sql_properties_var + ", '$", &sev));
           }
-          ++column_index;
-        }
-
-        // 1) Go through the patterns
-        for(const algebra::alternative<algebra::graph_node, algebra::graph_edge>& pattern : _node->get_patterns())
+          generate_var_match(&mc, &new_table, _node->get_variable(), sql_var, sql_properties_var, std::string(), algebra::expression_type::node);
+        },
+        [this, &mc, &sev, &new_table](const algebra::graph_edge_csp _edge)
         {
-          if(mc.count != 0)
+          std::string table_ref;
+          if(_edge->get_directivity() == algebra::edge_directivity::undirected)
           {
-            mc.sql_tables += " JOIN ";
+            table_ref = sev.eval_c->query_builder.add_table(format_string("gqlite_{}_edges_undirected", exec_c.graph_name), sql_join::inner, "undirected_edge_{}");
+          } else {
+            table_ref = sev.eval_c->query_builder.add_table(format_string("gqlite_{}_edges", exec_c.graph_name), sql_join::inner, "edge_{}");
           }
-          pattern.visit<void>([this, &mc, &fil_vis](const algebra::graph_node_csp _node)
+          std::string sql_source_var = format_string("{}.left", table_ref);
+          std::string sql_edge_var = format_string("{}.id", table_ref);
+          std::string sql_properties_edge_var = format_string("{}.properties", table_ref);
+          std::string sql_label_edge_var = format_string("{}.label", table_ref);
+          std::string sql_source_properties_var;
+          std::string sql_destination_properties_var;
+          std::string sql_destination_var = format_string("{}.right", table_ref);
+          mc.query_builder.add_where_condition(mc.generate_labels_match(_edge->get_source()->get_labels(), table_ref+ ".left"));
+          mc.query_builder.add_where_condition(mc.generate_labels_match(_edge->get_destination()->get_labels(), table_ref + ".right"));
+          if(not _edge->get_labels().empty())
           {
-            std::string count_s = std::to_string(mc.count++);
-            std::string sql_var = format_string("tb{}.id", count_s);
-            std::string sql_properties_var = format_string("tb{}.properties", count_s);
-            mc.sql_tables += format_string("gqlite_{}_nodes AS tb{}", exec_c.graph_name, count_s);
-            mc.sql_conditions += mc.generate_labels_match(_node->get_labels(), format_string("tb{}.id", count_s), true);
-            if(_node->get_properties())
+            std::string label_conds = "(FALSE ";
+            for(const std::string& label : _edge->get_labels())
             {
-              mc.sql_conditions += generate_filter(_node->get_properties(), sql_properties_var + ", '$", &fil_vis);
+              label_conds += format_string(" OR {} = {}", sql_label_edge_var, exec_c.data->id_for_label(label));
             }
-            generate_var_match(&mc, _node->get_variable(), sql_var, sql_properties_var, std::string(), true);
-          },
-          [this, &mc, &fil_vis](const algebra::graph_edge_csp _edge)
+            label_conds += ")";
+            mc.query_builder.add_where_condition(label_conds);
+          }
+          if(_edge->get_properties())
           {
-            std::string count_s = std::to_string(mc.count++);
-            std::string sql_source_var = format_string("tb{}.left", count_s);
-            std::string sql_edge_var = format_string("tb{}.id", count_s);
-            std::string sql_properties_edge_var = format_string("tb{}.properties", count_s);
-            std::string sql_label_edge_var = format_string("tb{}.label", count_s);
-            std::string sql_source_properties_var;
-            std::string sql_destination_properties_var;
-            std::string sql_destination_var = format_string("tb{}.right", count_s);
-            if(_edge->get_directivity() == algebra::edge_directivity::undirected)
-            {
-              mc.sql_tables += format_string("gqlite_{}_edges_undirected AS tb{}", exec_c.graph_name, count_s);
-            } else {
-              mc.sql_tables += format_string("gqlite_{}_edges AS tb{}", exec_c.graph_name, count_s);
-            }
-            mc.sql_conditions += mc.generate_labels_match(_edge->get_source()->get_labels(), "tb" + count_s + ".left", true);
-            mc.sql_conditions += mc.generate_labels_match(_edge->get_destination()->get_labels(), "tb" + count_s + ".right", true);
-            if(not _edge->get_labels().empty())
-            {
-              mc.sql_conditions += " AND (FALSE ";
-              for(const std::string& label : _edge->get_labels())
-              {
-                mc.sql_conditions += format_string(" OR {} = {}", sql_label_edge_var
-                , exec_c.data->id_for_label(label));
-              }
-              mc.sql_conditions += ")";
-            }
-            if(_edge->get_properties())
-            {
-              mc.sql_conditions += generate_filter(_edge->get_properties(), sql_properties_edge_var + ", '$", &fil_vis);
-            }
-            if(_edge->get_source()->get_properties())
-            {
-              sql_source_properties_var = mc.retrieve_sql_properties(sql_source_var);
-              mc.sql_conditions += generate_filter(_edge->get_source()->get_properties(), sql_source_properties_var + ", '$", &fil_vis);
-            }
-            if(_edge->get_destination()->get_properties())
-            {
-              sql_destination_properties_var = mc.retrieve_sql_properties(sql_destination_var);
-              mc.sql_conditions += generate_filter(_edge->get_destination()->get_properties(), sql_destination_properties_var + ", '$", &fil_vis);
-            }
-            // Ensure identical oc variablle are joined in SQL
-            generate_var_match(&mc, _edge->get_source()->get_variable(), sql_source_var, sql_source_properties_var, std::string(), true);
-            generate_var_match(&mc, _edge->get_variable(), sql_edge_var, sql_properties_edge_var, sql_label_edge_var, false);
-            generate_var_match(&mc, _edge->get_destination()->get_variable(), sql_destination_var, sql_destination_properties_var, std::string(), true);
-            // ensure edge isomorphism, i.e., if the variable names are different, the edges must be different
-            for(const std::pair<std::string, std::string>& sql_var_to_oc_var : mc.edge_sql_var_to_oc_var)
-            {
-              if(sql_var_to_oc_var.second != _edge->get_variable() and not _edge->get_variable().empty())
-              {
-                mc.sql_conditions += format_string(" AND {} != {}", sql_edge_var, sql_var_to_oc_var.first);
-              }
-            }
-            mc.edge_sql_var_to_oc_var.push_back({sql_edge_var, _edge->get_variable()});
-            // Increase variable counter
-          });
-        }
-        // 2) Handle where
-        if(_node->get_where())
-        {
-          mc.sql_conditions += " AND " + fil_vis.start(_node->get_where());
-        }
-        // 3) Assemble SQL query for execution
-        if(not mc.sql_conditions.empty())
-        {
-          mc.sql_conditions = (mc.count == 1 ? " WHERE TRUE " : " ON TRUE ") + mc.sql_conditions;
-        }
-        std::string sql_query = "SELECT " + mc.sql_variables + " FROM " + mc.sql_tables + mc.sql_conditions;
-        gqlite::value r = exec_c.data->execute_sql(sql_query, mc.bindings);
-
-        // 4) Store the results
-        std::vector<exec_value> values;
-        values.resize(eval_c.table.get_columns_count());
-        std::size_t start_new_values = 0;
-        if(not first_statement)
-        {
-          exec_value_table::const_row_view row_init = table.get_row(i);
-          std::copy(row_init.begin(), row_init.end(), values.begin());
-          start_new_values = row_init.size();
-        }
-        for(const gqlite::value& row_value : r.to_vector())
-        {
-          value_vector row = row_value.to_vector();
-          errors::check_condition(row.size() == mc.eval_c->new_vars.size(), exception_stage::runtime, exception_code::internal_error, "Wrong number of column return by SQL Query.");
-          for(const std::string& k : mc.eval_c->new_vars)
+            mc.query_builder.add_where_condition(generate_filter(_edge->get_properties(), sql_properties_edge_var + ", '$", &sev));
+          }
+          if(_edge->get_source()->get_properties())
           {
-            match_context::var_info vi = mc.oc_var_to_sql_var[k];
-            int id = row[vi.sql_column].to_integer();
-            if(vi.is_node)
+            sql_source_properties_var = mc.retrieve_sql_properties(sql_source_var, algebra::expression_type::node);
+            mc.query_builder.add_where_condition(generate_filter(_edge->get_source()->get_properties(), sql_source_properties_var + ", '$", &sev));
+          }
+          if(_edge->get_destination()->get_properties())
+          {
+            sql_destination_properties_var = mc.retrieve_sql_properties(sql_destination_var, algebra::expression_type::node);
+            mc.query_builder.add_where_condition(generate_filter(_edge->get_destination()->get_properties(), sql_destination_properties_var + ", '$", &sev));
+          }
+          // Ensure identical oc variablle are joined in SQL
+          generate_var_match(&mc, &new_table, _edge->get_source()->get_variable(), sql_source_var, sql_source_properties_var, std::string(), algebra::expression_type::node);
+          generate_var_match(&mc, &new_table, _edge->get_variable(), sql_edge_var, sql_properties_edge_var, sql_label_edge_var, algebra::expression_type::edge);
+          generate_var_match(&mc, &new_table, _edge->get_destination()->get_variable(), sql_destination_var, sql_destination_properties_var, std::string(), algebra::expression_type::node);
+          // ensure edge isomorphism, i.e., if the variable names are different, the edges must be different
+          for(const std::pair<std::string, std::string>& sql_var_to_oc_var : mc.edge_sql_var_to_oc_var)
+          {
+            if(sql_var_to_oc_var.second != _edge->get_variable() and not _edge->get_variable().empty())
             {
-              values[vi.sql_column + start_new_values] = std::make_shared<node_ref>(id);
-            } else {
-              values[vi.sql_column + start_new_values] = std::make_shared<edge_ref>(id);
+              mc.query_builder.add_where_condition(" {} != {} ", sql_edge_var, sql_var_to_oc_var.first);
             }
           }
-          eval_c.table.add_row(values);
-        }
+          mc.edge_sql_var_to_oc_var.push_back({sql_edge_var, _edge->get_variable()});
+          // Increase variable counter
+        });
       }
-      table = eval_c.table;
+      // 2) Handle where
+      if(_node->get_where())
+      {
+        mc.query_builder.add_where_condition(sev.start(_node->get_where()));
+      }
+      // 3) Assemble SQL query for execution
+      std::string sql_query = "CREATE TEMPORARY TABLE " + new_table.view_name + " AS " + mc.query_builder.assemble();
+
+      exec_c.data->execute_sql(sql_query, mc.query_builder.bindings);
+      current_table = new_table;
+
       return value{};
     }
+#if 0
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // delete
     value visit(algebra::delete_statement_csp _ds) override
@@ -1744,6 +1491,36 @@ namespace gqlite::backends::sqlite_oc_executor
         }
       }
     }
+#endif
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // add_filter_expressions table
+    void add_filter_expressions(sql_expression_visitor* _expr_v, algebra::modifiers_csp _modifiers)
+    {
+      if(_modifiers)
+      {
+        if(_modifiers->get_order_by())
+        {
+          std::string order_by = " ORDER BY ";
+          bool first = true;
+          for(algebra::order_by_expression_csp node : _modifiers->get_order_by()->get_expressions())
+          {
+            if(not first) order_by += ", ";
+            first = false;
+            order_by += _expr_v->start(node->get_expression()) + (node->get_asc() ? " ASC " : " DESC ");
+          }
+          _expr_v->eval_c->query_builder.add_modifier(order_by);
+        }
+        if(_modifiers->get_limit())
+        {
+          _expr_v->eval_c->query_builder.add_modifier(" LIMIT {} " % _expr_v->start(_modifiers->get_limit()));
+        }
+        if(_modifiers->get_skip())
+        {
+          if(not _modifiers->get_limit()) _expr_v->eval_c->query_builder.add_modifier(" LIMIT -1 ");
+          _expr_v->eval_c->query_builder.add_modifier(" OFFSET {} " % _expr_v->start(_modifiers->get_skip()));
+        }
+      }
+    }
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // with
     value visit(algebra::with_csp w) override
@@ -1756,135 +1533,158 @@ namespace gqlite::backends::sqlite_oc_executor
       {
         throw_exception(exception_stage::runtime, exception_code::unspecified, "Unimplemented WITH *, expressions");
       }
-      evaluation_context eval_c;
-      eval_c.table = table;
-      evaluator_visitor eval_v;
-      eval_v.exec_c = &exec_c;
-      eval_v.eval_c = &eval_c;
 
-      exec_value_table out_table;
-      value_vector labels;
+      sql_evaluation_context mc;
+      mc.exec_c = &exec_c;
+      table new_table = mc.prepare(current_table, true);
+      new_table.variables.clear();
+      sql_expression_visitor sev{&mc};
+      // Generate SQL Query
       for(const algebra::named_expression_csp& rv : w->get_expressions())
       {
-        out_table.add_column(rv->get_name());
+        std::string var = mc.query_builder.add_variable(sev.start(rv->get_expression()));
+        algebra::expression_type et = mc.expression_analyser.start(rv->get_expression()).type; 
+        new_table.variables[rv->get_name()] = {var, et};
+        mc.variables[rv->get_name()] = {var, et};
       }
-      std::size_t max_iter = first_statement ? 1 : table.get_rows_count();
-      for(std::size_t i = 0; i < max_iter; ++i)
-      {
-        std::vector<exec_value> row;
-        eval_c.prepare_current_row(table, i, first_statement);
-        for(const algebra::named_expression_csp& rv : w->get_expressions())
-        {
-          row.push_back(eval_v.start(rv->get_expression()));
-        }
-        out_table.add_row(row);
-      }
-      table = out_table;
-      filter_table(&table, w->get_modifiers());
+      add_filter_expressions(&sev, w->get_modifiers());
+      std::string query = "CREATE TEMPORARY TABLE " + new_table.view_name + " AS " + mc.query_builder.assemble();
+      exec_c.data->execute_sql(query, mc.query_builder.bindings);
+
+      current_table = new_table;
       return value();
     }
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // unwind
     value visit(algebra::unwind_csp uw) override
     {
-      evaluation_context eval_c;
-      eval_c.table = table;
-      evaluator_visitor eval_v;
-      eval_v.exec_c = &exec_c;
-      eval_v.eval_c = &eval_c;
-
-      exec_value_table out_table;
-      out_table.add_columns(table.get_columns_names());
-      out_table.add_column(uw->get_name());
-      std::size_t max_iter = first_statement ? 1 : table.get_rows_count();
-      for(std::size_t i = 0; i < max_iter; ++i)
-      {
-        eval_c.prepare_current_row(table, i, first_statement);
-        gqlite::value val = exec_c.get_value(eval_v.start(uw->get_expression()));
-        if(val.get_type() != value_type::invalid)
-        {
-          errors::check_condition(val.get_type() == value_type::vector, exception_stage::runtime, exception_code::invalid_argument_type, "Unwind expect an array.");
-          gqlite::value_vector valv = val.to_vector();
-          std::vector<exec_value> row = eval_c.current_row;
-          row.push_back(exec_value());
-          for(std::size_t j = 0; j < valv.size(); ++j)
-          {
-            row[row.size() - 1] = valv[j];
-            out_table.add_row(row);
-          }
-        }
-      }
-      table = out_table;
+      sql_evaluation_context mc;
+      mc.exec_c = &exec_c;
+      table new_table = mc.prepare(current_table, true);
+      sql_expression_visitor sev{&mc};
+      std::string table_ref = mc.query_builder.add_table("json_each(" + sev.start(uw->get_expression()) + ")", sql_join::inner, "a_uw_{}");
+      std::string var = mc.query_builder.add_variable(format_string("{}.value", table_ref));
+      std::string query = "CREATE TEMPORARY TABLE " + new_table.view_name + " AS " + mc.query_builder.assemble();
+      new_table.variables[uw->get_name()] = {var, oc::algebra::expression_type::value};
+      exec_c.data->execute_sql(query, mc.query_builder.bindings);
+      current_table = new_table;
       return value();
     }
-
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Return
-    value visit(algebra::return_statement_csp rs) override
+    value visit(algebra::return_statement_csp _rs) override
     {
-      if(rs->get_all())
+      sql_evaluation_context mc;
+      mc.exec_c = &exec_c;
+      mc.prepare(current_table, false);
+      sql_expression_visitor sev{&mc};
+      std::vector<gqlite::oc::algebra::named_expression_csp> expressions;
+      if(_rs->get_all())
       {
-        errors::check_condition(rs->get_expressions().empty(), exception_stage::runtime, exception_code::unimplemented_error, "Unimplemented RETURN *, expressions");
-        value_vector labels;
-        std::vector<bool> include;
-        for(const std::string&  c : table.get_columns_names())
+        for(const auto& [k, var_info] : current_table.variables)
         {
-          if(not c.starts_with("__gqlite_anon_"))
+          if(not k.starts_with("__gqlite_anon_"))
           {
-            labels.push_back(c);
-            include.push_back(true);
-          } else {
-            include.push_back(false);
+            expressions.push_back(std::make_shared<algebra::named_expression>(k, std::make_shared<algebra::variable>(k)));
           }
         }
-        value_vector results_rows;
-        results_rows.push_back(labels);
-        for(std::size_t i = 0; i < table.get_rows_count(); ++i)
+      } else {
+        expressions = _rs->get_expressions();
+      }
+      // Generate SQL Query
+      value_vector labels;
+      std::vector<oc::algebra::expression_type> column_types;
+      std::map<std::string, sql_variable_info> variables_extra; /// new variables to set for modifier
+
+      for(const algebra::named_expression_csp& rv : expressions)
+      {
+        oc::algebra::expression_type et = mc.expression_analyser.start(rv->get_expression()).type;
+        switch(et)
         {
-          value_vector row;
-          exec_value_table::row_view source = table.get_row(i);
-          for(std::size_t j = 0; j < include.size(); ++j)
+        case oc::algebra::expression_type::node:
           {
-            const exec_value& ev = source[j];
-            if(include[j])
+            std::string table_ref = mc.query_builder.add_table(format_string("gqlite_{}_nodes_as_json", exec_c.graph_name), sql_join::inner, "node_{}");
+            mc.query_builder.add_join_condition("{}.id = {}", table_ref, sev.start(rv->get_expression()));
+            std::string var_expr = mc.query_builder.add_variable("{}.node" % table_ref);
+            variables_extra[rv->get_name()] = {var_expr, oc::algebra::expression_type::node,
+                                  "json_extract({}, '$.properties')" % var_expr, "json_extract({}, '$.labels')" % var_expr};
+            break;
+          }
+        case oc::algebra::expression_type::edge:
+          {
+            std::string table_ref = mc.query_builder.add_table(format_string("gqlite_{}_edges_as_json", exec_c.graph_name), sql_join::inner, "edge_{}");
+            mc.query_builder.add_join_condition("{}.id = {}", table_ref, sev.start(rv->get_expression()));
+            std::string var_expr = mc.query_builder.add_variable("{}.edge" % table_ref);
+            variables_extra[rv->get_name()] = {var_expr, oc::algebra::expression_type::edge,
+                                    "json_extract({}, '$.properties')" % var_expr, "json_extract({}, '$.label')" % var_expr};
+            break;
+          }
+        case oc::algebra::expression_type::boolean:
+        case oc::algebra::expression_type::vector:
+        case oc::algebra::expression_type::map:
+          [[fallthrough]];
+        default:
+          {
+            std::string var_expr = mc.query_builder.add_variable(sev.start(rv->get_expression()));
+            variables_extra[rv->get_name()] = {var_expr, et};
+            break;
+          }
+        }
+        labels.push_back(rv->get_name());
+        column_types.push_back(et);
+      }
+      // Execute SQL query
+      if(_rs->get_modifiers())
+      {
+        mc.variables.insert(variables_extra.begin(), variables_extra.end());
+        add_filter_expressions(&sev, _rs->get_modifiers());
+      }
+      value res = exec_c.data->execute_sql(mc.query_builder.assemble(), mc.query_builder.bindings);
+      // Prepare to return results
+      value_vector res_v = res.to_vector();
+      value_vector ret_v;
+      ret_v.push_back(labels);
+      for(const value& r : res_v)
+      {
+        value_vector r_v = r.to_vector();
+        for(std::size_t c = 0; c < r_v.size(); ++c)
+        {
+          value& v = r_v[c];
+          switch(column_types[c])
+          {
+          case oc::algebra::expression_type::boolean:
+            if(v.get_type() != value_type::invalid)
             {
-              row.push_back(exec_c.get_value(ev));
+              v = (v.to_integer() == 1);
+            }
+            break;
+          case oc::algebra::expression_type::map:
+          case oc::algebra::expression_type::vector:
+            v = value::from_json(v.to_string());
+            break;
+          case oc::algebra::expression_type::node:
+          case oc::algebra::expression_type::edge:
+            v = value::from_json(v.to_string());
+            break;
+          default:
+            if(v.get_type() == value_type::string)
+            {
+              // Attempt to parse strings as json
+              try
+              {
+                v = value::from_json(v.to_string());
+              }
+              catch(const exception&)
+              {
+                // ignore, that probably means it is a real string
+              }
+              break;
             }
           }
-          results_rows.push_back(row);
         }
-        return results_rows;
-
-      } else {
-        filter_table(&table, rs->get_modifiers());
-
-        evaluation_context eval_c;
-        eval_c.table = table;
-        evaluator_visitor eval_v;
-        eval_v.exec_c = &exec_c;
-        eval_v.eval_c = &eval_c;
-
-        value_vector labels;
-        for(const algebra::named_expression_csp& rv : rs->get_expressions())
-        {
-          labels.push_back(rv->get_name());
-        }
-        value_vector results_rows;
-        results_rows.push_back(labels);
-        std::size_t max_iter = first_statement ? 1 : table.get_rows_count();
-        for(std::size_t i = 0; i < max_iter; ++i)
-        {
-          value_vector row;
-          eval_c.prepare_current_row(table, i, first_statement);
-          for(const algebra::named_expression_csp& rv : rs->get_expressions())
-          {
-            exec_value ev = eval_v.start(rv->get_expression());
-            row.push_back(exec_c.get_value(ev));
-          }
-          results_rows.push_back(row);
-        }
-        return value(results_rows);
+        ret_v.push_back(r_v);
       }
+      return ret_v;
     }
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Call
@@ -1906,7 +1706,6 @@ namespace gqlite::backends::sqlite_oc_executor
       for(algebra::node_csp node : _node->get_nodes())
       {
         value val = start(node);
-        first_statement = false;
         if(node->get_type() == algebra::node_type::return_statement)
         {
           return val;
@@ -1958,6 +1757,7 @@ sqlite* sqlite::from_file(const std::string& _filename)
     sqlite3_close(handle);
     return nullptr;
   }
+  initialise_sqlite_ext(handle);
   return new sqlite(handle);
 }
 
@@ -1970,10 +1770,12 @@ gqlite::value sqlite::execute_oc_query(oc::algebra::node_csp _node)
     executor.exec_c.data = d;
     value val = executor.start(_node);
     d->execute_sql("COMMIT");
+    d->clean_up();
     return val;
   } catch(const exception& _ex)
   {
     d->execute_sql("ROLLBACK");
+    d->clean_up();
     rethrow_exception(exception_stage::runtime, _ex);
   }
 }

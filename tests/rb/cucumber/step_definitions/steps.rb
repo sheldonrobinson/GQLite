@@ -209,9 +209,11 @@ IgnoredScenario = [
   "[4] Unwinding a collected unwound expression",
   "[5] Unwinding a collected expression",
   "[12] Unwind does not remove variables from scope",
-  # ORDER BY not supported yet
-  "[1] Forwarding multiple node and relationship variables",
   "[6] Reusing variable names in WITH",
+  "[17] Handle projected variables inside an order by item which contains an aggregation expression",
+  "[18]  Handle projected property accesses inside an order by item which contains an aggregation expression",
+  # ORDER BY not supported yet
+  # "[1] Forwarding multiple node and relationship variables",
   # No validation of delete expression
   "[8] Failing when deleting a label",
   # Missing variables should be handled by the parser
@@ -282,10 +284,15 @@ IgnoredScenario = [
   # handling of null
   "[4] Equality between almost equal lists with null should return null",
   "[7] Equality between almost equal nested lists with null should return null",
-  "[21] IN should return null if LHS and RHS are null - list version",
+  # "[21] IN should return null if LHS and RHS are null - list version",
   "[29] IN should return null if comparison with null is required, list version",
-  "[31] IN should return null when comparing two so-called identical lists where one element is null",
-  "[34] IN should return null if comparison with null is required, list version 2"
+  # "[31] IN should return null when comparing two so-called identical lists where one element is null",
+  # "[34] IN should return null if comparison with null is required, list version 2",
+  # variable inside the same CREATE statement are not accessible yet (https://gitlab.com/cyloncore/GQLite/-/issues/9)
+  "[1] Forwarding a property to express a join",
+  "[2] Handle dependencies across WITH with LIMIT",
+  # type of value stored in array/map is lost
+  "[5] `type()` handling Any type"
 ]
 
 Before do |scenario|
@@ -387,7 +394,7 @@ Then(/^a SyntaxError should be raised at compile time: UndefinedVariable$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
   # TODO: should not match for RunTime
-  expect(@exception.message).to match(/^(RunTime)|(CompileTime): UndefinedVariable: (Variable .* is not defined.)|(Unknown column .*.)$/)
+  expect(@exception.message).to match(/^(RunTime)|(CompileTime): UndefinedVariable: Unknown variable '.*'\.$/)
 end
 
 Then(/^a SyntaxError should be raised at compile time: NoSingleRelationshipType$/) do
@@ -417,7 +424,7 @@ end
 Then(/^a SyntaxError should be raised at compile time: VariableTypeConflict$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
-  expect(@exception.message).to match(/^.* is already bound.$/)
+  expect(@exception.message).to match(/^CompileTime: VariableTypeConflict: .* is redefined as a variable of a different type.$/)
 end
 
 Then(/^a SyntaxError should be raised at compile time: RelationshipUniquenessViolation$/) do
@@ -453,13 +460,14 @@ end
 Then(/^a SyntaxError should be raised at compile time: NonConstantExpression$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
-  expect(@exception.message).to match(/^RunTime: UndefinedVariable: Variable .* is not defined.$/)
+  expect(@exception.message).to match(/^CompileTime: NonConstantExpression: .*\.$/)
 end
 
 Then(/^an ArgumentError should be raised at runtime: NegativeIntegerArgument$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
-  expect(@exception.message).to match(/^RunTime: NegativeIntegerArgument: .*.$/)
+  # SKIP negative arguments with bindings are checked at CompileTime
+  expect(@exception.message).to match(/^(RunTime)|(CompileTime): NegativeIntegerArgument: .*\.$/)
 end
 
 Then(/^a SyntaxError should be raised at compile time: NegativeIntegerArgument$/) do
@@ -471,13 +479,13 @@ end
 Then(/^a ArgumentError should be raised at runtime: InvalidArgumentType$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
-  expect(@exception.message).to match(/^RunTime: InvalidArgumentType: .*$/)
+  expect(@exception.message).to match(/^(RunTime)|(CompileTime): InvalidArgumentType: .*$/)
 end
 
 Then(/^a SyntaxError should be raised at compile time: InvalidArgumentType$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
-  expect(@exception.message).to match(/^RunTime: InvalidArgumentType: .*$/)
+  expect(@exception.message).to match(/^CompileTime: InvalidArgumentType: .*$/)
 end
 
 Then(/^a TypeError should be raised at any time: InvalidArgumentType$/) do

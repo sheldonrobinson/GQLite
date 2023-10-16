@@ -42,7 +42,7 @@ namespace gqlite::oc::algebra::visitors
     }
     std::string visit(algebra::member_access_csp _var) override
     {
-      return format_string("{}.{}", _var->get_left(), string::join(_var->get_path(), "."));
+      return format_string("{}.{}", start(_var->get_left()), string::join(_var->get_path(), "."));
     }
     std::string visit(algebra::indexed_access_csp _var) override
     {

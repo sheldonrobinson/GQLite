@@ -1,5 +1,7 @@
 #pragma once
 
+#include <ranges>
+
 #define GQLITE_UNUSED (void)
 
 //BEGIN gqlite Foreach
@@ -139,4 +141,18 @@ namespace gqlite::traits
   {};
   template<typename T, typename... Ts>
   inline constexpr bool contains_v = contains<T, Ts...>::value;
+}
+
+namespace gqlite::workarounds::views
+{
+  template<typename _T_>
+  inline auto values(const _T_& _nodes)
+  { //work around a bug in gcc 11 where std::views::values works on a const& but not on the value directly 
+    return std::views::values(_nodes);
+  }
+  template<typename _T_>
+  inline auto keys(const _T_& _nodes)
+  { //work around a bug in gcc 11 where std::views::values works on a const& but not on the value directly 
+    return std::views::keys(_nodes);
+  }
 }

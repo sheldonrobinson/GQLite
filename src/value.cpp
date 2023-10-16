@@ -16,7 +16,7 @@ const char* gqlite::to_string(value_type _type)
     case invalid: return "invalid";
     case boolean: return "boolean";
     case integer: return "integer";
-    case number: return "number";
+    case floating_point: return "number";
     case string: return "string";
     case map: return "map";
     case vector: return "vector";
@@ -240,7 +240,7 @@ void value::data::to_json(std::stringstream& _stream)
   case value_type::integer:
     _stream << std::get<int64_t>(value_container);
     break;
-  case value_type::number:
+  case value_type::floating_point:
     _stream << std::get<double>(value_container);
     break;
   case value_type::string:
@@ -311,7 +311,7 @@ value::value(bool _v) : d(new data{value_type::boolean, _v})
 value::value(int64_t _v) : d(new data{value_type::integer, _v})
 {}
 
-value::value(double _v) : d(new data{value_type::number, _v})
+value::value(double _v) : d(new data{value_type::floating_point, _v})
 {}
 
 value::value(const char* _v) : value(std::string(_v))
@@ -345,7 +345,7 @@ bool value::operator<(const value& _rhs) const
     return to_bool() < _rhs.to_bool();
   case value_type::integer:
     return to_integer() < _rhs.to_integer();
-  case value_type::number:
+  case value_type::floating_point:
     return to_double() < _rhs.to_double();
   case value_type::string:
     return to_string() < _rhs.to_string();
@@ -364,7 +364,7 @@ bool value::to_bool() const
     return std::get<bool>(d->value_container);
   case value_type::integer:
     return std::get<int64_t>(d->value_container) != 0;
-  case value_type::number:
+  case value_type::floating_point:
     return std::get<double>(d->value_container) != 0.0;
   default:
     throw_exception(exception_stage::unspecified, exception_code::value_error, "Value is not a bool, it is {}.", d->type);
@@ -377,7 +377,7 @@ int64_t value::to_integer() const
   {
     case value_type::integer:
       return std::get<int64_t>(d->value_container);
-    case value_type::number:
+    case value_type::floating_point:
       return std::get<double>(d->value_container);
     default:
       throw_exception(exception_stage::unspecified, exception_code::value_error, "Value is not a number, it is '{}'.", d->type);
@@ -390,7 +390,7 @@ double value::to_double() const
   {
     case value_type::integer:
       return std::get<int64_t>(d->value_container);
-    case value_type::number:
+    case value_type::floating_point:
       return std::get<double>(d->value_container);
     default:
       throw_exception(exception_stage::unspecified, exception_code::value_error, "Value is not a number, it is '{}'.", d->type);

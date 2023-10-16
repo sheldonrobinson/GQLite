@@ -1,6 +1,7 @@
 #include "parser.h"
 
 #include "algebra/nodes.h"
+#include "algebra/visitors/expression_analyser.h"
 #include "algebra/visitors/stringify.h"
 
 #include "../gqlite_p.h"
@@ -16,6 +17,13 @@ struct parser::data
   lexer* lex;
   value_map bindings;
   token tok;
+  struct variable_info
+  {
+    algebra::node_csp node;
+    algebra::expression_type type;
+  };
+  std::unordered_map<std::string, variable_info> bounded_variables;
+  algebra::visitors::expression_analyser expression_analyser;
   int id = 0;
   algebra::node_csp parse_call();
   algebra::node_csp parse_create();
@@ -27,8 +35,9 @@ struct parser::data
   algebra::node_csp parse_set();
   algebra::node_csp parse_remove();
   algebra::modifiers_csp parse_modifiers();
-  std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>> parse_patterns(bool _allow_undirected_edge, bool _allow_multiple_edge_labels, bool _require_one_label);
-  std::unordered_map<std::string, algebra::node_csp> parse_properties();
+  std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>> parse_patterns(bool _creation_mode);
+  algebra::node_csp parse_map();
+  algebra::node_csp parse_properties();
   algebra::node_csp parse_expression();
   algebra::node_csp parse_unary_expression();
   algebra::node_csp parse_multiplicative_expression();
@@ -46,7 +55,6 @@ struct parser::data
   void validate(algebra::graph_node_csp);
   void validate(algebra::graph_edge_csp);
   std::string generate_anonymous_variable();
-  std::unordered_map<std::string, algebra::node_csp> bounded_variables;
   void get_next_token(int _flags = lexer::mode::normal);
   template<typename... _T_>
   [[noreturn]] void report_error(const token& _token, exception_code _code, const std::string& _errorMsg, const _T_&... _values);
@@ -55,6 +63,8 @@ struct parser::data
   bool is_of_type(token_type _type);
   int64_t string_to_integer(std::string _string);
 
+  void check_variable_existence(const std::string& _name);
+  void bind_variable(const std::string& _name, algebra::node_csp _node, algebra::expression_type _expression_type, bool _allow_rebinding);
 };
 
 namespace gqlite
@@ -66,18 +76,33 @@ namespace gqlite
   }
 }
 
+void parser::data::check_variable_existence(const std::string& _name)
+{
+  if(bounded_variables.find(_name) != bounded_variables.end())
+  {
+    report_error(tok, exception_code::variable_already_bound, "Variable {} is already bound.", _name);
+  }
+}
+
+void parser::data::bind_variable(const std::string& _name, algebra::node_csp _node, algebra::expression_type _expression_type, bool _allow_rebinding)
+{
+  if(not _allow_rebinding) check_variable_existence(_name);
+  bounded_variables[_name] = {_node, _expression_type };
+}
+
 void parser::data::validate(algebra::graph_node_csp _node)
 {
   if(_node->get_variable().empty()) return;
   auto it = bounded_variables.find(_node->get_variable());
   if(it == bounded_variables.end())
   {
-    bounded_variables[_node->get_variable()] = _node;
+    bind_variable(_node->get_variable(), _node, algebra::expression_type::node, false);
     return;
   }
+  errors::check_variable_type(it->second.type, algebra::expression_type::node, exception_stage::compiletime, _node->get_variable());
   if(_node->get_labels().empty() and not _node->get_properties()) return;
-  if(_node->equals(it->second)) return;
-  report_error(tok, exception_code::variable_already_bound, "Variable {} is already bound", _node->get_variable());
+  if(_node->equals(it->second.node)) return;
+  report_error(tok, exception_code::variable_already_bound, "Variable {} is already bound.", _node->get_variable());
 }
 
 void parser::data::validate(algebra::graph_edge_csp _node)
@@ -88,11 +113,12 @@ void parser::data::validate(algebra::graph_edge_csp _node)
   auto it = bounded_variables.find(_node->get_variable());
   if(it == bounded_variables.end())
   {
-    bounded_variables[_node->get_variable()] = _node;
+    bind_variable(_node->get_variable(), _node, algebra::expression_type::edge, false);
     return;
   }
+  errors::check_variable_type(it->second.type, algebra::expression_type::edge, exception_stage::compiletime, _node->get_variable());
   if(_node->get_labels().empty() and not _node->get_properties()) return;
-  if(_node->equals(it->second)) return;
+  if(_node->equals(it->second.node)) return;
   report_error(tok, exception_code::variable_already_bound, "Variable {} is already bound.", _node->get_variable());
 }
 
@@ -185,13 +211,13 @@ algebra::node_csp parser::data::parse_call()
 algebra::node_csp parser::data::parse_create()
 {
   get_next_token();
-  return std::make_shared<algebra::create>(parse_patterns(false, false, true));
+  return std::make_shared<algebra::create>(parse_patterns(true));
 }
 
 algebra::node_csp parser::data::parse_match()
 {
   get_next_token();
-  std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>> patterns = parse_patterns(true, true, false);
+  std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>> patterns = parse_patterns(false);
   algebra::node_csp where;
   if(tok.type == token_type::WHERE)
   {
@@ -248,6 +274,22 @@ algebra::node_csp parser::data::parse_with()
     return std::make_shared<algebra::with>(true, std::vector<algebra::named_expression_csp>(), parse_modifiers());
   }
   std::vector<algebra::named_expression_csp> named_expressions = parse_named_expressions();
+  std::vector<std::string> new_variables;
+  for(algebra::named_expression_csp ne : named_expressions)
+  {
+    new_variables.push_back(ne->get_name());
+    bind_variable(ne->get_name(), ne->get_expression(), expression_analyser.start(ne->get_expression()).type, true);
+  }
+  for(auto it = bounded_variables.begin(); it != bounded_variables.end(); )
+  {
+    if(std::find(new_variables.begin(), new_variables.end(), it->first) == new_variables.end())
+    {
+      it = bounded_variables.erase(it);
+    } else {
+      ++it;
+    }
+  }
+  gqlite_debug("With new variables {} kept variables {}", new_variables, std::views::keys(bounded_variables));
   return std::make_shared<algebra::with>(false, named_expressions, parse_modifiers());
 }
 
@@ -260,6 +302,7 @@ algebra::node_csp parser::data::parse_unwind()
   is_of_type(token_type::IDENTIFIER);
   std::string name = tok.string;
   get_next_token();
+  bind_variable(name, expr, algebra::expression_type::value, false);
   return std::make_shared<algebra::unwind>(name, expr);
 }
 
@@ -311,14 +354,14 @@ algebra::node_csp parser::data::parse_set()
       {
         get_next_token();
         algebra::node_csp value = parse_expression();
-        nodes.push_back(std::make_shared<algebra::set_property>(std::make_shared<algebra::member_access>(name, path), value));
+        nodes.push_back(std::make_shared<algebra::set_property>(name, path, value));
         break;
       }
       case token_type::PLUS_EQUAL:
       {
         get_next_token();
         algebra::node_csp value = parse_expression();
-        nodes.push_back(std::make_shared<algebra::add_property>(std::make_shared<algebra::member_access>(name, path), value));
+        nodes.push_back(std::make_shared<algebra::add_property>(name, path, value));
         break;
       }
       case token_type::COLON:
@@ -393,7 +436,7 @@ algebra::node_csp parser::data::parse_remove()
         break;
       }
       default:
-        nodes.push_back(std::make_shared<algebra::remove_property>(std::make_shared<algebra::member_access>(name, path)));
+        nodes.push_back(std::make_shared<algebra::remove_property>(name, path));
         break;
     }
 
@@ -416,6 +459,10 @@ algebra::node_csp parser::data::parse_return()
     return std::make_shared<algebra::return_statement>(true, std::vector<algebra::named_expression_csp>(), parse_modifiers());
   }
   std::vector<algebra::named_expression_csp> named_expressions = parse_named_expressions();
+  for(algebra::named_expression_csp ne : named_expressions)
+  {
+    bind_variable(ne->get_name(), ne->get_expression(), expression_analyser.start(ne->get_expression()).type, true);
+  }
   return std::make_shared<algebra::return_statement>(false, named_expressions, parse_modifiers());
 }
 
@@ -428,7 +475,7 @@ namespace
     algebra::graph_node_csp source, destination;
     std::string variable;
     std::vector<std::string> labels;
-    algebra::map_csp properties;
+    algebra::node_csp properties;
   };
 }
 
@@ -445,11 +492,25 @@ algebra::modifiers_csp parser::data::parse_modifiers()
         if(skip) report_unexpected(tok);
         get_next_token();
         skip = parse_expression();
+        if(skip->get_type() == algebra::node_type::value)
+        {
+          value v = std::static_pointer_cast<const algebra::value>(skip)->get_value();
+          errors::check_argument_type(v.get_type(), value_type::integer, exception_stage::compiletime, "SKIP expect integer argument.");
+          errors::check_condition(v.to_integer() >= 0, exception_stage::compiletime, exception_code::negative_integer_argument, "Arugments to SKIP should be positive.");
+        }
+        errors::check_constant(expression_analyser.start(skip).constant, exception_stage::compiletime, "SKIP expect a constant expression.");
         break;
       case token_type::LIMIT:
         if(limit) report_unexpected(tok);
         get_next_token();
         limit = parse_expression();
+        if(limit->get_type() == algebra::node_type::value)
+        {
+          value v = std::static_pointer_cast<const algebra::value>(limit)->get_value();
+          errors::check_argument_type(v.get_type(), value_type::integer, exception_stage::compiletime, "LIMIT expect integer argument.");
+          errors::check_condition(v.to_integer() >= 0, exception_stage::compiletime, exception_code::negative_integer_argument, "Arugments to LIMIT should be positive.");
+        }
+        errors::check_constant(expression_analyser.start(limit).constant, exception_stage::compiletime, "LIMIT expect a constant expression.");
         break;
       case token_type::ORDER:
       {
@@ -494,14 +555,14 @@ algebra::modifiers_csp parser::data::parse_modifiers()
   }
 }
 
-std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>> parser::data::parse_patterns(bool _allow_undirected_edge, bool _allow_multiple_edge_labels, bool _require_one_label)
+std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>> parser::data::parse_patterns(bool _creation_mode)
 {
   std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>> patterns;
+  std::vector<std::string> new_node_variables;
   edge current_edge;
   do
   {
     is_of_type(token_type::STARTBRACKET);
-    std::vector<algebra::graph_node_csp> nodes;
     get_next_token();
     // identifier
     std::string variable;
@@ -522,10 +583,10 @@ std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>> pars
       get_next_token();
     }
     // Properties
-    algebra::map_csp properties;
+    algebra::node_csp properties;
     if(tok.type == token_type::STARTBRACE or tok.type == token_type::PARAMETER)
     {
-      properties = std::make_shared<algebra::map>(parse_properties());
+      properties = parse_properties();
     }
     // End of node
     is_of_type(token_type::ENDBRACKET);
@@ -546,6 +607,8 @@ std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>> pars
       patterns.push_back(ge);
       current_edge.active = false;
       add_to_patterns = false;
+      new_node_variables.push_back(current_edge.source->get_variable());
+      new_node_variables.push_back(current_edge.destination->get_variable());
     }
     // If comma, an other node statement comes after
     if(tok.type == token_type::COMMA)
@@ -570,7 +633,7 @@ std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>> pars
       get_next_token();
       if(tok.type == token_type::RIGHT_ARROW or tok.type == token_type::MINUS)
       {
-        if(_require_one_label)
+        if(_creation_mode)
         {
           is_of_type(token_type::STARTBOXBRACKET);
         }
@@ -591,7 +654,7 @@ std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>> pars
           is_of_type(token_type::IDENTIFIER);
           current_edge.labels.push_back(tok.string);
           get_next_token();
-          if(_allow_multiple_edge_labels)
+          if(not _creation_mode)
           {
             while(tok.type != token_type::END_OF_FILE)
             {
@@ -613,12 +676,12 @@ std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>> pars
               }
             }
           }
-        } else if(_require_one_label) {
+        } else if(_creation_mode) {
           is_of_type(token_type::COLON); //
         }
         if(tok.type == token_type::STARTBRACE or tok.type == token_type::PARAMETER)
         {
-          current_edge.properties = std::make_shared<algebra::map>(parse_properties());
+          current_edge.properties = parse_properties();
         }
         is_of_type(token_type::ENDBOXBRACKET);
         get_next_token();
@@ -627,7 +690,7 @@ std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>> pars
       {
         if(current_edge.directivity == algebra::edge_directivity::undirected)
         {
-          if(not _allow_undirected_edge)
+          if(_creation_mode)
           {
             report_error(tok, exception_code::requires_directed_relationship, "Edge must be directed during creation");
           }
@@ -646,47 +709,84 @@ std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>> pars
       is_of_type(token_type::STARTBRACKET);
       add_to_patterns = false;
     } else {
-      if(add_to_patterns) { validate(gnode); patterns.push_back(gnode); }
+      if(add_to_patterns)
+      {
+        if(_creation_mode and std::find(new_node_variables.begin(), new_node_variables.end(), gnode->get_variable()) == new_node_variables.end())
+        {
+          check_variable_existence(gnode->get_variable());
+        }
+        new_node_variables.push_back(gnode->get_variable());
+        validate(gnode);
+        patterns.push_back(gnode);
+      }
       break;
     }
-    if(add_to_patterns) { validate(gnode); patterns.push_back(gnode); }
+    if(add_to_patterns)
+    {
+      if(_creation_mode and std::find(new_node_variables.begin(), new_node_variables.end(), gnode->get_variable()) == new_node_variables.end())
+      {
+        check_variable_existence(gnode->get_variable());
+      }
+      new_node_variables.push_back(gnode->get_variable());
+      validate(gnode);
+      patterns.push_back(gnode);
+    }
   } while(true);
   if(current_edge.active)
   {
     report_error(tok, exception_code::parse_error, "Unfinished edge");
   }
+  gqlite_debug("patterns {}", patterns.size());
   return patterns;
 }
 
-std::unordered_map<std::string, algebra::node_csp> parser::data::parse_properties()
+algebra::node_csp parser::data::parse_map()
+{
+  std::unordered_map<std::string, algebra::node_csp> p;
+  get_next_token(lexer::mode::disable_keywords);
+  bool only_values = true;
+  while(tok.type != token_type::ENDBRACE)
+  {
+    if(tok.type != token_type::STRING and tok.type != token_type::IDENTIFIER)
+    {
+      report_unexpected(tok);
+    }
+    std::string key = tok.string;
+    get_next_token();
+    is_of_type(token_type::COLON);
+    get_next_token();
+    algebra::node_csp n = parse_expression();
+    p[key] = n;
+    only_values = only_values and n->get_type() == algebra::node_type::value;
+    if(tok.type == token_type::COMMA)
+    {
+      get_next_token(lexer::mode::disable_keywords);
+    } else {
+      break;
+    }
+  }
+  is_of_type(token_type::ENDBRACE);
+  get_next_token();
+  if(only_values)
+  {
+    value_map vm;
+    for(const auto& [k, v] : p)
+    {
+      vm[k] = std::static_pointer_cast<const algebra::value>(v)->get_value();
+    }
+    return std::make_shared<algebra::value>(vm);
+  } else {
+    return std::make_shared<algebra::map>(p);
+  }
+}
+
+algebra::node_csp parser::data::parse_properties()
 {
   switch(tok.type)
   {
     case token_type::STARTBRACE:
     {
-      std::unordered_map<std::string, algebra::node_csp> p;
-      get_next_token(lexer::mode::disable_keywords);
-      while(tok.type != token_type::ENDBRACE)
-      {
-        if(tok.type != token_type::STRING and tok.type != token_type::IDENTIFIER)
-        {
-          report_unexpected(tok);
-        }
-        std::string key = tok.string;
-        get_next_token();
-        is_of_type(token_type::COLON);
-        get_next_token();
-        p[key] = parse_expression();
-        if(tok.type == token_type::COMMA)
-        {
-          get_next_token(lexer::mode::disable_keywords);
-        } else {
-          break;
-        }
-      }
-      is_of_type(token_type::ENDBRACE);
-      get_next_token();
-      return p;
+      return parse_map();
     }
     case token_type::PARAMETER:
     {
@@ -696,13 +796,7 @@ std::unordered_map<std::string, algebra::node_csp> parser::data::parse_propertie
         report_error(tok, exception_code::invalid_parameter_use, "Unknown parameter '{}'", tok.string);
       }
       get_next_token();
-      std::unordered_map<std::string, algebra::node_csp> p;
-      
-      for(auto const& [k, v] : it->second.to_map())
-      {
-        p[k] = std::make_shared<algebra::value>(v);
-      }
-      return p;
+      return std::make_shared<algebra::value>(it->second);
     }
     default:
       report_unexpected(tok);
@@ -769,6 +863,7 @@ algebra::node_csp parser::data::parse_terminal_expression()
         return std::make_shared<algebra::has_labels>(t.string, labels);
       }
       default:
+        if(bounded_variables.find(t.string) == bounded_variables.end()) errors::undefined_variable(exception_stage::compiletime, t.string);
         return std::make_shared<algebra::variable>(t.string);
     }
   case token_type::STRING:
@@ -788,7 +883,7 @@ algebra::node_csp parser::data::parse_terminal_expression()
     return std::make_shared<algebra::value>(false);
   case token_type::STARTBRACE:
   {
-    return std::make_shared<algebra::map>(parse_properties());
+    return parse_map();
   }
   case token_type::STARTBOXBRACKET:
   {
@@ -811,24 +906,37 @@ algebra::node_csp parser::data::parse_terminal_expression()
 
 algebra::node_csp parser::data::parse_expression_list()
 {
-  std::vector<algebra::node_csp> nodes;
   get_next_token();
   if(tok.type == token_type::ENDBOXBRACKET)
   {
     get_next_token();
     // empty list
-    return std::make_shared<algebra::array>(nodes);
+    return std::make_shared<algebra::value>(value_vector());
   }
+  std::vector<algebra::node_csp> nodes;
+  bool only_values = true;
   while(tok.type != token_type::END_OF_FILE)
   {
-    nodes.push_back(parse_expression());
+    algebra::node_csp n = parse_expression();
+    only_values = only_values and n->get_type() == algebra::node_type::value;
+    nodes.push_back(n);
     if(tok.type == token_type::COMMA)
     {
       get_next_token();
     } else {
       is_of_type(token_type::ENDBOXBRACKET);
       get_next_token();
-      return std::make_shared<algebra::array>(nodes);
+      if(only_values)
+      { // If only values, can return a value, which is much simpler to evaluate than an algebra::array
+        value_vector vv;
+        for(algebra::node_csp n : nodes)
+        {
+          vv.push_back(std::static_pointer_cast<const algebra::value>(n)->get_value());
+        }
+        return std::make_shared<algebra::value>(vv);
+      } else {
+        return std::make_shared<algebra::array>(nodes);
+      }
     }
   }
   report_unexpected(tok);
@@ -840,7 +948,10 @@ algebra::node_csp parser::data::parse_conditional_xor_expression()
   if(tok.type == token_type::XOR)
   {
     get_next_token();
-    return std::make_shared<algebra::logical_xor>(node, parse_conditional_xor_expression());
+    algebra::node_csp node_right = parse_conditional_xor_expression();
+    errors::check_argument_types(expression_analyser.start(node).type, {algebra::expression_type::boolean, algebra::expression_type::value, algebra::expression_type::empty}, exception_stage::compiletime, "Requires boolean in logical and expression.");
+    errors::check_argument_types(expression_analyser.start(node_right).type, {algebra::expression_type::boolean, algebra::expression_type::value, algebra::expression_type::empty}, exception_stage::compiletime, "Requires boolean in logical and expression.");
+    return std::make_shared<algebra::logical_xor>(node, node_right);
   } else {
     return node;
   }
@@ -852,7 +963,10 @@ algebra::node_csp parser::data::parse_conditional_or_expression()
   if(tok.type == token_type::OR)
   {
     get_next_token();
-    return std::make_shared<algebra::logical_or>(node, parse_conditional_or_expression());
+    algebra::node_csp node_right = parse_conditional_or_expression();
+    errors::check_argument_types(expression_analyser.start(node).type, {algebra::expression_type::boolean, algebra::expression_type::value, algebra::expression_type::empty}, exception_stage::compiletime, "Requires boolean in logical and expression.");
+    errors::check_argument_types(expression_analyser.start(node_right).type, {algebra::expression_type::boolean, algebra::expression_type::value, algebra::expression_type::empty}, exception_stage::compiletime, "Requires boolean in logical and expression.");
+    return std::make_shared<algebra::logical_or>(node, node_right);
   } else {
     return node;
   }
@@ -864,7 +978,10 @@ algebra::node_csp parser::data::parse_conditional_and_expression()
   if(tok.type == token_type::AND)
   {
     get_next_token();
-    return std::make_shared<algebra::logical_and>(node, parse_conditional_and_expression());
+    algebra::node_csp node_right = parse_conditional_and_expression();
+    errors::check_argument_types(expression_analyser.start(node).type, {algebra::expression_type::boolean, algebra::expression_type::value, algebra::expression_type::empty}, exception_stage::compiletime, "Requires boolean in logical and expression.");
+    errors::check_argument_types(expression_analyser.start(node_right).type, {algebra::expression_type::boolean, algebra::expression_type::value, algebra::expression_type::empty}, exception_stage::compiletime, "Requires boolean in logical and expression.");
+    return std::make_shared<algebra::logical_and>(node, node_right);
   } else {
     return node;
   }
@@ -909,15 +1026,33 @@ algebra::node_csp parser::data::parse_relational_expression()
       get_next_token();
       return std::make_shared<algebra::relational_superior_equal>(node, parse_relational_expression());
     case token_type::IN:
-      get_next_token();
-      return std::make_shared<algebra::relational_in>(node, parse_expression());
-    case token_type::NOT:
-      get_next_token();
-      if(is_of_type(tok, token_type::IN))
       {
         get_next_token();
+        algebra::node_csp container = parse_expression();
+        algebra::expression_type container_type = expression_analyser.start(container).type;
+        errors::check_argument_types(container_type, {algebra::expression_type::map, algebra::expression_type::vector, algebra::expression_type::value}, exception_stage::compiletime, "Relational IN can only be applied on vector/map.");
+        if(container_type == algebra::expression_type::map)
+        {
+          errors::check_argument_types(expression_analyser.start(node).type, {algebra::expression_type::string, algebra::expression_type::value}, exception_stage::compiletime, "Relational IN on map expect a string.");
+        }
+        return std::make_shared<algebra::relational_in>(node, container);
       }
-      return std::make_shared<algebra::relational_not_in>(node, parse_expression());
+    case token_type::NOT:
+      {
+        get_next_token();
+        if(is_of_type(tok, token_type::IN))
+        {
+          get_next_token();
+        }
+        algebra::node_csp container = parse_expression();
+        algebra::expression_type container_type = expression_analyser.start(container).type;
+        errors::check_argument_types(container_type, {algebra::expression_type::map, algebra::expression_type::vector, algebra::expression_type::value}, exception_stage::compiletime, "Relational NOT IN can only be applied on vector/map.");
+        if(container_type == algebra::expression_type::map)
+        {
+          errors::check_argument_types(expression_analyser.start(node).type, {algebra::expression_type::string, algebra::expression_type::value}, exception_stage::compiletime, "Relational NOT IN on map expect a string.");
+        }
+        return std::make_shared<algebra::relational_not_in>(node, container);
+      }
     default:
       return node;
   }
@@ -964,15 +1099,20 @@ algebra::node_csp parser::data::parse_unary_expression()
   {
     case token_type::NOT:
     case token_type::EXCLAMATION:
+    {
       get_next_token();
-      return std::make_shared<algebra::logical_negation>(parse_unary_expression());
+
+      algebra::node_csp node = parse_unary_expression();
+      errors::check_argument_types(expression_analyser.start(node).type, {algebra::expression_type::boolean, algebra::expression_type::value, algebra::expression_type::empty}, exception_stage::compiletime, "Requires boolean in logical and expression.");
+      return std::make_shared<algebra::logical_negation>(node);
+    }
     case token_type::MINUS:
     {
       get_next_token();
       token t = tok;
       switch(tok.type)
       {
-        // This needs to be here to properly parse -9223372036854775808
+        // This is needed to properly parse -9223372036854775808
       case token_type::INTEGER:
         get_next_token();
         return std::make_shared<algebra::value>(string_to_integer("-" + t.string));
@@ -1040,12 +1180,7 @@ algebra::node_csp parser::data::parse_member_expression()
   algebra::node_csp left = parse_terminal_expression();
   if(tok.type == token_type::DOT)
   {
-    if(left->get_type() != algebra::node_type::variable)
-    {
-      report_unexpected(tok);
-    }
-    std::string left_identif = std::static_pointer_cast<const algebra::variable>(left)->get_identifier();
-    return std::make_shared<algebra::member_access>(left_identif, parse_path());
+    return std::make_shared<algebra::member_access>(left, parse_path());
   }
   return left;
 }
@@ -1097,6 +1232,16 @@ parser::parser(lexer* _lexer, const value_map& _bindings) : d(new data)
 {
   d->lex = _lexer;
   d->bindings = _bindings;
+  d->expression_analyser.stage = exception_stage::compiletime;
+  d->expression_analyser.variables_f = [this](const std::string& _name)
+  {
+    auto it = d->bounded_variables.find(_name);
+    if(it == d->bounded_variables.end())
+    {
+      errors::undefined_variable(exception_stage::compiletime, _name);
+    }
+    return it->second.type;
+  };
 }
 
 parser::~parser()

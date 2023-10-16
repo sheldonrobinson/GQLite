@@ -1,6 +1,6 @@
 // Queries
 
-#define OC_ALGEBRA_CREATE_NODES_MEMBERS(_KLASS_NAME_, F)                          \
+#define OC_ALGEBRA_CREATE_NODES_MEMBERS(_KLASS_NAME_, F)                                    \
   F(_KLASS_NAME_, std::vector<alternative<GQLITE_LIST(graph_node, graph_edge)>>, patterns)
 
 OC_ALGEBRA_GENERATE(create, OC_ALGEBRA_CREATE_NODES_MEMBERS)
@@ -77,21 +77,24 @@ OC_ALGEBRA_GENERATE(order_by_expression, OC_ALGEBRA_ORDER_BY_EXPRESSION_MEMBERS)
 
 // Set/remove Expressions
 
-#define OC_ALGEBRA_SET_ADD_VALUE_MEMBERS(_KLASS_NAME_, F)                 \
-  F(_KLASS_NAME_, member_access_csp, target)                              \
+#define OC_ALGEBRA_SET_ADD_VALUE_MEMBERS(_KLASS_NAME_, F)       \
+  F(_KLASS_NAME_, std::string, left)                            \
+  F(_KLASS_NAME_, std::vector<std::string>, path)               \
   F(_KLASS_NAME_, node_csp, expression)
 
 OC_ALGEBRA_GENERATE(set_property, OC_ALGEBRA_SET_ADD_VALUE_MEMBERS)
 
 
 #define OC_ALGEBRA_SET_EQUAL_MEMBERS(_KLASS_NAME_, F)                     \
-  F(_KLASS_NAME_, member_access_csp, target)                              \
+  F(_KLASS_NAME_, std::string, left)                            \
+  F(_KLASS_NAME_, std::vector<std::string>, path)               \
   F(_KLASS_NAME_, nocde_csp, expression)
 
 OC_ALGEBRA_GENERATE(add_property, OC_ALGEBRA_SET_ADD_VALUE_MEMBERS)
 
-#define OC_ALGEBRA_REMOVE_PROPERTY_MEMBERS(_KLASS_NAME_, F)                   \
-  F(_KLASS_NAME_, member_access_csp, target)
+#define OC_ALGEBRA_REMOVE_PROPERTY_MEMBERS(_KLASS_NAME_, F)     \
+  F(_KLASS_NAME_, std::string, left)                            \
+  F(_KLASS_NAME_, std::vector<std::string>, path)
 
 OC_ALGEBRA_GENERATE(remove_property, OC_ALGEBRA_REMOVE_PROPERTY_MEMBERS)
 
@@ -111,7 +114,7 @@ OC_ALGEBRA_GENERATE(end_of_list, OC_ALGEBRA_NO_MEMBERS)
 #define OC_ALGEBRA_GRAPH_NODE_MEMBERS(_KLASS_NAME_, F)          \
   F(_KLASS_NAME_, std::string, variable)                        \
   F(_KLASS_NAME_, std::vector<std::string>, labels)             \
-  F(_KLASS_NAME_, map_csp, properties)
+  F(_KLASS_NAME_, node_csp, properties)
 
 OC_ALGEBRA_GENERATE(graph_node, OC_ALGEBRA_GRAPH_NODE_MEMBERS)
 
@@ -121,7 +124,7 @@ OC_ALGEBRA_GENERATE(graph_node, OC_ALGEBRA_GRAPH_NODE_MEMBERS)
   F(_KLASS_NAME_, graph_node_csp, destination)                  \
   F(_KLASS_NAME_, edge_directivity, directivity)                \
   F(_KLASS_NAME_, std::vector<std::string>, labels)             \
-  F(_KLASS_NAME_, map_csp, properties)
+  F(_KLASS_NAME_, node_csp, properties)
 
 OC_ALGEBRA_GENERATE(graph_edge, OC_ALGEBRA_GRAPH_EDGE_MEMBERS)
 
@@ -155,8 +158,8 @@ OC_ALGEBRA_GENERATE(named_expression, OC_ALGEBRA_NAMED_EXPRESSION)
 
 OC_ALGEBRA_GENERATE(variable, OC_ALGEBRA_VARIABLE_MEMBERS)
 
-#define OC_ALGEBRA_MEMBER_ACCESS_MEMBERS(_KLASS_NAME_, F) \
-  F(_KLASS_NAME_, std::string, left)                      \
+#define OC_ALGEBRA_MEMBER_ACCESS_MEMBERS(_KLASS_NAME_, F)   \
+  F(_KLASS_NAME_, node_csp, left)                           \
   F(_KLASS_NAME_, std::vector<std::string>, path)
 
 OC_ALGEBRA_GENERATE(member_access, OC_ALGEBRA_MEMBER_ACCESS_MEMBERS)
