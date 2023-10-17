@@ -91,6 +91,14 @@ namespace gqlite::oc::algebra::visitors
     GQLITE_ET_LOGICAL_OP(relational_superior_equal)
     GQLITE_ET_LOGICAL_OP(relational_in)
     GQLITE_ET_LOGICAL_OP(relational_not_in)
+#define GQLITE_ET_LOGICAL_UNARY_OP(_NAME_)                          \
+    expression_info visit(algebra::_NAME_ ## _csp _node) override   \
+    {                                                               \
+      bool constant = start(_node->get_value()).constant;           \
+      return {expression_type::boolean, constant};                  \
+    }
+    GQLITE_ET_LOGICAL_UNARY_OP(is_null)
+    GQLITE_ET_LOGICAL_UNARY_OP(is_not_null)
 #define GQLITE_ET_BINARY_OP(_NAME_)                                                                       \
     expression_info visit(algebra::_NAME_ ## _csp _node) override                                         \
     {                                                                                                     \
@@ -145,6 +153,9 @@ namespace gqlite::oc::algebra::visitors
       f.emplace("head", FI{value, V{vector}, true});
       f.emplace("id", FI{integer, V{node}, true});
       f.emplace("id", FI{integer, V{edge}, true});
+      f.emplace("keys", FI{vector, V{edge}, true});
+      f.emplace("keys", FI{vector, V{node}, true});
+      f.emplace("keys", FI{vector, V{map}, true});
       f.emplace("labels", FI{vector, V{node}, true});
       f.emplace("properties", FI{map, V{node}, true});
       f.emplace("properties", FI{map, V{edge}, true});
@@ -184,7 +195,7 @@ namespace gqlite::oc::algebra::visitors
           {
             expression_type arg_type = argument_types[i];
             expression_type f_type = it->second.arguments_types[i];
-            if(arg_type != f_type and arg_type != expression_type::value and f_type != expression_type::value)
+            if(arg_type != f_type and arg_type != expression_type::value and f_type != expression_type::value and arg_type != expression_type::empty)
             {
               match = false;
             }

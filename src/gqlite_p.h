@@ -25,6 +25,7 @@ namespace gqlite
     column_name_conflict = 100,
     integer_overflow,
     invalid_argument_type,
+    invalid_delete,
     invalid_number_literal,
     invalid_number_of_arguments,
     invalid_parameter_use,

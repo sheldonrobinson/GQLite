@@ -137,6 +137,7 @@ IgnoredScenario = [
   "[14] Fail when filtering path with property predicate",
   "[8] `labels()` failing on a path",
   "[5] Fail for `size()` on paths",
+  "[3] Delete relationship with bidirectional matching",
   # Path assignment and variable length path are not implemented
   "[8] Fail when a path has the same variable in a preceding MATCH",
   "[9] Fail when a relationship has the same variable in the same pattern",
@@ -181,6 +182,8 @@ IgnoredScenario = [
   "[2] Statically access a property of a optional non-null node",
   "[3] Statically access a property of a null node",
   "[3] `properties()` on null",
+  "[2] Delete optionally matched relationship",
+  "[4] Ignore null when deleting relationship",
   # TODO edge isomorphism
   "[29] Fail when re-using a relationship in the same pattern",
   # WITH allow to reuse variable even with considering edge isomorphism, need a better way to handle that, might have to be tracked by the parser
@@ -454,7 +457,7 @@ end
 Then(/^a SyntaxError should be raised at compile time: InvalidDelete$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
-  expect(@exception.message).to match(/^Invalid delete expression.$/)
+  expect(@exception.message).to match(/^CompileTime: InvalidDelete: .*\.$/)
 end
 
 Then(/^a SyntaxError should be raised at compile time: NonConstantExpression$/) do

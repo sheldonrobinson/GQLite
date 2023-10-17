@@ -1,1 +1,1 @@
-DELETE FROM gqlite_/%= _graph_name %/_labels WHERE label = ?001 AND node_id = ?002
+DELETE FROM gqlite_/%= _graph_name %/_labels WHERE node_id IN (/%= _what %/) AND label IN (/%= _labels %/)

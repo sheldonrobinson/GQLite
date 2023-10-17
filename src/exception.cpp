@@ -124,6 +124,8 @@ const char* exception::what() const throw()
         d->full_error += "IntegerOverflow: "; break;
       case invalid_argument_type:
         d->full_error += "InvalidArgumentType: "; break;
+      case invalid_delete:
+        d->full_error += "InvalidDelete: "; break;
       case invalid_number_literal:
         d->full_error += "InvalidNumberLiteral: "; break;
       case invalid_number_of_arguments:

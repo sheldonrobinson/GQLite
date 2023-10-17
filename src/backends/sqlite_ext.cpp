@@ -402,7 +402,7 @@ namespace gqlite::backends
   }
   void gqlite_tail(sqlite3_context* _context,int,sqlite3_value** _argv)
   {
-    NULL_CHECK(2);
+    NULL_CHECK(1);
     std::string left = reinterpret_cast<const char*>(sqlite3_value_text(_argv[0]));
     value val_left;
     SAFE(val_left = value::from_json(left));
@@ -428,6 +428,6 @@ namespace gqlite::backends
     sqlite3_create_function(db, "gqlite_indexed_access", 2, SQLITE_DETERMINISTIC | SQLITE_UTF8, nullptr, &gqlite_indexed_access, nullptr, nullptr);
     sqlite3_create_function(db, "gqlite_range_access", 3, SQLITE_DETERMINISTIC | SQLITE_UTF8, nullptr, &gqlite_range_access, nullptr, nullptr);
     sqlite3_create_function(db, "gqlite_contains", 2, SQLITE_DETERMINISTIC | SQLITE_UTF8, nullptr, &gqlite_contains, nullptr, nullptr);
-    sqlite3_create_function(db, "gqlite_tail", 2, SQLITE_DETERMINISTIC | SQLITE_UTF8, nullptr, &gqlite_tail, nullptr, nullptr);
+    sqlite3_create_function(db, "gqlite_tail", 1, SQLITE_DETERMINISTIC | SQLITE_UTF8, nullptr, &gqlite_tail, nullptr, nullptr);
   }
 }

@@ -40,11 +40,11 @@ features = [
   # WITH
   'with/With1', 'with/With2', 'with/With3', 'with/With4',
   # DELETE
-  # 'delete/Delete1',
-  # # SET
-  # 'set/Set1', 'set/Set2', 'set/Set3', 'set/Set4', 'set/Set5',
+  'delete/Delete1', 'delete/Delete2',
+  # SET
+  'set/Set1', 'set/Set2', 'set/Set3', 'set/Set4', 'set/Set5',
   # REMOVE
-  # 'remove/Remove1', 'remove/Remove2',
+  'remove/Remove1', 'remove/Remove2',
   # RETURN ORDER BY
   'return-orderby/ReturnOrderBy2', 'return-orderby/ReturnOrderBy3', 'return-orderby/ReturnOrderBy4',
   # RETURN SKIP LIMIT
@@ -73,15 +73,12 @@ expressions = [
   'literals/Literals1', 'literals/Literals2', 'literals/Literals3', 'literals/Literals4', 
 ]
 
-# In progress: waiting for SET:
-# 'list/List6',  'list/List9',
-
 # In progress
 # features = ['create/Create5', 'match/Match6', 'match-where/MatchWhere5', 'set/Set3', 'set/Set5', 'remove/Remove3' ]
 # expressions = ['comparison/Comparison1']
 # Current dev
 # features = []
-# expressions = [ ]
+# expressions = []
 
 # Build arguments
 

@@ -315,7 +315,10 @@ algebra::node_csp parser::data::parse_delete()
   std::vector<algebra::node_csp> expressions;
   while(tok.type != token_type::END_OF_FILE)
   {
-    expressions.push_back(parse_expression());
+    algebra::node_csp exp = parse_expression();
+    algebra::expression_type et = expression_analyser.start(exp).type;
+    errors::check_condition(et == algebra::expression_type::node or et == algebra::expression_type::edge or et== algebra::expression_type::value, exception_stage::compiletime, exception_code::invalid_delete, "Can only delete node/edges.");
+    expressions.push_back(exp);
     if(tok.type == token_type::COMMA)
     {
       get_next_token();
@@ -736,7 +739,6 @@ std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>> pars
   {
     report_error(tok, exception_code::parse_error, "Unfinished edge");
   }
-  gqlite_debug("patterns {}", patterns.size());
   return patterns;
 }
 
