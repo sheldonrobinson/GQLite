@@ -103,6 +103,31 @@
                 }
             ],
             "showDisplayString": true
+        },
+        {
+            "name": "gqlite benchmark (gdb)",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "/usr/bin/ruby",
+            "args": ["${env:LRS_PKG_ROOT}/src/gqlite/tests/rb/gqlite-bench.rb"],
+            "stopAtEntry": false,
+            "cwd": "${env:LRS_PKG_ROOT}/src/gqlite/tests/rb",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ],
+            "showDisplayString": true
         }
   ]
   }
