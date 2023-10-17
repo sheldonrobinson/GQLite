@@ -26,7 +26,7 @@ List of supported features:
 * *LIMIT*
 * *SKIP*
 
-The list of features under development or planned for future release can be found in [gitlab issues](https://gitlab.com/cyloncore/GQLite/-/issues/?label_name%5B%5D=cypher%3Afeature)
+The list of features under development or planned for future release can be found in [gitlab issues](https://gitlab.com/gqlite/GQLite/-/issues/?label_name%5B%5D=cypher%3Afeature)
 
 List of features with low likelyhood of implementation (external contributions are welcome):
 

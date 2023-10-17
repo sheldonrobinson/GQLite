@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include "gqlite_p.h"
 
 #include "oc/algebra/expression_info.h"

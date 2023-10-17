@@ -13,7 +13,7 @@ require 'rubygems/package_task'
 
 GEMSPEC = Gem::Specification.new do |s|
   s.name = "gqlite"
-  s.version = "0.9"
+  s.version = "1.0.0"
   s.summary = "Ruby bindings for GQLite, a Graph Query library."
   s.description = <<-DESC
 GQLite is a C++-language library, with a C interface, that implements a small, fast, self-contained, high-reliability, full-featured, Graph Query database engine. The data is stored in a SQLite database, which the fasted and most used SQL database. This enable to achieve high performance and for application to combine Graph queries with traditional SQL queries.
@@ -41,21 +41,21 @@ begin
   if value.nil?
     puts "Empty results"
   else
-    puts "Results are #{value.to_s}"
+    puts "Results are \#{value.to_s}"
   end
 rescue GQLite::Error => ex
   # Report any error
-  puts "An error has occured: #{ex.message}"
+  puts "An error has occured: \#{ex.message}"
 end
 
 ```
 
-The documentation for the openCypher query language can found in [openCypher](https://gitlab.com/cyloncore/GQLite/-/blob/docs/opencypher.md) and for the [API](https://gitlab.com/cyloncore/GQLite/-/blob/docs/api.md).
+The documentation for the openCypher query language can found in [openCypher](https://gitlab.com/gqlite/GQLite/-/blob/docs/opencypher.md) and for the [API](https://gitlab.com/gqlite/GQLite/-/blob/docs/api.md).
 
 DESC
   s.authors     = ["Cyrille Berger"]
   s.files       = %w[lib/gqlite.rb ext/gqlite/gqlite.h ext/gqlite/gqlite-c.h ext/gqlite/gqlite-amalgamate.cpp]
-  s.homepage    = "https://gitlab.com/cyloncore/gqlite"
+  s.homepage    = "https://gitlab.com/gqlite/gqlite"
   s.license     = "MIT"
   s.add_dependency "ffi", "~> 1.15"
   s.extensions = %w[ext/gqlite/extconf.rb]

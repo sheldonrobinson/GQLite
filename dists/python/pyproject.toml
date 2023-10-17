@@ -15,7 +15,7 @@ host-requires = [
 
 [project]
 name = "gqlitedb"
-version = "0.9.1"
+version = "1.0.0"
 authors = [
   { name="Cyrille Berger" },
 ]
@@ -30,5 +30,5 @@ classifiers = [
 dependencies = ["cffi>=1.0.0"]
 
 [project.urls]
-"Homepage" = "https://gitlab.com/cyloncore/gqlite"
-"Bug Tracker" = "https://github.com/cyloncore/gqlite/issues"
+"Homepage" = "https://gitlab.com/gqlite/gqlite"
+"Bug Tracker" = "https://github.com/gqlite/gqlite/issues"

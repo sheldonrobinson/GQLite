@@ -7,7 +7,7 @@ Compile from source
 From source, by default, git clone fetch the *stable* branch of GQLite:
 
 ```bash
-git clone https://gitlab.com/cyloncore/GQLite.git
+git clone https://gitlab.com/gqlite/GQLite.git
 cd GQLite
 mkdir build
 cd build
@@ -19,7 +19,7 @@ make install
 Amalgamate
 ----------
 
-From the [releases page](https://gitlab.com/cyloncore/GQLite/-/releases) it is possible to download an amalgamate variant of GQLite, which contains a single cpp file and two headers. This allow to easilly embedd GQLite in your own application build.
+From the [releases page](https://gitlab.com/gqlite/GQLite/-/releases) it is possible to download an amalgamate variant of GQLite, which contains a single cpp file and two headers. This allow to easilly embedd GQLite in your own application build.
 
 Using lrs-pkg
 -------------

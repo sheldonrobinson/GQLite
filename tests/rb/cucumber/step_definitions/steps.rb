@@ -241,7 +241,7 @@ IgnoredScenario = [
   "[1] Limit to two hits",
   "[6] LIMIT with an expression that does not depend on variables",
   "[7] The order direction cannot be overwritten",
-  # return modifiers (e.g. order by) must be done after computing expressions https://gitlab.com/cyloncore/GQLite/-/issues/2
+  # return modifiers (e.g. order by) must be done after computing expressions https://gitlab.com/gqlite/GQLite/-/issues/2
   "[7] Limit to more rows than actual results 1",
   "[8] Limit to more rows than actual results 2",
   "[15] Floating point parameter for LIMIT with ORDER BY should fail",
@@ -291,7 +291,7 @@ IgnoredScenario = [
   "[29] IN should return null if comparison with null is required, list version",
   # "[31] IN should return null when comparing two so-called identical lists where one element is null",
   # "[34] IN should return null if comparison with null is required, list version 2",
-  # variable inside the same CREATE statement are not accessible yet (https://gitlab.com/cyloncore/GQLite/-/issues/9)
+  # variable inside the same CREATE statement are not accessible yet (https://gitlab.com/gqlite/GQLite/-/issues/9)
   "[1] Forwarding a property to express a join",
   "[2] Handle dependencies across WITH with LIMIT",
   # type of value stored in array/map is lost

@@ -26,4 +26,4 @@ except gqlite.Error as ex:
   print(f"An error has occured: #{ex.msg}")
 ```
 
-The documentation for the openCypher query language can found in [openCypher](https://gitlab.com/cyloncore/GQLite/-/blob/docs/opencypher.md) and for the [API](https://gitlab.com/cyloncore/GQLite/-/blob/docs/api.md).
+The documentation for the openCypher query language can found in [openCypher](https://gitlab.com/gqlite/GQLite/-/blob/docs/opencypher.md) and for the [API](https://gitlab.com/gqlite/GQLite/-/blob/docs/api.md).

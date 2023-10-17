@@ -9,10 +9,10 @@ from distutils.ccompiler import new_compiler
 
 setup(
     name="gqlitedb",
-    version="0.9.1",
+    version="1.0.0",
     description="Python bindings for GQLite, a Graph Query library",
     long_description=open("README.md", "rt").read(),
-    url="https://gitlab.com/cyloncore/gqlite",
+    url="https://gitlab.com/gqlite/gqlite",
     author="Cyrille Berger",
     classifiers=[
         "Development Status :: 4 - Beta",

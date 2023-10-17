@@ -25,4 +25,4 @@ Documentation
 Contributions
 -------------
 
-Contributions are very welcome. They should be submited as merge requests in [gitlab](https://gitlab.com/cyloncore/GQLite/-/merge_requests). The code based does not follow strict coding style rules, but the indentation shoulbe two spaces, and the code should be aerated and readable.
+Contributions are very welcome. They should be submited as merge requests in [gitlab](https://gitlab.com/gqlite/GQLite/-/merge_requests). The code based does not follow strict coding style rules, but the indentation shoulbe two spaces, and the code should be aerated and readable.

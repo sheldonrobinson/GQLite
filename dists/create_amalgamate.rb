@@ -2,12 +2,15 @@
 
 source_dir = ARGV[0]
 
+# Order of headers matters
 src_files = [
   "format.h",
   "logging.h",
   "string.h",
   "gqlite_p.h",
   "global.h",
+  # errors.h depends on expression_info
+  "oc/algebra/expression_info.h",
   "errors.h",
   "oc/token.h",
   "oc/lexer.h",
@@ -15,9 +18,10 @@ src_files = [
   "oc/algebra/node.h",
   "oc/algebra/node_p.h",
   "oc/algebra/nodes.h",
+  # node visitors headers depends on nodes.h
   "oc/algebra/abstract_node_visitor.h",
   "oc/algebra/default_node_visitor.h",
-  # "oc/algebra/node_visitor.h",
+  "oc/algebra/visitors/expression_analyser.h",
   "oc/algebra/visitors/print.h",
   "oc/algebra/visitors/stringify.h",
   "oc/parser.h",
@@ -27,10 +31,10 @@ src_files = [
   
   
   "backend.cpp", "connection.cpp", "exception.cpp", "gqlite-c.cpp", "value.cpp",
-  "backends/sqlite.cpp",
   "oc/lexer.cpp", "oc/parser.cpp", "oc/token.cpp",
   "oc/algebra/abstract_node_visitor.cpp", "oc/algebra/node_type.cpp", "oc/algebra/node.cpp", "oc/algebra/nodes.cpp",
-  "oc/algebra/visitors/print.cpp"
+  "oc/algebra/visitors/print.cpp",
+  "backends/sqlite.cpp", "backends/sqlite_ext.cpp"
  ]
 
 token_keywords = File.open(source_dir + "/src/oc/token_keywords.h").read

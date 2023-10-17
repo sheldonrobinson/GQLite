@@ -7,7 +7,17 @@ module GQLite
   end
   module CApi
     extend FFI::Library
-    ffi_lib 'gqlite'
+
+    # Attempt to find the gqlite build that is shipped with gem
+    def CApi.get_lib_name()
+      path = "#{File.dirname __FILE__}/#{FFI::Platform::LIBPREFIX}gqlite.#{FFI::Platform::LIBSUFFIX}"
+      return path if File.exist?(path)
+      path = "#{File.dirname __FILE__}/gqlite.#{FFI::Platform::LIBSUFFIX}"
+      return path if File.exist?(path)
+      return "gqlite"
+    end
+
+    ffi_lib CApi.get_lib_name()
     attach_function :gqlite_api_context_create, [], :pointer
     attach_function :gqlite_api_context_destroy, [:pointer], :void
     attach_function :gqlite_api_context_clear_error, [:pointer], :void
