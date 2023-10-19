@@ -30,7 +30,9 @@ sqlite_queries = [
   ['node_remove_property(const std::string& _graph_name, const std::string& _what, const std::string& _path, const std::string& _node_id)', 'node_remove_property.sql'],
   ['node_set_property(const std::string& _graph_name, const std::string& _what, const std::string& _expr, const std::string& _path, const std::string& _node_id)', 'node_set_property.sql'],
   ['node_select_many(const std::string& _graph_name, int _idx)', 'node_select_many.sql'],
-  ['table_has()', 'table_has.sql']
+  ['table_has()', 'table_has.sql'],
+  ['uid_create_table()', 'uid_create_table.sql'],
+  ['uid_next()', 'uid_next.sql']
 ]
 
 output = File.open("sqlite_queries.h", "w")
@@ -48,7 +50,7 @@ file = Tempfile.new('foo')
 sqlite_queries.each() do |x|
   `ptc cppstream queries/sqlite/#{x[1]} #{file.path}`
   output.write <<FUNCTION
-  std::string #{x[0]}
+  inline std::string #{x[0]}
   {
     std::stringstream stream;
     #{File.open(file.path).read}

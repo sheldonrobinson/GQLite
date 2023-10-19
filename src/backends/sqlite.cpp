@@ -775,6 +775,7 @@ namespace gqlite::backends::sqlite_oc_executor
       mc.exec_c = &exec_c;
       mc.prepare(current_table, false);
       sql_expression_visitor sev{&mc};
+      mc.query_builder.add_variable("gqlite_next_uid('nodes')");
 
       std::string properties_str;
       if(_node->get_properties())
@@ -783,9 +784,9 @@ namespace gqlite::backends::sqlite_oc_executor
       } else {
         properties_str = "'{}'";
       }
-      sev.eval_c->query_builder.add_variable(properties_str);
+      mc.query_builder.add_variable(properties_str);
       std::string query = sqlite_queries::node_create(
-        sev.eval_c->exec_c->graph_name, sev.eval_c->query_builder.assemble());
+        exec_c.graph_name, sev.eval_c->query_builder.assemble());
       value res = exec_c.data->execute_sql(query, sev.eval_c->query_builder.bindings);
       value_vector ret_v;
       value_vector res_v = res.to_vector();
@@ -841,7 +842,7 @@ namespace gqlite::backends::sqlite_oc_executor
       mc.exec_c = &exec_c;
       mc.prepare(current_table, false);
       sql_expression_visitor sev{&mc};
-
+      mc.query_builder.add_variable("gqlite_next_uid('edges')");
       // Handle label
       std::string label = _edge->get_labels().empty() ? std::string() : _edge->get_labels().front();
       std::string label_binding_idx = sev.eval_c->query_builder.bind_value(exec_c.data->id_for_label(label));
@@ -1643,6 +1644,10 @@ sqlite::sqlite(void* _db) : d(new data)
   if(not d->table_has("gqlite_labels"))
   {
     d->execute_sql(sqlite_queries::label_create_table());
+  }
+  if(not d->table_has("gqlite_uid"))
+  {
+    d->execute_sql(sqlite_queries::uid_create_table());
   }
   if(not d->graph_has("default"))
   {

@@ -10,6 +10,8 @@
 #include "../gqlite_p.h"
 #include "../global.h"
 
+#include "sqlite_queries.h"
+
 namespace gqlite::backends
 {
   template<typename... _TArgs_>
@@ -177,7 +179,29 @@ namespace gqlite::backends
     }
     return false;
   }
+  void gqlite_next_uid(sqlite3_context* _context,int,sqlite3_value** _argv)
+  {
+    // We get our db connection from the context
+    sqlite3 *db = sqlite3_context_db_handle(_context);
+    const char* label = reinterpret_cast<const char*>(sqlite3_value_text(_argv[0]));
+    sqlite3_stmt *ps;
+    int rc = sqlite3_prepare_v2(db, sqlite_queries::uid_next().c_str(), -1, &ps, 0);
+    if (rc != SQLITE_OK) {
+      // Something bad happened, we'll come back to look at this later
+      return;
+    }
+    sqlite3_bind_text(ps, 1, label, -1, SQLITE_STATIC);
 
+    rc = sqlite3_step(ps);
+    if (rc == SQLITE_ROW)
+    {
+      gqlite_debug("counter {} = {}", label, sqlite3_column_int64(ps, 0));
+      sqlite3_result_int64(_context, sqlite3_column_int64(ps, 0));
+    } else {
+      report_error(_context, gqlite::exception_code::internal_error, "No uid counter for '{}'.", label);
+    }
+    sqlite3_finalize(ps);    
+  }
   void gqlite_range(sqlite3_context* _context,int,sqlite3_value** _argv)
   {
     int start = sqlite3_value_int(_argv[0]);
@@ -422,6 +446,7 @@ namespace gqlite::backends
 
   void initialise_sqlite_ext(sqlite3* db)
   {
+    sqlite3_create_function(db, "gqlite_next_uid", 1, SQLITE_UTF8, nullptr, &gqlite_next_uid, nullptr, nullptr);
     sqlite3_create_function(db, "gqlite_range", 2, SQLITE_DETERMINISTIC | SQLITE_UTF8, nullptr, &gqlite_range, nullptr, nullptr);
     sqlite3_create_function(db, "gqlite_concat", 2, SQLITE_DETERMINISTIC | SQLITE_UTF8, nullptr, &gqlite_concat, nullptr, nullptr);
     sqlite3_create_function(db, "gqlite_addition", 2, SQLITE_DETERMINISTIC | SQLITE_UTF8, nullptr, &gqlite_addition, nullptr, nullptr);
