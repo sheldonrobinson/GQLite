@@ -15,11 +15,11 @@ stream << "_edges AS tblu SET properties=json_patch(tblu.properties, json_set('{
 #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_add_properties.sql"
 stream << ( _path );
 #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_add_properties.sql"
-stream << "\", ";
+stream << "\", gqlite_jsonify(";
 #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_add_properties.sql"
 stream << ( _expr );
 #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_add_properties.sql"
-stream << ")) ";
+stream << "))) ";
 #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_add_properties.sql"
 stream << ( _what );
 #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_add_properties.sql"
@@ -116,11 +116,11 @@ stream << "_edges AS tblu SET properties=json_patch('{}', json_set(tblu.properti
 #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_set_property.sql"
 stream << ( _path );
 #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_set_property.sql"
-stream << "\", ";
+stream << "\", gqlite_jsonify(";
 #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_set_property.sql"
 stream << ( _expr );
 #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_set_property.sql"
-stream << ")) ";
+stream << "))) ";
 #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_set_property.sql"
 stream << ( _what );
 #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_set_property.sql"
@@ -407,11 +407,11 @@ stream << "_nodes AS tblu SET properties=json_patch(tblu.properties, json_set('{
 #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_add_properties.sql"
 stream << ( _path );
 #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_add_properties.sql"
-stream << "\", ";
+stream << "\", gqlite_jsonify(";
 #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_add_properties.sql"
 stream << ( _expr );
 #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_add_properties.sql"
-stream << ")) ";
+stream << "))) ";
 #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_add_properties.sql"
 stream << ( _what );
 #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_add_properties.sql"
@@ -542,11 +542,11 @@ stream << "_nodes AS tblu SET properties=json_patch('{}', json_set(tblu.properti
 #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_set_property.sql"
 stream << ( _path );
 #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_set_property.sql"
-stream << "\", ";
+stream << "\", gqlite_jsonify(";
 #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_set_property.sql"
 stream << ( _expr );
 #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_set_property.sql"
-stream << ")) ";
+stream << "))) ";
 #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_set_property.sql"
 stream << ( _what );
 #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_set_property.sql"

@@ -179,6 +179,176 @@ namespace gqlite::backends
     }
     return false;
   }
+  /**
+   * @internal
+   * class use to read json files
+   */
+  struct is_valid_json
+  {
+    struct invalid
+    {};
+    std::stringstream stream;
+    int last_char;
+    /// @brief get the next char
+    void fetch_next_non_space_char()
+    {
+      while(std::isspace(fetch_next_char()))
+      {
+        if(last_char == std::stringstream::traits_type::eof())
+        {
+          return;
+        } else if(stream.fail())
+        {
+          throw invalid();
+        }
+      }
+    };
+    int fetch_next_char()
+    {
+      return (last_char = stream.get());
+    }
+    /// @brief start parsing
+    /// @throw gqlite::exception
+    /// @return the parsed value
+    bool start()
+    {
+      try
+      {
+        fetch_next_non_space_char();
+        validate_value();
+        return true;
+      } catch(const invalid&)
+      {
+        return false;
+      }
+    }
+    static bool validate(const char* _string)
+    {
+      is_valid_json ivj{std::stringstream(_string), 0};
+      return ivj.start();
+    }
+    /// @brief read a string
+    /// @return the string without quotation
+    void validate_string()
+    {
+      is_char('"');
+      fetch_next_char();
+      bool keep_nc = false; // this is used to indicate if the last character was a '\' or not
+      while(keep_nc or last_char != '"')
+      {
+        keep_nc = (not keep_nc and last_char == '\\');
+        fetch_next_char();
+      }
+      fetch_next_char(); // eat the '"'
+    }
+    /// @brief throw an exception if last_char different from @param _c 
+    void is_char(int _c)
+    {
+      if(last_char != _c) throw invalid();
+    }
+    /// @brief read the next value
+    /// @return and return it
+    void validate_value()
+    {
+      switch (last_char)
+      {
+      case '{':
+      {
+        // Parse object
+        fetch_next_non_space_char();
+        while(last_char != '}')
+        {
+          validate_string();
+          is_char(':');
+          fetch_next_non_space_char();
+          validate_value();
+          if(last_char == ',')
+          {
+            fetch_next_non_space_char();
+          } else {
+            break;
+          }
+        }
+        is_char('}');
+        fetch_next_non_space_char();
+        return;
+      }
+      case '[':
+      {
+        // Parse array
+        fetch_next_non_space_char();
+        while(last_char != ']')
+        {
+          validate_value();
+          if(last_char == ',')
+          {
+            fetch_next_non_space_char();
+          } else {
+            break;
+          }
+        }
+        is_char(']');
+        fetch_next_non_space_char();
+        return;
+      }
+      case '"':
+        validate_string();
+        return;
+      case 't':
+      {
+        // Parse true
+        fetch_next_non_space_char(); is_char('r');
+        fetch_next_non_space_char(); is_char('u');
+        fetch_next_non_space_char(); is_char('e');
+        fetch_next_non_space_char();
+        return;
+      }
+      case 'f':
+      {
+        // Parse false
+        fetch_next_non_space_char(); is_char('a');
+        fetch_next_non_space_char(); is_char('l');
+        fetch_next_non_space_char(); is_char('s');
+        fetch_next_non_space_char(); is_char('e');
+        fetch_next_non_space_char();
+        return;
+      }
+      case 'n':
+      {
+        // Parse null
+        fetch_next_non_space_char(); is_char('u');
+        fetch_next_non_space_char(); is_char('l');
+        fetch_next_non_space_char(); is_char('l');
+        fetch_next_non_space_char();
+        return;
+      }
+      // Parse number
+      case '-':
+      case '0':
+      case '1':
+      case '2':
+      case '3':
+      case '4':
+      case '5':
+      case '6':
+      case '7':
+      case '8':
+      case '9':
+      {
+        fetch_next_non_space_char();
+        bool is_integer = true;
+        while((last_char >= '0' and last_char <= '9') or last_char == '.' or last_char == 'e' or last_char == '+' or last_char == '-')
+        {
+          is_integer = is_integer and (last_char != '.' and last_char != 'e');
+          fetch_next_non_space_char();
+        }
+        return;
+      }
+      default:
+        throw invalid{};
+      }
+    }
+  };
   void gqlite_next_uid(sqlite3_context* _context,int,sqlite3_value** _argv)
   {
     // We get our db connection from the context
@@ -201,6 +371,40 @@ namespace gqlite::backends
       report_error(_context, gqlite::exception_code::internal_error, "No uid counter for '{}'.", label);
     }
     sqlite3_finalize(ps);    
+  }
+  void gqlite_jsonify(sqlite3_context* _context,int,sqlite3_value** _argv)
+  {
+    constexpr int JSON_TYPE = 74;
+    if(sqlite3_value_subtype(_argv[0]) == JSON_TYPE)
+    {
+      sqlite3_result_subtype(_context, JSON_TYPE);
+      sqlite3_result_text(_context, reinterpret_cast<const char*>(sqlite3_value_text(_argv[0])), -1, SQLITE_TRANSIENT);
+    } else {
+      switch(sqlite3_value_type(_argv[0]))
+      {
+        case SQLITE_NULL:
+          sqlite3_result_null(_context);
+          break;
+        case SQLITE_INTEGER:
+          sqlite3_result_int64(_context, sqlite3_value_int64(_argv[0]));
+          break;
+        case SQLITE_FLOAT:
+          sqlite3_result_double(_context, sqlite3_value_double(_argv[0]));
+          break;
+        case SQLITE_TEXT:
+        {
+          const char* str =reinterpret_cast<const char*>(sqlite3_value_text(_argv[0]));
+          sqlite3_result_text(_context, str, -1, SQLITE_TRANSIENT);
+          if(is_valid_json::validate(str))
+          {
+            sqlite3_result_subtype(_context, JSON_TYPE);
+          }
+        }
+          break;
+        default:
+          report_error(_context, exception_code::invalid_argument_type, "Invalid arguments for addition.");
+      }
+    }
   }
   void gqlite_range(sqlite3_context* _context,int,sqlite3_value** _argv)
   {
@@ -260,7 +464,7 @@ namespace gqlite::backends
         }
           break;
         default:
-          report_error(_context, exception_code::invalid_argument_type, "Inavlid arguments for addition.");
+          report_error(_context, exception_code::invalid_argument_type, "Invalid arguments for addition.");
       }
     } else {
       double left_v = 0.0, right_v = 0.0;
@@ -446,6 +650,7 @@ namespace gqlite::backends
 
   void initialise_sqlite_ext(sqlite3* db)
   {
+    sqlite3_create_function(db, "gqlite_jsonify", 1, SQLITE_UTF8, nullptr, &gqlite_jsonify, nullptr, nullptr);
     sqlite3_create_function(db, "gqlite_next_uid", 1, SQLITE_UTF8, nullptr, &gqlite_next_uid, nullptr, nullptr);
     sqlite3_create_function(db, "gqlite_range", 2, SQLITE_DETERMINISTIC | SQLITE_UTF8, nullptr, &gqlite_range, nullptr, nullptr);
     sqlite3_create_function(db, "gqlite_concat", 2, SQLITE_DETERMINISTIC | SQLITE_UTF8, nullptr, &gqlite_concat, nullptr, nullptr);
