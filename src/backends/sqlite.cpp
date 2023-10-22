@@ -1645,7 +1645,7 @@ sqlite::sqlite(void* _db) : d(new data)
   {
     d->execute_sql(sqlite_queries::label_create_table());
   }
-  if(not d->table_has("gqlite_uid"))
+  if(not d->table_has("gqlite_uids"))
   {
     d->execute_sql(sqlite_queries::uid_create_table());
   }
