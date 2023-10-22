@@ -1,6 +1,6 @@
 .before_script_template_deb: &before_script_deb
   - echo "Installing packages..."
-  - apt-get -qq update && apt-get -qq install cmake g++ libsqlite3-dev ruby-dev ruby-ffi python3-dev python3-cffi python3-pytest xz
+  - apt-get -qq update && apt-get -qq install cmake g++ libsqlite3-dev ruby-dev ruby-ffi python3-dev python3-cffi python3-pytest xz-utils
   - gem install rspec cucumber rspec_junit_formatter
 
 .before_script_template_yum: &before_script_yum
