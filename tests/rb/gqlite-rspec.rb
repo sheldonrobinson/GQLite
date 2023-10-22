@@ -199,3 +199,26 @@ RSpec.describe "compare tables" do
     expect(compare_table_in_any_order([["b", "p"], [1, "foo"]], [["p", "a"], ["foo", 1]])).to be false
   end
 end
+
+RSpec.describe "test opening older database" do
+  it "can open 1.0 database" do
+    file = Tempfile.new('testdb')
+    `rm #{file.path}; cp #{__dir__}/data/test-1.0.db.xz #{file.path}.xz; xz -d #{file.path}.xz`
+    db = GQLite::Connection.new(sqlite_filename: file.path)
+    nodes = db.execute_oc_query "MATCH (a) RETURN a"
+    edges = db.execute_oc_query "MATCH ()-[a]->() RETURN a"
+
+    nodes_exp = [ ["a"],
+      [create_node(1, ["A", "E"], {"index"=>0, "name"=>"A"})],
+      [create_node(2, ["B"], {"index"=>1, "name"=>"B"})],
+      [create_node(3, ["C", "F"], {"index"=>2, "name"=>"C"})],
+      [create_node(4, ["D"], {"index"=>3, "name"=>"D"})] ]
+    edges_exp = [ ["a"],
+      [create_edge(1, "AB", {"sum"=>1, "name"=>"AB"})],
+      [create_edge(2, "BC", {"sum"=>3, "name"=>"BC"})],
+      [create_edge(3, "CD", {"sum"=>5, "name"=>"CD"})],
+      [create_edge(4, "DA", {"sum"=>3, "name"=>"DA"})] ]
+    expect(compare_table_in_any_order(nodes_exp, nodes)).to be true
+    expect(compare_table_in_any_order(edges_exp, edges)).to be true
+  end
+end

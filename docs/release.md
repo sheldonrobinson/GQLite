@@ -1,6 +1,8 @@
 How to release gqlite
 =====================
 
+- Make sure there is a test database in test/rb/data for the new version, and that it is called used in gqlite-rspec
+
 - Test amalgamate
 
 ```bash
