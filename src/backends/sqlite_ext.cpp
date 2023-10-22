@@ -365,7 +365,6 @@ namespace gqlite::backends
     rc = sqlite3_step(ps);
     if (rc == SQLITE_ROW)
     {
-      gqlite_debug("counter {} = {}", label, sqlite3_column_int64(ps, 0));
       sqlite3_result_int64(_context, sqlite3_column_int64(ps, 0));
     } else {
       report_error(_context, gqlite::exception_code::internal_error, "No uid counter for '{}'.", label);
