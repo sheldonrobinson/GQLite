@@ -1,18 +1,3 @@
-.before_script_template_deb: &before_script_deb
-  - echo "Installing packages..."
-  - apt-get -qq update && apt-get -qq install git cmake g++ libsqlite3-dev ruby-dev ruby-ffi python3-dev python3-cffi python3-pytest xz-utils
-  - gem install rspec cucumber rspec_junit_formatter
-
-.before_script_template_yum: &before_script_yum
-  - echo "Installing packages..."
-  - yum install -yy git cmake g++ sqlite-devel sqlite-devel ruby-devel rubygem-ffi redhat-rpm-config python3-cffi python3-devel python3-cffi python3-pytest xz
-  - gem install rspec cucumber rspec_junit_formatter
-
-.before_script_template_yum_rocky: &before_script_yum_rocky
-  - echo "Installing packages..."
-  - yum install -yy git cmake g++ sqlite-devel sqlite-devel ruby-devel  redhat-rpm-config python3-cffi python3-devel python3-cffi python3-pytest xz
-  - gem install rspec cucumber rspec_junit_formatter ffi
-
 stages:          # List of stages for jobs, and their order of execution
   - build
   - test
@@ -53,17 +38,13 @@ stages:          # List of stages for jobs, and their order of execution
 
 # Debian
 debian:build:
-  image: debian
+  image: cyrilleberger/cyloncore-ci:debian
   stage: build
-  before_script:
-    - *before_script_deb
   <<: *build_definition
 
 debian:test:   # This job runs in the test stage.
-  image: debian
+  image: cyrilleberger/cyloncore-ci:debian
   stage: test    # It only starts when the job in the build stage completes successfully.
-  before_script:
-    - *before_script_deb
   needs:
     - job: "debian:build"
       artifacts: true
@@ -71,17 +52,13 @@ debian:test:   # This job runs in the test stage.
 
 # Ubuntu
 ubuntu:build:
-  image: ubuntu
+  image: cyrilleberger/cyloncore-ci:ubuntu
   stage: build
-  before_script:
-    - *before_script_deb
   <<: *build_definition
 
 ubuntu:test:   # This job runs in the test stage.
-  image: ubuntu
+  image: cyrilleberger/cyloncore-ci:ubuntu
   stage: test    # It only starts when the job in the build stage completes successfully.
-  before_script:
-    - *before_script_deb
   needs:
     - job: "ubuntu:build"
       artifacts: true
@@ -89,37 +66,14 @@ ubuntu:test:   # This job runs in the test stage.
 
 # Fedora
 fedora:build:
-  image: fedora
+  image: cyrilleberger/cyloncore-ci:fedora
   stage: build
-  before_script:
-    - *before_script_yum
   <<: *build_definition
 
 fedora:test:   # This job runs in the test stage.
-  image: fedora
+  image: cyrilleberger/cyloncore-ci:fedora
   stage: test    # It only starts when the job in the build stage completes successfully.
-  before_script:
-    - *before_script_yum
   needs:
     - job: "fedora:build"
       artifacts: true
   <<: *test_definition
-
-# rockylinux
-# standard sqlite is too old
-# rockylinux:build:
-#   image: rockylinux:9
-#   stage: build
-#   before_script:
-#     - *before_script_yum_rocky
-#   <<: *build_definition
-
-# rockylinux:test:   # This job runs in the test stage.
-#   image: rockylinux:9
-#   stage: test    # It only starts when the job in the build stage completes successfully.
-#   before_script:
-#     - *before_script_yum_rocky
-#   needs:
-#     - job: "rockylinux:build"
-#       artifacts: true
-#   <<: *test_definition
