@@ -50,6 +50,11 @@ connection connection::create_from_sqlite_file(const std::string& _filename, con
 
 value connection::execute_oc_query(const std::string& _string, const value_map& _bindings)
 {
+#if 0
+  std::cout << "============= execute_oc_query =============\n"
+            << _string <<
+             "\n============================================" << std::endl;
+#endif
   std::stringstream ss(_string);
   oc::lexer l(&ss);
   oc::parser parser(&l, _bindings);

@@ -1010,23 +1010,65 @@ algebra::node_csp parser::data::parse_relational_expression()
       }
     }
     case token_type::EQUAL:
-      get_next_token();
-      return std::make_shared<algebra::relational_equal>(node, parse_relational_expression());
     case token_type::DIFFERENT:
-      get_next_token();
-      return std::make_shared<algebra::relational_different>(node, parse_relational_expression());
     case token_type::INFERIOR:
-      get_next_token();
-      return std::make_shared<algebra::relational_inferior>(node, parse_relational_expression());
     case token_type::SUPERIOR:
-      get_next_token();
-      return std::make_shared<algebra::relational_superior>(node, parse_relational_expression());
     case token_type::INFERIOR_EQUAL:
-      get_next_token();
-      return std::make_shared<algebra::relational_inferior_equal>(node, parse_relational_expression());
     case token_type::SUPERIOR_EQUAL:
-      get_next_token();
-      return std::make_shared<algebra::relational_superior_equal>(node, parse_relational_expression());
+    {
+      algebra::node_csp out_node;
+      while(tok.type != token_type::END_OF_FILE)
+      {
+        token_type current_op = tok.type;
+        get_next_token();
+        algebra::node_csp node_rhs = parse_additive_expression();
+        algebra::node_csp current_rel_node;
+        switch (current_op)
+        {
+        case token_type::EQUAL:
+          current_rel_node = std::make_shared<algebra::relational_equal>(node, node_rhs);
+          break;
+        case token_type::DIFFERENT:
+          current_rel_node =  std::make_shared<algebra::relational_different>(node, node_rhs);
+          break;
+        case token_type::INFERIOR:
+          current_rel_node =  std::make_shared<algebra::relational_inferior>(node, node_rhs);
+          break;
+        case token_type::SUPERIOR:
+          current_rel_node =  std::make_shared<algebra::relational_superior>(node, node_rhs);
+          break;
+        case token_type::INFERIOR_EQUAL:
+          current_rel_node =  std::make_shared<algebra::relational_inferior_equal>(node, node_rhs);
+          break;
+        case token_type::SUPERIOR_EQUAL:
+          current_rel_node =  std::make_shared<algebra::relational_superior_equal>(node, node_rhs);
+          break;
+        default:
+          report_error(tok, exception_code::internal_error, "While parsing relational expression.");
+        }
+        if(out_node)
+        {
+          out_node = std::make_shared<algebra::logical_and>(out_node, current_rel_node);
+        } else {
+          out_node = current_rel_node;
+        }
+        switch(tok.type)
+        {
+        case token_type::EQUAL:
+        case token_type::DIFFERENT:
+        case token_type::INFERIOR:
+        case token_type::SUPERIOR:
+        case token_type::INFERIOR_EQUAL:
+        case token_type::SUPERIOR_EQUAL:
+          node = node_rhs;
+          break;
+        default:
+          return out_node;
+        }
+      }
+      report_unexpected(tok);
+    }
+
     case token_type::IN:
       {
         get_next_token();

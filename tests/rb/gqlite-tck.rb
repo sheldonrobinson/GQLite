@@ -62,6 +62,8 @@ expressions = [
   'boolean/Boolean1', 'boolean/Boolean2', 'boolean/Boolean3', 'boolean/Boolean4', 'boolean/Boolean5',
   # conditonal
   'conditional/Conditional1', 'conditional/Conditional2',
+  # comparison
+  'comparison/Comparison1', 'comparison/Comparison2', 'comparison/Comparison3', 'comparison/Comparison4',
   # graph
   'graph/Graph1', 'graph/Graph2', 'graph/Graph3', 'graph/Graph4', 'graph/Graph5', 'graph/Graph7', 'graph/Graph9',
   # list
