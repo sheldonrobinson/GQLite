@@ -27,7 +27,7 @@ struct parser::data
   int id = 0;
   algebra::node_csp parse_call();
   algebra::node_csp parse_create();
-  algebra::node_csp parse_match();
+  algebra::node_csp parse_match(bool _optional);
   algebra::node_csp parse_return();
   algebra::node_csp parse_with();
   algebra::node_csp parse_unwind();
@@ -214,7 +214,7 @@ algebra::node_csp parser::data::parse_create()
   return std::make_shared<algebra::create>(parse_patterns(true));
 }
 
-algebra::node_csp parser::data::parse_match()
+algebra::node_csp parser::data::parse_match(bool _optional)
 {
   get_next_token();
   std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>> patterns = parse_patterns(false);
@@ -224,7 +224,7 @@ algebra::node_csp parser::data::parse_match()
     get_next_token();
     where = parse_expression();
   }
-  return std::make_shared<algebra::match>(patterns, where);
+  return std::make_shared<algebra::match>(patterns, where, _optional);
 }
 
 std::vector<algebra::named_expression_csp> parser::data::parse_named_expressions()
@@ -1074,7 +1074,7 @@ algebra::node_csp parser::data::parse_relational_expression()
         get_next_token();
         algebra::node_csp container = parse_expression();
         algebra::expression_type container_type = expression_analyser.start(container).type;
-        errors::check_argument_types(container_type, {algebra::expression_type::map, algebra::expression_type::vector, algebra::expression_type::value}, exception_stage::compiletime, "Relational IN can only be applied on vector/map.");
+        errors::check_argument_types(container_type, {algebra::expression_type::map, algebra::expression_type::vector, algebra::expression_type::value, algebra::expression_type::empty}, exception_stage::compiletime, "Relational IN can only be applied on vector/map.");
         if(container_type == algebra::expression_type::map)
         {
           errors::check_argument_types(expression_analyser.start(node).type, {algebra::expression_type::string, algebra::expression_type::value}, exception_stage::compiletime, "Relational IN on map expect a string.");
@@ -1304,8 +1304,13 @@ algebra::node_csp parser::parse()
     case token_type::CREATE:
       nodes.push_back(d->parse_create());
       break;
+    case token_type::OPTIONAL:
+      d->get_next_token();
+      d->is_of_type(token_type::MATCH);
+      nodes.push_back(d->parse_match(true));
+      break;
     case token_type::MATCH:
-      nodes.push_back(d->parse_match());
+      nodes.push_back(d->parse_match(false));
       break;
     case token_type::WITH:
       nodes.push_back(d->parse_with());
