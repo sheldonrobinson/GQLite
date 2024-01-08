@@ -61,9 +61,16 @@ namespace gqlite::oc::algebra::visitors
 #define GQLITE_STRINGIFY_UNARY_OP(_NAME_, _OP_)                                   \
     std::string visit(algebra::_NAME_ ## _csp _var) override                      \
     {                                                                             \
-      return # _OP_ " " + start(_var->get_value());                                 \
+      return # _OP_ " " + start(_var->get_value());                               \
     }
     GQLITE_STRINGIFY_UNARY_OP(logical_negation, NOT)
+#define GQLITE_STRINGIFY_UNARY_END_OP(_NAME_, _OP_)                               \
+    std::string visit(algebra::_NAME_ ## _csp _var) override                      \
+    {                                                                             \
+      return start(_var->get_value()) + " " # _OP_;                               \
+    }
+    GQLITE_STRINGIFY_UNARY_END_OP(is_null, IS NULL)
+    GQLITE_STRINGIFY_UNARY_END_OP(is_not_null, IS NOT NULL)
     std::string visit(algebra::variable_csp _var) override
     {
       return _var->get_identifier();

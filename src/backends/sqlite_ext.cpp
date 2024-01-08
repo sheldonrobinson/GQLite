@@ -37,6 +37,15 @@ namespace gqlite::backends
   {                                           \
     report_exception(_context, ex); return;   \
   }
+
+#define NULL_CHECK_AT(_ARG_INDEX_)                            \
+  {                                                           \
+    if(sqlite3_value_type(_argv[_ARG_INDEX_]) == SQLITE_NULL) \
+    {                                                         \
+      sqlite3_result_null(_context); return ;                 \
+    }                                                         \
+  }
+
 #define NULL_CHECK(_ARGS_COUNT_)                      \
   for(std::size_t i = 0; i < _ARGS_COUNT_; ++i)       \
   {                                                   \
@@ -153,7 +162,7 @@ namespace gqlite::backends
     using enum value_type;
     if(_value.get_type() == invalid)
     {
-      return comparison_result::compared_null;
+      return _container.empty() ? comparison_result::false_result : comparison_result::compared_null;
     }
     bool has_compared_to_null = false;
     for(const value& v_c : _container)
@@ -583,7 +592,7 @@ namespace gqlite::backends
   }
   void gqlite_contains(sqlite3_context* _context,int,sqlite3_value** _argv)
   {
-    NULL_CHECK(2);
+    NULL_CHECK_AT(0);
     std::string left = reinterpret_cast<const char*>(sqlite3_value_text(_argv[0]));
     value val_left;
     SAFE(val_left = value::from_json(left));
@@ -592,11 +601,13 @@ namespace gqlite::backends
     {
       case value_type::vector:
       {
-        std::string right = reinterpret_cast<const char*>(sqlite3_value_text(_argv[1]));
-        value_vector vv = val_left.to_vector();
         value val_right;
-        SAFE(val_right = value::from_json(right));
-
+        value_vector vv = val_left.to_vector();
+        if(sqlite3_value_type(_argv[1]) != SQLITE_NULL)
+        {
+          std::string right = reinterpret_cast<const char*>(sqlite3_value_text(_argv[1]));
+          SAFE(val_right = value::from_json(right));
+        }
         switch(contains(vv, val_right))
         {
         case comparison_result::true_result:

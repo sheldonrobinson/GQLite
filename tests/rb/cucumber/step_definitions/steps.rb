@@ -349,6 +349,7 @@ end
 Given(/^parameters are:$/) do |table|
   @bindings = {}
   table.raw.each() do |row|
+    null = nil
     @bindings["$" + row[0]] = eval(row[1])
   end
 end

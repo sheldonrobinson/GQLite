@@ -77,7 +77,7 @@ expressions = [
 
 # In progress
 # features = ['create/Create5', 'match/Match6', 'match-where/MatchWhere5', 'set/Set3', 'set/Set5', 'remove/Remove3' ]
-# expressions = ['comparison/Comparison1']
+# expressions = ['comparison/Comparison1', 'null/Null1', 'null/Null2', 'null/Null3']
 # Current dev
 # features = []
 # expressions = []
@@ -89,6 +89,7 @@ features = features.map { |file| 'openCypher/tck/features/clauses/' + file + '.f
 
 args = (features + expressions).concat %w(--require cucumber/step_definitions/)
 
+args = args.concat ['--tags', '~@skipStyleCheck']
 args = args.concat %w(--fail-fast)  if options[:abort_on_first_error]
 args = args.concat %w(--format html)  if options[:output_html]
 args = args.concat(%w(--format junit --out)).concat([options[:output_dir]])  if options[:output_junit]
