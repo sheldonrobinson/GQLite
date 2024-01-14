@@ -30,7 +30,7 @@ end
 module GQLiteTest
   def GQLiteTest.get_stats(handle)
     val = handle.execute_oc_query "CALL gqlite.internal.stats()"
-    return SideEffect.new val["nodes_count"], val["edges_count"], val["labels_assignment_nodes_count"], val["properties_count"]
+    return SideEffect.new val["nodes_count"], val["edges_count"], val["used_labels_nodes_count"], val["properties_count"]
   end
   def GQLiteTest.parse_side_effect_table(table)
     nodes_count = 0; edges_count = 0; labels_count = 0; properties_count = 0
@@ -172,29 +172,9 @@ IgnoredScenario = [
   # is not the case according to the test case)
   "[19] Two bound nodes pointing to the same node",
   # OPTIONAL MATCH is not supported yet
-  "[27] Matching from null nodes should return no results owing to finding no matches",
-  "[28] Matching from null nodes should return no results owing to matches being filtered out",
-  "[5] Forwarding null",
-  "[6] Forwarind a node variable possibly null",
-  "[4] Delete on null node",
-  "[5] Ignore null when deleting node",
-  "[6] Detach delete on null node",
-  "[8] Ignore null when setting property",
-  "[5] Ignore null when setting properties using an overriding map",
-  "[8] Ignore null when setting label",
-  "[1] Ignore null when setting properties using an appending map",
-  "[5] Ignore null when removing property from a node",
-  "[6] Ignore null when removing property from a relationship",
-  "[5] Ignore null when removing a node label",
-  "[7] `labels()` on null node",
   "[3] `type()` on null relationship",
   "[4] `type()` on mixed null and non-null relationships",
   "[5] Label expression on null",
-  "[2] Statically access a property of a optional non-null node",
-  "[3] Statically access a property of a null node",
-  "[3] `properties()` on null",
-  "[2] Delete optionally matched relationship",
-  "[4] Ignore null when deleting relationship",
   # TODO edge isomorphism
   "[29] Fail when re-using a relationship in the same pattern",
   # WITH allow to reuse variable even with considering edge isomorphism, need a better way to handle that, might have to be tracked by the parser
@@ -314,6 +294,7 @@ IgnoredScenario = [
   "[7] Comparing maps to maps, Examples (#14)",
   "[7] Comparing maps to maps, Examples (#15)",
   "[7] Comparing maps to maps, Examples (#16)",
+  "[3] `properties()` on null",
   # "[21] IN should return null if LHS and RHS are null - list version",
   "[29] IN should return null if comparison with null is required, list version",
   # "[31] IN should return null when comparing two so-called identical lists where one element is null",

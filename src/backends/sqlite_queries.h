@@ -156,17 +156,25 @@ stream << ( _edge_id );
   {
     std::stringstream stream;
     #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/function_labels.sql"
-stream << "(SELECT json_group_array(labels.label)\n"
-"            FROM gqlite_";
-#line 2 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/function_labels.sql"
-stream << ( _graph_name );
-#line 2 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/function_labels.sql"
-stream << "_labels as l\n"
-"            JOIN gqlite_labels AS labels ON labels.id = l.label WHERE l.node_id = ";
-#line 3 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/function_labels.sql"
+stream << "(CASE WHEN ";
+#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/function_labels.sql"
 stream << ( _node_id );
-#line 4 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/function_labels.sql"
+#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/function_labels.sql"
+stream << " IS NULL\n"
+"  THEN NULL\n"
+"  ELSE\n"
+"    (SELECT json_group_array(labels.label)\n"
+"                FROM gqlite_";
+#line 5 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/function_labels.sql"
+stream << ( _graph_name );
+#line 5 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/function_labels.sql"
+stream << "_labels as l\n"
+"                JOIN gqlite_labels AS labels ON labels.id = l.label WHERE l.node_id = ";
+#line 6 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/function_labels.sql"
+stream << ( _node_id );
+#line 8 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/function_labels.sql"
 stream << ")\n"
+"  END)\n"
 "";
 
     return stream.str();
@@ -205,7 +213,22 @@ stream << "_edges t, json_each(properties) j\n"
 #line 7 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/get_debug_stats.sql"
 stream << ( _graph_name );
 #line 7 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/get_debug_stats.sql"
-stream << "_labels";
+stream << "_labels\n"
+"UNION ALL SELECT COUNT(DISTINCT label) FROM (SELECT label FROM gqlite_";
+#line 8 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/get_debug_stats.sql"
+stream << ( _graph_name );
+#line 8 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/get_debug_stats.sql"
+stream << "_edges UNION SELECT label FROM gqlite_";
+#line 8 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/get_debug_stats.sql"
+stream << ( _graph_name );
+#line 8 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/get_debug_stats.sql"
+stream << "_labels)\n"
+"UNION ALL SELECT COUNT(DISTINCT label) FROM gqlite_";
+#line 9 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/get_debug_stats.sql"
+stream << ( _graph_name );
+#line 10 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/get_debug_stats.sql"
+stream << "_labels\n"
+"";
 
     return stream.str();
   }
@@ -375,7 +398,7 @@ stream << "INSERT INTO gqlite_";
 #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_add_label.sql"
 stream << ( _graph_name );
 #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/node_add_label.sql"
-stream << "_labels(label, node_id)  SELECT label.value, node.value FROM json_each(?001) label  JOIN json_each(?002) node";
+stream << "_labels(label, node_id)  SELECT label.value, node.value FROM json_each(?001) label  JOIN json_each(?002) node WHERE node.value IS NOT NULL";
 
     return stream.str();
   }

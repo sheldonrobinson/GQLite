@@ -1363,6 +1363,7 @@ namespace gqlite::backends::sqlite_oc_executor
             std::string labels_ref = mc.query_builder.add_table("json_each({})"s % mc.query_builder.bind_value(value_vector(label_ids_view.begin(), label_ids_view.end())), sql_join::inner);
             mc.query_builder.add_variable("{}.value" % labels_ref);
             mc.query_builder.add_variable(svi.sql_var_name);
+            mc.query_builder.add_where_condition("{} IS NOT NULL", svi.sql_var_name);
             std::string what = mc.query_builder.assemble();
 
             switch(svi.type)
@@ -1613,38 +1614,38 @@ namespace gqlite::backends::sqlite_oc_executor
         for(std::size_t c = 0; c < r_v.size(); ++c)
         {
           value& v = r_v[c];
-          switch(column_types[c])
+          if(v.get_type() != value_type::invalid)
           {
-          case oc::algebra::expression_type::boolean:
-            if(v.get_type() != value_type::invalid)
+            switch(column_types[c])
             {
-              v = (v.to_integer() == 1);
-            }
-            break;
-          case oc::algebra::expression_type::map:
-          case oc::algebra::expression_type::vector:
-            v = value::from_json(v.to_string());
-            break;
-          case oc::algebra::expression_type::node:
-          case oc::algebra::expression_type::edge:
-            if(v.get_type() != value_type::invalid)
-            {
-              v = value::from_json(v.to_string());
-            }
-            break;
-          default:
-            if(v.get_type() == value_type::string)
-            {
-              // Attempt to parse strings as json
-              try
+            case oc::algebra::expression_type::boolean:
+              if(v.get_type() != value_type::invalid)
               {
-                v = value::from_json(v.to_string());
-              }
-              catch(const exception&)
-              {
-                // ignore, that probably means it is a real string
+                v = (v.to_integer() == 1);
               }
               break;
+            case oc::algebra::expression_type::map:
+            case oc::algebra::expression_type::vector:
+              v = value::from_json(v.to_string());
+              break;
+            case oc::algebra::expression_type::node:
+            case oc::algebra::expression_type::edge:
+              v = value::from_json(v.to_string());
+              break;
+            default:
+              if(v.get_type() == value_type::string)
+              {
+                // Attempt to parse strings as json
+                try
+                {
+                  v = value::from_json(v.to_string());
+                }
+                catch(const exception&)
+                {
+                  // ignore, that probably means it is a real string
+                }
+                break;
+              }
             }
           }
         }
@@ -1702,7 +1703,7 @@ sqlite::sqlite(void* _db) : d(new data)
   {
     gqlite::value result = d->execute_sql(sqlite_queries::get_debug_stats("default"));
     value_vector rows = result.to_vector();
-    errors::check_condition(rows.size() == 7, exception_stage::runtime, exception_code::internal_error, "Invalid number of debug stats got {} expected 7.", rows.size());
+    errors::check_condition(rows.size() == 9, exception_stage::runtime, exception_code::internal_error, "Invalid number of debug stats got {} expected 7.", rows.size());
     value_map stats;
     stats["nodes_count"] = rows[0].to_vector()[0].to_integer();
     stats["edges_count"] = rows[1].to_vector()[0].to_integer();
@@ -1710,6 +1711,8 @@ sqlite::sqlite(void* _db) : d(new data)
     stats["properties_count"] = rows[3].to_vector()[0].to_integer() + rows[4].to_vector()[0].to_integer();
     stats["labels_count"] = rows[5].to_vector()[0].to_integer();
     stats["labels_assignment_nodes_count"] = rows[6].to_vector()[0].to_integer();
+    stats["used_labels_count"] = rows[7].to_vector()[0].to_integer();
+    stats["used_labels_nodes_count"] = rows[8].to_vector()[0].to_integer();
     return stats;
   };
 }
