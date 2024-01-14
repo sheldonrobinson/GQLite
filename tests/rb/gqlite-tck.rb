@@ -34,7 +34,7 @@ features = [
   # Create
   'create/Create1', 'create/Create2',
   # Match
-  'match/Match1', 'match/Match2', 'match/Match3', 
+  'match/Match1', 'match/Match2', 'match/Match3', 'match/Match7',
   # MatchWhere
   'match-where/MatchWhere1', 'match-where/MatchWhere2', 'match-where/MatchWhere3', 'match-where/MatchWhere4',
   # WITH
@@ -73,13 +73,15 @@ expressions = [
   #  'list/List9',
   # literals
   'literals/Literals1', 'literals/Literals2', 'literals/Literals3', 'literals/Literals4', 
+  # null
+  'null/Null1', 'null/Null2', 'null/Null3',
 ]
 
 # In progress
 # features = ['create/Create5', 'match/Match6', 'match-where/MatchWhere5', 'set/Set3', 'set/Set5', 'remove/Remove3' ]
-# expressions = ['comparison/Comparison1', 'null/Null1', 'null/Null2', 'null/Null3']
+# expressions = ['comparison/Comparison1']
 # Current dev
-# features = []
+# features = ['match/Match7']
 # expressions = []
 
 # Build arguments

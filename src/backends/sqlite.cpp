@@ -280,11 +280,15 @@ namespace gqlite::backends::sqlite_oc_executor
   struct sql_query_builder
   {
     std::size_t uid = 0;
-    std::size_t table_count = 0;
     std::string variables;
-    std::string tables;
+    struct table
+    {
+      sql_join join;
+      std::string table, name;
+    };
+    std::vector<table> tables;
     std::string join_conditions;
-    std::string where_conditions;
+    // std::string where_conditions;
     std::string modifiers;
     std::map<int, value> bindings;
     std::size_t next_uid()
@@ -314,26 +318,19 @@ namespace gqlite::backends::sqlite_oc_executor
       variables += format_string("{} AS {}", _expression, _name);
       return _name;
     }
+    void add_fake_table()
+    {
+      errors::check_condition(tables.empty(), exception_stage::runtime, exception_code::internal_error, "Fake table can only be added when the number of table is 0.");
+      tables.push_back({sql_join::inner, "(SELECT 1 AS fake)", "faketable"});
+    }
     std::string add_table(const std::string& _table, sql_join _join, const char* _table_name_format= "tbl_{}")
     {
-      if(table_count == 0)
+      if(tables.empty())
       {
         errors::check_condition(_join == sql_join::inner, exception_stage::runtime, exception_code::internal_error, "Joining with non-inner join on first table.");
-        tables += " FROM ";
-      } else {
-        switch(_join)
-        {
-          case sql_join::inner:
-            tables += " JOIN ";
-            break;
-          case sql_join::left:
-            tables += " LEFT JOIN ";
-            break;
-        }
       }
-      ++table_count;
       std::string table_name = format_string(_table_name_format, next_uid());
-      tables += format_string(" {} {} ", _table, table_name);
+      tables.push_back({_join, _table, table_name});
       return table_name;
     }
     template<typename... _T_>
@@ -346,22 +343,51 @@ namespace gqlite::backends::sqlite_oc_executor
     template<typename... _T_>
     void add_where_condition(const std::string& _condition, const _T_&... _args)
     {
-      if(_condition.empty()) return;
-      where_conditions += where_conditions.empty() ? " WHERE " : " AND ";
-      where_conditions += format_string(_condition, _args...);
+      add_join_condition(_condition, _args...);
+      // if(_condition.empty()) return;
+      // where_conditions += where_conditions.empty() ? " WHERE " : " AND ";
+      // where_conditions += format_string(_condition, _args...);
     }
     void add_modifier(const std::string& _modifier)
     {
       modifiers += _modifier;
     }
-    std::string assemble(bool _optional)
+    std::string assemble()
     {
       std::string q = "SELECT ";
       q += variables.empty() ? " null " : variables;
-      q += tables;
+      if(not tables.empty())
+      {
+      // errors::check_condition(not tables.empty(), exception_stage::runtime, exception_code::internal_error, "Missing tables in query.");
+        q += format_string(" FROM {} {}", tables[0].table, tables[0].name);
+        for(std::size_t i = 1; i < tables.size(); ++i)
+        {
+          table& tbl = tables[i];
+          const char* join_type;
+          switch(tbl.join)
+          {
+            case sql_join::inner:
+              join_type = "JOIN";
+              break;
+            case sql_join::left:
+              join_type = "LEFT JOIN";
+              break;
+          }
+          if(i == tables.size() - 1)
+          {
+            q += format_string(" {} {} {}", join_type, tbl.table, tbl.name);
+          } else {
+            q += format_string(" {} ({} {}", join_type, tbl.table, tbl.name);          
+          }
+        }
+        for(std::size_t i = 1; i < tables.size() - 1; ++i)
+        {
+          q += ")";
+        }
+      }
       if(not join_conditions.empty())
       {
-        if(table_count == 1)
+        if(tables.size() == 1)
         {
           q += " WHERE ";
         } else {
@@ -369,11 +395,7 @@ namespace gqlite::backends::sqlite_oc_executor
         }
         q += join_conditions;
       }
-      q += where_conditions;
-      if(_optional)
-      {
-        q += " RIGHT OUTER JOIN (SELECT 1 AS fake) faketable ON 1=1 ";
-      }
+      // q += where_conditions;
       q += modifiers;
       return q;
     }
@@ -392,7 +414,7 @@ namespace gqlite::backends::sqlite_oc_executor
     // std::string view_name;
     oc::algebra::visitors::expression_analyser expression_analyser;
 
-    table prepare(const table& _table, bool _create_new_table)
+    table prepare(const table& _table, bool _create_new_table, bool _optional)
     {
       expression_analyser.stage = exception_stage::runtime;
       expression_analyser.variables_f = [this](const std::string& _var_name)
@@ -401,8 +423,13 @@ namespace gqlite::backends::sqlite_oc_executor
       };
       table new_table;
       if(_create_new_table) new_table.view_name = "__view" + std::to_string(++exec_c->next_view_id);
-      if(not _table.view_name.empty())
+      if(_table.view_name.empty())
       {
+        if(_optional)
+        {
+          query_builder.add_fake_table();
+        }
+      } else {
         previous_table_ref = query_builder.add_table(_table.view_name, sql_join::inner, "pt_{}");
 
         for(auto const& [k, v] : _table.variables)
@@ -777,7 +804,7 @@ namespace gqlite::backends::sqlite_oc_executor
     {
       sql_evaluation_context mc;
       mc.exec_c = &exec_c;
-      mc.prepare(current_table, false);
+      mc.prepare(current_table, false, false);
       sql_expression_visitor sev{&mc};
       mc.query_builder.add_variable("gqlite_next_uid('nodes')");
 
@@ -790,7 +817,7 @@ namespace gqlite::backends::sqlite_oc_executor
       }
       mc.query_builder.add_variable(properties_str);
       std::string query = sqlite_queries::node_create(
-        exec_c.graph_name, sev.eval_c->query_builder.assemble(false));
+        exec_c.graph_name, sev.eval_c->query_builder.assemble());
       value res = exec_c.data->execute_sql(query, sev.eval_c->query_builder.bindings);
       value_vector ret_v;
       value_vector res_v = res.to_vector();
@@ -844,7 +871,7 @@ namespace gqlite::backends::sqlite_oc_executor
     {
       sql_evaluation_context mc;
       mc.exec_c = &exec_c;
-      mc.prepare(current_table, false);
+      mc.prepare(current_table, false, false);
       sql_expression_visitor sev{&mc};
       mc.query_builder.add_variable("gqlite_next_uid('edges')");
       // Handle label
@@ -874,7 +901,7 @@ namespace gqlite::backends::sqlite_oc_executor
       mc.query_builder.add_variable(right_expr, "destination_{}");
 
       // Execute queries
-      std::string query = sqlite_queries::edge_create(exec_c.graph_name, sev.eval_c->query_builder.assemble(false));
+      std::string query = sqlite_queries::edge_create(exec_c.graph_name, sev.eval_c->query_builder.assemble());
       value res = sev.eval_c->exec_c->data->execute_sql(query, sev.eval_c->query_builder.bindings);
 
       // Prepare return
@@ -933,7 +960,7 @@ namespace gqlite::backends::sqlite_oc_executor
         // 2) Create the resulting table
         sql_evaluation_context mc;
         mc.exec_c = &exec_c;
-        table new_table = mc.prepare(current_table, true);
+        table new_table = mc.prepare(current_table, true, false);
         sql_expression_visitor sev{&mc};
         std::string first_table_ref;
         // loop over new things
@@ -962,7 +989,7 @@ namespace gqlite::backends::sqlite_oc_executor
         {
           mc.query_builder.add_join_condition("{}.rowid = {}.key + 1", mc.previous_table_ref, first_table_ref);
         }
-        exec_c.data->execute_sql("CREATE TEMPORARY TABLE " + new_table.view_name + " AS " + mc.query_builder.assemble(false), mc.query_builder.bindings);
+        exec_c.data->execute_sql("CREATE TEMPORARY TABLE " + new_table.view_name + " AS " + mc.query_builder.assemble(), mc.query_builder.bindings);
         current_table = new_table;
       }
       return value{};
@@ -1054,15 +1081,18 @@ namespace gqlite::backends::sqlite_oc_executor
     {
       sql_match_evaluation_context mc;
       mc.exec_c = &exec_c;
-      table new_table = mc.prepare(current_table, true);
+      table new_table = mc.prepare(current_table, true, _node->get_optional());
       sql_match_expression_visitor sev{&mc};
+
+      const bool is_optional = _node->get_optional();
 
       // 1) Go through the patterns
       for(const algebra::alternative<algebra::graph_node, algebra::graph_edge>& pattern : _node->get_patterns())
       {
-        pattern.visit<void>([this, &mc, &sev, &new_table](const algebra::graph_node_csp _node)
+        pattern.visit<void>([this, &mc, &sev, &new_table, is_optional](const algebra::graph_node_csp _node)
         {
-          std::string table_ref = sev.eval_c->query_builder.add_table(format_string("gqlite_{}_nodes", exec_c.graph_name), sql_join::inner, "node_{}");
+          sql_join s_join = is_optional ? sql_join::left : sql_join::inner;
+          std::string table_ref = sev.eval_c->query_builder.add_table(format_string("gqlite_{}_nodes", exec_c.graph_name), s_join, "node_{}");
           std::string sql_var = format_string("{}.id", table_ref);
           std::string sql_properties_var = format_string("{}.properties", table_ref);
           mc.query_builder.add_join_condition(mc.generate_labels_match(_node->get_labels(), format_string("{}.id", table_ref)));
@@ -1072,14 +1102,15 @@ namespace gqlite::backends::sqlite_oc_executor
           }
           generate_var_match(&mc, &new_table, _node->get_variable(), sql_var, sql_properties_var, std::string(), algebra::expression_type::node);
         },
-        [this, &mc, &sev, &new_table](const algebra::graph_edge_csp _edge)
+        [this, &mc, &sev, &new_table, is_optional](const algebra::graph_edge_csp _edge)
         {
+          sql_join s_join = is_optional ? sql_join::left : sql_join::inner;
           std::string table_ref;
           if(_edge->get_directivity() == algebra::edge_directivity::undirected)
           {
-            table_ref = sev.eval_c->query_builder.add_table(format_string("gqlite_{}_edges_undirected", exec_c.graph_name), sql_join::inner, "undirected_edge_{}");
+            table_ref = sev.eval_c->query_builder.add_table(format_string("gqlite_{}_edges_undirected", exec_c.graph_name), s_join, "undirected_edge_{}");
           } else {
-            table_ref = sev.eval_c->query_builder.add_table(format_string("gqlite_{}_edges", exec_c.graph_name), sql_join::inner, "edge_{}");
+            table_ref = sev.eval_c->query_builder.add_table(format_string("gqlite_{}_edges", exec_c.graph_name), s_join, "edge_{}");
           }
           std::string sql_source_var = format_string("{}.left", table_ref);
           std::string sql_edge_var = format_string("{}.id", table_ref);
@@ -1092,7 +1123,13 @@ namespace gqlite::backends::sqlite_oc_executor
           mc.query_builder.add_where_condition(mc.generate_labels_match(_edge->get_destination()->get_labels(), table_ref + ".right"));
           if(not _edge->get_labels().empty())
           {
-            std::string label_conds = "(FALSE ";
+            std::string label_conds;
+            if(is_optional)
+            {
+              label_conds = format_string("({} IS NULL", sql_label_edge_var);
+            } else {
+              label_conds = "(FALSE ";
+            }
             for(const std::string& label : _edge->get_labels())
             {
               label_conds += format_string(" OR {} = {}", sql_label_edge_var, exec_c.data->id_for_label(label));
@@ -1136,7 +1173,7 @@ namespace gqlite::backends::sqlite_oc_executor
         mc.query_builder.add_where_condition(sev.start(_node->get_where()));
       }
       // 3) Assemble SQL query for execution
-      std::string sql_query = "CREATE TEMPORARY TABLE " + new_table.view_name + " AS " + mc.query_builder.assemble(_node->get_optional());
+      std::string sql_query = "CREATE TEMPORARY TABLE " + new_table.view_name + " AS " + mc.query_builder.assemble();
 
       exec_c.data->execute_sql(sql_query, mc.query_builder.bindings);
       current_table = new_table;
@@ -1151,11 +1188,11 @@ namespace gqlite::backends::sqlite_oc_executor
       {
         sql_match_evaluation_context mc;
         mc.exec_c = &exec_c;
-        mc.prepare(current_table, false);
+        mc.prepare(current_table, false, false);
         sql_match_expression_visitor sev{&mc};
         std::string expr = sev.start(node);
         mc.query_builder.add_variable(expr);
-        std::string what = mc.query_builder.assemble(false);
+        std::string what = mc.query_builder.assemble();
 
         switch(mc.expression_analyser.start(node).type)
         {
@@ -1261,12 +1298,12 @@ namespace gqlite::backends::sqlite_oc_executor
           {
             sql_match_evaluation_context mc;
             mc.exec_c = &self->exec_c;
-            mc.prepare(self->current_table, false);
+            mc.prepare(self->current_table, false, false);
             sql_match_expression_visitor sev{&mc};
             sql_variable_info svi = mc.get_variable_info(_property->get_left());
             // mc.query_builder.add_variable(svi.sql_var_name);
             std::string expr = sev.start(_property->get_expression());
-            std::string what = mc.query_builder.assemble(false).substr(sizeof("SELECT null"));
+            std::string what = mc.query_builder.assemble().substr(sizeof("SELECT null"));
 
             switch(svi.type)
             {
@@ -1290,11 +1327,11 @@ namespace gqlite::backends::sqlite_oc_executor
           {
             sql_match_evaluation_context mc;
             mc.exec_c = &self->exec_c;
-            mc.prepare(self->current_table, false);
+            mc.prepare(self->current_table, false, false);
             sql_match_expression_visitor sev{&mc};
             sql_variable_info svi = mc.get_variable_info(_property->get_left());
             std::string expr = sev.start(_property->get_expression());
-            std::string what = mc.query_builder.assemble(false).substr(sizeof("SELECT null"));
+            std::string what = mc.query_builder.assemble().substr(sizeof("SELECT null"));
 
             switch(svi.type)
             {
@@ -1318,7 +1355,7 @@ namespace gqlite::backends::sqlite_oc_executor
           {
             sql_match_evaluation_context mc;
             mc.exec_c = &self->exec_c;
-            mc.prepare(self->current_table, false);
+            mc.prepare(self->current_table, false, false);
             sql_match_expression_visitor sev{&mc};
             sql_variable_info svi = mc.get_variable_info(_edit_label->get_target());
             std::vector<std::string> labels = _edit_label->get_labels();
@@ -1326,7 +1363,7 @@ namespace gqlite::backends::sqlite_oc_executor
             std::string labels_ref = mc.query_builder.add_table("json_each({})"s % mc.query_builder.bind_value(value_vector(label_ids_view.begin(), label_ids_view.end())), sql_join::inner);
             mc.query_builder.add_variable("{}.value" % labels_ref);
             mc.query_builder.add_variable(svi.sql_var_name);
-            std::string what = mc.query_builder.assemble(false);
+            std::string what = mc.query_builder.assemble();
 
             switch(svi.type)
             {
@@ -1364,10 +1401,10 @@ namespace gqlite::backends::sqlite_oc_executor
           {
             sql_match_evaluation_context mc;
             mc.exec_c = &self->exec_c;
-            mc.prepare(self->current_table, false);
+            mc.prepare(self->current_table, false, false);
             sql_match_expression_visitor sev{&mc};
             sql_variable_info svi = mc.get_variable_info(_property->get_left());
-            std::string what = mc.query_builder.assemble(false).substr(sizeof("SELECT null"));
+            std::string what = mc.query_builder.assemble().substr(sizeof("SELECT null"));
 
             switch(svi.type)
             {
@@ -1391,14 +1428,14 @@ namespace gqlite::backends::sqlite_oc_executor
           {
             sql_match_evaluation_context mc;
             mc.exec_c = &self->exec_c;
-            mc.prepare(self->current_table, false);
+            mc.prepare(self->current_table, false, false);
             sql_match_expression_visitor sev{&mc};
             sql_variable_info svi = mc.get_variable_info(_edit_label->get_target());
             std::vector<std::string> labels = _edit_label->get_labels();
             auto label_ids_view = labels | std::views::transform([this](const std::string& _label) { return std::to_string(self->exec_c.data->id_for_label(_label)); });
             std::string labels_ref = string::join(label_ids_view, ", ");
             mc.query_builder.add_variable(svi.sql_var_name);
-            std::string what = mc.query_builder.assemble(false);
+            std::string what = mc.query_builder.assemble();
 
             switch(svi.type)
             {
@@ -1462,7 +1499,7 @@ namespace gqlite::backends::sqlite_oc_executor
 
       sql_evaluation_context mc;
       mc.exec_c = &exec_c;
-      table new_table = mc.prepare(current_table, true);
+      table new_table = mc.prepare(current_table, true, false);
       new_table.variables.clear();
       sql_expression_visitor sev{&mc};
       // Generate SQL Query
@@ -1474,7 +1511,7 @@ namespace gqlite::backends::sqlite_oc_executor
         mc.variables[rv->get_name()] = {var, et};
       }
       add_filter_expressions(&sev, w->get_modifiers());
-      std::string query = "CREATE TEMPORARY TABLE " + new_table.view_name + " AS " + mc.query_builder.assemble(false);
+      std::string query = "CREATE TEMPORARY TABLE " + new_table.view_name + " AS " + mc.query_builder.assemble();
       exec_c.data->execute_sql(query, mc.query_builder.bindings);
 
       current_table = new_table;
@@ -1486,11 +1523,11 @@ namespace gqlite::backends::sqlite_oc_executor
     {
       sql_evaluation_context mc;
       mc.exec_c = &exec_c;
-      table new_table = mc.prepare(current_table, true);
+      table new_table = mc.prepare(current_table, true, false);
       sql_expression_visitor sev{&mc};
       std::string table_ref = mc.query_builder.add_table("json_each(" + sev.start(uw->get_expression()) + ")", sql_join::inner, "a_uw_{}");
       std::string var = mc.query_builder.add_variable(format_string("{}.value", table_ref));
-      std::string query = "CREATE TEMPORARY TABLE " + new_table.view_name + " AS " + mc.query_builder.assemble(false);
+      std::string query = "CREATE TEMPORARY TABLE " + new_table.view_name + " AS " + mc.query_builder.assemble();
       new_table.variables[uw->get_name()] = {var, oc::algebra::expression_type::value};
       exec_c.data->execute_sql(query, mc.query_builder.bindings);
       current_table = new_table;
@@ -1502,7 +1539,7 @@ namespace gqlite::backends::sqlite_oc_executor
     {
       sql_evaluation_context mc;
       mc.exec_c = &exec_c;
-      mc.prepare(current_table, false);
+      mc.prepare(current_table, false, false);
       sql_expression_visitor sev{&mc};
       std::vector<gqlite::oc::algebra::named_expression_csp> expressions;
       if(_rs->get_all())
@@ -1530,7 +1567,7 @@ namespace gqlite::backends::sqlite_oc_executor
         case oc::algebra::expression_type::node:
           {
             std::string table_ref = mc.query_builder.add_table(format_string("gqlite_{}_nodes_as_json", exec_c.graph_name), sql_join::inner, "node_{}");
-            mc.query_builder.add_join_condition("{}.id = {}", table_ref, sev.start(rv->get_expression()));
+            mc.query_builder.add_join_condition("{}.id IS {}", table_ref, sev.start(rv->get_expression()));
             std::string var_expr = mc.query_builder.add_variable("{}.node" % table_ref);
             variables_extra[rv->get_name()] = {var_expr, oc::algebra::expression_type::node,
                                   "json_extract({}, '$.properties')" % var_expr, "json_extract({}, '$.labels')" % var_expr};
@@ -1539,7 +1576,7 @@ namespace gqlite::backends::sqlite_oc_executor
         case oc::algebra::expression_type::edge:
           {
             std::string table_ref = mc.query_builder.add_table(format_string("gqlite_{}_edges_as_json", exec_c.graph_name), sql_join::inner, "edge_{}");
-            mc.query_builder.add_join_condition("{}.id = {}", table_ref, sev.start(rv->get_expression()));
+            mc.query_builder.add_join_condition("{}.id IS {}", table_ref, sev.start(rv->get_expression()));
             std::string var_expr = mc.query_builder.add_variable("{}.edge" % table_ref);
             variables_extra[rv->get_name()] = {var_expr, oc::algebra::expression_type::edge,
                                     "json_extract({}, '$.properties')" % var_expr, "json_extract({}, '$.label')" % var_expr};
@@ -1565,7 +1602,7 @@ namespace gqlite::backends::sqlite_oc_executor
         mc.variables.insert(variables_extra.begin(), variables_extra.end());
         add_filter_expressions(&sev, _rs->get_modifiers());
       }
-      value res = exec_c.data->execute_sql(mc.query_builder.assemble(false), mc.query_builder.bindings);
+      value res = exec_c.data->execute_sql(mc.query_builder.assemble(), mc.query_builder.bindings);
       // Prepare to return results
       value_vector res_v = res.to_vector();
       value_vector ret_v;
@@ -1590,7 +1627,10 @@ namespace gqlite::backends::sqlite_oc_executor
             break;
           case oc::algebra::expression_type::node:
           case oc::algebra::expression_type::edge:
-            v = value::from_json(v.to_string());
+            if(v.get_type() != value_type::invalid)
+            {
+              v = value::from_json(v.to_string());
+            }
             break;
           default:
             if(v.get_type() == value_type::string)

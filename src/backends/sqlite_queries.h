@@ -288,23 +288,24 @@ stream << ( _graph_name );
 #line 26 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_create.sql"
 stream << "_labels as l ON l.node_id = n.id\n"
 "            LEFT JOIN gqlite_labels AS labels ON labels.id = l.label\n"
-"            GROUP BY n.id);\n"
+"            GROUP BY n.id)\n"
+"        UNION SELECT NULL, NULL;\n"
 "\n"
 "CREATE VIEW gqlite_";
-#line 30 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_create.sql"
+#line 31 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_create.sql"
 stream << ( _graph_name );
-#line 30 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_create.sql"
+#line 31 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_create.sql"
 stream << "_edges_as_json (id, edge) AS\n"
 "        SELECT e.id, json_object('id', e.id, 'properties', json(e.properties), \n"
 "          'label', label.label,\n"
 "          'type', 'edge') FROM\n"
 "          gqlite_";
-#line 34 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_create.sql"
+#line 35 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_create.sql"
 stream << ( _graph_name );
-#line 37 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_create.sql"
+#line 38 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_create.sql"
 stream << "_edges e\n"
 "          JOIN gqlite_labels label ON label.id = e.label\n"
-"\n"
+"        UNION SELECT NULL, NULL\n"
 "";
 
     return stream.str();

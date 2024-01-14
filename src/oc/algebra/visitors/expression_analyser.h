@@ -172,7 +172,22 @@ namespace gqlite::oc::algebra::visitors
     {
       if(_node->get_name() == "coalesce")
       { // coalesce is a special case that can accept any value
-        return {expression_type::value, constant_nodes(_node->get_arguments())};
+        expression_type et;
+        bool first = true;
+        for(const algebra::node_csp& n : _node->get_arguments())
+        {
+          expression_info ei = start(n);
+          if(first)
+          {
+            first = false;
+            et = ei.type;
+          } else if(et != ei.type)
+          {
+            et = expression_type::value;
+            break;
+          }
+        }
+        return {et, constant_nodes(_node->get_arguments())};
       }
       // 1) Check if all arguments are constant and get their type
       bool constant_arguments = true;

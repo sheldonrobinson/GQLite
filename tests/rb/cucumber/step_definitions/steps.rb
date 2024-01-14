@@ -148,9 +148,18 @@ IgnoredScenario = [
   "[10] Fail when a path has the same variable in a preceding MATCH",
   "[11] Fail when a node has the same variable in the same pattern",
   "[12] Fail when a path has the same variable in the same pattern",
-  # p = ()-[]->() not supported (path assignment)
+  "[12] Variable length optional relationships",
+  "[13] Variable length optional relationships with bound nodes",
+  "[14] Variable length optional relationships with length predicates",
+  "[15] Variable length patterns and nulls",
+  "[20] Variable length optional relationships with bound nodes, no matches",
+  # p = ()-[]->() not supported (named path)
   "[12] Filter path with path length predicate on multi variables with one binding",
   "[13] Filter path with false path length predicate on multi variables with one binding",
+  "[16] Optionally matching named paths - null result",
+  "[17] Optionally matching named paths - existing result",
+  "[18] Named paths inside optional matches with node predicates",
+  "[19] Optionally matching named paths with single and variable length patterns",
   # WITH not implemented
   "[11] Fail when matching a node variable bound to a value",
   "[7] Matching twice with conflicting relationship types on same relationship",
@@ -221,6 +230,9 @@ IgnoredScenario = [
   "[2] Number-typed float comparison",
   "[3] Any-typed string comparison",
   "[4] Comparing nodes to nodes",
+  "[29] Satisfies the open world assumption, relationships between same nodes",
+  "[30] Satisfies the open world assumption, single relationship",
+  "[31] Satisfies the open world assumption, relationships between different nodes",
   # ORDER BY not supported yet
   # "[1] Forwarding multiple node and relationship variables",
   # No validation of delete expression
@@ -315,7 +327,10 @@ IgnoredScenario = [
   "[5] Comparing relationships to relationships",
   "[5] Comparing NaN",
   "[6] Comparability between numbers and strings",
-  "[8] Equality and inequality of NaN"
+  "[8] Equality and inequality of NaN",
+  # NULL and OPTIONAL
+  "[3] Property null check on null node",
+  "[3] Property not null check on null node"
 ]
 
 Before do |scenario|

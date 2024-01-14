@@ -25,7 +25,8 @@ CREATE VIEW gqlite_/%= _graph_name %/_nodes_as_json (id, node) AS
             FROM gqlite_/%= _graph_name %/_nodes n
             LEFT JOIN gqlite_/%= _graph_name %/_labels as l ON l.node_id = n.id
             LEFT JOIN gqlite_labels AS labels ON labels.id = l.label
-            GROUP BY n.id);
+            GROUP BY n.id)
+        UNION SELECT NULL, NULL;
 
 CREATE VIEW gqlite_/%= _graph_name %/_edges_as_json (id, edge) AS
         SELECT e.id, json_object('id', e.id, 'properties', json(e.properties), 
@@ -33,4 +34,4 @@ CREATE VIEW gqlite_/%= _graph_name %/_edges_as_json (id, edge) AS
           'type', 'edge') FROM
           gqlite_/%= _graph_name %/_edges e
           JOIN gqlite_labels label ON label.id = e.label
-
+        UNION SELECT NULL, NULL
