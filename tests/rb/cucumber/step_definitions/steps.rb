@@ -160,13 +160,11 @@ IgnoredScenario = [
   "[17] Optionally matching named paths - existing result",
   "[18] Named paths inside optional matches with node predicates",
   "[19] Optionally matching named paths with single and variable length patterns",
-  # WITH not implemented
-  "[11] Fail when matching a node variable bound to a value",
+  # WITH not eliminating conflicts
   "[7] Matching twice with conflicting relationship types on same relationship",
   "[24] Matching twice with duplicate relationship types on same relationship",
   "[25] Matching twice with an additional node label",
   "[26] Matching twice with a duplicate predicate",
-  "[30] Fail when using a list or nodes as a node",
   # <--> is considered an error, unclear if it is equivalent to -- (aka no specified direction,
   # to me it should indicate that there are two edges between the node, in each direction, but
   # is not the case according to the test case)
