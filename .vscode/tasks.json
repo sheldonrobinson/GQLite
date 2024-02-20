@@ -38,9 +38,9 @@
       }
     },
     {
-      "label": "build gqlite and dependencies (release)",
+      "label": "build gqlite (release)",
       "type": "shell",
-      "command": "lrs-pkg build gqlite",
+      "command": "lrs-pkg build --no-recursive gqlite",
       "group": {
         "kind": "build"
       },

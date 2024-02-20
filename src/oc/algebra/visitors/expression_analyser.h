@@ -172,7 +172,7 @@ namespace gqlite::oc::algebra::visitors
     {
       if(_node->get_name() == "coalesce")
       { // coalesce is a special case that can accept any value
-        expression_type et;
+        expression_type et = expression_type::empty;
         bool first = true;
         for(const algebra::node_csp& n : _node->get_arguments())
         {
