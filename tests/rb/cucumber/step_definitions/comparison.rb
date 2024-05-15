@@ -28,6 +28,8 @@ def compare(a,b)
   else
     if a.class == Integer 
       case b
+      when Float
+        return (a-b).abs() < 1e-12
       when TrueClass
         return a == 1
       when FalseClass
@@ -36,7 +38,9 @@ def compare(a,b)
         return false
       end
     elsif b.class == Integer
-      case a.class
+      case a
+      when Float
+        return (a-b).abs() < 1e-12
       when TrueClass
         return b == 1
       when FalseClass

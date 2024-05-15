@@ -58,6 +58,8 @@ features = [
 ]
 
 expressions = [
+  # Aggregations
+  'aggregation/Aggregation1', 'aggregation/Aggregation2', 'aggregation/Aggregation3', 'aggregation/Aggregation4', 'aggregation/Aggregation7',
   # boolean
   'boolean/Boolean1', 'boolean/Boolean2', 'boolean/Boolean3', 'boolean/Boolean4', 'boolean/Boolean5',
   # conditonal
@@ -78,10 +80,10 @@ expressions = [
 ]
 
 # In progress
-# features = ['create/Create5', 'match/Match6', 'match-where/MatchWhere5', 'set/Set3', 'set/Set5', 'remove/Remove3' ]
-# expressions = ['comparison/Comparison1']
+# features = ['create/Create5', 'match/Match6', 'match-where/MatchWhere5', 'set/Set3', 'set/Set5', 'remove/Remove3', 'match/Match7' ]
+# expressions = ['comparison/Comparison1', 'aggregation/Aggregation8']
 # Current dev
-# features = ['match/Match7']
+# features = []
 # expressions = []
 
 # Build arguments

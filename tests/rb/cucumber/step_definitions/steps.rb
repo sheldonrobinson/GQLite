@@ -181,40 +181,33 @@ IgnoredScenario = [
   "[3] Forwarding a relationship variable",
   # paths are not supported in where
   "[2] Join with disjunctive multi-part predicates including patterns",
-  # Aggregations are not supported yet
-  "[5] Fail when not aliasing expressions in WITH",
-  "[7] Remove a missing node property",
-  "[3] Sort on aggregated function",
-  "[6] Count star should count everything in scope",
-  "[7] Ordering with aggregation",
-  "[11] Aggregates ordered by arithmetics",
-  "[1] Sort on aggregate function and normal property",
-  "[22] Sort by an expression that is only partially orderable on a non-distinct binding table, but used as a grouping key",
-  "[23] Sort by an expression that is only partially orderable on a non-distinct binding table, but used in parts as a grouping key",
-  "[2] Ordering and skipping on aggregate",
-  "[4] Ordering and limiting on aggregate",
-  "[11] Sort by an aggregate projection",
-  "[12] Sort by an aliased aggregate projection",
-  "[13] Fail on sorting by a non-projected aggregation on a variable",
-  "[14] Fail on sorting by a non-projected aggregation on an expression",
-  "[15] Sort by an aliased aggregate projection does allow subsequent matching",
-  "[16] Handle constants and parameters inside an order by item which contains an aggregation expression",
-  "[19] Fail if not projected variables are used inside an order by item which contains an aggregation expression",
-  "[4] Unwinding a collected unwound expression",
-  "[5] Unwinding a collected expression",
-  "[12] Unwind does not remove variables from scope",
-  "[6] Reusing variable names in WITH",
-  "[17] Handle projected variables inside an order by item which contains an aggregation expression",
-  "[18]  Handle projected property accesses inside an order by item which contains an aggregation expression",
-  "[1] Number-typed integer comparison",
-  "[2] Number-typed float comparison",
-  "[3] Any-typed string comparison",
-  "[4] Comparing nodes to nodes",
+  # count(*) not supported https://gitlab.com/GQLite/GQLite/-/issues/15
   "[29] Satisfies the open world assumption, relationships between same nodes",
   "[30] Satisfies the open world assumption, single relationship",
   "[31] Satisfies the open world assumption, relationships between different nodes",
-  # ORDER BY not supported yet
-  # "[1] Forwarding multiple node and relationship variables",
+  "[1] Sort on aggregate function and normal property",
+  "[5] Fail when not aliasing expressions in WITH",
+  "[6] Count star should count everything in scope",
+  "[7] Ordering with aggregation",
+  "[22] Sort by an expression that is only partially orderable on a non-distinct binding table, but used as a grouping key",
+  "[23] Sort by an expression that is only partially orderable on a non-distinct binding table, but used in parts as a grouping key",
+  "[15] Sort by an aliased aggregate projection does allow subsequent matching",
+  # aggregation (or function call) fail to access a variable when used in a WITH statement (such as ´count(you.age)´) https://gitlab.com/GQLite/GQLite/-/issues/16
+  "[11] Sort by an aggregate projection",
+  "[12] Sort by an aliased aggregate projection",
+  "[16] Handle constants and parameters inside an order by item which contains an aggregation expression",
+  "[17] Handle projected variables inside an order by item which contains an aggregation expression",
+  "[18]  Handle projected property accesses inside an order by item which contains an aggregation expression",
+  "[6] Reusing variable names in WITH",
+  # GROUP BY fails with WITH statement https://gitlab.com/GQLite/GQLite/-/issues/17
+  "[2] Ordering and skipping on aggregate",
+  # Collect not supported https://gitlab.com/GQLite/GQLite/-/issues/13
+  "[4] Unwinding a collected unwound expression",
+  "[5] Unwinding a collected expression",
+  "[12] Unwind does not remove variables from scope",
+  "[1] Number-typed integer comparison",
+  "[2] Number-typed float comparison",
+  "[3] Any-typed string comparison",
   # No validation of delete expression
   "[8] Failing when deleting a label",
   # Missing variables should be handled by the parser
@@ -311,7 +304,11 @@ IgnoredScenario = [
   "[8] Equality and inequality of NaN",
   # NULL and OPTIONAL
   "[3] Property null check on null node",
-  "[3] Property not null check on null node"
+  "[3] Property not null check on null node",
+  # MAX aggregation on list
+  "[9] `max()` over list values", # Needs a custom max/min aggregator see https://gitlab.com/GQLite/GQLite/-/issues/12
+  "[11] `max()` over mixed values",
+  "[12] `min()` over mixed values",
 ]
 
 Before do |scenario|

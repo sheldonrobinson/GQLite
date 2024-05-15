@@ -25,19 +25,19 @@ namespace gqlite::oc::algebra::visitors
       switch(_var->get_value().get_type())
       {
         case value_type::invalid:
-          return {expression_type::empty, true };
+          return {expression_type::empty, true, false};
         case value_type::boolean:
-          return {expression_type::boolean, true };
+          return {expression_type::boolean, true, false};
         case value_type::integer:
-          return {expression_type::integer, true };
+          return {expression_type::integer, true , false};
         case value_type::floating_point:
-          return {expression_type::floating_point, true };
+          return {expression_type::floating_point, true, false};
         case value_type::string:
-          return {expression_type::string, true };
+          return {expression_type::string, true, false};
         case value_type::map:
-          return {expression_type::map, true };
+          return {expression_type::map, true, false};
         case value_type::vector:
-          return {expression_type::vector, true };
+          return {expression_type::vector, true, false};
       };
       throw_exception(exception_stage::unspecified, exception_code::internal_error, "Unknown value type.");
     }
@@ -53,32 +53,46 @@ namespace gqlite::oc::algebra::visitors
       }
       return true;
     }
+    template<typename _T_>
+    bool aggregation_result_nodes(const _T_& _nodes)
+    {
+      for(algebra::node_csp n : _nodes)
+      {
+        if(start(n).aggregation_result)
+        {
+          return true;
+        }
+      }
+      return false;
+    }
     expression_info visit(algebra::array_csp _value) override
     {
-      return {expression_type::vector, constant_nodes(_value->get_array())};
+      return {expression_type::vector, constant_nodes(_value->get_array()), aggregation_result_nodes(_value->get_array())};
     }
     expression_info visit(algebra::map_csp _value) override
     {
-      return {expression_type::map, constant_nodes(workarounds::views::values(_value->get_map()))};
+      return {expression_type::map, constant_nodes(workarounds::views::values(_value->get_map())), aggregation_result_nodes(workarounds::views::values(_value->get_map()))};
     }
     expression_info visit(algebra::member_access_csp _ma) override
     {
-      return {expression_type::value, start(_ma->get_left()).constant};
+      return {expression_type::value, start(_ma->get_left()).constant, false};
     }
     expression_info visit(algebra::indexed_access_csp _ia) override
     {
-      return {expression_type::value, start(_ia->get_left()).constant};
+      return {expression_type::value, start(_ia->get_left()).constant, false};
     }
     expression_info visit(algebra::has_labels_csp) override
     {
-      return {expression_type::boolean, false};
+      return {expression_type::boolean, false, false};
     }
-#define GQLITE_ET_LOGICAL_OP(_NAME_)                              \
-    expression_info visit(algebra::_NAME_ ## _csp _node) override \
-    {                                                             \
-      bool constant = start(_node->get_left()).constant           \
-                  and start(_node->get_right()).constant;         \
-      return {expression_type::boolean, constant};                \
+#define GQLITE_ET_LOGICAL_OP(_NAME_)                                                  \
+    expression_info visit(algebra::_NAME_ ## _csp _node) override                     \
+    {                                                                                 \
+      expression_info left = start(_node->get_left());                                \
+      expression_info right = start(_node->get_right());                              \
+      bool constant = left.constant and right.constant;                               \
+      bool aggregation_result = left.aggregation_result or right.aggregation_result;  \
+      return {expression_type::boolean, constant, aggregation_result};                \
     }
     GQLITE_ET_LOGICAL_OP(logical_and)
     GQLITE_ET_LOGICAL_OP(logical_or)
@@ -91,11 +105,11 @@ namespace gqlite::oc::algebra::visitors
     GQLITE_ET_LOGICAL_OP(relational_superior_equal)
     GQLITE_ET_LOGICAL_OP(relational_in)
     GQLITE_ET_LOGICAL_OP(relational_not_in)
-#define GQLITE_ET_LOGICAL_UNARY_OP(_NAME_)                          \
-    expression_info visit(algebra::_NAME_ ## _csp _node) override   \
-    {                                                               \
-      bool constant = start(_node->get_value()).constant;           \
-      return {expression_type::boolean, constant};                  \
+#define GQLITE_ET_LOGICAL_UNARY_OP(_NAME_)                                        \
+    expression_info visit(algebra::_NAME_ ## _csp _node) override                 \
+    {                                                                             \
+      expression_info info = start(_node->get_value());                           \
+      return {expression_type::boolean, info.constant, info.aggregation_result};  \
     }
     GQLITE_ET_LOGICAL_UNARY_OP(is_null)
     GQLITE_ET_LOGICAL_UNARY_OP(is_not_null)
@@ -105,21 +119,22 @@ namespace gqlite::oc::algebra::visitors
       expression_info left = start(_node->get_left());                                                    \
       expression_info right = start(_node->get_right());                                                  \
       bool constant = left.constant and right.constant;                                                   \
-      if(left.type == right.type) return {left.type, constant};                                           \
+      bool aggregation_result = left.aggregation_result or right.aggregation_result;                      \
+      if(left.type == right.type) return {left.type, constant, aggregation_result};                       \
       if(left.type == expression_type::value or right.type == expression_type::value)                     \
-        return {expression_type::value, constant};                                                        \
+        return {expression_type::value, constant, aggregation_result};                                    \
       if(left.type == expression_type::floating_point or right.type == expression_type::floating_point)   \
       {                                                                                                   \
-        return {expression_type::floating_point, constant};                                               \
+        return {expression_type::floating_point, constant, aggregation_result};                           \
       }                                                                                                   \
       if(left.type == expression_type::string or right.type == expression_type::string)                   \
       {                                                                                                   \
-        return {expression_type::string, constant};                                                       \
+        return {expression_type::string, constant, aggregation_result};                                   \
       }                                                                                                   \
       if(std::is_same_v<algebra::_NAME_ ## _csp, algebra::addition_csp>                                   \
             and left.type == expression_type::vector)                                                     \
       {                                                                                                   \
-        return {expression_type::vector, constant};                                                       \
+        return {expression_type::vector, constant, aggregation_result};                                   \
       }                                                                                                   \
       errors::invalid_argument_type(stage, "In binary operation.");                                       \
     }
@@ -131,18 +146,19 @@ namespace gqlite::oc::algebra::visitors
 
     expression_info visit(algebra::logical_negation_csp _node)
     {
-      bool constant = start(_node->get_value()).constant;
-      return {expression_type::boolean, constant};
+      expression_info ei = start(_node->get_value());
+      return {expression_type::boolean, ei.constant, ei.aggregation_result};
     }
     expression_info visit(algebra::variable_csp _var) override
     {
-      return {variables_f(_var->get_identifier()), false};
+      return {variables_f(_var->get_identifier()), false, false};
     }
     struct function_info
     {
       expression_type return_type;
       std::vector<expression_type> arguments_types;
       bool deterministic;
+      bool aggregation;
     };
     static std::unordered_multimap<std::string, function_info> create_functions()
     {
@@ -150,22 +166,28 @@ namespace gqlite::oc::algebra::visitors
       using enum expression_type;
       using FI = function_info;
       using V = std::vector<expression_type>;
-      f.emplace("head", FI{value, V{vector}, true});
-      f.emplace("id", FI{integer, V{node}, true});
-      f.emplace("id", FI{integer, V{edge}, true});
-      f.emplace("keys", FI{vector, V{edge}, true});
-      f.emplace("keys", FI{vector, V{node}, true});
-      f.emplace("keys", FI{vector, V{map}, true});
-      f.emplace("labels", FI{vector, V{node}, true});
-      f.emplace("properties", FI{map, V{node}, true});
-      f.emplace("properties", FI{map, V{edge}, true});
-      f.emplace("properties", FI{map, V{map}, true});
-      f.emplace("range", FI{string, V{integer, integer}, true});
-      f.emplace("size", FI{integer, V{vector}, true});
-      f.emplace("tail", FI{vector, V{vector}, true});
-      f.emplace("toInteger", FI{integer, V{integer}, true});
-      f.emplace("toInteger", FI{integer, V{floating_point}, true});
-      f.emplace("type", FI{string, V{edge}, true});
+      f.emplace("head", FI{value, V{vector}, true, false});
+      f.emplace("id", FI{integer, V{node}, true, false});
+      f.emplace("id", FI{integer, V{edge}, true, false});
+      f.emplace("keys", FI{vector, V{edge}, true, false});
+      f.emplace("keys", FI{vector, V{node}, true, false});
+      f.emplace("keys", FI{vector, V{map}, true, false});
+      f.emplace("labels", FI{vector, V{node}, true, false});
+      f.emplace("properties", FI{map, V{node}, true, false});
+      f.emplace("properties", FI{map, V{edge}, true, false});
+      f.emplace("properties", FI{map, V{map}, true, false});
+      f.emplace("range", FI{string, V{integer, integer}, true, false});
+      f.emplace("size", FI{integer, V{vector}, true, false});
+      f.emplace("tail", FI{vector, V{vector}, true, false});
+      f.emplace("toInteger", FI{integer, V{integer}, true, false});
+      f.emplace("toInteger", FI{integer, V{floating_point}, true, false});
+      f.emplace("type", FI{string, V{edge}, true, false});
+      // aggregations
+      f.emplace("avg", FI{integer, V{value}, true, true});
+      f.emplace("count", FI{integer, V{value}, true, true});
+      f.emplace("max", FI{value, V{value}, true, true});
+      f.emplace("min", FI{value, V{value}, true, true});
+      f.emplace("sum", FI{value, V{value}, true, true});
       return f;
     }
     expression_info visit(algebra::function_call_csp _node) override
@@ -187,7 +209,7 @@ namespace gqlite::oc::algebra::visitors
             break;
           }
         }
-        return {et, constant_nodes(_node->get_arguments())};
+        return {et, constant_nodes(_node->get_arguments()), aggregation_result_nodes(_node->get_arguments())};
       }
       // 1) Check if all arguments are constant and get their type
       bool constant_arguments = true;
@@ -216,7 +238,7 @@ namespace gqlite::oc::algebra::visitors
             }
             break;
           }
-          if(match) return {it->second.return_type, it->second.deterministic and constant_arguments};
+          if(match) return {it->second.return_type, it->second.deterministic and constant_arguments, it->second.aggregation};
         }
       }
       // 3) If no function was found, return an exception for unknown function or invalid arguments

@@ -10,5 +10,6 @@ namespace gqlite::oc::algebra
   {
     expression_type type = expression_type::empty;
     bool constant = true;
+    bool aggregation_result;
   };
 }

@@ -132,11 +132,13 @@ RSpec.describe "compare" do
     expect(compare("abcd", "abc")).to be false
     expect(compare("abd", "abc")).to be false
   end
-  it "can't compare values of different types" do
+  it "can compare integers to float" do
     expect(compare(1, 2.0)).to be false
-    expect(compare(2, 2.0)).to be false
+    expect(compare(2, 2.0)).to be true
     expect(compare(2.0, 1)).to be false
-    expect(compare(2.0, 2)).to be false
+    expect(compare(2.0, 2)).to be true
+  end
+  it "can't compare values of different types" do
     expect(compare("1", 1)).to be false
     expect(compare("1.0", 1.0)).to be false
     expect(compare(1.0, "1.0")).to be false
