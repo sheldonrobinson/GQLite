@@ -46,7 +46,7 @@ features = [
   # REMOVE
   'remove/Remove1', 'remove/Remove2',
   # RETURN ORDER BY
-  'return-orderby/ReturnOrderBy2', 'return-orderby/ReturnOrderBy3', 'return-orderby/ReturnOrderBy4',
+  'return-orderby/ReturnOrderBy2', 'return-orderby/ReturnOrderBy3', 'return-orderby/ReturnOrderBy4', 'return-orderby/ReturnOrderBy5',
   # RETURN SKIP LIMIT
   'return-skip-limit/ReturnSkipLimit1', 'return-skip-limit/ReturnSkipLimit2', 'return-skip-limit/ReturnSkipLimit3',
   # WITH ORDER BY

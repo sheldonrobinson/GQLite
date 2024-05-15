@@ -1574,7 +1574,8 @@ namespace gqlite::backends::sqlite_oc_executor
       // Execute SQL query
       if(_rs->get_modifiers())
       {
-        mc.variables.insert(variables_extra.begin(), variables_extra.end());
+        std::swap(mc.variables, variables_extra);
+        mc.variables.merge(variables_extra);
         add_filter_expressions(&sev, _rs->get_modifiers());
       }
       value res = exec_c.data->execute_sql(mc.query_builder.assemble(), mc.query_builder.bindings);
