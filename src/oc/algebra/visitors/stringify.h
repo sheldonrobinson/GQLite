@@ -16,6 +16,10 @@ namespace gqlite::oc::algebra::visitors
     {
       return _var->get_value().to_json();
     }
+    std::string visit(algebra::all_csp) override
+    {
+      return "*";
+    }
      std::string visit(algebra::array_csp _var) override
     {
       std::string r = "[";

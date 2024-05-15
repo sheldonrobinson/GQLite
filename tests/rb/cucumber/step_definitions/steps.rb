@@ -181,17 +181,8 @@ IgnoredScenario = [
   "[3] Forwarding a relationship variable",
   # paths are not supported in where
   "[2] Join with disjunctive multi-part predicates including patterns",
-  # count(*) not supported https://gitlab.com/GQLite/GQLite/-/issues/15
-  "[29] Satisfies the open world assumption, relationships between same nodes",
-  "[30] Satisfies the open world assumption, single relationship",
-  "[31] Satisfies the open world assumption, relationships between different nodes",
-  "[1] Sort on aggregate function and normal property",
+  # Unreported error
   "[5] Fail when not aliasing expressions in WITH",
-  "[6] Count star should count everything in scope",
-  "[7] Ordering with aggregation",
-  "[22] Sort by an expression that is only partially orderable on a non-distinct binding table, but used as a grouping key",
-  "[23] Sort by an expression that is only partially orderable on a non-distinct binding table, but used in parts as a grouping key",
-  "[15] Sort by an aliased aggregate projection does allow subsequent matching",
   # aggregation (or function call) fail to access a variable when used in a WITH statement (such as ´count(you.age)´) https://gitlab.com/GQLite/GQLite/-/issues/16
   "[11] Sort by an aggregate projection",
   "[12] Sort by an aliased aggregate projection",
@@ -199,6 +190,9 @@ IgnoredScenario = [
   "[17] Handle projected variables inside an order by item which contains an aggregation expression",
   "[18]  Handle projected property accesses inside an order by item which contains an aggregation expression",
   "[6] Reusing variable names in WITH",
+  "[22] Sort by an expression that is only partially orderable on a non-distinct binding table, but used as a grouping key",
+  "[23] Sort by an expression that is only partially orderable on a non-distinct binding table, but used in parts as a grouping key",
+  "[15] Sort by an aliased aggregate projection does allow subsequent matching",
   # GROUP BY fails with WITH statement https://gitlab.com/GQLite/GQLite/-/issues/17
   "[2] Ordering and skipping on aggregate",
   # Collect not supported https://gitlab.com/GQLite/GQLite/-/issues/13

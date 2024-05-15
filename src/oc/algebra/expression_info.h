@@ -4,7 +4,7 @@ namespace gqlite::oc::algebra
 {
   enum class expression_type
   {
-    empty, value, boolean, integer, floating_point, string, map, vector, node, edge, path
+    empty, value, boolean, integer, floating_point, string, map, vector, node, edge, path, all
   };
   struct expression_info
   {

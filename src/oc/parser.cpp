@@ -901,6 +901,11 @@ algebra::node_csp parser::data::parse_terminal_expression()
     get_next_token();
     return std::make_shared<algebra::value>(it->second);
   }
+  case token_type::STAR:
+  {
+    get_next_token();
+    return std::make_shared<algebra::all>();
+  }
   default:
     report_unexpected(tok);
   }

@@ -77,6 +77,10 @@ namespace gqlite::oc::algebra::visitors
     {
       return {expression_type::value, start(_ma->get_left()).constant, false};
     }
+    expression_info visit(algebra::all_csp) override
+    {
+      return {expression_type::all, false, false};
+    }
     expression_info visit(algebra::indexed_access_csp _ia) override
     {
       return {expression_type::value, start(_ia->get_left()).constant, false};
@@ -185,6 +189,7 @@ namespace gqlite::oc::algebra::visitors
       // aggregations
       f.emplace("avg", FI{integer, V{value}, true, true});
       f.emplace("count", FI{integer, V{value}, true, true});
+      f.emplace("count", FI{integer, V{all}, true, true});
       f.emplace("max", FI{value, V{value}, true, true});
       f.emplace("min", FI{value, V{value}, true, true});
       f.emplace("sum", FI{value, V{value}, true, true});

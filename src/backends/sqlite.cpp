@@ -514,6 +514,10 @@ namespace gqlite::backends::sqlite_oc_executor
     {
       return eval_c->query_builder.bind_value(_node->get_value());
     }
+    std::string visit(algebra::all_csp) override
+    {
+      return "*";
+    }
     std::string visit(algebra::has_labels_csp _node) override
     {
       oc::algebra::expression_type et = eval_c->get_variable_info(_node->get_left()).type;
