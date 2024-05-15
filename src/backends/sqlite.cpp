@@ -1245,59 +1245,6 @@ namespace gqlite::backends::sqlite_oc_executor
         }
       }
       return value();
-      #if 0
-      evaluation_context eval_c;
-      eval_c.table = table;
-      evaluator_visitor eval_v;
-      eval_v.exec_c = &exec_c;
-      eval_v.eval_c = &eval_c;
-
-      struct deleter
-      {
-        statement_visitor* self;
-        bool detach;
-        void operator()(const node_ref_sp& _node)
-        {
-          if(detach)
-          {
-            self->exec_c.data->execute_sql(sqlite_queries::edge_delete_by_node(self->exec_c.graph_name), {{1, _node->id}});
-          } else {
-            value result = self->exec_c.data->execute_sql(sqlite_queries::edge_count_by_node(self->exec_c.graph_name), {{1, _node->id}});
-            value_vector rows = result.to_vector();
-            errors::check_condition(rows.size() == 1, exception_stage::runtime, exception_code::internal_error, "Invalid number of rows for counting edges got {} expected 1.", rows.size());
-            value_vector row = rows.front().to_vector();
-            errors::check_condition(row.size() == 1, exception_stage::runtime, exception_code::internal_error, "Invalid number of columns for counting edges got {} expected 1.", rows.size());
-            int count = row.front().to_integer();
-            errors::check_condition(count == 0, exception_stage::runtime, exception_code::unspecified, "Cannot delete node with {} relationships.", count);
-          }
-          self->exec_c.data->execute_sql(sqlite_queries::node_delete(self->exec_c.graph_name), {{1, _node->id}});
-        }
-        void operator()(const edge_ref_sp& _edge)
-        {
-          self->exec_c.data->execute_sql(sqlite_queries::edge_delete(self->exec_c.graph_name), {{1, _edge->id}});
-        }
-        void operator()(const value&)
-        {
-          throw_exception(exception_stage::runtime, exception_code::invalid_argument_type, "Cannot delete a value.");
-        }
-        void operator()(const empty&)
-        {
-          throw_exception(exception_stage::runtime, exception_code::invalid_argument_type, "Cannot delete an empty value.");
-        }
-      };
-
-      for(std::size_t i = 0; i < table.get_rows_count(); ++i)
-      {
-        value_vector row;
-        eval_c.prepare_current_row(table, i, false);
-        for(const algebra::node_csp& rv : _ds->get_expressions())
-        {
-          exec_value ev =eval_v.start(rv);
-          std::visit(deleter{this, _ds->get_detach()}, ev);
-        }
-      }
-      return value();
-      #endif
     }
     std::string to_sqlite_path(const std::vector<std::string>& _path)
     {
