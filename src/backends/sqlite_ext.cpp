@@ -660,7 +660,7 @@ namespace gqlite::backends
 
   void initialise_sqlite_ext(sqlite3* db)
   {
-    sqlite3_create_function(db, "gqlite_jsonify", 1, SQLITE_UTF8, nullptr, &gqlite_jsonify, nullptr, nullptr);
+    sqlite3_create_function(db, "gqlite_jsonify", 1, SQLITE_SUBTYPE | SQLITE_RESULT_SUBTYPE | SQLITE_UTF8, nullptr, &gqlite_jsonify, nullptr, nullptr);
     sqlite3_create_function(db, "gqlite_next_uid", 1, SQLITE_UTF8, nullptr, &gqlite_next_uid, nullptr, nullptr);
     sqlite3_create_function(db, "gqlite_range", 2, SQLITE_DETERMINISTIC | SQLITE_UTF8, nullptr, &gqlite_range, nullptr, nullptr);
     sqlite3_create_function(db, "gqlite_concat", 2, SQLITE_DETERMINISTIC | SQLITE_UTF8, nullptr, &gqlite_concat, nullptr, nullptr);
