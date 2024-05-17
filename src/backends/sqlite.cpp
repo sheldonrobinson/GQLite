@@ -680,7 +680,7 @@ namespace gqlite::backends::sqlite_oc_executor
         return "(SELECT json_group_array(key) FROM json_each({}))" % map_expr;
       } else if(_node->get_name() == "toInteger")
       {
-        return "CAST({} AS INTEGER)"s % start(_node->get_arguments()[0]);
+        return "gqlite_to_integer({})"s % start(_node->get_arguments()[0]);
       } else if(_node->get_name() == "size")
       {
         return "json_array_length({})"s % start(_node->get_arguments()[0]);

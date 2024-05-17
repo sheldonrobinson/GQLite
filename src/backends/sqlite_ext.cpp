@@ -662,7 +662,27 @@ namespace gqlite::backends
       report_error(_context, exception_code::invalid_argument_type, "Invalid argument to function tail, list was expected.");
     }
   }
-
+  void gqlite_to_integer(sqlite3_context* _context,int,sqlite3_value** _argv)
+  {
+    int type = sqlite3_value_type(_argv[0]);
+    switch(type)
+    {
+      case SQLITE_INTEGER:
+        sqlite3_result_int64(_context, sqlite3_value_int64(_argv[0]));
+        break;
+      case SQLITE_FLOAT:
+        sqlite3_result_int64(_context, sqlite3_value_double(_argv[0]));
+        break;
+      case SQLITE_TEXT:
+      {
+        std::string s(reinterpret_cast<const char*>(sqlite3_value_text(_argv[0])));
+        sqlite3_result_int64(_context, std::stol(s));
+      }
+        break;
+      default:
+        report_error(_context, exception_code::invalid_argument_type, "Invalid arguments for toInteger.");
+    }
+  }
   void initialise_sqlite_ext(sqlite3* db)
   {
     sqlite3_create_function(db, "gqlite_jsonify", 1, SQLITE_SUBTYPE | SQLITE_RESULT_SUBTYPE | SQLITE_UTF8, nullptr, &gqlite_jsonify, nullptr, nullptr);
@@ -674,5 +694,6 @@ namespace gqlite::backends
     sqlite3_create_function(db, "gqlite_range_access", 3, SQLITE_DETERMINISTIC | SQLITE_UTF8, nullptr, &gqlite_range_access, nullptr, nullptr);
     sqlite3_create_function(db, "gqlite_contains", 2, SQLITE_DETERMINISTIC | SQLITE_UTF8, nullptr, &gqlite_contains, nullptr, nullptr);
     sqlite3_create_function(db, "gqlite_tail", 1, SQLITE_DETERMINISTIC | SQLITE_UTF8, nullptr, &gqlite_tail, nullptr, nullptr);
+    sqlite3_create_function(db, "gqlite_to_integer", 1, SQLITE_DETERMINISTIC | SQLITE_UTF8, nullptr, &gqlite_to_integer, nullptr, nullptr);
   }
 }
