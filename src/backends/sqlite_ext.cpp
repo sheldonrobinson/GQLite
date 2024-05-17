@@ -12,6 +12,11 @@
 
 #include "sqlite_queries.h"
 
+// Older version of SQLITE don*t have SQLITE_RESULT_SUBTYPE
+#ifndef SQLITE_RESULT_SUBTYPE
+#define SQLITE_RESULT_SUBTYPE 0
+#endif
+
 namespace gqlite::backends
 {
   template<typename... _TArgs_>
