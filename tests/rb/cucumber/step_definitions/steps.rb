@@ -191,15 +191,12 @@ IgnoredScenario = [
   "[22] Sort by an expression that is only partially orderable on a non-distinct binding table, but used as a grouping key",
   "[23] Sort by an expression that is only partially orderable on a non-distinct binding table, but used in parts as a grouping key",
   "[15] Sort by an aliased aggregate projection does allow subsequent matching",
+  # Missing RANGE function
+  "[4] Unwinding a collected unwound expression",
   # GROUP BY fails with WITH statement https://gitlab.com/GQLite/GQLite/-/issues/17
   "[2] Ordering and skipping on aggregate",
-  # Collect not supported https://gitlab.com/GQLite/GQLite/-/issues/13
-  "[4] Unwinding a collected unwound expression",
+  # collect(nodes) returns an array with the node internal id as an integer (aka it loses the information that it is a ref)
   "[5] Unwinding a collected expression",
-  "[12] Unwind does not remove variables from scope",
-  "[1] Number-typed integer comparison",
-  "[2] Number-typed float comparison",
-  "[3] Any-typed string comparison",
   # No validation of delete expression
   "[8] Failing when deleting a label",
   # Missing variables should be handled by the parser
@@ -226,6 +223,7 @@ IgnoredScenario = [
   "[1] Limit to two hits",
   "[6] LIMIT with an expression that does not depend on variables",
   "[7] The order direction cannot be overwritten",
+  "[12] Unwind does not remove variables from scope",
   # return modifiers (e.g. order by) must be done after computing expressions https://gitlab.com/gqlite/GQLite/-/issues/2
   "[7] Limit to more rows than actual results 1",
   "[8] Limit to more rows than actual results 2",

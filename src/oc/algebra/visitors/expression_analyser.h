@@ -190,6 +190,7 @@ namespace gqlite::oc::algebra::visitors
       f.emplace("avg", FI{integer, V{value}, true, true});
       f.emplace("count", FI{integer, V{value}, true, true});
       f.emplace("count", FI{integer, V{all}, true, true});
+      f.emplace("collect", FI{vector, V{value}, true, true});
       f.emplace("max", FI{value, V{value}, true, true});
       f.emplace("min", FI{value, V{value}, true, true});
       f.emplace("sum", FI{value, V{value}, true, true});

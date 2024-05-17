@@ -699,6 +699,9 @@ namespace gqlite::backends::sqlite_oc_executor
       } else if(_node->get_name() == "count")
       {
         return "count({})" % start(_node->get_arguments()[0]);
+      } else if(_node->get_name() == "collect")
+      {
+        return "json_group_array({})" % start(_node->get_arguments()[0]);
       } else if(_node->get_name() == "max")
       {
         return "max({})" % start(_node->get_arguments()[0]);
