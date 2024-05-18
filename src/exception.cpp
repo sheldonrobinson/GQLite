@@ -120,8 +120,12 @@ const char* exception::what() const throw()
         d->full_error += "UnimplementedError: "; break;
       case column_name_conflict:
         d->full_error += "ColumnNameConflict: "; break;
+      case delete_connected_node:
+        d->full_error += "DeleteConnectedNode: "; break;
       case integer_overflow:
         d->full_error += "IntegerOverflow: "; break;
+      case invalid_aggregation:
+        d->full_error += "InvalidAggregation: "; break;
       case invalid_argument_type:
         d->full_error += "InvalidArgumentType: "; break;
       case invalid_delete:

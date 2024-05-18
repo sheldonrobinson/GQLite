@@ -34,7 +34,7 @@ struct parser::data
   algebra::node_csp parse_delete();
   algebra::node_csp parse_set();
   algebra::node_csp parse_remove();
-  algebra::modifiers_csp parse_modifiers();
+  algebra::modifiers_csp parse_modifiers(const std::vector<algebra::named_expression_csp>& _expressions);
   std::vector<algebra::alternative<algebra::graph_node, algebra::graph_edge>> parse_patterns(bool _creation_mode);
   algebra::node_csp parse_map();
   algebra::node_csp parse_properties();
@@ -223,6 +223,10 @@ algebra::node_csp parser::data::parse_match(bool _optional)
   {
     get_next_token();
     where = parse_expression();
+    if(expression_analyser.start(where).aggregation_result)
+    {
+      report_error(tok, exception_code::invalid_aggregation, "in where expression.");
+    }
   }
   return std::make_shared<algebra::match>(patterns, where, _optional);
 }
@@ -271,7 +275,7 @@ algebra::node_csp parser::data::parse_with()
   if(tok.type == token_type::STAR)
   {
     get_next_token();
-    return std::make_shared<algebra::with>(true, std::vector<algebra::named_expression_csp>(), parse_modifiers());
+    return std::make_shared<algebra::with>(true, std::vector<algebra::named_expression_csp>(), parse_modifiers({}));
   }
   std::vector<algebra::named_expression_csp> named_expressions = parse_named_expressions();
   std::vector<std::string> new_variables;
@@ -289,8 +293,8 @@ algebra::node_csp parser::data::parse_with()
       ++it;
     }
   }
-  gqlite_debug("With new variables {} kept variables {}", new_variables, std::views::keys(bounded_variables));
-  return std::make_shared<algebra::with>(false, named_expressions, parse_modifiers());
+  // gqlite_debug("With new variables {} kept variables {}", new_variables, std::views::keys(bounded_variables));
+  return std::make_shared<algebra::with>(false, named_expressions, parse_modifiers(named_expressions));
 }
 
 algebra::node_csp parser::data::parse_unwind()
@@ -459,14 +463,14 @@ algebra::node_csp parser::data::parse_return()
   if(tok.type == token_type::STAR)
   {
     get_next_token();
-    return std::make_shared<algebra::return_statement>(true, std::vector<algebra::named_expression_csp>(), parse_modifiers());
+    return std::make_shared<algebra::return_statement>(true, std::vector<algebra::named_expression_csp>(), parse_modifiers({}));
   }
   std::vector<algebra::named_expression_csp> named_expressions = parse_named_expressions();
   for(algebra::named_expression_csp ne : named_expressions)
   {
     bind_variable(ne->get_name(), ne->get_expression(), expression_analyser.start(ne->get_expression()).type, true);
   }
-  return std::make_shared<algebra::return_statement>(false, named_expressions, parse_modifiers());
+  return std::make_shared<algebra::return_statement>(false, named_expressions, parse_modifiers(named_expressions));
 }
 
 namespace
@@ -482,7 +486,7 @@ namespace
   };
 }
 
-algebra::modifiers_csp parser::data::parse_modifiers()
+algebra::modifiers_csp parser::data::parse_modifiers(const std::vector<algebra::named_expression_csp>& _expressions)
 {
   algebra::node_csp skip, limit;
   algebra::order_by_csp order_by;
@@ -526,6 +530,24 @@ algebra::modifiers_csp parser::data::parse_modifiers()
         {
           bool asc = true;
           algebra::node_csp expression = parse_expression();
+          if(expression_analyser.start(expression).aggregation_result)
+          {
+            bool has_same = false;
+
+            for(const algebra::named_expression_csp& ne : _expressions)
+            {
+              if(ne->get_expression()->equals(expression))
+              {
+                has_same = true;
+                break;
+              }
+            }
+            if(not has_same)
+            {
+              report_error(tok, exception_code::invalid_aggregation, "in order by expression.");
+            }
+
+          }
           if(tok.type == token_type::ASC)
           {
             get_next_token();

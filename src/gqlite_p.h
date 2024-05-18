@@ -23,7 +23,9 @@ namespace gqlite
     unimplemented_error,
     // OpenCypher error code
     column_name_conflict = 100,
+    delete_connected_node,
     integer_overflow,
+    invalid_aggregation,
     invalid_argument_type,
     invalid_delete,
     invalid_number_literal,

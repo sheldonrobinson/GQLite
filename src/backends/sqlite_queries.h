@@ -29,15 +29,20 @@ stream << ( _edge_id );
 
     return stream.str();
   }
-  inline std::string edge_count_by_node(const std::string& _graph_name)
+  inline std::string edge_count_by_nodes(const std::string& _graph_name, const std::string& _what)
   {
     std::stringstream stream;
-    #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_count_by_node.sql"
-stream << "SELECT count(*) FROM gqlite_";
-#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_count_by_node.sql"
+    #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_count_by_nodes.sql"
+stream << "WITH source_delete AS NOT MATERIALIZED (";
+#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_count_by_nodes.sql"
+stream << ( _what );
+#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_count_by_nodes.sql"
+stream << ")\n"
+"SELECT count(*) FROM gqlite_";
+#line 2 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_count_by_nodes.sql"
 stream << ( _graph_name );
-#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_count_by_node.sql"
-stream << "_edges WHERE left=?001 or right=?001";
+#line 2 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_count_by_nodes.sql"
+stream << "_edges WHERE left IN source_delete or right IN source_delete";
 
     return stream.str();
   }
@@ -75,19 +80,19 @@ stream << ")";
 
     return stream.str();
   }
-  inline std::string edge_delete_by_node(const std::string& _graph_name, const std::string& _what)
+  inline std::string edge_delete_by_nodes(const std::string& _graph_name, const std::string& _what)
   {
     std::stringstream stream;
-    #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_delete_by_node.sql"
+    #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_delete_by_nodes.sql"
 stream << "WITH source_delete AS NOT MATERIALIZED (";
-#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_delete_by_node.sql"
+#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_delete_by_nodes.sql"
 stream << ( _what );
-#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_delete_by_node.sql"
+#line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_delete_by_nodes.sql"
 stream << ")\n"
 "DELETE FROM gqlite_";
-#line 2 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_delete_by_node.sql"
+#line 2 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_delete_by_nodes.sql"
 stream << ( _graph_name );
-#line 2 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_delete_by_node.sql"
+#line 2 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/edge_delete_by_nodes.sql"
 stream << "_edges WHERE left IN source_delete or right IN source_delete";
 
     return stream.str();

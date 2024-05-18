@@ -140,6 +140,7 @@ IgnoredScenario = [
   "[3] Delete relationship with bidirectional matching",
   "[3] Comparing across types yields null, except numbers",
   "[14] Direction of traversed relationship is not significant for path equality, simple",
+  "[12] Aggregation of named paths",
   # Path assignment and variable length path are not implemented
   "[8] Fail when a path has the same variable in a preceding MATCH",
   "[9] Fail when a relationship has the same variable in the same pattern",
@@ -160,6 +161,8 @@ IgnoredScenario = [
   "[17] Optionally matching named paths - existing result",
   "[18] Named paths inside optional matches with node predicates",
   "[19] Optionally matching named paths with single and variable length patterns",
+  "[9] `labels()` failing on invalid arguments",
+  "[6] `type()` failing on invalid arguments",
   # WITH not eliminating conflicts
   "[7] Matching twice with conflicting relationship types on same relationship",
   "[24] Matching twice with duplicate relationship types on same relationship",
@@ -299,6 +302,13 @@ IgnoredScenario = [
   "[9] `max()` over list values", # Needs a custom max/min aggregator see https://gitlab.com/GQLite/GQLite/-/issues/12
   "[11] `max()` over mixed values",
   "[12] `min()` over mixed values",
+  # Correctly fail, but with different error message:
+  "[25] Fail on sorting by an aggregation",
+  "[19] Fail if not projected variables are used inside an order by item which contains an aggregation expression",
+  "[20] Fail if more complex expressions, even if projected, are used inside an order by item which contains an aggregation expression",
+  # No checking of index type
+  "[8] Fail when indexing with a non-integer",
+  "[9] Fail when indexing with a non-integer given by a parameter"
 ]
 
 Before do |scenario|
@@ -384,6 +394,20 @@ Then(/^the result should be, in any order:$/) do |table|
 end
 
 Then(/^the result should be, in order:$/) do |table|
+  pending if @ignored_scenario
+  expect(@exception).to be_nil
+  expect(@query_result).not_to be_nil
+  expect(@query_result).to eq(GQLiteTest.parse_results_table table)
+end
+
+Then(/^the result should be \(ignoring element order for lists\):$/) do |table|
+  pending if @ignored_scenario
+  expect(@exception).to be_nil
+  expect(@query_result).not_to be_nil
+  expect(@query_result).to eq(GQLiteTest.parse_results_table table)
+end
+
+Then(/^the result should be, in order \(ignoring element order for lists\):$/) do |table|
   pending if @ignored_scenario
   expect(@exception).to be_nil
   expect(@query_result).not_to be_nil
@@ -523,4 +547,51 @@ Then(/^a SyntaxError should be raised at compile time: UnexpectedSyntax$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
   expect(@exception.message).to match(/^CompileTime: UnexpectedSyntax: .* \(\d+, \d+\)\.$/)
+end
+
+Then(/^a SyntaxError should be raised at compile time: InvalidAggregation$/) do
+  pending if @ignored_scenario
+  expect(@exception).not_to be_nil
+  expect(@exception.message).to match(/^CompileTime: InvalidAggregation: .* \(\d+, \d+\)\.$/)
+end
+
+Then(/^a ConstraintValidationFailed should be raised at runtime: DeleteConnectedNode$/) do
+  pending if @ignored_scenario
+  expect(@exception).not_to be_nil
+  expect(@exception.message).to match(/^RunTime: DeleteConnectedNode: .*\.$/)
+end
+
+Then(/^a TypeError should be raised at runtime: InvalidPropertyType$/) do
+  pending if @ignored_scenario
+  expect(@exception).not_to be_nil
+  expect(@exception.message).to match(/^CompileTime: UnexpectedSyntax: .* \(\d+, \d+\)\.$/)
+end
+
+Then(/^an ArgumentError should be raised at runtime: InvalidArgumentType$/) do
+  pending if @ignored_scenario
+  expect(@exception).not_to be_nil
+  expect(@exception.message).to match(/^CompileTime: InvalidArgumentType: .*\.$/)
+end
+
+Then(/^a ArgumentError should be raised at runtime: NegativeIntegerArgument$/) do
+  pending if @ignored_scenario
+  expect(@exception).not_to be_nil
+  expect(@exception.message).to match(/^CompileTime: NegativeIntegerArgument: .*\.$/)
+end
+
+Then(/^a SyntaxError should be raised at compile time: AmbiguousAggregationExpression$/) do
+  pending if @ignored_scenario
+  expect(@exception).not_to be_nil
+  expect(@exception.message).to match(/^CompileTime: UnexpectedSyntax: .* \(\d+, \d+\)\.$/)
+end
+
+Then(/^a TypeError should be raised at runtime: InvalidArgumentValue$/) do
+  pending if @ignored_scenario
+  expect(@exception).not_to be_nil
+  expect(@exception.message).to match(/^RunTime: InvalidArgumentValue: .*\.$/)
+end
+
+Then(/^an Error should be raised at any time: \*$/) do
+  pending if @ignored_scenario
+  expect(@exception).not_to be_nil
 end

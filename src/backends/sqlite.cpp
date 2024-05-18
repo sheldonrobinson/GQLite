@@ -553,7 +553,7 @@ namespace gqlite::backends::sqlite_oc_executor
       {
         if(not first)
         {
-          map += " UNION ";
+          map += " UNION ALL ";
         }
         map += "SELECT " + eval_c->query_builder.bind_value(k);
         if(first)
@@ -578,7 +578,7 @@ namespace gqlite::backends::sqlite_oc_executor
       {
         if(not first)
         {
-          array += " UNION ";
+          array += " UNION ALL ";
         }
         array += "SELECT " + start(v);
         if(first)
@@ -1230,8 +1230,15 @@ namespace gqlite::backends::sqlite_oc_executor
           {
             if(_ds->get_detach())
             {
-              std::string query = sqlite_queries::edge_delete_by_node(exec_c.graph_name, what);
+              std::string query = sqlite_queries::edge_delete_by_nodes(exec_c.graph_name, what);
               mc.exec_c->data->execute_sql(query, mc.query_builder.bindings);
+            } else {
+              std::string query = sqlite_queries::edge_count_by_nodes(exec_c.graph_name, what);
+              gqlite::value count = mc.exec_c->data->execute_sql(query, mc.query_builder.bindings);
+              if(count.to_vector().front().to_vector().front().to_integer() > 0)
+              {
+                throw_exception(exception_stage::runtime, exception_code::delete_connected_node, "delete connected node not allowed, unless using detach.");
+              }
             }
             std::string query = sqlite_queries::node_delete(exec_c.graph_name, what);
             mc.exec_c->data->execute_sql(query, mc.query_builder.bindings);

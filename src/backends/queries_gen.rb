@@ -4,10 +4,10 @@ require 'tempfile'
 
 sqlite_queries = [
   ['edge_add_properties(const std::string& _graph_name, const std::string& _what, const std::string& _expr, const std::string& _path, const std::string& _edge_id)', 'edge_add_properties.sql'],
-  ['edge_count_by_node(const std::string& _graph_name)', 'edge_count_by_node.sql'],
+  ['edge_count_by_nodes(const std::string& _graph_name, const std::string& _what)', 'edge_count_by_nodes.sql'],
   ['edge_create(const std::string& _graph_name, const std::string& _values)', 'edge_create.sql'],
   ['edge_delete(const std::string& _graph_name, const std::string& _what)', 'edge_delete.sql'],
-  ['edge_delete_by_node(const std::string& _graph_name, const std::string& _what)', 'edge_delete_by_node.sql'],
+  ['edge_delete_by_nodes(const std::string& _graph_name, const std::string& _what)', 'edge_delete_by_nodes.sql'],
   ['edge_get_label_properties(const std::string& _graph_name)', 'edge_get_label_properties.sql'],
   ['edge_set_property(const std::string& _graph_name, const std::string& _what, const std::string& _expr, const std::string& _path, const std::string& _edge_id)', 'edge_set_property.sql'],
   ['edge_remove_property(const std::string& _graph_name, const std::string& _what, const std::string& _path, const std::string& _edge_id)', 'edge_remove_property.sql'],
