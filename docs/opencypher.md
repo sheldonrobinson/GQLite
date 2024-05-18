@@ -25,6 +25,7 @@ List of supported features:
 * *ORDER BY*
 * *LIMIT*
 * *SKIP*
+* *OPTIONAL*
 
 The list of features under development or planned for future release can be found in [gitlab issues](https://gitlab.com/gqlite/GQLite/-/issues/?label_name%5B%5D=cypher%3Afeature)
 
@@ -37,6 +38,11 @@ Create Query
 
 Match Query
 -----------
+
+Optional Query
+--------------
+
+The support for `OPTIONAL` query is partial and does not fully conform to the specification. As such, results might change in future version.
 
 With Statement
 --------------
@@ -53,3 +59,15 @@ Set Query
 Return Statement
 ----------------
 
+Functions
+---------
+
+Aggregations
+------------
+
+* `avg`
+* `collect`
+* `count`
+* `max`
+* `min`
+* `sum`
