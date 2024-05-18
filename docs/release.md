@@ -1,6 +1,11 @@
 How to release gqlite
 =====================
 
+- Check version numbers:
+  - CMakeLists.txt
+  - dists/python/setup.py
+  - dists/python/pyproject.toml
+  - dists/ruby/Rakefile
 - Make sure there is a test database in test/rb/data for the new version, and that it is called used in gqlite-rspec
 
 - Test amalgamate
