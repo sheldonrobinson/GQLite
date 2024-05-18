@@ -292,48 +292,9 @@ stream << "_edges\n"
 "        UNION SELECT id, label, properties, right, left FROM gqlite_";
 #line 17 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_create.sql"
 stream << ( _graph_name );
-#line 17 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_create.sql"
+#line 19 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_create.sql"
 stream << "_edges;\n"
 "\n"
-"-- view for getting the nodes as a json representation\n"
-"CREATE VIEW gqlite_";
-#line 20 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_create.sql"
-stream << ( _graph_name );
-#line 20 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_create.sql"
-stream << "_nodes_as_json (id, node) AS\n"
-"        SELECT id, json_object('id', id, 'properties', json(properties), \n"
-"          'labels', (SELECT json_group_array(value) FROM json_each(labels) AS result WHERE value IS NOT NULL),\n"
-"          'type', 'node') FROM\n"
-"          (SELECT n.id AS id, n.properties AS properties, json_group_array(labels.label) AS labels\n"
-"            FROM gqlite_";
-#line 25 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_create.sql"
-stream << ( _graph_name );
-#line 25 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_create.sql"
-stream << "_nodes n\n"
-"            LEFT JOIN gqlite_";
-#line 26 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_create.sql"
-stream << ( _graph_name );
-#line 26 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_create.sql"
-stream << "_labels as l ON l.node_id = n.id\n"
-"            LEFT JOIN gqlite_labels AS labels ON labels.id = l.label\n"
-"            GROUP BY n.id)\n"
-"        UNION SELECT NULL, NULL;\n"
-"\n"
-"CREATE VIEW gqlite_";
-#line 31 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_create.sql"
-stream << ( _graph_name );
-#line 31 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_create.sql"
-stream << "_edges_as_json (id, edge) AS\n"
-"        SELECT e.id, json_object('id', e.id, 'properties', json(e.properties), \n"
-"          'label', label.label,\n"
-"          'type', 'edge') FROM\n"
-"          gqlite_";
-#line 35 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_create.sql"
-stream << ( _graph_name );
-#line 38 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_create.sql"
-stream << "_edges e\n"
-"          JOIN gqlite_labels label ON label.id = e.label\n"
-"        UNION SELECT NULL, NULL\n"
 "";
 
     return stream.str();
@@ -357,6 +318,64 @@ stream << "_edges' or name='gqlite_";
 stream << ( _graph_name );
 #line 3 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_has.sql"
 stream << "_labels')";
+
+    return stream.str();
+  }
+  inline std::string graph_update_json_view(const std::string& _graph_name)
+  {
+    std::stringstream stream;
+    #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_update_json_view.sql"
+stream << "-- view for getting the nodes as a json representation\n"
+"\n"
+"DROP VIEW IF EXISTS gqlite_";
+#line 3 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_update_json_view.sql"
+stream << ( _graph_name );
+#line 3 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_update_json_view.sql"
+stream << "_nodes_as_json;\n"
+"CREATE VIEW gqlite_";
+#line 4 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_update_json_view.sql"
+stream << ( _graph_name );
+#line 4 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_update_json_view.sql"
+stream << "_nodes_as_json (id, node) AS\n"
+"        SELECT id, json_object('id', id, 'properties', json(properties), \n"
+"          'labels', (SELECT json_group_array(value) FROM json_each(labels) AS result WHERE value IS NOT NULL),\n"
+"          'type', 'node') FROM\n"
+"          (SELECT n.id AS id, n.properties AS properties, json_group_array(labels.label) AS labels\n"
+"            FROM gqlite_";
+#line 9 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_update_json_view.sql"
+stream << ( _graph_name );
+#line 9 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_update_json_view.sql"
+stream << "_nodes n\n"
+"            LEFT JOIN gqlite_";
+#line 10 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_update_json_view.sql"
+stream << ( _graph_name );
+#line 10 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_update_json_view.sql"
+stream << "_labels as l ON l.node_id = n.id\n"
+"            LEFT JOIN gqlite_labels AS labels ON labels.id = l.label\n"
+"            GROUP BY n.id)\n"
+"        UNION SELECT NULL, NULL;\n"
+"\n"
+"DROP VIEW IF EXISTS gqlite_";
+#line 15 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_update_json_view.sql"
+stream << ( _graph_name );
+#line 15 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_update_json_view.sql"
+stream << "_edges_as_json;\n"
+"CREATE VIEW gqlite_";
+#line 16 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_update_json_view.sql"
+stream << ( _graph_name );
+#line 16 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_update_json_view.sql"
+stream << "_edges_as_json (id, edge) AS\n"
+"        SELECT e.id, json_object('id', e.id, 'properties', json(e.properties), \n"
+"          'label', label.label,\n"
+"          'type', 'edge') FROM\n"
+"          gqlite_";
+#line 20 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_update_json_view.sql"
+stream << ( _graph_name );
+#line 23 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/graph_update_json_view.sql"
+stream << "_edges e\n"
+"          JOIN gqlite_labels label ON label.id = e.label\n"
+"        UNION SELECT NULL, NULL\n"
+"";
 
     return stream.str();
   }
@@ -392,6 +411,32 @@ stream << "SELECT id FROM gqlite_labels WHERE label = ?001\n"
     std::stringstream stream;
     #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/label_insert.sql"
 stream << "INSERT INTO gqlite_labels(label) VALUES (?001)";
+
+    return stream.str();
+  }
+  inline std::string metadata_create_table()
+  {
+    std::stringstream stream;
+    #line 2 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/metadata_create_table.sql"
+stream << "CREATE TABLE gqlite_metadata(name TEXT PRIMARY KEY, value TEXT NOT NULL)\n"
+"";
+
+    return stream.str();
+  }
+  inline std::string metadata_get()
+  {
+    std::stringstream stream;
+    #line 1 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/metadata_get.sql"
+stream << "SELECT value FROM gqlite_metadata WHERE name=?001";
+
+    return stream.str();
+  }
+  inline std::string metadata_set()
+  {
+    std::stringstream stream;
+    #line 2 "/home/cyrille/lrs-pkg/src/gqlite/src/backends/queries/sqlite/metadata_set.sql"
+stream << "INSERT INTO gqlite_metadata (name, value) VALUES (?001, ?002) ON CONFLICT(name) DO UPDATE SET value=?002\n"
+"";
 
     return stream.str();
   }

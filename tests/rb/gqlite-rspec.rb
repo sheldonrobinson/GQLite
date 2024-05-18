@@ -202,10 +202,10 @@ RSpec.describe "compare tables" do
   end
 end
 
-RSpec.describe "test opening older database" do
-  it "can open 1.0 database" do
+module OlderDatabaseHelper
+  def validate_db(version)
     file = Tempfile.new('testdb')
-    `rm #{file.path}; cp #{__dir__}/data/test-1.0.db.xz #{file.path}.xz; xz -d #{file.path}.xz`
+    `rm #{file.path}; cp #{__dir__}/data/test-#{version}.db.xz #{file.path}.xz; xz -d #{file.path}.xz`
     db = GQLite::Connection.new(sqlite_filename: file.path)
     nodes = db.execute_oc_query "MATCH (a) RETURN a"
     edges = db.execute_oc_query "MATCH ()-[a]->() RETURN a"
@@ -222,5 +222,21 @@ RSpec.describe "test opening older database" do
       [create_edge(4, "DA", {"sum"=>3, "name"=>"DA"})] ]
     expect(compare_table_in_any_order(nodes_exp, nodes)).to be true
     expect(compare_table_in_any_order(edges_exp, edges)).to be true
+
+    nodes_optional = db.execute_oc_query "OPTIONAL MATCH (a:NOT_EXISTING) RETURN a"
+
+    nodes_optional_exp = [ ["a"], [nil]]
+
+    expect(compare_table_in_any_order(nodes_optional_exp, nodes_optional)).to be true
+  end
+end
+
+RSpec.describe "test opening older database" do
+  include OlderDatabaseHelper
+  it "can open 1.0 database" do
+    validate_db("1.0")
+  end
+  it "can open 1.1 database" do
+    validate_db("1.1")
   end
 end

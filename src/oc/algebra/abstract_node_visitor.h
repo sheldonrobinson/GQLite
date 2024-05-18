@@ -72,7 +72,7 @@ namespace gqlite::oc::algebra
     }
     _TR_ accept(const node* _node, const _TArgs_... _arguments)
     {
-      _TR_ r;
+      _TR_ r = _TR_();
       if(_node)
       {
         ParametersTuple pt = std::make_tuple(_arguments...);

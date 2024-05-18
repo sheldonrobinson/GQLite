@@ -34,6 +34,11 @@ namespace gqlite::backends
     bool graph_has(const std::string& _name);
     bool table_has(const std::string& _name);
 
+    void set_metadata(const std::string& _name, const value& _value);
+    value get_metadata(const std::string& _name);
+    void set_graph_list(const std::vector<std::string>& _graph_list);
+    std::vector<std::string> get_graph_list();
+
     value execute_sql(const std::string& _query, const std::map<int, value>& _bindings = {});
     void clean_up();
     uint64_t last_row_id();
@@ -173,7 +178,7 @@ void sqlite_data::clean_up()
 
 void sqlite_data::graph_create(const std::string& _name)
 {
-  execute_sql(sqlite_queries::graph_create(_name));
+  execute_sql(sqlite_queries::graph_create(_name) + sqlite_queries::graph_update_json_view(_name));
 }
 
 bool sqlite_data::graph_has(const std::string& _name)
@@ -196,6 +201,31 @@ bool sqlite_data::table_has(const std::string& _name)
   return v.begin()->to_bool();
 }
 
+void sqlite_data::set_metadata(const std::string& _name, const value& _value)
+{
+  execute_sql(sqlite_queries::metadata_set(), {{1, _name}, {2, _value}});
+}
+
+gqlite::value sqlite_data::get_metadata(const std::string& _name)
+{
+  value r = execute_sql(sqlite_queries::metadata_get(), {{1, _name}});
+  return value::from_json(r.to_vector().front().to_vector().front().to_string());
+}
+
+void sqlite_data::set_graph_list(const std::vector<std::string>& _graph_list)
+{
+  std::vector<value> values;
+  std::copy(_graph_list.begin(), _graph_list.end(), std::back_inserter(values));
+  set_metadata("graphs", values);
+}
+
+std::vector<std::string> sqlite_data::get_graph_list()
+{
+  value_vector vv = get_metadata("graphs").to_vector();
+  std::vector<std::string> res;
+  std::transform(vv.begin(), vv.end(), std::back_inserter(res), [](const value& _v){ return _v.to_string(); });
+  return res;
+}
 
 uint64_t sqlite_data::last_row_id()
 {
@@ -1679,11 +1709,27 @@ sqlite::sqlite(void* _db) : d(new data)
   {
     d->execute_sql(sqlite_queries::uid_create_table());
   }
-  if(not d->graph_has("default"))
+  bool update_node_edge_json_view = false;
+  if(not d->table_has("gqlite_metadata"))
+  {
+    update_node_edge_json_view = true;
+    d->execute_sql(sqlite_queries::metadata_create_table());
+    d->execute_sql(sqlite_queries::metadata_set(), {{1, "version"}, {2, "{'major': 1, 'minor': 1, 'release': 0}"}});
+    d->set_graph_list({"default"});
+  }
+  if(d->graph_has("default"))
+  {
+    if(update_node_edge_json_view)
+    {
+      for(const std::string& graph_name : d->get_graph_list())
+      {
+        d->execute_sql(sqlite_queries::graph_update_json_view(graph_name));
+      }
+    }
+  } else
   {
     d->graph_create("default");
   }
-
   d->procedures["gqlite.internal.stats"] = [this](const value_vector&)
   {
     gqlite::value result = d->execute_sql(sqlite_queries::get_debug_stats("default"));
