@@ -30,6 +30,7 @@ else
 end
 
 # Validated
+gql = ['Graph1']
 features = [
   # Create
   'create/Create1', 'create/Create2',
@@ -80,18 +81,21 @@ expressions = [
 ]
 
 # In progress
+# gql = []
 # features = ['create/Create5', 'match/Match6', 'match-where/MatchWhere5', 'set/Set3', 'set/Set5', 'remove/Remove3', 'match/Match7' ]
 # expressions = ['comparison/Comparison1', 'aggregation/Aggregation8']
 # Current dev
+# gql = []
 # features = []
 # expressions = []
 
 # Build arguments
 
+gql = gql.map { |file| 'gql/features/' + file + '.feature' }
 expressions = expressions.map { |file| 'openCypher/tck/features/expressions/' + file + '.feature' }
 features = features.map { |file| 'openCypher/tck/features/clauses/' + file + '.feature' }
 
-args = (features + expressions).concat %w(--require cucumber/step_definitions/)
+args = (gql + features + expressions).concat %w(--require cucumber/step_definitions/)
 
 args = args.concat ['--tags', '~@skipStyleCheck']
 args = args.concat %w(--fail-fast)  if options[:abort_on_first_error]

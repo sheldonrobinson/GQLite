@@ -978,6 +978,32 @@ namespace gqlite::backends::sqlite_oc_executor
       return {left_value_ret, ret_v, right_value_ret};
     }
     /**
+     * Execute the create graph statement
+     */
+    value visit(algebra::create_graph_csp _node) override
+    {
+      if(exec_c.data->graph_has(_node->get_name()))
+      {
+        throw_exception(exception_stage::runtime, exception_code::duplicate_graph_name, "Graph {} already exists.", _node->get_name());
+      }
+      exec_c.data->graph_create(_node->get_name());
+      exec_c.graph_name = _node->get_name();
+      return value{};
+    }
+    /**
+     * Execute the use graph statement
+     */
+    value visit(algebra::use_graph_csp _node) override
+    {
+      if(exec_c.data->graph_has(_node->get_name()))
+      {
+        exec_c.graph_name = _node->get_name();
+      } else {
+        throw_exception(exception_stage::runtime, exception_code::inexisting_graph, "Graph {} does not exists.", _node->get_name());
+      }
+      return value{};
+    }
+    /**
      * Execute the create statement
      */
     value visit(algebra::create_csp _node) override

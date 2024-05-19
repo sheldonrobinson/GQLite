@@ -211,7 +211,16 @@ algebra::node_csp parser::data::parse_call()
 algebra::node_csp parser::data::parse_create()
 {
   get_next_token();
-  return std::make_shared<algebra::create>(parse_patterns(true));
+  if(tok.type == token_type::GRAPH)
+  {
+    get_next_token();
+    is_of_type(tok, token_type::IDENTIFIER);
+    std::string gn = tok.string;
+    get_next_token();
+    return std::make_shared<algebra::create_graph>(gn);
+  } else {
+    return std::make_shared<algebra::create>(parse_patterns(true));
+  }
 }
 
 algebra::node_csp parser::data::parse_match(bool _optional)
@@ -1361,6 +1370,15 @@ algebra::node_csp parser::parse()
       break;
     case token_type::CALL:
       nodes.push_back(d->parse_call());
+      break;
+    case token_type::USE:
+    {
+      d->get_next_token();
+      d->is_of_type(d->tok, token_type::IDENTIFIER);
+      nodes.push_back(std::make_shared<algebra::use_graph>(d->tok.string));
+      d->get_next_token();
+      break;
+    }
       break;
     default:
       d->report_unexpected(d->tok);

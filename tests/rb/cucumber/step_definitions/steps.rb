@@ -595,3 +595,13 @@ Then(/^an Error should be raised at any time: \*$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
 end
+
+Then(/^an Error should be raised at run time: DuplicateGraphName$/) do
+  expect(@exception).not_to be_nil
+  expect(@exception.message).to match(/^RunTime: DuplicateGraphName: .*\.$/)
+end
+
+Then(/^an Error should be raised at run time: InexistingGraph$/) do
+  expect(@exception).not_to be_nil
+  expect(@exception.message).to match(/^RunTime: InexistingGraph: .*\.$/)
+end

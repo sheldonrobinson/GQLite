@@ -1,5 +1,15 @@
 // Queries
 
+#define OC_ALGEBRA_CREATE_GRAPH_MEMBERS(_KLASS_NAME_, F)                                    \
+  F(_KLASS_NAME_, std::string, name)
+
+OC_ALGEBRA_GENERATE(create_graph, OC_ALGEBRA_CREATE_GRAPH_MEMBERS)
+
+#define OC_ALGEBRA_USE_GRAPH_MEMBERS(_KLASS_NAME_, F)                                    \
+  F(_KLASS_NAME_, std::string, name)
+
+OC_ALGEBRA_GENERATE(use_graph, OC_ALGEBRA_USE_GRAPH_MEMBERS)
+
 #define OC_ALGEBRA_CREATE_NODES_MEMBERS(_KLASS_NAME_, F)                                    \
   F(_KLASS_NAME_, std::vector<alternative<GQLITE_LIST(graph_node, graph_edge)>>, patterns)
 

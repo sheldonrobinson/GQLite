@@ -154,6 +154,10 @@ const char* exception::what() const throw()
         d->full_error += "VariableAlreadyBound: "; break;
       case variable_type_conflict:
         d->full_error += "VariableTypeConflict: "; break;
+      case duplicate_graph_name:
+        d->full_error += "DuplicateGraphName: "; break;
+      case inexisting_graph:
+        d->full_error += "InexistingGraph: "; break;
     }
     if(d->c_error)
     {

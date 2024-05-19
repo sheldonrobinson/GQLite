@@ -39,7 +39,10 @@ namespace gqlite
     unexpected_syntax,
     unknown_function,
     variable_already_bound,
-    variable_type_conflict
+    variable_type_conflict,
+    // GQL error codes
+    duplicate_graph_name,
+    inexisting_graph
   };
 
   exception_code get_execption_code(const exception& _exception);
