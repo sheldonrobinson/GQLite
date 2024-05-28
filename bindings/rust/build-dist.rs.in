@@ -1,0 +1,8 @@
+fn main() {
+  cc::Build::new()
+    .cpp(true)
+    .file("../../dists/gqlite-amalgamate.cpp")
+    .include("@CMAKE_CURRENT_SOURCE_DIR@/include")
+    .std("c++20")
+    .compile("gqlite");
+}

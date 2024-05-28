@@ -7,7 +7,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake/modules)
 ## Define version
 
 set(GQLITE_MAJOR_VERSION 1)
-set(GQLITE_MINOR_VERSION 0)
+set(GQLITE_MINOR_VERSION 2)
 set(GQLITE_PATCH_VERSION 0)
 set(GQLITE_VERSION ${GQLITE_MAJOR_VERSION}.${GQLITE_MINOR_VERSION}.${GQLITE_PATCH_VERSION})
 
@@ -167,6 +167,15 @@ set_package_properties(Crystal PROPERTIES
     PURPOSE "Used for running the crsytal test suite.")
 
 ########################
+## Find Rust
+
+find_package(Rust)
+set_package_properties(Rust PROPERTIES
+    DESCRIPTION ""
+    TYPE OPTIONAL
+    PURPOSE "Used for running the Rust test suite.")
+
+########################
 ## Build library
 
 include_directories(BEFORE include ${CMAKE_CURRENT_BINARY_DIR}/src)
@@ -302,6 +311,24 @@ if(Crystal_FOUND)
   )
 endif()
 
+if(Rust_FOUND)
+  configure_file(bindings/rust/Cargo.toml dists/rust/Cargo.toml COPYONLY)
+  configure_file(bindings/rust/build-dist.rs.in dists/rust/build.rs)
+  configure_file(bindings/rust/src/lib.rs dists/rust/src/lib.rs COPYONLY)
+
+  file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/rust/src/)
+  configure_file(bindings/rust/build-tests.rs.in rust/build.rs)
+  file(CREATE_LINK ${CMAKE_CURRENT_SOURCE_DIR}/bindings/rust/Cargo.toml ${CMAKE_CURRENT_BINARY_DIR}/rust/Cargo.toml SYMBOLIC)
+  file(CREATE_LINK ${CMAKE_CURRENT_SOURCE_DIR}/bindings/rust/src/lib.rs ${CMAKE_CURRENT_BINARY_DIR}/rust/src/lib.rs SYMBOLIC)
+
+  add_custom_target(rust_bindings ALL
+    COMMAND cargo build
+    COMMAND cargo build --release
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/rust
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/bindings/rust/Cargo.toml ${CMAKE_CURRENT_SOURCE_DIR}/bindings/rust/src/lib.rs
+  )
+endif()
+
 ########################
 ## Run tests
 
@@ -331,6 +358,10 @@ endif()
 
 if(Crystal_FOUND)
   add_test(NAME gqlite-cr-spec COMMAND ${CMAKE_CURRENT_BINARY_DIR}/gqlite-cr-spec )
+endif()
+
+if(Rust_FOUND)
+  add_test(NAME gqlite-rs COMMAND cargo test WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/rust )
 endif()
 
 ########################

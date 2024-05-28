@@ -1,0 +1,10 @@
+[package]
+name = "gqlite"
+version = "1.2.0"
+
+[build-dependencies]
+cc = "1.0"
+
+[lib]
+name = "gqlite_rs"
+crate-type = ["cdylib"]
