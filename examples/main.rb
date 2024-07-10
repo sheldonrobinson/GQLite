@@ -9,7 +9,7 @@ end
 
 begin
   # Create a database on the file given in argv[0]
-  connection = GQLite::Connection.new sqlite_filename: ARGV[0]
+  connection = GQLite::Connection.new filename: ARGV[0]
 
   # Execute the query from argv[1]
   value = connection.execute_oc_query ARGV[1]

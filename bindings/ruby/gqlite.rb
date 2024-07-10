@@ -23,9 +23,9 @@ module GQLite
     attach_function :gqlite_api_context_clear_error, [:pointer], :void
     attach_function :gqlite_api_context_has_error, [:pointer], :bool
     attach_function :gqlite_api_context_get_message, [:pointer], :string
-    attach_function :gqlite_connection_create_from_sqlite_file, [:pointer, :string, :pointer], :pointer
+    attach_function :gqlite_connection_create_from_file, [:pointer, :string, :pointer], :pointer
     attach_function :gqlite_connection_destroy, [:pointer, :pointer], :void
-    attach_function :gqlite_connection_oc_query, [:pointer, :pointer, :string, :pointer], :pointer
+    attach_function :gqlite_connection_query, [:pointer, :pointer, :string, :pointer], :pointer
     attach_function :gqlite_value_create, [:pointer], :pointer
     attach_function :gqlite_value_destroy, [:pointer, :pointer], :void
     attach_function :gqlite_value_to_json, [:pointer, :pointer], :string
@@ -44,9 +44,9 @@ module GQLite
   end
   class Connection
     attr_reader :dbhandle
-    def initialize(sqlite_filename: nil)
-      if sqlite_filename != nil
-        @dbhandle = CApi.call_function :gqlite_connection_create_from_sqlite_file, sqlite_filename, nil
+    def initialize(filename: nil)
+      if filename != nil
+        @dbhandle = CApi.call_function :gqlite_connection_create_from_file, filename, nil
       else
         raise Error.new "No connection backend was selected."
       end
@@ -59,7 +59,7 @@ module GQLite
       if bindings
         b = CApi.call_function :gqlite_value_from_json, bindings.to_json 
       end
-      ret = CApi.call_function :gqlite_connection_oc_query, @dbhandle, query, b
+      ret = CApi.call_function :gqlite_connection_query, @dbhandle, query, b
       if b
         CApi.call_function :gqlite_value_destroy, b
       end

@@ -8,12 +8,6 @@ How to release gqlite
   - dists/ruby/Rakefile
 - Make sure there is a test database in test/rb/data for the new version, and that it is called used in gqlite-rspec
 
-- Test amalgamate
-
-```bash
-g++ -std=c++20 -I../../../src/gqlite/include/ gqlite-amalgamate.cpp -lsqlite3 -c
-```
-
 - Ruby
 ```bash
   cd dists/ruby;
@@ -26,7 +20,7 @@ docker run -it -v `pwd`/pkg:/pkg ruby:3.1 bash
 gem install /pkg/gqlite-*gem
 irb
 require 'gqlite'
-c = GQLite::Connection.new sqlite_filename: "testdb"
+c = GQLite::Connection.new filename: "testdb"
 c.execute_oc_query "CREATE (n) RETURN n"
 ``````
 

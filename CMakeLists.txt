@@ -77,17 +77,6 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 endif()
 
 ########################
-## Find SQLite
-
-find_package(SQLite)
-
-set_package_properties(SQLite PROPERTIES
-    DESCRIPTION "SQLite is a C-language library that implements a small, fast, self-contained, high-reliability, full-featured, SQL connection engine."
-    URL "http://www.sqlite.org"
-    TYPE OPTIONAL
-    PURPOSE "Required for sqlite module.")
-
-########################
 ## Find readline
 
 find_package(Readline)
@@ -166,54 +155,28 @@ set_package_properties(Crystal PROPERTIES
     TYPE OPTIONAL
     PURPOSE "Used for running the crsytal test suite.")
 
-########################
-## Find Rust
+####################################
+## Corrosion (build rust from CMake)
 
-find_package(Rust)
-set_package_properties(Rust PROPERTIES
-    DESCRIPTION ""
-    TYPE OPTIONAL
-    PURPOSE "Used for running the Rust test suite.")
+include(FetchContent)
+
+FetchContent_Declare(
+    Corrosion
+    GIT_REPOSITORY https://github.com/corrosion-rs/corrosion.git
+    GIT_TAG v0.5 # Optionally specify a commit hash, version tag or branch here
+)
+FetchContent_MakeAvailable(Corrosion)
+
+corrosion_import_crate(MANIFEST_PATH Cargo.toml)
 
 ########################
 ## Build library
 
 include_directories(BEFORE include ${CMAKE_CURRENT_BINARY_DIR}/src)
 
-if(SQLITE_FOUND)
-set(GQLITE_HAVE_SQLITE 1)
-endif()
-
-configure_file(src/config.h.in src/config.h)
-
-set(GQLITE_SRCS
-    src/backend.cpp
-    src/connection.cpp
-    src/exception.cpp
-    src/gqlite-c.cpp
-    src/value.cpp
-    src/oc/lexer.cpp
-    src/oc/token.cpp
-    src/oc/parser.cpp
-    src/oc/algebra/abstract_node_visitor.cpp
-    src/oc/algebra/node.cpp
-    src/oc/algebra/node_type.cpp
-    src/oc/algebra/nodes.cpp
-    src/oc/algebra/visitors/print.cpp
-    src/backends/sqlite.cpp
-    src/backends/sqlite_ext.cpp
-  )
-
-add_library(gqlite SHARED ${GQLITE_SRCS})
-set_target_properties(gqlite PROPERTIES VERSION ${GQLITE_VERSION}
-                                           SOVERSION ${GQLITE_MAJOR_VERSION})
-
-target_link_libraries(gqlite PRIVATE ${SQLITE3_LIBRARY})
-
-install(TARGETS gqlite EXPORT GQLiteTargets ${INSTALL_TARGETS_DEFAULT_ARGS} )
-
-install(FILES include/gqlite-c.h include/gqlite.h
-      DESTINATION ${INSTALL_INCLUDE_DIR}/)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libgqlite.so DESTINATION ${INSTALL_LIB_DIR})
+# install(TARGETS gqlite EXPORT GQLiteTargets ${INSTALL_TARGETS_DEFAULT_ARGS} )
+install(FILES include/gqlite-c.h DESTINATION ${INSTALL_INCLUDE_DIR}/)
 
 ########################
 ## Build python
@@ -238,23 +201,12 @@ endif()
 install(DIRECTORY bindings/ruby DESTINATION ${INSTALL_LIB_DIR})
 
 ########################
-## Build tools
-
-if(READLINE_FOUND)
-  add_executable(gqlite_cmd tools/gqlite.cpp)
-  target_link_libraries(gqlite_cmd PRIVATE gqlite ${Readline_LIBRARY})
-  set_property(TARGET gqlite_cmd PROPERTY OUTPUT_NAME gqlite)
-
-  install(TARGETS gqlite_cmd EXPORT GQLiteTargets ${INSTALL_TARGETS_DEFAULT_ARGS} )
-endif()
-
-########################
 ## Build examples
 
 add_executable(gqlite_c_example examples/main.c)
 target_link_libraries(gqlite_c_example PRIVATE gqlite)
-add_executable(gqlite_cpp_example examples/main.cpp)
-target_link_libraries(gqlite_cpp_example PRIVATE gqlite)
+# add_executable(gqlite_cpp_example examples/main.cpp)
+# target_link_libraries(gqlite_cpp_example PRIVATE gqlite)
 
 ###########################
 ## COPY dists to binary dir
@@ -271,7 +223,6 @@ endforeach()
 
 # For Ruby
 
-file(CREATE_LINK ${CMAKE_CURRENT_SOURCE_DIR}/include/gqlite.h ${CMAKE_CURRENT_BINARY_DIR}/dists/ruby/ext/gqlite/gqlite.h)
 file(CREATE_LINK ${CMAKE_CURRENT_SOURCE_DIR}/include/gqlite-c.h ${CMAKE_CURRENT_BINARY_DIR}/dists/ruby/ext/gqlite/gqlite-c.h)
 
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/dists/ruby/lib)
@@ -283,49 +234,19 @@ file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/dists/python/gqlite)
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/dists/python/src)
 file(CREATE_LINK ${CMAKE_CURRENT_SOURCE_DIR}/bindings/python/gqlite/__init__.py ${CMAKE_CURRENT_BINARY_DIR}/dists/python/gqlite/__init__.py)
 file(CREATE_LINK ${CMAKE_CURRENT_SOURCE_DIR}/bindings/python/build-ffi.py ${CMAKE_CURRENT_BINARY_DIR}/dists/python/build-ffi.py)
-file(CREATE_LINK ${CMAKE_CURRENT_SOURCE_DIR}/include/gqlite.h ${CMAKE_CURRENT_BINARY_DIR}/dists/python/src/gqlite.h)
 file(CREATE_LINK ${CMAKE_CURRENT_SOURCE_DIR}/include/gqlite-c.h ${CMAKE_CURRENT_BINARY_DIR}/dists/python/src/gqlite-c.h)
-
-##########################
-# Generate amalgamate
-if(Ruby_EXECUTABLE)
-  add_custom_target(gqlite_amalgamate ALL
-    COMMAND ${Ruby_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/dists/create_amalgamate.rb ${CMAKE_CURRENT_SOURCE_DIR}
-    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/dists/gqlite-amalgamate.cpp ${CMAKE_CURRENT_BINARY_DIR}/dists/ruby/ext/gqlite/gqlite-amalgamate.cpp
-    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/dists/gqlite-amalgamate.cpp ${CMAKE_CURRENT_BINARY_DIR}/dists/python/src/gqlite-amalgamate.cpp
-    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/dists/
-    DEPENDS ${GQLITE_SRCS})
-endif()
 
 ########################
 ## Build tests
 
-add_executable(gqlite_cpp_tests tests/cpp/catch_amalgamated.cpp tests/cpp/test_value.cpp)
-target_link_libraries(gqlite_cpp_tests PRIVATE gqlite)
+# add_executable(gqlite_cpp_tests tests/cpp/catch_amalgamated.cpp tests/cpp/test_value.cpp)
+# target_link_libraries(gqlite_cpp_tests PRIVATE gqlite)
 
 if(Crystal_FOUND)
   add_custom_target(gqlite-cr-spec ALL
   COMMAND ${CMAKE_COMMAND} -E env CRYSTAL_PATH=${CMAKE_CURRENT_SOURCE_DIR}/bindings/crystal/:${Crystal_PATH} ${Crystal_EXECUTABLE} build --link-flags "-L${CMAKE_CURRENT_BINARY_DIR}" ${CMAKE_CURRENT_SOURCE_DIR}/tests/cr/gqlite-spec.cr -o gqlite-cr-spec
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     DEPENDS gqlite ${CMAKE_CURRENT_SOURCE_DIR}/tests/cr/gqlite-spec.cr ${CMAKE_CURRENT_SOURCE_DIR}/bindings/crystal/gqlite.cr
-  )
-endif()
-
-if(Rust_FOUND)
-  configure_file(bindings/rust/Cargo.toml dists/rust/Cargo.toml COPYONLY)
-  configure_file(bindings/rust/build-dist.rs.in dists/rust/build.rs)
-  configure_file(bindings/rust/src/lib.rs dists/rust/src/lib.rs COPYONLY)
-
-  file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/rust/src/)
-  configure_file(bindings/rust/build-tests.rs.in rust/build.rs)
-  file(CREATE_LINK ${CMAKE_CURRENT_SOURCE_DIR}/bindings/rust/Cargo.toml ${CMAKE_CURRENT_BINARY_DIR}/rust/Cargo.toml SYMBOLIC)
-  file(CREATE_LINK ${CMAKE_CURRENT_SOURCE_DIR}/bindings/rust/src/lib.rs ${CMAKE_CURRENT_BINARY_DIR}/rust/src/lib.rs SYMBOLIC)
-
-  add_custom_target(rust_bindings ALL
-    COMMAND cargo build
-    COMMAND cargo build --release
-    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/rust
-    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/bindings/rust/Cargo.toml ${CMAKE_CURRENT_SOURCE_DIR}/bindings/rust/src/lib.rs
   )
 endif()
 
@@ -360,15 +281,11 @@ if(Crystal_FOUND)
   add_test(NAME gqlite-cr-spec COMMAND ${CMAKE_CURRENT_BINARY_DIR}/gqlite-cr-spec )
 endif()
 
-if(Rust_FOUND)
-  add_test(NAME gqlite-rs COMMAND cargo test WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/rust )
-endif()
-
 ########################
 ## Config files
 
-export(TARGETS ${PROJECT_EXPORTED_TARGETS}
-FILE "${PROJECT_BINARY_DIR}/GQLiteTargets.cmake")
+# export(TARGETS ${PROJECT_EXPORTED_TARGETS}
+# FILE "${PROJECT_BINARY_DIR}/GQLiteTargets.cmake")
 
 include(CMakePackageConfigHelpers)
 configure_package_config_file(GQLiteConfig.cmake.in "${PROJECT_BINARY_DIR}/GQLiteConfig.cmake"
@@ -384,7 +301,7 @@ install(FILES
 DESTINATION "${INSTALL_CMAKE_DIR}" COMPONENT dev)
 
 # Install the export set for use with the install-tree
-install(EXPORT GQLiteTargets DESTINATION "${INSTALL_CMAKE_DIR}" COMPONENT dev)
+# install(EXPORT GQLiteTargets DESTINATION "${INSTALL_CMAKE_DIR}" COMPONENT dev)
 
 ########################
 ## Feature summary

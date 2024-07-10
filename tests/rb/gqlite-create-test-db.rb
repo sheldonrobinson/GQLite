@@ -12,7 +12,7 @@ end
 require 'gqlite'
 
 file = "data/test-#{ARGV[0]}.db"
-connection = GQLite::Connection.new(sqlite_filename: file)
+connection = GQLite::Connection.new(filename: file)
 
 connection.execute_oc_query <<-QUERY
 

@@ -1,0 +1,11 @@
+WHITESPACE = _{ " " | "\t" }
+ident = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* ~ "'"* }
+int = { ("+" | "-")? ~ ASCII_DIGIT+ }
+num = @{ int ~ ("." ~ ASCII_DIGIT*)? ~ (^"e" ~ int)? }
+
+create_node = { "CREATE" ~ "(" ~ ident ~ ")" }
+create_edge = { "CREATE" ~ "(" ~ ident ~ ")" ~ "-[" ~ ident ~ "]>" ~ "(" ~ ident ~ ")" }
+
+statement = { create_node | create_edge }
+
+query = _{ SOI ~ statement* ~ EOI }

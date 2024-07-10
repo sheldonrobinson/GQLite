@@ -1,1 +1,0 @@
-DELETE FROM gqlite_/%= _graph_name %/_edges WHERE id IN (/%= _what %/)

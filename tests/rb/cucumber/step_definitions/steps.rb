@@ -324,7 +324,7 @@ end
 Given(/^any graph$/) do
   if @handle.nil?
     file = Tempfile.new('testdb')
-    @handle = GQLite::Connection.new(sqlite_filename: file.path)
+    @handle = GQLite::Connection.new(filename: file.path)
   end
 end
 
@@ -336,7 +336,7 @@ end
 Given(/^an empty graph$/) do
   pending if @ignored_scenario
   file = Tempfile.new('testdb')
-  @handle = GQLite::Connection.new(sqlite_filename: file.path)
+  @handle = GQLite::Connection.new(filename: file.path)
 end
 
 Given(/^parameters are:$/) do |table|

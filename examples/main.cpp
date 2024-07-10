@@ -13,7 +13,7 @@ int main(int _argc, char** _argv)
   try
   {
     // Create a database on the file given in argv[1]
-    gqlite::connection connection = gqlite::connection::create_from_sqlite_file(_argv[1]);
+    gqlite::connection connection = gqlite::connection::create_from_file(_argv[1]);
 
     // Execute the query from argv[2]
     gqlite::value value = connection.execute_oc_query(_argv[2]);

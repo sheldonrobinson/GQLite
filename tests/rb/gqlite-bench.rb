@@ -54,7 +54,7 @@ def run_benchmark(create_count, query_count)
   Benchmark.bm 40 do |x|
     connection = nil
     x.report "INIT" do
-      connection = GQLite::Connection.new(sqlite_filename: FILE.path)
+      connection = GQLite::Connection.new(filename: FILE.path)
     end
     x.report "CREATE" do
       for i in 0...create_count

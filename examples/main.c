@@ -27,11 +27,11 @@ int main(int _argc, char** _argv)
   gqlite_api_context_t context = gqlite_api_context_create();
 
   // Create a database on the file given in argv[1]
-  gqlite_connection_t connection = gqlite_connection_create_from_sqlite_file(context, _argv[1], NULL);
+  gqlite_connection_t connection = gqlite_connection_create_from_file(context, _argv[1], NULL);
   check_error(context);
 
   // Execute the query from argv[2]
-  gqlite_value_t value = gqlite_connection_oc_query(context, connection, _argv[2], NULL);
+  gqlite_value_t value = gqlite_connection_query(context, connection, _argv[2], NULL);
   check_error(context);
 
   // Convert the result to json and print it

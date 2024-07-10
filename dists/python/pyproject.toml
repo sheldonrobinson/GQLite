@@ -10,7 +10,6 @@ requires = [
   "cffi",
 ]
 host-requires = [
-  "pkg:generic/sqlite3",
 ]
 
 [project]

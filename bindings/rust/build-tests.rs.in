@@ -1,5 +1,0 @@
-fn main() {
-  // cc::Build::new()
-    // .compile("gqlite_rs");
-    println!(r"cargo:rustc-link-search=@CMAKE_CURRENT_BINARY_DIR@");
-}

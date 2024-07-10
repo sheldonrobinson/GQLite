@@ -32,14 +32,20 @@ def make_results_edges(gc)
   [["a", "b", "c"]] + gc
 end
 
+def get_temp_file()
+  ::Dir::Tmpname.create('testdb') do |tmpname, n, opts|
+    tmpname
+  end
+end
+
 RSpec.describe "connection" do
   it "can be created" do
-    file = Tempfile.new('testdb')
-    db = GQLite::Connection.new(sqlite_filename: file.path)
+    file = get_temp_file()
+    db = GQLite::Connection.new(filename: file)
   end
   it "can be queried with oc to create nodes" do
-    file = Tempfile.new('testdb')
-    db = GQLite::Connection.new(sqlite_filename: file.path)
+    file = get_temp_file()
+    db = GQLite::Connection.new(filename: file)
     
     # Variable that hold the current state of the graph
     gc = []
@@ -85,8 +91,8 @@ RSpec.describe "connection" do
     expect(nodes).to eq(make_results(gc))
   end
   it "can be queried with oc to create nodes and edges" do
-    file = Tempfile.new('testdb')
-    db = GQLite::Connection.new(sqlite_filename: file.path)
+    file = get_temp_file()
+    db = GQLite::Connection.new(filename: file)
     
     # Variable that hold the current state of the graph
     gc = []
@@ -204,9 +210,9 @@ end
 
 module OlderDatabaseHelper
   def validate_db(version)
-    file = Tempfile.new('testdb')
-    `rm #{file.path}; cp #{__dir__}/data/test-#{version}.db.xz #{file.path}.xz; xz -d #{file.path}.xz`
-    db = GQLite::Connection.new(sqlite_filename: file.path)
+    file = get_temp_file()
+    `cp #{__dir__}/data/test-#{version}.db.xz #{file}.xz; xz -d #{file}.xz`
+    db = GQLite::Connection.new(filename: file)
     nodes = db.execute_oc_query "MATCH (a) RETURN a"
     edges = db.execute_oc_query "MATCH ()-[a]->() RETURN a"
 

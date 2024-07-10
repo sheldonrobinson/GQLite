@@ -12,10 +12,10 @@ if IS_MSWIN
   $CXXFLAGS += " /std:c++20 /EHsc /permissive- /bigobj"
 elsif IS_MINGW
   $CXXFLAGS += " -std=c++20 -Wa,-mbig-obj"
-  $LDFLAGS += " -lsqlite3 "
+  $LDFLAGS += " -lgqlite "
 else
   $CXXFLAGS += " -std=c++20"
-  $LDFLAGS += " -lsqlite3 "
+  $LDFLAGS += " -lgqlite "
 end
 
 create_makefile "gqlite"

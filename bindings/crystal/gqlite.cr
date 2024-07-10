@@ -7,9 +7,9 @@ lib LibGQLite
   fun gqlite_api_context_clear_error(Void*) : Void*
   fun gqlite_api_context_has_error(Void*) : Bool
   fun gqlite_api_context_get_message(Void*) : UInt8*
-  fun gqlite_connection_create_from_sqlite_file(Void*, UInt8*, Void*) : Void*
+  fun gqlite_connection_create_from_file(Void*, UInt8*, Void*) : Void*
   fun gqlite_connection_destroy(Void*, Void*) : Void*
-  fun gqlite_connection_oc_query(Void*, Void*, UInt8*, Void*) : Void*
+  fun gqlite_connection_query(Void*, Void*, UInt8*, Void*) : Void*
   fun gqlite_value_create(Void*) : Void*
   fun gqlite_value_destroy(Void*, Void*) : Void*
   fun gqlite_value_to_json(Void*, Void*) : UInt8*
@@ -33,9 +33,9 @@ module GQLite
 
   class Connection
     @dbhandle : Void*
-    def initialize(sqlite_filename = nil)
-      if sqlite_filename != nil
-        @dbhandle = GQLite.handle_api_context(LibGQLite.gqlite_connection_create_from_sqlite_file ApiContext, sqlite_filename, Pointer(Void).null)
+    def initialize(filename = nil)
+      if filename != nil
+        @dbhandle = GQLite.handle_api_context(LibGQLite.gqlite_connection_create_from_file ApiContext, filename, Pointer(Void).null)
       else
         raise Error.new "No connection backend was selected."
       end
@@ -44,7 +44,7 @@ module GQLite
       # }
     end
     def execute_oc_query(query, bindings = nil)
-      ret = GQLite.handle_api_context(LibGQLite.gqlite_connection_oc_query ApiContext, @dbhandle, query, nil)
+      ret = GQLite.handle_api_context(LibGQLite.gqlite_connection_query ApiContext, @dbhandle, query, nil)
       if GQLite.handle_api_context(LibGQLite.gqlite_value_is_valid ApiContext, ret)
         val = GQLite.handle_api_context(LibGQLite.gqlite_value_to_json ApiContext, ret)
         val = JSON.parse(String.new(val))

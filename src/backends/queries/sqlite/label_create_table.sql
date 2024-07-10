@@ -1,2 +1,0 @@
-CREATE TABLE gqlite_labels(id INTEGER PRIMARY KEY AUTOINCREMENT, label TEXT NOT NULL UNIQUE);
-INSERT INTO gqlite_labels(id, label) VALUES (0, "")

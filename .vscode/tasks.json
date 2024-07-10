@@ -11,7 +11,7 @@
         "kind": "build"
       },
       "presentation": {
-          "clear": true
+        "clear": true
       }
     },
     {
@@ -22,7 +22,7 @@
         "kind": "build"
       },
       "presentation": {
-          "clear": true
+        "clear": true
       }
     },
     {
@@ -34,7 +34,7 @@
         "isDefault": true
       },
       "presentation": {
-          "clear": true
+        "clear": true
       }
     },
     {
@@ -45,8 +45,37 @@
         "kind": "build"
       },
       "presentation": {
-          "clear": true
+        "clear": true
       }
     },
+    {
+      "type": "cargo",
+      "command": "build",
+      "args": [
+      ],
+      "problemMatcher": [
+        "$rustc"
+      ],
+      "presentation": {
+        "clear": true
+      },
+      "group": "build",
+      "label": "rust: cargo build"
+    }
+    ,
+    {
+      "type": "cargo",
+      "command": "test",
+      "args": [
+      ],
+      "problemMatcher": [
+        "$rustc"
+      ],
+      "presentation": {
+        "clear": true
+      },
+      "group": "test",
+      "label": "GQLite: cargo test"
+    }
   ]
 }

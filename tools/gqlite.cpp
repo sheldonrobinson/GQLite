@@ -29,7 +29,7 @@ int main(int argc, const char** argv)
   gqlite::connection handle;
   if(argc == 2)
   {
-    handle = gqlite::connection:: create_from_sqlite_file(argv[1]);
+    handle = gqlite::connection:: create_from_file(argv[1]);
   }
   std::cout << "Enter '.help' for usage hints." << std::endl;
   char *line;
@@ -66,7 +66,7 @@ int main(int argc, const char** argv)
           {
             std::cout << ".open expect a filename as argument" << std::endl;
           } else {
-            handle = gqlite::connection:: create_from_sqlite_file(command_split[1]);
+            handle = gqlite::connection::create_from_file(command_split[1]);
           }
         } else if(command_split[0] == ".quit")
         {
