@@ -5,6 +5,7 @@ mod graph;
 mod interpreter;
 mod parser;
 mod store;
+mod value_table;
 
 pub type Error = error::Error;
 pub type Result<T> = std::result::Result<T, Error>;
