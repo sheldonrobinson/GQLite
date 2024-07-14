@@ -1,9 +1,9 @@
-use serde::{Serialize, Deserialize};
+use serde::{ Serialize, Deserialize };
 
 /// Represent a value in a properties for a Node or an Edge.
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, Clone)]
-pub enum Value
-{
+#[serde(untagged)]
+pub enum Value {
   #[default]
   Invalid,
   Integer(i64),
@@ -17,25 +17,21 @@ pub enum Value
 
 pub type ValueObject = std::collections::HashMap<String, Value>;
 
-impl Value
-{
+impl Value {
   /// Return an object from the value, or an empty object
-  pub fn to_object_safe(&self) -> ValueObject
-  {
+  pub fn to_object_safe(&self) -> ValueObject {
     match self {
       Value::Object(o) => o.clone(),
-      _ => ValueObject::new()
+      _ => ValueObject::new(),
     }
   }
 }
 
-pub trait ToValue
-{
+pub trait ToValue {
   fn to_value(&self) -> Value;
 }
 
-macro_rules! impl_to_value
-{
+macro_rules! impl_to_value {
   ($type:tt, $vn:tt) => (
     impl ToValue for $type
     {
@@ -44,23 +40,33 @@ macro_rules! impl_to_value
         Value::$vn(self.clone())
       }
     }
-  )
+  );
 }
 
-impl_to_value!{i64, Integer}
-impl_to_value!{f64, Float}
-impl_to_value!{String, String}
-impl_to_value!{Node, Node}
-impl_to_value!{Edge, Edge}
+impl_to_value!(i64, Integer);
+impl_to_value!(f64, Float);
+impl_to_value!(String, String);
+impl_to_value!(Node, Node);
+impl_to_value!(Edge, Edge);
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Copy)]
-pub struct Key
-{
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub struct Key {
   uuid: u128,
 }
 
-impl Default for Key
-{
+impl Serialize for Key {
+  fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: serde::Serializer {
+    serializer.serialize_u128(self.uuid)
+  }
+}
+
+impl<'de> Deserialize<'de> for Key {
+  fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: serde::Deserializer<'de> {
+    Ok(Self { uuid: u128::deserialize(deserializer)? })
+  }
+}
+
+impl Default for Key {
   fn default() -> Self {
     Key {
       uuid: uuid::Uuid::new_v4().as_u128(),
@@ -68,24 +74,23 @@ impl Default for Key
   }
 }
 
-impl From<&Key> for u128
-{
+impl From<&Key> for u128 {
   fn from(value: &Key) -> Self {
     value.uuid
   }
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, Clone)]
-pub struct Node
-{
+#[serde(tag = "type", rename="node")]
+pub struct Node {
   pub key: Key,
   pub labels: Vec<String>,
   pub properties: ValueObject,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, Clone)]
-pub struct Edge
-{
+#[serde(tag = "type", rename="edge")]
+pub struct Edge {
   pub source: Key,
   pub destination: Key,
   pub label: String,
@@ -95,17 +100,21 @@ pub struct Edge
 #[macro_export]
 macro_rules! properties {
   // map-like
-  ($($k:expr => $v:expr),* $(,)?) => {{
+  ($($k:expr => $v:expr),* $(,)?) => {
+    {
     core::convert::From::from([$(($k.to_string(), $v.to_value()),)*])
-  }};
+    }
+  };
 }
 
 #[macro_export]
 macro_rules! labels {
   // match a list of expressions separated by comma:
-  ($($str:expr),*) => ({
+  ($($str:expr),*) => (
+    {
     // create a Vec with this list of expressions,
     // calling String::from on each:
     vec![$(String::from($str),)*] as Vec<String>
-  });
+    }
+  );
 }

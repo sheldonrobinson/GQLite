@@ -1,5 +1,7 @@
 pub(crate) enum Statement
 {
+  CreateGraph(CreateGraph),
+  UseGraph(UseGraph),
   Create(Create),
   Match(Match),
   Return(Return),
@@ -14,12 +16,12 @@ pub(crate) enum Node
 
 pub(crate) struct CreateGraph
 {
-  name: String,
+  pub(crate) name: String,
 }
 
 pub(crate) struct UseGraph
 {
-  name: String,
+  pub(crate) name: String,
 }
 
 pub(crate) struct Create
@@ -30,101 +32,103 @@ pub(crate) struct Create
 
 pub(crate) struct Match
 {
-  patterns: Vec<GraphNodeOrEdge>,
-  where_expression: Expression,
-  optional: bool,
+  pub(crate) patterns: Vec<GraphNodeOrEdge>,
+  pub(crate) where_expression: Option<Expression>,
+  pub(crate) optional: bool,
 }
 
 pub(crate) struct Return
 {
-  all: bool,
-  expressions: Vec<NamedExpression>,
-  modifiers: Modifiers,
+  pub(crate) all: bool,
+  pub(crate) expressions: Vec<NamedExpression>,
+  pub(crate) modifiers: Modifiers,
 }
 
 pub(crate) struct With
 {
-  all: bool,
-  expressions: Vec<NamedExpression>,
-  modifiers: Modifiers,
+  pub(crate) all: bool,
+  pub(crate) expressions: Vec<NamedExpression>,
+  pub(crate) modifiers: Modifiers,
 }
 
 pub(crate) struct Unwind
 {
-  name: String,
-  expression: Expression,
+  pub(crate) name: String,
+  pub(crate) expression: Expression,
 }
 
 pub(crate) struct Delete
 {
-  detach: bool,
-  expressions: Vec<Node>,
+  pub(crate) detach: bool,
+  pub(crate) expressions: Vec<Node>,
 }
 
 pub(crate) struct Set
 {
-  expressions: Vec<Node>,
+  pub(crate) expressions: Vec<Node>,
 }
 
 pub(crate) struct Remove
 {
-  expressions: Vec<Node>,
+  pub(crate) expressions: Vec<Node>,
 }
 
 pub(crate) struct Call
 {
-  name: String,
-  arguments: Vec<Expression>,
-  yield_: Vec<String>
+  pub(crate) name: String,
+  pub(crate) arguments: Vec<Expression>,
+  pub(crate) yield_: Vec<String>
 }
 
 // Set/remove Statements
 
 pub(crate) struct SetProperty
 {
-  left: String,
-  path: Vec<String>,
-  expression: Expression,
+  pub(crate) left: String,
+  pub(crate) path: Vec<String>,
+  pub(crate) expression: Expression,
 }
 
 pub(crate) struct AddProperty
 {
-  left: String,
-  path: Vec<String>,
-  expression: Expression,
+  pub(crate) left: String,
+  pub(crate) path: Vec<String>,
+  pub(crate) expression: Expression,
 }
 
 pub(crate) struct RemoveProperty
 {
-  left: String,
-  path: Vec<String>,
+  pub(crate) left: String,
+  pub(crate) path: Vec<String>,
 }
 
 pub(crate) struct EditLabels
 {
-  target: String,
-  labels: Vec<String>,
+  pub(crate) target: String,
+  pub(crate) labels: Vec<String>,
 }
 
 // Modifiers
 
 pub(crate) struct OrderBy
 {
-  expressions: Vec<OrderByExpression>,
+  pub(crate) expressions: Vec<OrderByExpression>,
 }
 
+#[derive(Default)]
 pub(crate) struct Modifiers
 {
-  skip: Expression,
-  limit: Expression,
-  order_by: OrderBy,
+  pub(crate) skip: Option<Expression>,
+  pub(crate) limit: Option<Expression>,
+  pub(crate) order_by: Option<OrderBy>,
 }
 
 // Expressions
 
 pub(crate) enum Expression
 {
-
+  Value(Value),
+  Variable(Variable),
 }
 
 // Order By Expression
@@ -172,63 +176,63 @@ pub(crate) struct EndOfList {}
 
 pub(crate) struct Value
 {
-  value: crate::graph::Value,
+  pub(crate) value: crate::graph::Value,
 }
 
 pub(crate) struct Map
 {
-  map: std::collections::HashMap<String, Expression>,
+  pub(crate) map: std::collections::HashMap<String, Expression>,
 }
 
 pub(crate) struct Array
 {
-  array: Vec<Expression>,
+  pub(crate) array: Vec<Expression>,
 }
 
 // Expressions
 
 pub(crate) struct NamedExpression
 {
-  name: String,
-  expression: Expression,
+  pub(crate) name: String,
+  pub(crate) expression: Expression,
 }
 
 pub(crate) struct Variable
 {
-  identifier: String,
+  pub(crate) identifier: String,
 }
 
 pub(crate) struct MemberAccess
 {
-  left: Expression,
-  path: Vec<String>,
+  pub(crate) left: Expression,
+  pub(crate) path: Vec<String>,
 }
 
 pub(crate) struct IndexAccess
 {
-  left: Expression,
-  index: Expression,
-  end: Expression,
+  pub(crate) left: Expression,
+  pub(crate) index: Expression,
+  pub(crate) end: Expression,
 }
 
 pub(crate) struct HasLabels
 {
-  left: String,
-  labels: Vec<String>,
+  pub(crate) left: String,
+  pub(crate) labels: Vec<String>,
 }
 
 pub(crate) struct FunctionCall
 {
-  name: String,
-  arguments: Vec<Expression>,
+  pub(crate) name: String,
+  pub(crate) arguments: Vec<Expression>,
 }
 
 #[macro_export]
 macro_rules! create_binary_op {
   ( $x:tt ) => (
     pub(crate) struct $x {
-      left: Expression,
-      right: Expression,
+      pub(crate) left: Expression,
+      pub(crate) right: Expression,
     }
   )
 }
