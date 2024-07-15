@@ -10,6 +10,8 @@ mod value_table;
 pub type Error = error::Error;
 pub type Result<T> = std::result::Result<T, Error>;
 pub type Connection = connection::Connection;
+pub type Value = graph::Value;
+pub type ValueObject = graph::ValueObject;
 
 
 #[cfg(test)]

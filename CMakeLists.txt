@@ -168,6 +168,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(Corrosion)
 
 corrosion_import_crate(MANIFEST_PATH Cargo.toml)
+corrosion_import_crate(MANIFEST_PATH tools/gqlite-cmd/Cargo.toml)
 
 ########################
 ## Build library

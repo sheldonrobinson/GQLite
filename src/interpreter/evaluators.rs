@@ -11,6 +11,22 @@ fn eval_instructions(
 ) -> Result<()> {
   for instruction in instructions {
     match instruction {
+      instructions::Instruction::CreateEdge { label: _ } => {
+        // let props = stack.pop();
+        // stack.push(crate::graph::Edge {
+        //   label: label,
+        //   properties: props,
+        // })
+        return Err(crate::Error::Unimplemented("eval_instructions/CreateEdge"));
+      }
+      instructions::Instruction::CreateNode { labels } => {
+        let props = stack.pop().unwrap();
+        stack.push(crate::graph::Node {
+          key: crate::graph::Key::default(),
+          labels: labels.clone(),
+          properties: props.to_object_safe(),
+        }.into())
+      }
       instructions::Instruction::Push { value } => {
         stack.push(value.clone());
       }
@@ -37,19 +53,30 @@ pub(crate) fn eval_program(
   for block in program {
     match block {
       instructions::Block::Create { instructions, variables } => {
+        let mut output_table = crate::value_table::ValueTable::new();
         for row in input_table.iter() {
           eval_instructions(stack.borrow_mut(), row, instructions.borrow())?;
-          for v in stack.drain(stack.len() - variables.len()..) {
+          let mut new_row = row.clone();
+          for (v,var) in stack.drain(stack.len() - variables.len()..).zip(variables.iter()) {
             match v {
               crate::graph::Value::Node(n) => {
-                store.add_nodes(tx.borrow_mut(), "default", vec![n].iter())?;
+                store.add_nodes(tx.borrow_mut(), "default", vec![n.to_owned()].iter())?;
+                new_row.insert(
+                  var
+                    .as_ref()
+                    .ok_or(crate::Error::Unknown("executor/eval/variables[0].as_ref()"))?
+                    .to_owned(),
+                  crate::graph::Value::Node(n)
+                );
               }
               _ => {
                 return Err(crate::Error::Unimplemented("executor/eval/create"));
               }
             }
           }
+          output_table.add_row(new_row);
         }
+        input_table = output_table;
       }
       instructions::Block::Match { instructions, variables } => {
         let mut output_table = crate::value_table::ValueTable::new();
@@ -114,6 +141,7 @@ pub(crate) fn eval_program(
             )
           );
         }
+        tx.commit()?;
         return Ok(crate::graph::Value::Array(r));
       }
     }

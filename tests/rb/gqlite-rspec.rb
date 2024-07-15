@@ -72,34 +72,36 @@ RSpec.describe "connection" do
     add_node gc, [], {}
     add_node gc, [], {}
     nodes = db.execute_oc_query "MATCH (nodes) RETURN nodes"
-    expect(nodes).to eq(make_results(gc))
+    expect(remove_keys(nodes)).to eq(make_results(gc))
     
     # Test label and return
     n1 = db.execute_oc_query "CREATE (n1:Person) RETURN n1"
     n1_person = add_node(gc, ["Person"], {})
-    expect(n1).to eq([["n1"], [n1_person]])
+    expect(remove_keys(n1)).to eq([["n1"], [n1_person]])
     nodes = db.execute_oc_query "MATCH (nodes) RETURN nodes"
-    expect(nodes).to eq(make_results(gc))
+    puts "/////////////#{gc}"
+    puts "/////////////#{nodes}"
+    expect(remove_keys(nodes)).to eq(make_results(gc))
 
     # Test two nodes
     db.execute_oc_query "CREATE (n1:Person), (n2:Film)"
     add_node gc, ["Person"], {}
     add_node gc, ["Film"], {}
     nodes = db.execute_oc_query "MATCH (nodes) RETURN nodes"
-    expect(nodes).to eq(make_results(gc))
+    expect(remove_keys(nodes)).to eq(make_results(gc))
 
     # Test properties
     db.execute_oc_query "CREATE (n1 {name: 'Andres', title: 'Developer'})"
     add_node gc, [], {"name" => 'Andres', "title" => 'Developer'}
     nodes = db.execute_oc_query "MATCH (nodes) RETURN nodes"
-    expect(nodes).to eq(make_results(gc))
+    expect(remove_keys(nodes)).to eq(make_results(gc))
 
     # Test label properties
     n1 = db.execute_oc_query "CREATE (n1:Person {name: 'Andres', title: 'Developer'}) RETURN n1"
     n1_ref = add_node gc, ["Person"], {"name" => 'Andres', "title" => 'Developer'}
     expect(n1).to eq([["n1"],[n1_ref]])
     nodes = db.execute_oc_query "MATCH (nodes) RETURN nodes"
-    expect(nodes).to eq(make_results(gc))
+    expect(remove_keys(nodes)).to eq(make_results(gc))
   end
   it "can be queried with oc to create nodes and edges" do
     file = get_temp_file()
@@ -115,7 +117,7 @@ RSpec.describe "connection" do
     add_node gc, [], {}
     add_edge gc_edges, [], {}, "RELTYPE", {}, 2, [], {}
     nodes = db.execute_oc_query "MATCH (nodes) RETURN nodes"
-    expect(nodes).to eq(make_results(gc))
+    expect(remove_keys(nodes)).to eq(make_results(gc))
     edges = db.execute_oc_query "MATCH (edges)-[]->() RETURN edges"
 
     # Simple create 2
@@ -124,10 +126,10 @@ RSpec.describe "connection" do
     add_node gc, [], {}
     add_edge gc_edges, [], {}, "RELTYPE", {}, [], {}
     nodes = db.execute_oc_query "MATCH (nodes) RETURN nodes"
-    expect(nodes).to eq(make_results(gc))
+    expect(remove_keys(nodes)).to eq(make_results(gc))
 
     nodes_edges = db.execute_oc_query "MATCH (a)-[b]->(c) RETURN a, b, c"
-    expect(nodes_edges).to eq(make_results_edges(gc_edges))
+    expect(remove_keys(nodes_edges)).to eq(make_results_edges(gc_edges))
 
     # Create with match
     db.execute_oc_query "CREATE (:X), (:Y)"
