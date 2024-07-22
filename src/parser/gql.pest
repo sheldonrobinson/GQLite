@@ -1,7 +1,10 @@
 WHITESPACE = _{ " " | "\t" }
 ident = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* ~ "'"* }
-int = { ("+" | "-")? ~ ASCII_DIGIT+ }
-num = @{ int ~ ("." ~ ASCII_DIGIT*)? ~ (^"e" ~ int)? }
+char = {
+    !("'" | "\\") ~ ANY
+    | "\\" ~ ("\"" | "\\" | "/" | "b" | "f" | "n" | "r" | "t")
+    | "\\" ~ ("u" ~ ASCII_HEX_DIGIT{4})
+}
 
 // Query
 query = _{ SOI ~ statement* ~ ";"? ~ EOI }
@@ -21,9 +24,19 @@ create_statement = { "CREATE" ~ node_or_edge_pattern ~ ( "," ~ node_or_edge_patt
 match_statement = { "MATCH" ~ node_or_edge_pattern ~ ( "," ~ node_or_edge_pattern )* }
 return_statement = { "RETURN" ~ named_expression+ }
 
+// literals
+int = { ("+" | "-")? ~ ASCII_DIGIT+ }
+num = @{ int ~ ("." ~ ASCII_DIGIT*)? ~ (^"e" ~ int)? }
+string_literal = ${ "'" ~ inner ~ "'" }
+inner = @{ char* }
 // Expression
 
 named_expression = { expression | ident ~ expression }
-expression = _{ ident | map }
+expression = _{ ident | map | string_literal | num}
 
-map = { "{" ~ (ident ~ ":" ~ expression)  ~ "}" }
+pair = { ident ~ ":" ~ expression }
+
+map = {
+  "{" ~ "}" |
+  "{" ~ pair ~ ("," ~ pair)* ~ "}"
+}

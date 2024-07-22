@@ -79,8 +79,6 @@ RSpec.describe "connection" do
     n1_person = add_node(gc, ["Person"], {})
     expect(remove_keys(n1)).to eq([["n1"], [n1_person]])
     nodes = db.execute_oc_query "MATCH (nodes) RETURN nodes"
-    puts "/////////////#{gc}"
-    puts "/////////////#{nodes}"
     expect(remove_keys(nodes)).to eq(make_results(gc))
 
     # Test two nodes
@@ -99,7 +97,7 @@ RSpec.describe "connection" do
     # Test label properties
     n1 = db.execute_oc_query "CREATE (n1:Person {name: 'Andres', title: 'Developer'}) RETURN n1"
     n1_ref = add_node gc, ["Person"], {"name" => 'Andres', "title" => 'Developer'}
-    expect(n1).to eq([["n1"],[n1_ref]])
+    expect(remove_keys(n1)).to eq([["n1"],[n1_ref]])
     nodes = db.execute_oc_query "MATCH (nodes) RETURN nodes"
     expect(remove_keys(nodes)).to eq(make_results(gc))
   end

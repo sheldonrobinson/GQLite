@@ -4,12 +4,6 @@ pub enum Error {
   CborSerialisationError(#[from] ciborium::ser::Error<std::io::Error>),
   #[error("An error occured while deserialization from Cbor: {0}")]
   CborDeserialisationError(#[from] ciborium::de::Error<std::io::Error>),
-  // #[error("the data for key `{0}` is not available")]
-  // Redaction(String),
-  // #[error("invalid header (expected {expected:?}, found {found:?})")] InvalidHeader {
-    // expected: String,
-    // found: String,
-  // },
   #[error("Parse error: {0}")]
   ParseError(#[from] pest::error::Error<crate::parser::Rule>),
   #[error("Store error: {0}")]
@@ -20,6 +14,8 @@ pub enum Error {
   UnknownNode,
   #[error("Unknown variable {0}")]
   UnknownVariable(String),
+  #[error("Empty stack {0}")]
+  EmptyStack(String),
   #[error("Unknown error at {0}")]
   Unknown(&'static str),
   #[error("Unimplemented error at {0}")]

@@ -1,6 +1,6 @@
 use std::borrow::{Borrow, BorrowMut};
 
-use crate::Result;
+use crate::{graph, Result};
 
 use super::instructions;
 
@@ -39,6 +39,20 @@ fn eval_instructions(
         } else {
           return Err(crate::Error::UnknownVariable(name.to_owned()));
         }
+      }
+      instructions::Instruction::CreateMap { keys } => {
+        let mut m = crate::graph::ValueObject::new();
+        for k in keys.iter().rev() {
+          if let Some(value) = stack.pop() {
+            m.insert(k.to_owned(), value);
+          } else {
+            return Err(crate::Error::EmptyStack(format!(
+              "Missing value for key {:?}",
+              k
+            )));
+          }
+        }
+        stack.push(graph::Value::Object(m));
       }
     }
   }
