@@ -111,9 +111,9 @@ RSpec.describe "connection" do
 
     # Simple create
     db.execute_oc_query "CREATE (n1), (n2) CREATE (n1)-[:RELTYPE]->(n2)"
-    add_node gc [], {}
     add_node gc, [], {}
-    add_edge gc_edges, [], {}, "RELTYPE", {}, 2, [], {}
+    add_node gc, [], {}
+    add_edge gc_edges, [], {}, "RELTYPE", {}, [], {}
     nodes = db.execute_oc_query "MATCH (nodes) RETURN nodes"
     expect(remove_keys(nodes)).to eq(make_results(gc))
     edges = db.execute_oc_query "MATCH (edges)-[]->() RETURN edges"

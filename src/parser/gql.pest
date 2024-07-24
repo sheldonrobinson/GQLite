@@ -14,8 +14,8 @@ query = _{ SOI ~ statement* ~ ";"? ~ EOI }
 labels = { (":" ~ ident)* }
 pattern = { ident? ~ labels ~ map? }
 node_pattern = { "(" ~ pattern ~ ")" }
-edge_pattern = { "[" ~ pattern ~ "]" }
-node_or_edge_pattern = _{ node_pattern | edge_pattern }
+edge_pattern = { "(" ~ pattern ~ ")-[" ~ pattern ~ "]->(" ~ pattern ~ ")" }
+node_or_edge_pattern = _{ edge_pattern | node_pattern }
 
 // Statements
 statement = { create_statement | match_statement | return_statement }

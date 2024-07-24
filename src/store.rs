@@ -1,63 +1,152 @@
-use std::borrow::Borrow;
+use serde::{Deserialize, Serialize};
+use std::cell::RefCell;
+use std::default;
+use std::{borrow::Borrow, collections::HashMap};
 
 use persy::PersyError;
 
 use crate::graph;
+use crate::Error;
+use crate::Result;
 
-pub(crate) struct Store {
-  persy_store: persy::Persy,
+struct GraphInfo {
+  name: String,
+  nodes_segment: persy::SegmentId,
+  nodes_uuid_index: String,
+  edges_segment: persy::SegmentId,
+  edges_uuid_index: String,
+  edges_source_uuid_index: String,
+  edges_destination_uuid_index: String,
+}
+
+fn persy_id_serialize<S>(x: &persy::PersyId, s: S) -> std::result::Result<S::Ok, S::Error>
+where
+  S: serde::Serializer,
+{
+  s.serialize_str(x.to_string().as_str())
+}
+
+fn persy_id_deserialize<'de, D>(deserializer: D) -> std::result::Result<persy::PersyId, D::Error>
+where
+  D: serde::Deserializer<'de>,
+{
+  let buf = String::deserialize(deserializer)?;
+  match buf.parse::<persy::PersyId>() {
+    Ok(pid) => Ok(pid),
+    Err(err) => Err(serde::de::Error::custom(format!(
+      "Failed to parse PersyId: {}",
+      err
+    ))),
+  }
+}
+
+/// This structure is used to represent the internal storage of an edge.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+struct PersistentEdge {
+  pub key: graph::Key,
+  #[serde(
+    serialize_with = "persy_id_serialize",
+    deserialize_with = "persy_id_deserialize"
+  )]
+  pub source: persy::PersyId,
+  #[serde(
+    serialize_with = "persy_id_serialize",
+    deserialize_with = "persy_id_deserialize"
+  )]
+  pub destination: persy::PersyId,
+  pub label: String,
+  pub properties: graph::ValueObject,
 }
 
 #[derive(Default)]
-pub(crate) struct SelectQuery<'a, T: Iterator<Item = &'a crate::graph::Key>> {
+pub(crate) struct SelectNodeQuery<'a, T: Iterator<Item = &'a crate::graph::Key>> {
   keys: Option<T>,
 }
 
-impl SelectQuery<'static, core::slice::Iter<'static, crate::graph::Key>> {
+impl SelectNodeQuery<'static, core::slice::Iter<'static, crate::graph::Key>> {
   pub(crate) fn select_all() -> Self {
     Self::default()
   }
 }
 
-impl<'a, T: Iterator<Item = &'a crate::graph::Key>> SelectQuery<'a, T> {
-  // pub(crate) fn select_all() -> Self {
-  // Self::default()
-  // }
+impl<'a, T: Iterator<Item = &'a crate::graph::Key>> SelectNodeQuery<'a, T> {
   pub(crate) fn select_keys(keys: T) -> Self {
     Self { keys: Some(keys) }
   }
 }
 
+#[derive(Default)]
+pub(crate) struct SelectEdgeQuery<'a, T: Iterator<Item = &'a crate::graph::Key>> {
+  keys: Option<T>,
+}
+
+impl SelectEdgeQuery<'static, core::slice::Iter<'static, crate::graph::Key>> {
+  pub(crate) fn select_all() -> Self {
+    Self::default()
+  }
+}
+
+impl<'a, T: Iterator<Item = &'a crate::graph::Key>> SelectEdgeQuery<'a, T> {
+  pub(crate) fn select_keys(keys: T) -> Self {
+    Self { keys: Some(keys) }
+  }
+}
+
+/// Storage, aka, interface to the underlying persy store.
+pub(crate) struct Store {
+  persy_store: persy::Persy,
+  graphs: HashMap<String, GraphInfo>,
+}
+
 impl Store {
-  pub(crate) fn new<P: AsRef<std::path::Path>>(path: P) -> crate::Result<Store> {
+  /// Crate a new store, with a default graph
+  pub(crate) fn new<P: AsRef<std::path::Path>>(path: P) -> Result<Store> {
     let path = path.as_ref();
     let create = !path.exists();
     if create {
       persy::Persy::create(path)?;
     }
-    let s = Store {
+    let mut s = Store {
       persy_store: persy::Persy::open(path, persy::Config::new())?,
+      graphs: Default::default(),
     };
     if create {
       s.create_graph("default")?;
     }
+    s.graphs.insert(
+      "default".into(),
+      GraphInfo {
+        name: "default".into(),
+        nodes_segment: s.persy_store.solve_segment_id("default_nodes")?,
+        nodes_uuid_index: "default_nodes_uuid_index".into(),
+        edges_segment: s.persy_store.solve_segment_id("default_edges")?,
+        edges_uuid_index: "default_edges_uuid_index".into(),
+        edges_source_uuid_index: "default_edges_source_uuid_index".into(),
+        edges_destination_uuid_index: "default_edges_destination_uuid_index".into(),
+      },
+    );
     Ok(s)
   }
-  fn graph_main_index_name(graph_name: impl Into<String>) -> String {
-    format!("{}_uuid", graph_name.into())
-  }
-  pub(crate) fn create_graph(&self, name: impl Into<String>) -> crate::Result<()> {
+  pub(crate) fn create_graph(&self, name: impl Into<String>) -> Result<()> {
     let mut tx = self.persy_store.begin()?;
     let graph_name = name.into();
-    tx.create_segment(graph_name.as_str())?;
-    tx.create_index::<u128, persy::PersyId>(
-      Self::graph_main_index_name(graph_name).as_str(),
-      persy::ValueMode::Exclusive,
-    )?;
+    tx.create_segment(format!("{}_nodes", graph_name).as_str())?;
+    tx.create_segment(format!("{}_edges", graph_name).as_str())?;
+    for index_name in [
+      "_nodes_uuid_index",
+      "_edges_uuid_index",
+      "_edges_source_uuid_index",
+      "_edges_destination_uuid_index",
+    ] {
+      tx.create_index::<u128, persy::PersyId>(
+        (graph_name.clone() + index_name).as_str(),
+        persy::ValueMode::Exclusive,
+      )?;
+    }
     tx.commit()?;
     Ok(())
   }
-  pub(crate) fn begin(&self) -> crate::Result<persy::Transaction> {
+  pub(crate) fn begin(&self) -> Result<persy::Transaction> {
     let s = self.persy_store.begin()?;
     Ok(s)
   }
@@ -67,53 +156,51 @@ impl Store {
     transaction: &mut persy::Transaction,
     graph_name: impl Into<String>,
     nodes_iter: T,
-  ) -> crate::Result<()> {
+  ) -> Result<()> {
     let graph_name = graph_name.into();
-    let graph_name_index = Self::graph_main_index_name(graph_name.clone());
+    let graph_info = self.graphs.get(&graph_name).unwrap();
     for x in nodes_iter {
       let mut data = Vec::<u8>::new();
       ciborium::into_writer(&x, &mut data)?;
-      let pid = transaction.insert(graph_name.clone(), &data)?;
+      let pid = transaction.insert(graph_info.nodes_segment, &data)?;
       transaction.put::<u128, persy::PersyId>(
-        graph_name_index.as_str(),
+        graph_info.nodes_uuid_index.as_str(),
         x.key.borrow().into(),
         pid,
       )?;
     }
     Ok(())
   }
+  /// Select nodes according to a given query
   pub(crate) fn select_nodes<'a, T: Iterator<Item = &'a crate::graph::Key>>(
     &self,
     transaction: &mut persy::Transaction,
     graph_name: impl Into<String>,
-    query: SelectQuery<'a, T>,
-  ) -> crate::Result<Vec<crate::graph::Node>> {
+    query: SelectNodeQuery<'a, T>,
+  ) -> Result<Vec<crate::graph::Node>> {
     let graph_name = graph_name.into();
-    let graph_name_index = Self::graph_main_index_name(graph_name.clone());
+    let graph_info = self.graphs.get(&graph_name).unwrap();
 
     let nodes_raw = match query.keys {
-      Some(keys_iter) => {
-        Box::new(keys_iter.map(|key| {
-          let key: u128 = key.into();
-          if let Some(key) =
-            transaction.one::<u128, persy::PersyId>(graph_name_index.as_str(), &key)?
-          {
-            if let Some(v) = transaction.read(graph_name.clone(), key.borrow())? {
-              Ok(v)
-              // Ok::<graph::Node, crate::Error>(ciborium::from_reader::<graph::Node, &[u8]>(&mut v.as_ref())?)
-            } else {
-              Err(crate::Error::UnknownNode)
-            }
+      Some(keys_iter) => Box::new(keys_iter.map(|key| {
+        let key: u128 = key.into();
+        if let Some(key) =
+          transaction.one::<u128, persy::PersyId>(graph_info.nodes_uuid_index.as_str(), &key)?
+        {
+          if let Some(v) = transaction.read(graph_info.nodes_segment, key.borrow())? {
+            Ok(v)
           } else {
-            Err(crate::Error::UnknownNode)
+            Err(Error::UnknownNode)
           }
-        })) as Box<dyn Iterator<Item = crate::Result<Vec<u8>>>>
-      }
+        } else {
+          Err(Error::UnknownNode)
+        }
+      })) as Box<dyn Iterator<Item = Result<Vec<u8>>>>,
       None => Box::new(
         transaction
-          .scan(graph_name)?
+          .scan(graph_info.nodes_segment)?
           .map(|(_, content)| Ok::<Vec<u8>, crate::Error>(content)),
-      ) as Box<dyn Iterator<Item = crate::Result<Vec<u8>>>>,
+      ) as Box<dyn Iterator<Item = Result<Vec<u8>>>>,
     };
     let r = nodes_raw
       .map(|v| {
@@ -121,7 +208,132 @@ impl Store {
           &mut v?.as_ref(),
         )?)
       })
-      .collect::<crate::Result<Vec<crate::graph::Node>>>()?;
+      .collect::<Result<Vec<crate::graph::Node>>>()?;
+    Ok(r)
+  }
+  fn get_node_id(
+    &self,
+    transaction: &mut persy::Transaction,
+    graph_name: &String,
+    key: crate::graph::Key,
+  ) -> Result<persy::PersyId> {
+    let graph_info = self.graphs.get(graph_name).unwrap();
+    let key: u128 = key.borrow().into();
+    if let Some(pid) =
+      transaction.one::<u128, persy::PersyId>(graph_info.nodes_uuid_index.as_str(), &key)?
+    {
+      Ok(pid)
+    } else {
+      Err(Error::UnknownNode)
+    }
+  }
+  /// Add edge
+  pub(crate) fn add_edges<'a, T: Iterator<Item = &'a crate::graph::Edge>>(
+    &self,
+    transaction: &mut persy::Transaction,
+    graph_name: impl Into<String>,
+    edges_iter: T,
+  ) -> Result<()> {
+    let graph_name = graph_name.into();
+    let graph_info = self.graphs.get(&graph_name).unwrap();
+    for x in edges_iter {
+      let source_pid = self.get_node_id(transaction, &graph_name, x.source.key)?;
+      let destination_pid = self.get_node_id(transaction, &graph_name, x.destination.key)?;
+      let mut data = Vec::<u8>::new();
+      ciborium::into_writer(
+        &PersistentEdge {
+          key: x.key,
+          source: source_pid,
+          destination: destination_pid,
+          label: x.label.clone(),
+          properties: x.properties.clone(),
+        },
+        &mut data,
+      )?;
+      let pid = transaction.insert(graph_info.edges_segment, &data)?;
+      transaction.put::<u128, persy::PersyId>(
+        graph_info.edges_uuid_index.as_str(),
+        x.key.borrow().into(),
+        pid,
+      )?;
+      transaction.put::<u128, persy::PersyId>(
+        &graph_info.edges_source_uuid_index.as_str(),
+        x.source.key.borrow().into(),
+        pid,
+      )?;
+      transaction.put::<u128, persy::PersyId>(
+        graph_info.edges_destination_uuid_index.as_str(),
+        x.destination.key.borrow().into(),
+        pid,
+      )?;
+    }
+    Ok(())
+  }
+  fn fetch_node(
+    &self,
+    transaction: &mut persy::Transaction,
+    graph_info: &GraphInfo,
+    node_key: persy::PersyId,
+  ) -> Result<graph::Node> {
+    if let Some(v) = transaction.read(graph_info.nodes_segment, node_key.borrow())? {
+      Ok::<graph::Node, crate::Error>(ciborium::from_reader::<graph::Node, &[u8]>(
+        &mut v.as_ref(),
+      )?)
+    } else {
+      Err(Error::UnknownNode)
+    }
+  }
+  /// Select edges
+  pub(crate) fn select_edges<'a, T: Iterator<Item = &'a crate::graph::Key>>(
+    &self,
+    transaction: &mut persy::Transaction,
+    graph_name: impl Into<String>,
+    query: SelectEdgeQuery<'a, T>,
+  ) -> Result<Vec<crate::graph::Edge>> {
+    let graph_name = graph_name.into();
+    let graph_info = self.graphs.get(&graph_name).unwrap();
+    let transaction = RefCell::new(transaction);
+    let edges_raw = {
+      let mut transaction = transaction.borrow_mut();
+      match query.keys {
+        Some(keys_iter) => Box::new(keys_iter.map(|key| {
+          let key: u128 = key.into();
+          if let Some(key) =
+            transaction.one::<u128, persy::PersyId>(graph_info.edges_uuid_index.as_str(), &key)?
+          {
+            if let Some(v) = transaction.read(graph_info.edges_segment, key.borrow())? {
+              Ok(v)
+            } else {
+              Err(Error::UnknownNode)
+            }
+          } else {
+            Err(Error::UnknownNode)
+          }
+        })) as Box<dyn Iterator<Item = Result<Vec<u8>>>>,
+        None => Box::new({
+          transaction
+            .scan(graph_info.edges_segment)?
+            .map(|(_, content)| Ok::<Vec<u8>, crate::Error>(content))
+        }) as Box<dyn Iterator<Item = Result<Vec<u8>>>>,
+      }
+      .collect::<Result<Vec<Vec<u8>>>>()?
+    };
+    let r = edges_raw
+      .into_iter()
+      .map(|v| {
+        Ok::<graph::Edge, crate::Error>({
+          let edge = ciborium::from_reader::<PersistentEdge, &[u8]>(&mut v.as_ref())?;
+          let mut transaction = transaction.borrow_mut();
+          graph::Edge {
+            key: edge.key,
+            source: self.fetch_node(&mut transaction, graph_info, edge.source)?,
+            destination: self.fetch_node(&mut transaction, graph_info, edge.destination)?,
+            label: edge.label,
+            properties: edge.properties,
+          }
+        })
+      })
+      .collect::<Result<Vec<crate::graph::Edge>>>()?;
     Ok(r)
   }
 }
@@ -134,7 +346,7 @@ where
 {
   fn from(value: persy::PE<T>) -> Self {
     match value {
-      persy::PE::PE(err) => crate::Error::StoreError(err.into().to_string()),
+      persy::PE::PE(err) => Error::StoreError(err.into().to_string()),
     }
   }
 }
@@ -162,11 +374,59 @@ mod tests {
       .select_nodes(
         store.begin().unwrap().borrow_mut(),
         "default",
-        crate::store::SelectQuery::select_keys([nodes[0].key].iter()),
+        crate::store::SelectNodeQuery::select_keys([nodes[0].key].iter()),
       )
       .unwrap();
 
     assert_eq!(nodes.len(), selected_nodes.len());
     assert_eq!(nodes[0], selected_nodes[0]);
+  }
+  #[test]
+  fn test_add_edges() {
+    let source_node = crate::graph::Node {
+      labels: crate::labels!("hello"),
+      properties: crate::properties!("key" => 42i64),
+      key: crate::graph::Key::default(),
+    };
+    let destination_node = crate::graph::Node {
+      labels: crate::labels!("world"),
+      properties: crate::properties!("key" => 12i64),
+      key: crate::graph::Key::default(),
+    };
+    let edge = crate::graph::Edge {
+      source: source_node.clone(),
+      destination: destination_node.clone(),
+      key: crate::graph::Key::default(),
+      label: "!".into(),
+      properties: crate::properties!("existence" => true),
+    };
+    let store = super::Store::new(crate::tests::get_tmp_file().unwrap()).unwrap();
+
+    let mut tx = store.begin().unwrap();
+    store
+      .add_edges(tx.borrow_mut(), "default", [edge.clone()].iter())
+      .expect_err("expect missing node");
+    store
+      .add_nodes(
+        tx.borrow_mut(),
+        "default",
+        [source_node, destination_node].iter(),
+      )
+      .unwrap();
+    store
+      .add_edges(tx.borrow_mut(), "default", [edge.clone()].iter())
+      .unwrap();
+    tx.commit().unwrap();
+
+    let selected_edges = store
+      .select_edges(
+        store.begin().unwrap().borrow_mut(),
+        "default",
+        crate::store::SelectEdgeQuery::select_keys([edge.key].iter()),
+      )
+      .unwrap();
+
+    assert_eq!(1, selected_edges.len());
+    assert_eq!(edge, selected_edges[0]);
   }
 }
