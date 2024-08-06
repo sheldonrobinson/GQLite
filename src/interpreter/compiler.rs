@@ -5,21 +5,24 @@ use std::cell::Cell;
 use crate::interpreter::context;
 use crate::interpreter::instructions::{Block, Instruction, Instructions};
 use crate::parser::ast;
+use crate::Error;
+use crate::Result;
 
-fn compile_expression(
-  expression: &crate::parser::ast::Expression,
-  instructions: &mut Instructions,
-) {
-  let expr = match expression {
+fn compile_expression(expression: &crate::parser::ast::Expression, instructions: &mut Instructions)
+{
+  let expr = match expression
+  {
     ast::Expression::Value(value) => Instruction::Push {
       value: value.value.clone(),
     },
     ast::Expression::Variable(variable) => Instruction::GetVariable {
       name: variable.identifier.clone(),
     },
-    ast::Expression::Map(map) => {
+    ast::Expression::Map(map) =>
+    {
       let mut keys = Vec::new();
-      for (k, v) in map.map.iter() {
+      for (k, v) in map.map.iter()
+      {
         compile_expression(v, instructions);
         keys.push(k.to_owned());
       }
@@ -32,27 +35,37 @@ fn compile_expression(
 fn compile_optional_expression(
   properties: &Option<ast::Expression>,
   instructions: &mut Instructions,
-) {
-  if let Some(expr) = properties {
+)
+{
+  if let Some(expr) = properties
+  {
     compile_expression(expr, instructions);
-  } else {
+  }
+  else
+  {
     instructions.push(Instruction::Push {
       value: crate::graph::Value::Invalid,
     });
   }
 }
 
-fn has_variable(variables: &Vec<Option<String>>, var_name: &Option<String>) -> bool {
-  if let Some(var_name) = var_name {
+fn has_variable(variables: &Vec<Option<String>>, var_name: &Option<String>) -> bool
+{
+  if let Some(var_name) = var_name
+  {
     if let Some(_) = variables
       .iter()
       .find(|item| item.as_ref().is_some_and(|v| *v == *var_name))
     {
       true
-    } else {
+    }
+    else
+    {
       false
     }
-  } else {
+  }
+  else
+  {
     false
   }
 }
@@ -61,102 +74,200 @@ fn compile_create_node(
   node: &crate::parser::ast::GraphNode,
   instructions: &mut Instructions,
   variables: &mut Vec<Option<String>>,
-) {
+)
+{
   variables.push(node.variable.to_owned());
   compile_optional_expression(node.properties.borrow(), instructions);
-  instructions.push(Instruction::CreateNode {
+  instructions.push(Instruction::CreateNodeLiteral {
     labels: node.labels.to_owned(),
   });
 }
 
-fn compile_patterns(
+fn compile_create_patterns(
   context: &context::Context,
   patterns: &Vec<crate::parser::ast::Pattern>,
-  instructions: &mut Instructions,
-  variables: &mut Vec<Option<String>>,
-) {
-  for c in patterns.iter() {
-    match c {
-      crate::parser::ast::Pattern::GraphNode(node) => {
-        compile_create_node(node, instructions, variables);
+) -> Result<Block>
+{
+  let mut instructions = Instructions::new();
+  let mut variables = Vec::<Option<String>>::new();
+
+  for c in patterns.iter()
+  {
+    match c
+    {
+      crate::parser::ast::Pattern::GraphNode(node) =>
+      {
+        compile_create_node(node, &mut instructions, &mut variables);
       }
-      crate::parser::ast::Pattern::GraphEdge(edge) => {
-        if context.existing_variable(edge.source.variable.borrow()) {
+      crate::parser::ast::Pattern::GraphEdge(edge) =>
+      {
+        if context.existing_variable(edge.source.variable.borrow())
+        {
           instructions.push(Instruction::GetVariable {
             name: edge.source.variable.as_ref().unwrap().to_owned(),
           });
-        } else {
-          compile_create_node(&edge.source, instructions, variables);
         }
-        if context.existing_variable(edge.destination.variable.borrow()) {
+        else
+        {
+          compile_create_node(&edge.source, &mut instructions, &mut variables);
+        }
+        if context.existing_variable(edge.destination.variable.borrow())
+        {
           instructions.push(Instruction::GetVariable {
             name: edge.destination.variable.as_ref().unwrap().to_owned(),
           });
-        } else {
-          compile_create_node(&edge.destination, instructions, variables);
+        }
+        else
+        {
+          compile_create_node(&edge.destination, &mut instructions, &mut variables);
         }
         variables.push(edge.variable.to_owned());
-        compile_optional_expression(edge.properties.borrow(), instructions);
-        instructions.push(Instruction::CreateEdge {
+        compile_optional_expression(edge.properties.borrow(), &mut instructions);
+        instructions.push(Instruction::CreateEdgeLiteral {
           label: edge.label.as_ref().map(|x| x.to_owned()),
         });
       }
     }
   }
+  Ok(Block::Create {
+    instructions: instructions,
+    variables: variables,
+  })
 }
 
-pub(crate) fn compile(statements: crate::parser::ast::Statements) -> crate::Result<super::Program> {
-  let context_cell = Cell::new(context::Context::default());
-  let program = statements.iter().map(|stmt| {
-    let c_context = context::build_context(stmt, context_cell.take())?;
-    let inst = match stmt {
-      ast::Statement::Create(create) => {
-        let mut instructions = Instructions::new();
-        let mut variables = Vec::<Option<String>>::new();
-        compile_patterns(
-          c_context.borrow(),
-          create.patterns.borrow(),
-          instructions.borrow_mut(),
-          variables.borrow_mut(),
-        );
-        Ok(Block::Create {
-          instructions: instructions,
-          variables: variables,
-        })
-      }
-      ast::Statement::Match(match_statement) => {
-        let mut instructions = Instructions::new();
-        let mut variables = Vec::<Option<String>>::new();
-        compile_patterns(
-          c_context.borrow(),
-          match_statement.patterns.borrow(),
-          instructions.borrow_mut(),
-          variables.borrow_mut(),
-        );
-        Ok(Block::Match {
-          instructions: instructions,
-          variables: variables,
-        })
-      }
-      ast::Statement::Return(return_statement) => {
-        let mut variables = std::collections::HashMap::<String, Instructions>::new();
-
-        for expr in return_statement.expressions.iter() {
-          let mut ints = Instructions::new();
-          compile_expression(expr.expression.borrow(), ints.borrow_mut());
-          variables.insert(expr.name.to_owned(), ints);
-        }
-
-        Ok(Block::Return {
-          variables: variables,
-        })
-      }
-      _ => Err(crate::Error::Unimplemented("compile")),
-    };
-    context_cell.set(c_context);
-    inst
+fn compile_match_node(node: &crate::parser::ast::GraphNode, instructions: &mut Instructions)
+{
+  compile_optional_expression(node.properties.borrow(), instructions);
+  instructions.push(Instruction::CreateNodeLiteral {
+    labels: node.labels.to_owned(),
   });
-  let program = program.collect::<crate::Result<super::Program>>();
+}
+
+fn compile_match_patterns(
+  context: &context::Context,
+  patterns: &Vec<crate::parser::ast::Pattern>,
+) -> Result<Vec<Block>>
+{
+  let blocks = patterns
+    .iter()
+    .map(|c| match c
+    {
+      crate::parser::ast::Pattern::GraphNode(node) =>
+      {
+        let mut instructions = Instructions::new();
+        compile_match_node(node, &mut instructions);
+        Block::MatchNode {
+          instructions: instructions,
+          variable: node.variable.to_owned(),
+        }
+      }
+      crate::parser::ast::Pattern::GraphEdge(edge) =>
+      {
+        let mut instructions = Instructions::new();
+        let mut source_variable = None;
+        if context.existing_variable(&edge.source.variable)
+        {
+          instructions.push(Instruction::GetVariable {
+            name: edge.source.variable.as_ref().unwrap().to_owned(),
+          });
+        }
+        else
+        {
+          source_variable = edge.source.variable.to_owned();
+          compile_match_node(&edge.source, &mut instructions);
+        }
+        let mut destination_variable = None;
+        if context.existing_variable(edge.destination.variable.borrow())
+        {
+          instructions.push(Instruction::GetVariable {
+            name: edge.destination.variable.as_ref().unwrap().to_owned(),
+          });
+        }
+        else
+        {
+          destination_variable = edge.destination.variable.to_owned();
+          compile_match_node(&edge.destination, &mut instructions);
+        }
+        compile_optional_expression(edge.properties.borrow(), &mut instructions);
+        instructions.push(Instruction::CreateEdgeLiteral {
+          label: edge.label.as_ref().map(|x| x.to_owned()),
+        });
+        Block::MatchEdge {
+          instructions: instructions,
+          left_variable: source_variable,
+          edge_variable: edge.variable.to_owned(),
+          right_variable: destination_variable,
+        }
+      }
+    })
+    .collect();
+  Ok(blocks)
+}
+
+pub(crate) fn compile(statements: crate::parser::ast::Statements) -> Result<super::Program>
+{
+  let context_cell = Cell::new(context::Context::default());
+  let mut statements_err = Ok(());
+  let program = statements
+    .iter()
+    .map(|stmt| {
+      let c_context_ = context::build_context(stmt, context_cell.take());
+      match c_context_
+      {
+        Ok(c_context) =>
+        {
+          let inst = match stmt
+          {
+            ast::Statement::Create(create) =>
+            {
+              let cp = compile_create_patterns(&c_context, &create.patterns);
+              match cp
+              {
+                Ok(cp) => Ok(Vec::from([cp]).into_iter()),
+                Err(e) => Err(e),
+              }
+            }
+            ast::Statement::Match(match_statement) =>
+            {
+              let cm = compile_match_patterns(&c_context, &match_statement.patterns);
+              match cm
+              {
+                Ok(cm) => Ok(cm.into_iter()),
+                Err(e) => Err(e),
+              }
+            }
+            ast::Statement::Return(return_statement) =>
+            {
+              let mut variables = std::collections::HashMap::<String, Instructions>::new();
+
+              for expr in return_statement.expressions.iter()
+              {
+                let mut ints = Instructions::new();
+                compile_expression(expr.expression.borrow(), ints.borrow_mut());
+                variables.insert(expr.name.to_owned(), ints);
+              }
+
+              Ok(
+                Vec::from([Block::Return {
+                  variables: variables,
+                }])
+                .into_iter(),
+              )
+            }
+            _ => Err(crate::Error::Unimplemented("compile")),
+          };
+          context_cell.set(c_context);
+          inst
+        }
+        Err(e) => Err(e),
+      }
+    })
+    .scan(&mut statements_err, |err, gp| {
+      gp.map_err(|e| **err = Err(e)).ok()
+    })
+    .flatten();
+  let program = program.collect::<super::Program>();
+  statements_err?;
   println!("program = {:?}", program);
-  program
+  Ok(program)
 }
