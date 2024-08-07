@@ -264,7 +264,7 @@ pub(crate) fn compile(statements: crate::parser::ast::Statements) -> Result<supe
         }
         ast::Statement::Return(return_statement) =>
         {
-          let mut variables = std::collections::HashMap::<String, Instructions>::new();
+          let mut variables = std::collections::BTreeMap::<String, Instructions>::new();
 
           for expr in return_statement.expressions.iter()
           {

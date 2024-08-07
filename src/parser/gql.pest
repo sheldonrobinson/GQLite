@@ -22,7 +22,7 @@ statement = { create_statement | match_statement | return_statement }
 
 create_statement = { "CREATE" ~ node_or_edge_pattern ~ ( "," ~ node_or_edge_pattern )* }
 match_statement = { "MATCH" ~ node_or_edge_pattern ~ ( "," ~ node_or_edge_pattern )* }
-return_statement = { "RETURN" ~ named_expression+ }
+return_statement = { "RETURN" ~ named_expression ~ ("," ~ named_expression )* }
 
 // literals
 int = { ("+" | "-")? ~ ASCII_DIGIT+ }
