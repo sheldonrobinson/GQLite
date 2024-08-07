@@ -148,7 +148,7 @@ fn build_edge_pattern(
       }
       Rule::labels =>
       {
-        label = Some(pair.as_str().to_string());
+        label = Some(pair.into_inner().as_str().to_string());
       }
       Rule::map => properties = Some(build_expression(pair)?),
       unknown_expression =>
