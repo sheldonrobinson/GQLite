@@ -5,25 +5,26 @@ pub(crate) enum Instruction
 {
   CreateNodeLiteral
   {
-    labels: Vec<String>
+    labels: Vec<String>,
   },
   CreateEdgeLiteral
   {
-    label: Option<String>
+    label: Option<String>,
   },
   Push
   {
-    value: crate::graph::Value
+    value: crate::graph::Value,
   },
   GetVariable
   {
-    name: String
+    name: String,
   },
   CreateMap
   {
-    keys: Vec<String>
+    keys: Vec<String>,
   },
-  // Duplicate,
+  Duplicate,
+  Rot3,
 }
 
 pub(crate) type Instructions = Vec<Instruction>;

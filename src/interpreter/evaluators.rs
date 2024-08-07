@@ -84,6 +84,27 @@ fn eval_instructions(
         }
         stack.push(graph::Value::Object(m));
       }
+      instructions::Instruction::Duplicate => stack.push(
+        stack
+          .last()
+          .ok_or(Error::EmptyStack("in duplicate".to_string()))?
+          .clone(),
+      ),
+      &instructions::Instruction::Rot3 =>
+      {
+        let a = stack
+          .pop()
+          .ok_or(Error::EmptyStack("in Rot3 a".to_string()))?;
+        let b = stack
+          .pop()
+          .ok_or(Error::EmptyStack("in Rot3 b".to_string()))?;
+        let c = stack
+          .pop()
+          .ok_or(Error::EmptyStack("in Rot3 c".to_string()))?;
+        stack.push(a);
+        stack.push(c);
+        stack.push(b);
+      }
     }
   }
   Ok(())
@@ -120,25 +141,21 @@ pub(crate) fn eval_program(
             {
               crate::graph::Value::Node(n) =>
               {
-                store.add_nodes(tx.borrow_mut(), "default", vec![n.to_owned()].iter())?;
-                new_row.insert(
-                  var
-                    .as_ref()
-                    .ok_or(Error::Unknown("executor/eval/variables[0].as_ref()"))?
-                    .to_owned(),
-                  crate::graph::Value::Node(n),
-                );
+                println!("Create node {:?}", n);
+                store.add_nodes(&mut tx, "default", vec![n.to_owned()].iter())?;
+                if let Some(var) = var
+                {
+                  new_row.insert(var.to_owned(), crate::graph::Value::Node(n));
+                }
               }
               crate::graph::Value::Edge(e) =>
               {
-                store.add_edges(tx.borrow_mut(), "default", vec![e.to_owned()].iter())?;
-                new_row.insert(
-                  var
-                    .as_ref()
-                    .ok_or(Error::Unknown("executor/eval/variables[0].as_ref()"))?
-                    .to_owned(),
-                  crate::graph::Value::Edge(e),
-                );
+                println!("Create edge {:?}", e);
+                store.add_edges(&mut tx, "default", vec![e.to_owned()].iter())?;
+                if let Some(var) = var
+                {
+                  new_row.insert(var.to_owned(), crate::graph::Value::Edge(e));
+                }
               }
               _ =>
               {
