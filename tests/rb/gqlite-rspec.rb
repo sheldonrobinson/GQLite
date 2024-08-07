@@ -10,8 +10,8 @@ def create_node(labels, properties)
   {"type" => "node", "labels" => labels, "properties" => properties}
 end
 
-def create_edge(label, properties)
-  {"type" => "edge", "label" => label, "properties" => properties}
+def create_edge(source, label, properties, destination)
+  {"type" => "edge", "label" => label, "properties" => properties, "source" => source, "destination" => destination}
 end
 
 def add_node(list, labels, properties)
@@ -21,7 +21,9 @@ def add_node(list, labels, properties)
 end
 
 def add_edge(list, labels_1, properties_1, label_e, properites_e, labels_2, properties_2)
-  list.push [create_node(labels_1, properties_1), create_edge(label_e, properites_e), create_node(labels_2, properties_2)]
+  n1 = create_node(labels_1, properties_1)
+  n2 = create_node(labels_2, properties_2)
+  list.push [n1, create_edge(n1, label_e, properites_e, n2), n2]
 end
 
 def make_results(gc)
@@ -37,6 +39,10 @@ def remove_keys(table)
     row.map do |val|
       if val.class == Hash
         val.delete "key"
+        if val["type"] == "edge"
+          val["source"].delete "key"
+          val["destination"].delete "key"
+        end
       end
       val
     end
@@ -127,6 +133,8 @@ RSpec.describe "connection" do
     expect(remove_keys(nodes)).to eq(make_results(gc))
 
     nodes_edges = db.execute_oc_query "MATCH (a)-[b]->(c) RETURN a, b, c"
+    expect(nodes_edges[1][0]["key"]).to eq(nodes_edges[1][1]["source"]["key"])
+    expect(nodes_edges[1][2]["key"]).to eq(nodes_edges[1][1]["destination"]["key"])
     expect(remove_keys(nodes_edges)).to eq(make_results_edges(gc_edges))
 
     # Create with match
