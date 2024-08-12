@@ -30,7 +30,7 @@ end
 module GQLiteTest
   def GQLiteTest.get_stats(handle)
     val = handle.execute_oc_query "CALL gqlite.internal.stats()"
-    return SideEffect.new val["nodes_count"], val["edges_count"], val["used_labels_nodes_count"], val["properties_count"]
+    return SideEffect.new val["nodes_count"], val["edges_count"], val["labels_nodes_count"], val["properties_count"]
   end
   def GQLiteTest.parse_side_effect_table(table)
     nodes_count = 0; edges_count = 0; labels_count = 0; properties_count = 0
@@ -324,7 +324,9 @@ end
 Given(/^any graph$/) do
   if @handle.nil?
     file = Tempfile.new('testdb')
-    @handle = GQLite::Connection.new(filename: file.path)
+    path = file.path
+    file.unlink
+    @handle = GQLite::Connection.new(filename: path)
   end
 end
 
@@ -336,7 +338,9 @@ end
 Given(/^an empty graph$/) do
   pending if @ignored_scenario
   file = Tempfile.new('testdb')
-  @handle = GQLite::Connection.new(filename: file.path)
+  path = file.path
+  file.unlink
+  @handle = GQLite::Connection.new(filename: path)
 end
 
 Given(/^parameters are:$/) do |table|

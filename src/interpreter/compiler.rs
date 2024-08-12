@@ -2,8 +2,8 @@ use std::borrow::{Borrow, BorrowMut};
 use std::cell::Cell;
 
 // use crate::graph::ToValue;
-use crate::interpreter::context;
 use crate::interpreter::instructions::{Block, Instruction, Instructions};
+use crate::interpreter::{context, instructions};
 use crate::parser::ast;
 use crate::Error;
 use crate::Result;
@@ -276,6 +276,21 @@ pub(crate) fn compile(statements: crate::parser::ast::Statements) -> Result<supe
           Ok(
             Vec::from([Block::Return {
               variables: variables,
+            }])
+            .into_iter(),
+          )
+        }
+        ast::Statement::Call(call) =>
+        {
+          let mut instructions = Instructions::new();
+          for e in call.arguments.iter().rev()
+          {
+            compile_expression(e, &mut instructions);
+          }
+          Ok(
+            Vec::from([Block::Call {
+              arguments: instructions,
+              name: call.name.to_owned(),
             }])
             .into_iter(),
           )

@@ -1,10 +1,12 @@
 #[derive(Debug)]
-pub(crate) enum Statement {
+pub(crate) enum Statement
+{
   CreateGraph(CreateGraph),
   UseGraph(UseGraph),
   Create(Create),
   Match(Match),
   Return(Return),
+  Call(Call),
 }
 
 pub(crate) type Statements = Vec<Statement>;
@@ -13,65 +15,76 @@ pub(crate) type Statements = Vec<Statement>;
 pub(crate) enum Node {}
 
 #[derive(Debug)]
-pub(crate) struct CreateGraph {
+pub(crate) struct CreateGraph
+{
   pub(crate) name: String,
 }
 
 #[derive(Debug)]
-pub(crate) struct UseGraph {
+pub(crate) struct UseGraph
+{
   pub(crate) name: String,
 }
 
 #[derive(Debug)]
-pub(crate) struct Create {
+pub(crate) struct Create
+{
   pub(crate) patterns: Vec<Pattern>,
 }
 
 #[derive(Debug)]
-pub(crate) struct Match {
+pub(crate) struct Match
+{
   pub(crate) patterns: Vec<Pattern>,
   pub(crate) where_expression: Option<Expression>,
   pub(crate) optional: bool,
 }
 
 #[derive(Debug)]
-pub(crate) struct Return {
+pub(crate) struct Return
+{
   pub(crate) all: bool,
   pub(crate) expressions: Vec<NamedExpression>,
   pub(crate) modifiers: Modifiers,
 }
 
 #[derive(Debug)]
-pub(crate) struct With {
+pub(crate) struct With
+{
   pub(crate) all: bool,
   pub(crate) expressions: Vec<NamedExpression>,
   pub(crate) modifiers: Modifiers,
 }
 
 #[derive(Debug)]
-pub(crate) struct Unwind {
+pub(crate) struct Unwind
+{
   pub(crate) name: String,
   pub(crate) expression: Expression,
 }
 
 #[derive(Debug)]
-pub(crate) struct Delete {
+pub(crate) struct Delete
+{
   pub(crate) detach: bool,
   pub(crate) expressions: Vec<Node>,
 }
 
 #[derive(Debug)]
-pub(crate) struct Set {
+pub(crate) struct Set
+{
   pub(crate) expressions: Vec<Node>,
 }
 
 #[derive(Debug)]
-pub(crate) struct Remove {
+pub(crate) struct Remove
+{
   pub(crate) expressions: Vec<Node>,
 }
 
 #[derive(Debug)]
-pub(crate) struct Call {
+pub(crate) struct Call
+{
   pub(crate) name: String,
   pub(crate) arguments: Vec<Expression>,
   pub(crate) yield_: Vec<String>,
@@ -80,27 +93,31 @@ pub(crate) struct Call {
 // Set/remove Statements
 
 #[derive(Debug)]
-pub(crate) struct SetProperty {
+pub(crate) struct SetProperty
+{
   pub(crate) left: String,
   pub(crate) path: Vec<String>,
   pub(crate) expression: Expression,
 }
 
 #[derive(Debug)]
-pub(crate) struct AddProperty {
+pub(crate) struct AddProperty
+{
   pub(crate) left: String,
   pub(crate) path: Vec<String>,
   pub(crate) expression: Expression,
 }
 
 #[derive(Debug)]
-pub(crate) struct RemoveProperty {
+pub(crate) struct RemoveProperty
+{
   pub(crate) left: String,
   pub(crate) path: Vec<String>,
 }
 
 #[derive(Debug)]
-pub(crate) struct EditLabels {
+pub(crate) struct EditLabels
+{
   pub(crate) target: String,
   pub(crate) labels: Vec<String>,
 }
@@ -108,12 +125,14 @@ pub(crate) struct EditLabels {
 // Modifiers
 
 #[derive(Debug)]
-pub(crate) struct OrderBy {
+pub(crate) struct OrderBy
+{
   pub(crate) expressions: Vec<OrderByExpression>,
 }
 
 #[derive(Default, Debug)]
-pub(crate) struct Modifiers {
+pub(crate) struct Modifiers
+{
   pub(crate) skip: Option<Expression>,
   pub(crate) limit: Option<Expression>,
   pub(crate) order_by: Option<OrderBy>,
@@ -122,7 +141,8 @@ pub(crate) struct Modifiers {
 // Expressions
 
 #[derive(Debug)]
-pub(crate) enum Expression {
+pub(crate) enum Expression
+{
   Map(Map),
   Value(Value),
   Variable(Variable),
@@ -131,7 +151,8 @@ pub(crate) enum Expression {
 // Order By Expression
 
 #[derive(Debug)]
-pub(crate) struct OrderByExpression {
+pub(crate) struct OrderByExpression
+{
   asc: bool,
   expression: Expression,
 }
@@ -139,26 +160,30 @@ pub(crate) struct OrderByExpression {
 // Values: Patterns
 
 #[derive(Debug)]
-pub(crate) enum Pattern {
+pub(crate) enum Pattern
+{
   GraphNode(GraphNode),
   GraphEdge(GraphEdge),
 }
 
 #[derive(Debug)]
-pub(crate) struct GraphNode {
+pub(crate) struct GraphNode
+{
   pub(crate) variable: Option<String>,
   pub(crate) labels: Vec<String>,
   pub(crate) properties: Option<Expression>,
 }
 
 #[derive(Debug)]
-pub(crate) enum EdgeDirectivity {
+pub(crate) enum EdgeDirectivity
+{
   Undirected,
   Directed,
 }
 
 #[derive(Debug)]
-pub(crate) struct GraphEdge {
+pub(crate) struct GraphEdge
+{
   pub(crate) variable: Option<String>,
   pub(crate) source: GraphNode,
   pub(crate) destination: GraphNode,
@@ -175,54 +200,63 @@ pub(crate) struct All {}
 pub(crate) struct EndOfList {}
 
 #[derive(Debug)]
-pub(crate) struct Value {
+pub(crate) struct Value
+{
   pub(crate) value: crate::graph::Value,
 }
 
 #[derive(Debug)]
-pub(crate) struct Map {
+pub(crate) struct Map
+{
   pub(crate) map: std::collections::HashMap<String, Expression>,
 }
 
 #[derive(Debug)]
-pub(crate) struct Array {
+pub(crate) struct Array
+{
   pub(crate) array: Vec<Expression>,
 }
 
 // Expressions
 
 #[derive(Debug)]
-pub(crate) struct NamedExpression {
+pub(crate) struct NamedExpression
+{
   pub(crate) name: String,
   pub(crate) expression: Expression,
 }
 
 #[derive(Debug)]
-pub(crate) struct Variable {
+pub(crate) struct Variable
+{
   pub(crate) identifier: String,
 }
 
 #[derive(Debug)]
-pub(crate) struct MemberAccess {
+pub(crate) struct MemberAccess
+{
   pub(crate) left: Expression,
   pub(crate) path: Vec<String>,
 }
 
 #[derive(Debug)]
-pub(crate) struct IndexAccess {
+pub(crate) struct IndexAccess
+{
   pub(crate) left: Expression,
   pub(crate) index: Expression,
   pub(crate) end: Expression,
 }
 
 #[derive(Debug)]
-pub(crate) struct HasLabels {
+pub(crate) struct HasLabels
+{
   pub(crate) left: String,
   pub(crate) labels: Vec<String>,
 }
 
 #[derive(Debug)]
-pub(crate) struct FunctionCall {
+pub(crate) struct FunctionCall
+{
   pub(crate) name: String,
   pub(crate) arguments: Vec<Expression>,
 }
@@ -231,7 +265,8 @@ pub(crate) struct FunctionCall {
 macro_rules! create_binary_op {
   ( $x:tt ) => {
     #[derive(Debug)]
-    pub(crate) struct $x {
+    pub(crate) struct $x
+    {
       pub(crate) left: Expression,
       pub(crate) right: Expression,
     }
@@ -260,7 +295,8 @@ create_binary_op! {Modulo}
 macro_rules! create_unary_op {
   ( $x:tt ) => {
     #[derive(Debug)]
-    pub(crate) struct $x {
+    pub(crate) struct $x
+    {
       value: Expression,
     }
   };
