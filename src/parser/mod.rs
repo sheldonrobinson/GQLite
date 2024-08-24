@@ -42,6 +42,18 @@ fn build_expression(pair: pest::iterators::Pair<Rule>) -> Result<ast::Expression
       }
       ast::Map { map: map }
     })),
+    Rule::member_access =>
+    {
+      let mut it = pair.into_inner();
+      let left =
+        build_expression(it.next().ok_or_else(|| {
+          crate::Error::InternalError("Missing first element of member access,")
+        })?)?;
+      Ok(ast::Expression::MemberAccess(Box::new(ast::MemberAccess {
+        left,
+        path: it.map(|el| el.as_str().to_string()).collect(),
+      })))
+    }
     Rule::string_literal => Ok(ast::Expression::Value(ast::Value {
       value: graph::Value::String(pair.into_inner().next().unwrap().as_str().to_string()),
     })),

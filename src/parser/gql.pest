@@ -1,4 +1,4 @@
-WHITESPACE = _{ " " | "\t" }
+WHITESPACE = _{ " " | "\t" | "\n" }
 ident = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* ~ "'"* }
 char = {
     !("'" | "\\") ~ ANY
@@ -37,7 +37,9 @@ function_name = { ident ~ ("." ~ ident)* }
 // Expression
 
 named_expression = { expression ~ "AS" ~ ident | expression }
-expression = _{ map | string_literal | num | true_lit | false_lit | ident }
+expression = _{ map | string_literal | num | true_lit | false_lit | member_access | ident }
+
+member_access = { ident ~ ("." ~ ident)+}
 
 pair = { ident ~ ":" ~ expression }
 

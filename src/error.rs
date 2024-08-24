@@ -19,6 +19,8 @@ pub enum Error
   EmptyStack(String),
   #[error("Unknown error at {0}")]
   Unknown(&'static str),
+  #[error("Internal error at {0}")]
+  InternalError(&'static str),
   #[error("Unimplemented error at {0}")]
   Unimplemented(&'static str),
 }
