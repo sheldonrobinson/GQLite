@@ -1,11 +1,12 @@
 use std::borrow::Borrow;
 use std::collections::HashMap;
 
-use crate::parser::ast::{self, Statement};
+use crate::parser::ast;
 use crate::Error;
 use crate::Result;
 
 #[derive(Debug, PartialEq, Eq)]
+#[allow(unused)]
 pub(crate) enum VariableType
 {
   Node,

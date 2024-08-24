@@ -2,10 +2,9 @@ use std::borrow::{Borrow, BorrowMut};
 use std::cell::Cell;
 
 // use crate::graph::ToValue;
+use crate::interpreter::context;
 use crate::interpreter::instructions::{Block, Instruction, Instructions};
-use crate::interpreter::{context, instructions};
-use crate::parser::ast::{self, MemberAccess};
-use crate::Error;
+use crate::parser::ast;
 use crate::Result;
 
 fn compile_expression(expression: &crate::parser::ast::Expression, instructions: &mut Instructions)

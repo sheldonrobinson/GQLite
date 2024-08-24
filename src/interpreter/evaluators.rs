@@ -1,9 +1,6 @@
 use std::borrow::{Borrow, BorrowMut};
 
-use crate::{
-  graph::{self, Key},
-  Error, Result,
-};
+use crate::{graph, Error, Result};
 
 use super::instructions;
 

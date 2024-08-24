@@ -1,6 +1,36 @@
+/// Represent compile time errors
+#[derive(thiserror::Error, Debug)]
+pub enum CompileTimeError
+{
+  /// This error happens
+  #[error("VariableAlreadyBound: Variable {name} is already bound.")]
+  VariableAlreadyBound
+  {
+    name: String
+  },
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum RunTimeError {}
+
+#[derive(thiserror::Error, Debug)]
+pub enum InternalError {}
+
+/// GQLite errors
 #[derive(thiserror::Error, Debug)]
 pub enum Error
 {
+  /// Error that occurs during compilation
+  #[error("CompileTime: {0}")]
+  CompileTime(#[from] CompileTimeError),
+  /// Error that occurs during runtime
+  #[error("RunTime: {0}")]
+  RunTime(#[from] RunTimeError),
+  /// Error that should not occurs and most likely correspond to a bug
+  #[error("Internal: {0}")]
+  Internal(#[from] InternalError),
+
+  // Following errors need reviews, and most would fall in the internal error category
   #[error("An error occured while serialization to Cbor: {0}")]
   CborSerialisationError(#[from] ciborium::ser::Error<std::io::Error>),
   #[error("An error occured while deserialization from Cbor: {0}")]

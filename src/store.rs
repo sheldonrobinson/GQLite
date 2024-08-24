@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
-use std::default;
 use std::{borrow::Borrow, collections::HashMap};
 
 use persy::PersyError;

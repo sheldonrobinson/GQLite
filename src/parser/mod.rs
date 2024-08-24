@@ -1,10 +1,8 @@
-use std::env::var;
-
-use ast::{Expression, Value, Variable};
-use pest::{error::Error, Parser};
+use ast::Expression;
+use pest::Parser;
 use pest_derive::Parser;
 
-use crate::{graph, properties, Result};
+use crate::{graph, Result};
 
 pub(crate) mod ast;
 
