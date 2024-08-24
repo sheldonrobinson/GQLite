@@ -47,7 +47,7 @@ fn build_expression(pair: pest::iterators::Pair<Rule>) -> Result<ast::Expression
       let mut it = pair.into_inner();
       let left =
         build_expression(it.next().ok_or_else(|| {
-          crate::Error::InternalError("Missing first element of member access,")
+          crate::Error::InternalError("Missing first element of member access.")
         })?)?;
       Ok(ast::Expression::MemberAccess(Box::new(ast::MemberAccess {
         left,
@@ -57,6 +57,34 @@ fn build_expression(pair: pest::iterators::Pair<Rule>) -> Result<ast::Expression
     Rule::string_literal => Ok(ast::Expression::Value(ast::Value {
       value: graph::Value::String(pair.into_inner().next().unwrap().as_str().to_string()),
     })),
+    Rule::num =>
+    {
+      println!("num : {:?}", pair);
+      let mut it = pair.into_inner();
+      let num_str = it
+        .next()
+        .ok_or_else(|| crate::Error::InternalError("Missing first element of number."))?
+        .as_str();
+      match it.next()
+      {
+        Some(frag) =>
+        {
+          let num_str = num_str.to_owned() + frag.as_str();
+          match it.next()
+          {
+            Some(frag) => Ok(ast::Expression::Value(ast::Value {
+              value: graph::Value::Float((num_str + frag.as_str()).as_str().parse()?),
+            })),
+            None => Ok(ast::Expression::Value(ast::Value {
+              value: graph::Value::Float(num_str.as_str().parse()?),
+            })),
+          }
+        }
+        None => Ok(ast::Expression::Value(ast::Value {
+          value: graph::Value::Integer(num_str.parse()?),
+        })),
+      }
+    }
     unknown_expression => Err(crate::Error::UnxpectedExpression(
       "build_expression",
       format!("{unknown_expression:?}"),

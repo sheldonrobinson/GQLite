@@ -7,6 +7,10 @@ pub enum Error
   CborDeserialisationError(#[from] ciborium::de::Error<std::io::Error>),
   #[error("Parse error: {0}")]
   ParseError(#[from] pest::error::Error<crate::parser::Rule>),
+  #[error("Parse int error: {0}")]
+  ParseFloatError(#[from] std::num::ParseFloatError),
+  #[error("Parse int error: {0}")]
+  ParseIntError(#[from] std::num::ParseIntError),
   #[error("Store error: {0}")]
   StoreError(String),
   #[error("Unexpected expression from the parser: {1} in {0}")]
