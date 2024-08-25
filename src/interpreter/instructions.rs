@@ -34,12 +34,18 @@ pub(crate) enum Instruction
 pub(crate) type Instructions = Vec<Instruction>;
 
 #[derive(Debug)]
+pub(crate) struct CreateAction
+{
+  pub(crate) instructions: Instructions,
+  pub(crate) variables: Vec<Option<String>>,
+}
+
+#[derive(Debug)]
 pub(crate) enum Block
 {
   Create
   {
-    instructions: Instructions,
-    variables: Vec<Option<String>>,
+    actions: Vec<CreateAction>
   },
   MatchNode
   {

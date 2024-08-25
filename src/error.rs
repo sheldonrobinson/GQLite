@@ -5,15 +5,29 @@ use pest::error;
 pub enum CompileTimeError
 {
   /// This error happens
-  #[error("VariableAlreadyBound: Variable {name} is already bound.")]
+  #[error("VariableAlreadyBound: Variable '{name}' is already bound.")]
   VariableAlreadyBound
+  {
+    name: String
+  },
+  /// Variable is not defined
+  #[error("UndefinedVariable: Unknown variable '{name}'.")]
+  UndefinedVariable
   {
     name: String
   },
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum RunTimeError {}
+pub enum RunTimeError
+{
+  /// Variable is not defined
+  #[error("UndefinedVariable: Unknown variable '{name}'.")]
+  UndefinedVariable
+  {
+    name: String
+  },
+}
 
 #[derive(thiserror::Error, Debug)]
 pub enum InternalError
