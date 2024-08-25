@@ -159,7 +159,7 @@ set_package_properties(Crystal PROPERTIES
 ## Corrosion (build rust from CMake)
 
 include(FetchContent)
-
+set(FETCHCONTENT_FULLY_DISCONNECTED CACHE ON "")
 FetchContent_Declare(
     Corrosion
     GIT_REPOSITORY https://github.com/corrosion-rs/corrosion.git
@@ -168,7 +168,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(Corrosion)
 
 corrosion_import_crate(MANIFEST_PATH Cargo.toml)
-corrosion_import_crate(MANIFEST_PATH tools/gqlite-cmd/Cargo.toml)
+corrosion_import_crate(MANIFEST_PATH tools/gqlite-cmd/Cargo.toml TARGET_NAME_PREFIX cmd_)
 
 ########################
 ## Build library

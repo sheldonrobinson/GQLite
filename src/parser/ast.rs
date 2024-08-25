@@ -142,7 +142,7 @@ pub(crate) struct Modifiers
 
 // Expressions
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) enum Expression
 {
   Map(Map),
@@ -169,7 +169,7 @@ pub(crate) enum Pattern
   GraphEdge(GraphEdge),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct GraphNode
 {
   pub(crate) variable: Option<String>,
@@ -202,13 +202,13 @@ pub(crate) struct All {}
 #[derive(Debug)]
 pub(crate) struct EndOfList {}
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Value
 {
   pub(crate) value: crate::graph::Value,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Map
 {
   pub(crate) map: std::collections::HashMap<String, Expression>,
@@ -229,13 +229,13 @@ pub(crate) struct NamedExpression
   pub(crate) expression: Expression,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Variable
 {
   pub(crate) identifier: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) struct MemberAccess
 {
   pub(crate) left: Expression,
