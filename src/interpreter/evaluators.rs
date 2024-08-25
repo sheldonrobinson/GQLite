@@ -1,6 +1,6 @@
 use std::borrow::{Borrow, BorrowMut};
 
-use crate::{graph, Error, Result};
+use crate::{error::InternalError, graph, Error, Result};
 
 use super::instructions;
 
@@ -86,7 +86,6 @@ fn eval_instructions(
         let v = stack
           .pop()
           .ok_or_else(|| Error::InternalError("Missing stack value for member access."))?;
-        println!("{:?} {:?}", v, path);
         stack.push(v.access(path.iter()));
       }
       instructions::Instruction::Duplicate => stack.push(
@@ -146,7 +145,6 @@ pub(crate) fn eval_program(
             {
               crate::graph::Value::Node(n) =>
               {
-                println!("Create node {:?}", n);
                 store.add_nodes(&mut tx, "default", vec![n.to_owned()].iter())?;
                 if let Some(var) = var
                 {
@@ -155,7 +153,6 @@ pub(crate) fn eval_program(
               }
               crate::graph::Value::Edge(e) =>
               {
-                println!("Create edge {:?}", e);
                 store.add_edges(&mut tx, "default", vec![e.to_owned()].iter())?;
                 if let Some(var) = var
                 {
@@ -181,11 +178,17 @@ pub(crate) fn eval_program(
         for row in input_table.iter()
         {
           eval_instructions(stack.borrow_mut(), row, instructions.borrow())?;
-          let _template = stack.pop().unwrap();
+          let template = stack.pop().unwrap();
           let nodes = store.select_nodes(
             tx.borrow_mut(),
             "default",
-            crate::store::SelectNodeQuery::select_all(),
+            crate::store::SelectNodeQuery::select_labels(
+              template
+                .to_node()
+                .ok_or_else(|| InternalError::ExpectedNode("eval_program/MatchNode"))?
+                .labels
+                .iter(),
+            ),
           )?;
 
           for node in nodes.iter()

@@ -1,3 +1,5 @@
+use pest::error;
+
 /// Represent compile time errors
 #[derive(thiserror::Error, Debug)]
 pub enum CompileTimeError
@@ -14,7 +16,11 @@ pub enum CompileTimeError
 pub enum RunTimeError {}
 
 #[derive(thiserror::Error, Debug)]
-pub enum InternalError {}
+pub enum InternalError
+{
+  #[error("Expected a value to be a node in {0}")]
+  ExpectedNode(&'static str),
+}
 
 /// GQLite errors
 #[derive(thiserror::Error, Debug)]
