@@ -19,6 +19,7 @@ fn eval_instructions(
     {
       instructions::Instruction::CreateEdgeLiteral { label } =>
       {
+        println!("{:?}", stack);
         let props = stack.pop().unwrap();
         let dst: graph::Node = stack
           .pop()
@@ -30,6 +31,7 @@ fn eval_instructions(
           .unwrap()
           .to_node()
           .ok_or(Error::Unknown("Expected node on stack."))?;
+        println!("{:?} {:?} ", src, dst);
         stack.push(
           crate::graph::Edge {
             key: graph::Key::default(),
@@ -40,6 +42,7 @@ fn eval_instructions(
           }
           .into(),
         );
+        println!("{:?}", stack);
       }
       instructions::Instruction::CreateNodeLiteral { labels } =>
       {
@@ -137,6 +140,7 @@ pub(crate) fn eval_program(
     {
       instructions::Block::Create { actions } =>
       {
+        println!("instructions::Block::Create input {:?}", input_table);
         let mut output_table = crate::value_table::ValueTable::new();
         for row in input_table.iter()
         {
@@ -212,6 +216,7 @@ pub(crate) fn eval_program(
             output_table.add_row(new_row);
           }
         }
+        println!("match output {:?}", output_table);
         input_table = output_table;
       }
       instructions::Block::MatchEdge {
