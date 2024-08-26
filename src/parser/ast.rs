@@ -177,14 +177,14 @@ pub(crate) struct GraphNode
   pub(crate) properties: Option<Expression>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) enum EdgeDirectivity
 {
   Undirected,
   Directed,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct GraphEdge
 {
   pub(crate) variable: Option<String>,

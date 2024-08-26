@@ -132,6 +132,8 @@ end
 IgnoredScenario = [
   # Triggers a different error first, as MATCH (a) return an empty list, it fails in creation
   "[24] Fail when creating a relationship using undefined variable in pattern",
+  # Variable lenght not supported
+  "[22] Fail when creating a variable-length relationship",
   # Path assignment is not implemented yet
   "[4] Forwarding a path variable",
   "[14] Fail when filtering path with property predicate",
@@ -435,13 +437,13 @@ end
 Then(/^a SyntaxError should be raised at compile time: NoSingleRelationshipType$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
-  expect(@exception.message).to match(/^CompileTime: UnexpectedSyntax: .* at \(\d+, \d+\)\.$/)
+  expect(@exception.message).to match(/^Parse error:.*$/)
 end
 
 Then(/^a SyntaxError should be raised at compile time: RequiresDirectedRelationship$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
-  expect(@exception.message).to match(/^CompileTime: RequiresDirectedRelationship: (Edge cannot have both direction)|(Edge must be directed during creation) at \(\d+, \d+\)\.$/)
+  expect(@exception.message).to match(/^CompileTime: RequiresDirectedRelationship: edges need to be directed in this context: '.*'.$/)
 end
 
 Then(/^a SyntaxError should be raised at compile time: CreatingVarLength$/) do

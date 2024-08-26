@@ -143,6 +143,7 @@ fn compile_create_patterns(
           instructions.push(Instruction::Duplicate);
           instructions.push(Instruction::Rot3);
         }
+        validator.declare_edge_variable(edge)?;
         variables.push(edge.variable.to_owned());
         compile_optional_expression(edge.properties.borrow(), &mut instructions);
         instructions.push(Instruction::CreateEdgeLiteral {
@@ -190,6 +191,7 @@ fn compile_match_patterns(
       crate::parser::ast::Pattern::GraphEdge(edge) =>
       {
         let mut instructions = Instructions::new();
+        validator.declare_edge_variable(edge)?;
         let mut source_variable = None;
         if validator.check_existing_node(&edge.source)?
         {

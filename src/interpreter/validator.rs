@@ -1,11 +1,32 @@
-use std::borrow::Borrow;
 use std::collections::HashMap;
 
 use crate::error::CompileTimeError;
-use crate::graph;
 use crate::parser::ast;
-use crate::Error;
 use crate::Result;
+
+// __     __         _       _     _     _____
+// \ \   / /_ _ _ __(_) __ _| |__ | | __|_   _|   _ _ __   ___
+//  \ \ / / _` | '__| |/ _` | '_ \| |/ _ \| || | | | '_ \ / _ \
+//   \ V / (_| | |  | | (_| | |_) | |  __/| || |_| | |_) |  __/
+//    \_/ \__,_|_|  |_|\__,_|_.__/|_|\___||_| \__, | .__/ \___|
+//                                            |___/|_|
+
+#[derive(Debug, PartialEq)]
+#[allow(unused)]
+pub(crate) enum VariableType
+{
+  Node,
+  Edge,
+  Number,
+  String,
+  Variant,
+}
+
+// __     __         _       _     _
+// \ \   / /_ _ _ __(_) __ _| |__ | | ___
+//  \ \ / / _` | '__| |/ _` | '_ \| |/ _ \
+//   \ V / (_| | |  | | (_| | |_) | |  __/
+//    \_/ \__,_|_|  |_|\__,_|_.__/|_|\___|
 
 #[derive(Debug)]
 #[allow(unused)]
@@ -19,17 +40,6 @@ pub(crate) enum Variable
   {
     edge: ast::GraphEdge,
   },
-  Number,
-  String,
-  Variant,
-}
-
-#[derive(Debug, PartialEq)]
-#[allow(unused)]
-pub(crate) enum VariableType
-{
-  Node,
-  Edge,
   Number,
   String,
   Variant,
@@ -58,6 +68,20 @@ impl From<ast::GraphNode> for Variable
   }
 }
 
+impl From<ast::GraphEdge> for Variable
+{
+  fn from(value: ast::GraphEdge) -> Self
+  {
+    Self::Edge { edge: value }
+  }
+}
+
+// __     __    _ _     _       _
+// \ \   / /_ _| (_) __| | __ _| |_ ___  _ __
+//  \ \ / / _` | | |/ _` |/ _` | __/ _ \| '__|
+//   \ V / (_| | | | (_| | (_| | || (_) | |
+//    \_/ \__,_|_|_|\__,_|\__,_|\__\___/|_|
+
 #[derive(Debug, Default)]
 pub(crate) struct Validator
 {
@@ -67,11 +91,37 @@ pub(crate) struct Validator
 
 impl Validator
 {
+  pub(crate) fn declare_edge_variable(&mut self, edge: &ast::GraphEdge) -> Result<()>
+  {
+    if let Some(var_name) = &edge.variable
+    {
+      if let Some(_) = self.variables.get(var_name)
+      {
+        Err(
+          CompileTimeError::VariableAlreadyBound {
+            name: var_name.to_owned(),
+          }
+          .into(),
+        )
+      }
+      else
+      {
+        self
+          .variables
+          .insert(var_name.to_owned(), (*edge).to_owned().into());
+        Ok(())
+      }
+    }
+    else
+    {
+      Ok(())
+    }
+  }
   pub(crate) fn declare_node_variable(&mut self, node: &ast::GraphNode) -> Result<()>
   {
     if let Some(var_name) = &node.variable
     {
-      if let Some(var) = self.variables.get(var_name)
+      if let Some(_) = self.variables.get(var_name)
       {
         Err(
           CompileTimeError::VariableAlreadyBound {

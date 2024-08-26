@@ -1,5 +1,3 @@
-use pest::error;
-
 /// Represent compile time errors
 #[derive(thiserror::Error, Debug)]
 pub enum CompileTimeError
@@ -15,6 +13,12 @@ pub enum CompileTimeError
   UndefinedVariable
   {
     name: String
+  },
+  /// ()-[]-() is not accepted in this context
+  #[error("RequiresDirectedRelationship: edges need to be directed in this context: '{context}'.")]
+  RequiresDirectedRelationship
+  {
+    context: &'static str
   },
 }
 
