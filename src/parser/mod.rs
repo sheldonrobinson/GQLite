@@ -3,8 +3,9 @@ use std::error;
 use ast::Expression;
 use pest::Parser;
 use pest_derive::Parser;
+use rand::Error;
 
-use crate::{error::CompileTimeError, graph, Result};
+use crate::{error::CompileTimeError, error::InternalError, graph, Result};
 
 pub(crate) mod ast;
 
@@ -307,6 +308,39 @@ fn build_ast_from_statement(pair: pest::iterators::Pair<Rule>) -> Result<ast::St
       Ok(ast::Statement::Return(ast::Return {
         all: false,
         expressions: named_expressions,
+        modifiers: ast::Modifiers::default(),
+      }))
+    }
+    Rule::with_statement =>
+    {
+      let mut all = false;
+      let mut expressions = vec![];
+      let mut it = pair.into_inner();
+      let first = it.next();
+      match first
+      {
+        Some(pair) => match pair.as_rule()
+        {
+          Rule::star => all = true,
+          Rule::named_expression => expressions.push(build_named_expression(pair)?),
+          _ => Err(InternalError::UnexpectedPair {
+            context: "build_ast_from_statement/with_statement",
+            pair: pair.as_str().to_string(),
+          })?,
+        },
+        _ => Err(InternalError::MissingPair {
+          context: "build_ast_from_statement/with_statement",
+        })?,
+      }
+      expressions.append(
+        &mut it
+          .map(|pair| build_named_expression(pair))
+          .collect::<Result<Vec<ast::NamedExpression>>>()?,
+      );
+
+      Ok(ast::Statement::With(ast::With {
+        all,
+        expressions,
         modifiers: ast::Modifiers::default(),
       }))
     }

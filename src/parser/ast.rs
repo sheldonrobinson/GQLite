@@ -9,6 +9,7 @@ pub(crate) enum Statement
   Match(Match),
   Return(Return),
   Call(Call),
+  With(With),
 }
 
 pub(crate) type Statements = Vec<Statement>;
