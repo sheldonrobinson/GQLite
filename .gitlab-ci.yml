@@ -52,7 +52,7 @@ debian:test:   # This job runs in the test stage.
 
 # Ubuntu
 ubuntu:build:
-  image: cyrilleberger/cyloncore-ci:ubuntu
+  image: cyrilleberger/cyloncore-ci:ubuntu-noble
   stage: build
   <<: *build_definition
 
