@@ -392,16 +392,17 @@ impl Store
         x.key.borrow().into(),
         pid,
       )?;
-      transaction.put::<u128, persy::PersyId>(
-        &graph_info.edges_source_uuid_index.as_str(),
-        x.source.key.borrow().into(),
-        pid,
-      )?;
-      transaction.put::<u128, persy::PersyId>(
-        graph_info.edges_destination_uuid_index.as_str(),
-        x.destination.key.borrow().into(),
-        pid,
-      )?;
+      // TODO support for proper index, but the following is buggy as it only allow a node to belong to one edge
+      // transaction.put::<u128, persy::PersyId>(
+      //   &graph_info.edges_source_uuid_index.as_str(),
+      //   x.source.key.borrow().into(),
+      //   pid,
+      // )?;
+      // transaction.put::<u128, persy::PersyId>(
+      //   graph_info.edges_destination_uuid_index.as_str(),
+      //   x.destination.key.borrow().into(),
+      //   pid,
+      // )?;
     }
     Ok(())
   }
