@@ -1,6 +1,7 @@
 use std::collections::HashMap;
+use std::hash::Hash;
 
-use crate::error::CompileTimeError;
+use crate::error::{CompileTimeError, InternalError};
 use crate::parser::ast;
 use crate::Result;
 
@@ -28,7 +29,7 @@ pub(crate) enum VariableType
 //   \ V / (_| | |  | | (_| | |_) | |  __/
 //    \_/ \__,_|_|  |_|\__,_|_.__/|_|\___|
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[allow(unused)]
 pub(crate) enum Variable
 {
@@ -86,11 +87,39 @@ impl From<ast::GraphEdge> for Variable
 pub(crate) struct Validator
 {
   variables: HashMap<String, Variable>,
-  new_variables: Vec<String>,
 }
 
 impl Validator
 {
+  pub(crate) fn to_variables(&self) -> HashMap<String, Variable>
+  {
+    self.variables.to_owned()
+  }
+  pub(crate) fn set_variables(&mut self, variables: HashMap<String, Variable>)
+  {
+    self.variables = variables;
+  }
+  pub(crate) fn evaluate(&self, expression: &ast::Expression) -> Result<Variable>
+  {
+    match expression
+    {
+      ast::Expression::Map(_) => Ok(Variable::Variant),
+      ast::Expression::MemberAccess(_) => Ok(Variable::Variant),
+      ast::Expression::Value(_) => Ok(Variable::Variant),
+      ast::Expression::Variable(var) =>
+      {
+        let v =
+          self
+            .variables
+            .get(&var.identifier)
+            .ok_or_else(|| InternalError::UnknownVariable {
+              context: "Validator/evaluate",
+              variable: var.identifier.to_owned(),
+            })?;
+        Ok((*v).to_owned())
+      }
+    }
+  }
   pub(crate) fn declare_edge_variable(&mut self, edge: &ast::GraphEdge) -> Result<()>
   {
     if let Some(var_name) = &edge.variable

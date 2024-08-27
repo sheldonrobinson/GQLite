@@ -1,7 +1,5 @@
-use std::borrow::{Borrow, BorrowMut};
-
 // use crate::graph::ToValue;
-use crate::interpreter::instructions::{self, Block, CreateAction, Instruction, Instructions};
+use crate::interpreter::instructions::{Block, CreateAction, Instruction, Instructions};
 use crate::interpreter::validator;
 use crate::parser::ast;
 use crate::Result;
@@ -84,7 +82,7 @@ fn compile_create_node(
 {
   validator.declare_node_variable(node)?;
   variables.push(node.variable.to_owned());
-  compile_optional_expression(node.properties.borrow(), instructions);
+  compile_optional_expression(&node.properties, instructions);
   instructions.push(Instruction::CreateNodeLiteral {
     labels: node.labels.to_owned(),
   });
@@ -108,7 +106,6 @@ fn compile_create_patterns(
       crate::parser::ast::Pattern::GraphEdge(edge) =>
       {
         println!("{:?}", validator);
-        let mut second_should_swap = false;
         if validator.check_existing_node(&edge.source)?
         {
           instructions.push(Instruction::GetVariable {
@@ -145,7 +142,7 @@ fn compile_create_patterns(
         }
         validator.declare_edge_variable(edge)?;
         variables.push(edge.variable.to_owned());
-        compile_optional_expression(edge.properties.borrow(), &mut instructions);
+        compile_optional_expression(&edge.properties, &mut instructions);
         instructions.push(Instruction::CreateEdgeLiteral {
           label: edge.label.as_ref().map(|x| x.to_owned()),
         });
@@ -163,7 +160,7 @@ fn compile_create_patterns(
 
 fn compile_match_node(node: &crate::parser::ast::GraphNode, instructions: &mut Instructions)
 {
-  compile_optional_expression(node.properties.borrow(), instructions);
+  compile_optional_expression(&node.properties, instructions);
   instructions.push(Instruction::CreateNodeLiteral {
     labels: node.labels.to_owned(),
   });
@@ -216,7 +213,7 @@ fn compile_match_patterns(
           destination_variable = edge.destination.variable.to_owned();
           compile_match_node(&edge.destination, &mut instructions);
         }
-        compile_optional_expression(edge.properties.borrow(), &mut instructions);
+        compile_optional_expression(&edge.properties, &mut instructions);
         instructions.push(Instruction::CreateEdgeLiteral {
           label: edge.label.as_ref().map(|x| x.to_owned()),
         });
@@ -294,13 +291,20 @@ pub(crate) fn compile(statements: crate::parser::ast::Statements) -> Result<supe
         }
         ast::Statement::With(with) =>
         {
+          let mut val_variables = Default::default();
+          if with.all
+          {
+            val_variables = validator.to_variables();
+          }
           let mut variables = std::collections::BTreeMap::<String, Instructions>::new();
           for e in with.expressions.iter()
           {
             let mut instructions = Instructions::new();
             compile_expression(&e.expression, &mut instructions);
             variables.insert(e.name.to_owned(), instructions);
+            val_variables.insert(e.name.to_owned(), validator.evaluate(&e.expression)?);
           }
+          validator.set_variables(val_variables);
           Ok(
             Vec::from([Block::With {
               all: with.all,

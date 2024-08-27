@@ -51,6 +51,12 @@ pub enum InternalError
   {
     context: &'static str, pair: String
   },
+  #[error("Unknown variable {variable} in {context}.")]
+  UnknownVariable
+  {
+    context: &'static str,
+    variable: String,
+  },
 }
 
 /// GQLite errors

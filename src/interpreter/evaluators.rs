@@ -31,7 +31,7 @@ fn eval_instructions(
           .unwrap()
           .to_node()
           .ok_or(Error::Unknown("Expected node on stack."))?;
-        println!("{:?} {:?} ", src, dst);
+        println!("Create edge between {:?} {:?} ", src, dst);
         stack.push(
           crate::graph::Edge {
             key: graph::Key::default(),
