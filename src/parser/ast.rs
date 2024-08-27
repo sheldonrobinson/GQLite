@@ -10,6 +10,7 @@ pub(crate) enum Statement
   Return(Return),
   Call(Call),
   With(With),
+  Unwind(Unwind),
 }
 
 pub(crate) type Statements = Vec<Statement>;
@@ -146,6 +147,7 @@ pub(crate) struct Modifiers
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum Expression
 {
+  Array(Array),
   Map(Map),
   MemberAccess(Box<MemberAccess>),
   Value(Value),
@@ -215,7 +217,7 @@ pub(crate) struct Map
   pub(crate) map: std::collections::HashMap<String, Expression>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Array
 {
   pub(crate) array: Vec<Expression>,

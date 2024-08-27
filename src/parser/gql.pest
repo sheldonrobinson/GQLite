@@ -20,7 +20,7 @@ undirected_edge_pattern = { ( "(" ~ pattern ~ ")-[" ~ pattern ~ "]-(" ~ pattern 
 node_or_edge_pattern = _{ edge_pattern | reverse_edge_pattern | undirected_edge_pattern | node_pattern  }
 
 // Statements
-statement = { create_statement | match_statement | return_statement | call_statement | with_statement }
+statement = { create_statement | match_statement | return_statement | call_statement | with_statement | unwind_statement }
 
 star = { "*" }
 
@@ -29,6 +29,7 @@ match_statement = { "MATCH" ~ node_or_edge_pattern ~ ( "," ~ node_or_edge_patter
 return_statement = { "RETURN" ~ named_expression ~ ("," ~ named_expression )* }
 call_statement = { "CALL" ~ function_name ~ "()" }
 with_statement = { "WITH" ~ (star | named_expression) ~ ("," ~ named_expression )* }
+unwind_statement = { "UNWIND" ~ named_expression }
 
 // literals
 int = { ("+" | "-")? ~ ASCII_DIGIT+ }
@@ -43,11 +44,16 @@ function_name = { ident ~ ("." ~ ident)* }
 // Expression
 
 named_expression = { expression ~ "AS" ~ ident | expression }
-expression = _{ null_lit | true_lit | false_lit | num | string_literal | map | member_access | ident }
+expression = _{ null_lit | true_lit | false_lit | num | string_literal | map | array | member_access | ident }
 
 member_access = { ident ~ ("." ~ ident)+}
 
 pair = { ident ~ ":" ~ expression }
+
+array = {
+   "[" ~ "]" |
+   "[" ~ expression ~ ("," ~ expression)* ~ "]"
+  }
 
 map = {
   "{" ~ "}" |

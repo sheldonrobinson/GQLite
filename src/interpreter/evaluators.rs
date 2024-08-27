@@ -1,9 +1,6 @@
 use std::borrow::{Borrow, BorrowMut};
 
-use crate::{
-  error::{self, InternalError},
-  graph, Error, Result,
-};
+use crate::{error::InternalError, graph, Error, Result};
 
 use super::instructions;
 
@@ -75,6 +72,21 @@ fn eval_instructions(
             .into(),
           );
         }
+      }
+      instructions::Instruction::CreateArray { length } =>
+      {
+        let mut m = vec![];
+        for _ in 0..*length
+        {
+          m.push(
+            stack
+              .pop()
+              .ok_or_else(|| InternalError::MissingStackValue {
+                context: "eval_instructions/CreateArray",
+              })?,
+          );
+        }
+        stack.push(graph::Value::Array(m));
       }
       instructions::Instruction::CreateMap { keys } =>
       {
@@ -280,7 +292,11 @@ pub(crate) fn eval_program(
           {
             let mut stack = Vec::<crate::graph::Value>::new();
             eval_instructions(&mut stack, row, instructions)?;
-            let value = stack.first().ok_or(Error::Unknown("eval_program/return"))?;
+            let value = stack
+              .first()
+              .ok_or_else(|| InternalError::MissingStackValue {
+                context: "eval_program/return",
+              })?;
             out_row.insert(name.to_owned(), value.to_owned());
           }
           output_table.add_row(out_row);
@@ -325,13 +341,50 @@ pub(crate) fn eval_program(
           {
             let mut stack = Vec::<crate::graph::Value>::new();
             eval_instructions(&mut stack, row, instructions)?;
-            let value = stack.first().ok_or(Error::Unknown("eval_program/return"))?;
+            let value = stack
+              .first()
+              .ok_or_else(|| InternalError::MissingStackValue {
+                context: "eval_program/with",
+              })?;
             out_row.insert(name.to_owned(), value.to_owned());
           }
           output_table.add_row(out_row);
         }
         input_table = output_table;
         println!("After with: {:?}", input_table);
+      }
+      instructions::Block::Unwind { name, instructions } =>
+      {
+        let mut output_table = crate::value_table::ValueTable::new();
+        for row in input_table.iter()
+        {
+          let mut stack = Vec::<crate::graph::Value>::new();
+          eval_instructions(&mut stack, row, &instructions)?;
+          let value = stack
+            .pop()
+            .ok_or_else(|| InternalError::MissingStackValue {
+              context: "eval_program/unwind",
+            })?;
+          match value
+          {
+            graph::Value::Array(arr) =>
+            {
+              for v in arr.into_iter()
+              {
+                let mut out_row = row.clone();
+                out_row.insert(name.to_owned(), v);
+                output_table.add_row(out_row);
+              }
+            }
+            _ =>
+            {
+              let mut out_row = row.clone();
+              out_row.insert(name.to_owned(), value);
+              output_table.add_row(out_row);
+            }
+          }
+        }
+        input_table = output_table;
       }
       instructions::Block::Call { arguments: _, name } =>
       {

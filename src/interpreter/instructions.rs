@@ -19,6 +19,10 @@ pub(crate) enum Instruction
   {
     name: String,
   },
+  CreateArray
+  {
+    length: usize,
+  },
   CreateMap
   {
     keys: Vec<String>,
@@ -72,5 +76,10 @@ pub(crate) enum Block
   {
     all: bool,
     variables: BTreeMap<String, Instructions>,
+  },
+  Unwind
+  {
+    name: String,
+    instructions: Instructions,
   },
 }
