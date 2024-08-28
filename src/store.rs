@@ -96,20 +96,47 @@ struct PersistentEdge
 //                                                                          |___/
 
 #[derive(Default)]
-pub(crate) struct SelectNodeQuery<'a, TKeys, TLabels>
+pub(crate) struct SelectNodeQuery<'a, TKeys, TLabels, TProperties>
 where
   TKeys: Iterator<Item = &'a crate::graph::Key>,
   TLabels: Iterator<Item = &'a String>,
+  TProperties: Iterator<Item = (&'a String, &'a graph::Value)>,
 {
   keys: Option<TKeys>,
   labels: Option<TLabels>,
+  properties: Option<TProperties>,
+}
+
+pub(crate) struct NullIterator<'a, T: 'a>
+{
+  _phantom: core::marker::PhantomData<&'a T>,
+}
+
+impl<'a, T: 'a> Default for NullIterator<'a, T>
+{
+  fn default() -> Self
+  {
+    Self {
+      _phantom: Default::default(),
+    }
+  }
+}
+
+impl<'a, T: 'a> Iterator for NullIterator<'a, T>
+{
+  type Item = T;
+  fn next(&mut self) -> Option<Self::Item>
+  {
+    None
+  }
 }
 
 impl
   SelectNodeQuery<
     'static,
-    core::slice::Iter<'static, crate::graph::Key>,
-    core::slice::Iter<'static, String>,
+    NullIterator<'static, &crate::graph::Key>,
+    NullIterator<'static, &String>,
+    NullIterator<'static, (&'static String, &'static graph::Value)>,
   >
 {
   pub(crate) fn select_all() -> Self
@@ -119,25 +146,66 @@ impl
 }
 
 impl<'a, TKeys: Iterator<Item = &'a crate::graph::Key>>
-  SelectNodeQuery<'a, TKeys, core::slice::Iter<'a, String>>
+  SelectNodeQuery<
+    'a,
+    TKeys,
+    NullIterator<'a, &'a String>,
+    NullIterator<'a, (&'a String, &'a graph::Value)>,
+  >
 {
   pub(crate) fn select_keys(keys: TKeys) -> Self
   {
     Self {
       keys: Some(keys),
       labels: None,
+      properties: None,
     }
   }
 }
 
 impl<'a, TLabels: Iterator<Item = &'a String>>
-  SelectNodeQuery<'a, core::slice::Iter<'a, crate::graph::Key>, TLabels>
+  SelectNodeQuery<
+    'a,
+    NullIterator<'a, &'a crate::graph::Key>,
+    TLabels,
+    NullIterator<'a, (&'a String, &'a graph::Value)>,
+  >
 {
   pub(crate) fn select_labels(labels: TLabels) -> Self
   {
     Self {
       keys: None,
       labels: Some(labels),
+      properties: None,
+    }
+  }
+}
+
+impl<'a, TProperties: Iterator<Item = (&'a String, &'a graph::Value)>>
+  SelectNodeQuery<'a, NullIterator<'a, &'a graph::Key>, NullIterator<'a, &'a String>, TProperties>
+{
+  pub(crate) fn select_properties(properties: TProperties) -> Self
+  {
+    Self {
+      keys: None,
+      labels: None,
+      properties: Some(properties),
+    }
+  }
+}
+
+impl<
+    'a,
+    TLabels: Iterator<Item = &'a String>,
+    TProperties: Iterator<Item = (&'a String, &'a graph::Value)>,
+  > SelectNodeQuery<'a, NullIterator<'a, &'a graph::Key>, TLabels, TProperties>
+{
+  pub(crate) fn select_labels_properties(labels: TLabels, properties: TProperties) -> Self
+  {
+    Self {
+      keys: None,
+      labels: Some(labels),
+      properties: Some(properties),
     }
   }
 }
@@ -267,15 +335,16 @@ impl Store
     Ok(())
   }
   /// Select nodes according to a given query
-  pub(crate) fn select_nodes<'a, TKeys, TLabels>(
+  pub(crate) fn select_nodes<'a, TKeys, TLabels, TProperties>(
     &self,
     transaction: &mut persy::Transaction,
     graph_name: impl Into<String>,
-    query: SelectNodeQuery<'a, TKeys, TLabels>,
+    query: SelectNodeQuery<'a, TKeys, TLabels, TProperties>,
   ) -> Result<Vec<crate::graph::Node>>
   where
     TKeys: Iterator<Item = &'a crate::graph::Key>,
     TLabels: Iterator<Item = &'a String>,
+    TProperties: Iterator<Item = (&'a String, &'a graph::Value)>,
   {
     let graph_name = graph_name.into();
     let graph_info = self.graphs.get(&graph_name).unwrap();
@@ -320,7 +389,7 @@ impl Store
       Some(labels) =>
       {
         let labels = labels.collect::<Vec<&'a String>>();
-        r.filter(|n| match n
+        Box::new(r.filter(move |n| match n
         {
           Ok(n) =>
           {
@@ -334,11 +403,44 @@ impl Store
             true
           }
           Err(_) => true,
-        })
-        .collect::<Result<Vec<crate::graph::Node>>>()
+        })) as Box<dyn Iterator<Item = Result<crate::graph::Node>>>
       }
-      None => r.collect::<Result<Vec<crate::graph::Node>>>(),
-    }?;
+      None => Box::new(r) as Box<dyn Iterator<Item = Result<crate::graph::Node>>>,
+    };
+    let r = match query.properties
+    {
+      Some(properties) =>
+      {
+        let properties = properties.collect::<Vec<(&'a String, &'a graph::Value)>>();
+        Box::new(r.filter(move |n| match n
+        {
+          Ok(n) =>
+          {
+            for (k, v) in properties.iter()
+            {
+              match n.properties.get(*k)
+              {
+                Some(val) =>
+                {
+                  if val != *v
+                  {
+                    return false;
+                  }
+                }
+                None =>
+                {
+                  return false;
+                }
+              }
+            }
+            true
+          }
+          Err(_) => true,
+        })) as Box<dyn Iterator<Item = Result<crate::graph::Node>>>
+      }
+      None => Box::new(r) as Box<dyn Iterator<Item = Result<crate::graph::Node>>>,
+    }
+    .collect::<Result<Vec<crate::graph::Node>>>()?;
     Ok(r)
   }
   fn get_node_id(
