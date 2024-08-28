@@ -105,6 +105,7 @@ impl Validator
       ast::Expression::Array(_) => Ok(Variable::Variant),
       ast::Expression::Map(_) => Ok(Variable::Variant),
       ast::Expression::MemberAccess(_) => Ok(Variable::Variant),
+      ast::Expression::Parameter(_) => Ok(Variable::Variant),
       ast::Expression::Value(_) => Ok(Variable::Variant),
       ast::Expression::Variable(var) =>
       {
@@ -124,14 +125,23 @@ impl Validator
   {
     if let Some(var_name) = &edge.variable
     {
-      if let Some(_) = self.variables.get(var_name)
+      if let Some(var) = self.variables.get(var_name)
       {
-        Err(
-          CompileTimeError::VariableAlreadyBound {
-            name: var_name.to_owned(),
-          }
-          .into(),
-        )
+        match var
+        {
+          Variable::Edge { .. } => Err(
+            CompileTimeError::VariableAlreadyBound {
+              name: var_name.to_owned(),
+            }
+            .into(),
+          ),
+          _ => Err(
+            CompileTimeError::VariableTypeConflict {
+              name: var_name.to_owned(),
+            }
+            .into(),
+          ),
+        }
       }
       else
       {
@@ -150,14 +160,23 @@ impl Validator
   {
     if let Some(var_name) = &node.variable
     {
-      if let Some(_) = self.variables.get(var_name)
+      if let Some(var) = self.variables.get(var_name)
       {
-        Err(
-          CompileTimeError::VariableAlreadyBound {
-            name: var_name.to_owned(),
-          }
-          .into(),
-        )
+        match var
+        {
+          Variable::Node { .. } => Err(
+            CompileTimeError::VariableAlreadyBound {
+              name: var_name.to_owned(),
+            }
+            .into(),
+          ),
+          _ => Err(
+            CompileTimeError::VariableTypeConflict {
+              name: var_name.to_owned(),
+            }
+            .into(),
+          ),
+        }
       }
       else
       {

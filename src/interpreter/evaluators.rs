@@ -1,5 +1,3 @@
-use std::borrow::{Borrow, BorrowMut};
-
 use crate::{error::InternalError, graph, Error, Result};
 
 use super::instructions;
@@ -8,6 +6,7 @@ fn eval_instructions(
   stack: &mut Vec<crate::graph::Value>,
   row: &crate::value_table::Row,
   instructions: &instructions::Instructions,
+  parameters: &crate::graph::ValueObject,
 ) -> Result<()>
 {
   for instruction in instructions
@@ -67,6 +66,22 @@ fn eval_instructions(
         {
           return Err(
             crate::error::RunTimeError::UndefinedVariable {
+              name: name.to_owned(),
+            }
+            .into(),
+          );
+        }
+      }
+      instructions::Instruction::GetParameter { name } =>
+      {
+        if let Some(value) = parameters.get(name)
+        {
+          stack.push(value.to_owned());
+        }
+        else
+        {
+          return Err(
+            crate::error::RunTimeError::UnknownParameter {
               name: name.to_owned(),
             }
             .into(),
@@ -140,6 +155,7 @@ fn eval_instructions(
 pub(crate) fn eval_program(
   store: &crate::store::Store,
   program: super::Program,
+  parameters: crate::graph::ValueObject,
 ) -> crate::Result<crate::graph::Value>
 {
   let mut input_table = crate::value_table::ValueTable::new();
@@ -159,7 +175,7 @@ pub(crate) fn eval_program(
           let mut new_row = row.clone();
           for action in actions.iter()
           {
-            eval_instructions(stack.borrow_mut(), &new_row, &action.instructions)?;
+            eval_instructions(&mut stack, &new_row, &action.instructions, &parameters)?;
             for (v, var) in stack
               .drain(stack.len() - action.variables.len()..)
               .zip(action.variables.iter())
@@ -201,7 +217,7 @@ pub(crate) fn eval_program(
         let mut output_table = crate::value_table::ValueTable::new();
         for row in input_table.iter()
         {
-          eval_instructions(stack.borrow_mut(), row, instructions.borrow())?;
+          eval_instructions(&mut stack, row, &instructions, &parameters)?;
           let template = stack
             .pop()
             .ok_or_else(|| InternalError::MissingStackValue {
@@ -212,7 +228,7 @@ pub(crate) fn eval_program(
               context: "eval_program/MatchNode",
             })?;
           let nodes = store.select_nodes(
-            tx.borrow_mut(),
+            &mut tx,
             "default",
             crate::store::SelectNodeQuery::select_labels_properties(
               template.labels.iter(),
@@ -251,10 +267,10 @@ pub(crate) fn eval_program(
         let mut output_table = crate::value_table::ValueTable::new();
         for row in input_table.iter()
         {
-          eval_instructions(stack.borrow_mut(), row, instructions.borrow())?;
+          eval_instructions(&mut stack, row, &instructions, &parameters)?;
           let _template = stack.pop().unwrap();
           let edges = store.select_edges(
-            tx.borrow_mut(),
+            &mut tx,
             "default",
             crate::store::SelectEdgeQuery::select_all(),
           )?;
@@ -294,7 +310,7 @@ pub(crate) fn eval_program(
           for (name, instructions) in variables.iter()
           {
             let mut stack = Vec::<crate::graph::Value>::new();
-            eval_instructions(&mut stack, row, instructions)?;
+            eval_instructions(&mut stack, row, instructions, &parameters)?;
             let value = stack
               .first()
               .ok_or_else(|| InternalError::MissingStackValue {
@@ -343,7 +359,7 @@ pub(crate) fn eval_program(
           for (name, instructions) in variables.iter()
           {
             let mut stack = Vec::<crate::graph::Value>::new();
-            eval_instructions(&mut stack, row, instructions)?;
+            eval_instructions(&mut stack, row, instructions, &parameters)?;
             let value = stack
               .first()
               .ok_or_else(|| InternalError::MissingStackValue {
@@ -362,7 +378,7 @@ pub(crate) fn eval_program(
         for row in input_table.iter()
         {
           let mut stack = Vec::<crate::graph::Value>::new();
-          eval_instructions(&mut stack, row, &instructions)?;
+          eval_instructions(&mut stack, row, &instructions, &parameters)?;
           let value = stack
             .pop()
             .ok_or_else(|| InternalError::MissingStackValue {

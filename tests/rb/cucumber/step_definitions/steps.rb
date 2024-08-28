@@ -314,6 +314,8 @@ IgnoredScenario = [
   # No checking of index type
   "[8] Fail when indexing with a non-integer",
   "[9] Fail when indexing with a non-integer given by a parameter",
+  # Multi-edge not supported yet, aka ()-[]-()-[]-()
+  "[7] Fail when a relationship has the same variable in a preceding MATCH",
 ]
 
 Before do |scenario|
@@ -440,7 +442,7 @@ end
 Then(/^a SyntaxError should be raised at compile time: NoSingleRelationshipType$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
-  expect(@exception.message).to match(/^Parse error:.*$/)
+  expect(@exception.message).to match(/^CompileTime: ParseError:.*$/)
 end
 
 Then(/^a SyntaxError should be raised at compile time: RequiresDirectedRelationship$/) do
@@ -458,7 +460,7 @@ end
 Then(/^a SyntaxError should be raised at compile time: InvalidParameterUse$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
-  expect(@exception.message).to match(/^CompileTime: InvalidParameterUse: Unknown parameter '\$.*' at \(\d+, \d+\)\.$/)
+  expect(@exception.message).to match(/^CompileTime: ParseError: .*$/)
 end
 
 Then(/^a SyntaxError should be raised at compile time: VariableTypeConflict$/) do

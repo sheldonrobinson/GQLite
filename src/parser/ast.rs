@@ -150,6 +150,7 @@ pub(crate) enum Expression
   Array(Array),
   Map(Map),
   MemberAccess(Box<MemberAccess>),
+  Parameter(Parameter),
   Value(Value),
   Variable(Variable),
 }
@@ -230,6 +231,12 @@ pub(crate) struct NamedExpression
 {
   pub(crate) name: String,
   pub(crate) expression: Expression,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct Parameter
+{
+  pub(crate) name: String,
 }
 
 #[derive(Debug, Clone, PartialEq)]

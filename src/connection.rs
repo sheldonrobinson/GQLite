@@ -21,12 +21,12 @@ impl Connection
   pub fn execute_query(
     &self,
     query: impl Into<String>,
-    _bindings: crate::graph::ValueObject,
+    parameters: crate::graph::ValueObject,
   ) -> crate::Result<crate::graph::Value>
   {
     let q: String = query.into();
     let q = crate::parser::parse(q.as_str())?;
     let q = interpreter::compiler::compile(q)?;
-    return interpreter::evaluators::eval_program(self.store.borrow(), q);
+    return interpreter::evaluators::eval_program(self.store.borrow(), q, parameters);
   }
 }

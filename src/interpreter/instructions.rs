@@ -19,6 +19,10 @@ pub(crate) enum Instruction
   {
     name: String,
   },
+  GetParameter
+  {
+    name: String,
+  },
   CreateArray
   {
     length: usize,
