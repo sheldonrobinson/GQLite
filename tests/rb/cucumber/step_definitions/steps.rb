@@ -110,7 +110,7 @@ module GQLiteTest
               else
                 properties = YAML.load properties
               end
-              { "type"=>"edge", "properties" => properties, "label" => label }
+              { "type"=>"edge", "properties" => properties, "labels" => [label] }
             else
               YAML.load v
             end
@@ -401,6 +401,8 @@ Then(/^the result should be, in any order:$/) do |table|
   pending if @ignored_scenario
   expect(@exception).to be_nil
   expect(@query_result).not_to be_nil
+  puts @query_result
+  puts GQLiteTest.parse_results_table table
   expect(@query_result).to eq_in_any_order(GQLiteTest.parse_results_table table)
 end
 

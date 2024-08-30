@@ -9,7 +9,7 @@ pub(crate) enum Instruction
   },
   CreateEdgeLiteral
   {
-    label: Option<String>,
+    labels: Vec<String>,
   },
   Push
   {

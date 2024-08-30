@@ -157,7 +157,7 @@ fn compile_create_patterns(
         variables.push(edge.variable.to_owned());
         compile_optional_expression(&edge.properties, &mut instructions);
         instructions.push(Instruction::CreateEdgeLiteral {
-          label: edge.label.as_ref().map(|x| x.to_owned()),
+          labels: edge.labels.to_owned(),
         });
       }
     }
@@ -228,7 +228,7 @@ fn compile_match_patterns(
         }
         compile_optional_expression(&edge.properties, &mut instructions);
         instructions.push(Instruction::CreateEdgeLiteral {
-          label: edge.label.as_ref().map(|x| x.to_owned()),
+          labels: edge.labels.to_owned(),
         });
         Ok(Block::MatchEdge {
           instructions: instructions,

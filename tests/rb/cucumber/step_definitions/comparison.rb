@@ -12,7 +12,7 @@ def compare(a,b)
       end
       return true
     when Hash
-      if (a.keys.sort == ["labels", "properties", "type"] || a.keys.sort == ["key", "labels", "properties", "type"]) && a["type"] == "node"
+      if (a.keys.sort == ["labels", "properties", "type"] || a.keys.sort == ["key", "labels", "properties", "type"]) && (a["type"] == "node" || a["type"] == "edge")
         return a["labels"].sort == b["labels"].sort && compare(a["properties"], b["properties"])
       else
         return false unless a.keys.sort == b.keys.sort
