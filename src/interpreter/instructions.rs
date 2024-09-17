@@ -66,6 +66,7 @@ pub(crate) enum Block
     left_variable: Option<String>,
     edge_variable: Option<String>,
     right_variable: Option<String>,
+    path_variable: Option<String>,
   },
   Return
   {

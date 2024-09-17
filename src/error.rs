@@ -1,4 +1,6 @@
-/// Represent compile time errors
+//! Errors used for gqlite.
+
+/// Represent compile time errors.
 #[derive(thiserror::Error, Debug)]
 pub enum CompileTimeError
 {
@@ -33,6 +35,7 @@ pub enum CompileTimeError
   },
 }
 
+/// Runtime errors.
 #[derive(thiserror::Error, Debug)]
 pub enum RunTimeError
 {
@@ -50,6 +53,7 @@ pub enum RunTimeError
   },
 }
 
+/// Internal errors, should be treated as bugs.
 #[derive(thiserror::Error, Debug)]
 pub enum InternalError
 {
@@ -76,6 +80,11 @@ pub enum InternalError
   },
   #[error("Missing value from stack in {context}.")]
   MissingStackValue
+  {
+    context: &'static str
+  },
+  #[error("Path pattern was used in create expression in {context}.")]
+  PathPatternInCreateExpression
   {
     context: &'static str
   },

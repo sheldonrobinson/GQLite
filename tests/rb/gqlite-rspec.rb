@@ -10,8 +10,12 @@ def create_node(labels, properties)
   {"type" => "node", "labels" => labels, "properties" => properties}
 end
 
-def create_edge(source, label, properties, destination)
-  {"type" => "edge", "label" => label, "properties" => properties, "source" => source, "destination" => destination}
+def create_edge(label, properties)
+  {"type" => "edge", "labels" => label, "properties" => properties}
+end
+
+def create_path(source, labels, properties, destination)
+  {"type" => "path", "labels" => labels, "properties" => properties, "source" => source, "destination" => destination}
 end
 
 def add_node(list, labels, properties)
@@ -20,10 +24,10 @@ def add_node(list, labels, properties)
   return node
 end
 
-def add_edge(list, labels_1, properties_1, label_e, properites_e, labels_2, properties_2)
+def add_path(list, labels_1, properties_1, labels_e, properites_e, labels_2, properties_2)
   n1 = create_node(labels_1, properties_1)
   n2 = create_node(labels_2, properties_2)
-  list.push [n1, create_edge(n1, label_e, properites_e, n2), n2]
+  list.push [n1, create_edge(labels_e, properites_e), n2, create_path(n1, labels_e, properites_e, n2)]
 end
 
 def make_results(gc)
@@ -31,7 +35,7 @@ def make_results(gc)
 end
 
 def make_results_edges(gc)
-  [["a", "b", "c"]] + gc
+  [["a", "b", "c", "p"]] + gc
 end
 
 def remove_keys(table)
@@ -39,7 +43,7 @@ def remove_keys(table)
     row.map do |val|
       if val.class == Hash
         val.delete "key"
-        if val["type"] == "edge"
+        if val["type"] == "path"
           val["source"].delete "key"
           val["destination"].delete "key"
         end
@@ -119,22 +123,22 @@ RSpec.describe "connection" do
     db.execute_oc_query "CREATE (n1), (n2) CREATE (n1)-[:RELTYPE]->(n2)"
     add_node gc, [], {}
     add_node gc, [], {}
-    add_edge gc_edges, [], {}, "RELTYPE", {}, [], {}
+    add_path gc_edges, [], {}, ["RELTYPE"], {}, [], {}
     nodes = db.execute_oc_query "MATCH (nodes) RETURN nodes"
     expect(remove_keys(nodes)).to eq(make_results(gc))
     edges = db.execute_oc_query "MATCH (edges)-[]->() RETURN edges"
 
     # Simple create 2
-    db.execute_oc_query "CREATE (n1)-[:RELTYPE]->(n2)"
+    db.execute_oc_query "CREATE (n1:cc)-[:RELTYPE]->(n2)"
+    add_node gc, ["cc"], {}
     add_node gc, [], {}
-    add_node gc, [], {}
-    add_edge gc_edges, [], {}, "RELTYPE", {}, [], {}
+    add_path gc_edges, ["cc"], {}, ["RELTYPE"], {}, [], {}
     nodes = db.execute_oc_query "MATCH (nodes) RETURN nodes"
     expect(remove_keys(nodes)).to eq(make_results(gc))
 
-    nodes_edges = db.execute_oc_query "MATCH (a)-[b]->(c) RETURN a, b, c"
-    expect(nodes_edges[1][0]["key"]).to eq(nodes_edges[1][1]["source"]["key"])
-    expect(nodes_edges[1][2]["key"]).to eq(nodes_edges[1][1]["destination"]["key"])
+    nodes_edges = db.execute_oc_query "MATCH p = (a)-[b]->(c) RETURN a, b, c, p"
+    expect(nodes_edges[1][0]["key"]).to eq(nodes_edges[1][3]["source"]["key"])
+    expect(nodes_edges[1][2]["key"]).to eq(nodes_edges[1][3]["destination"]["key"])
     expect(remove_keys(nodes_edges)).to eq(make_results_edges(gc_edges))
 
     # Create with match
@@ -213,7 +217,9 @@ RSpec.describe "compare" do
     expect(compare({"key"=>71399689742590698717330075576608269690, "type" => "node", "labels" => ["a", "b"], "properties" => {}}, {"type" => "node", "labels" => ["b", "a"], "properties" => {}})).to be true
   end
   
-
+  it "can compare nodes with edges" do
+    expect(compare({"type"=>"edge", "key"=>248450202975772154401016793053495639615, "labels"=>["T1"], "properties"=>{}}, {"type"=>"edge", "properties"=>{}, "labels"=>["T1"]})).to be true
+  end
 end
 
 RSpec.describe "compare tables" do
