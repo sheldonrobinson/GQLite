@@ -103,6 +103,10 @@ impl Validator
     match expression
     {
       ast::Expression::Array(_) => Ok(Variable::Variant),
+      ast::Expression::FunctionCall(_) =>
+      {
+        todo!()
+      } // Ok(Variable::Variant),
       ast::Expression::Map(_) => Ok(Variable::Variant),
       ast::Expression::MemberAccess(_) => Ok(Variable::Variant),
       ast::Expression::Parameter(_) => Ok(Variable::Variant),

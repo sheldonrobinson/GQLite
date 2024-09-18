@@ -94,6 +94,21 @@ fn build_expression(pair: pest::iterators::Pair<Rule>) -> Result<ast::Expression
         })),
       }
     }
+    Rule::function_call =>
+    {
+      println!("{:#?}", pair);
+      let mut it = pair.into_inner();
+      let function_name = it
+        .next()
+        .ok_or_else(|| crate::Error::InternalError("Missing function name."))?
+        .as_str();
+      Ok(ast::Expression::FunctionCall(ast::FunctionCall {
+        name: function_name.to_string(),
+        arguments: it
+          .map(|pair| build_expression(pair))
+          .collect::<Result<Vec<ast::Expression>>>()?,
+      }))
+    }
     unknown_expression => Err(crate::Error::UnxpectedExpression(
       "build_expression",
       format!("{unknown_expression:?}"),
@@ -431,7 +446,10 @@ pub(crate) fn parse(input: &str) -> Result<ast::Statements>
   println!("\n\n\n{:?}\n\n\n", input);
   let pairs = GQLParser::parse(Rule::query, input)?;
   let mut stmts = ast::Statements::new();
-  println!("pairs = {:#?}", pairs);
+  if crate::consts::SHOW_PARSE_TREE
+  {
+    println!("pairs = {:#?}", pairs);
+  }
   for pair in pairs
   {
     match pair.as_rule()
@@ -451,6 +469,9 @@ pub(crate) fn parse(input: &str) -> Result<ast::Statements>
       }
     }
   }
-  println!("statements = {:#?}", &stmts);
+  if crate::consts::SHOW_AST
+  {
+    println!("statements = {:#?}", &stmts);
+  }
   Ok(stmts)
 }

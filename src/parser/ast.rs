@@ -148,6 +148,7 @@ pub(crate) struct Modifiers
 pub(crate) enum Expression
 {
   Array(Array),
+  FunctionCall(FunctionCall),
   Map(Map),
   MemberAccess(Box<MemberAccess>),
   Parameter(Parameter),
@@ -275,7 +276,7 @@ pub(crate) struct HasLabels
   pub(crate) labels: Vec<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) struct FunctionCall
 {
   pub(crate) name: String,

@@ -49,6 +49,20 @@ fn eval_instructions(
           .into(),
         );
       }
+      instructions::Instruction::FunctionCall {
+        function,
+        arguments_count,
+      } =>
+      {
+        let args: Vec<graph::Value> = stack.drain((stack.len() - arguments_count)..).collect();
+        if args.len() != *arguments_count
+        {
+          Err(InternalError::MissingStackValue {
+            context: "eval_instructions/FunctionCall",
+          })?;
+        }
+        stack.push(function.call(args)?);
+      }
       instructions::Instruction::Push { value } =>
       {
         stack.push(value.clone());

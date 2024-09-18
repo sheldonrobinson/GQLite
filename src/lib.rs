@@ -7,7 +7,9 @@
 
 mod capi;
 mod connection;
+mod consts;
 mod error;
+mod functions;
 mod graph;
 mod interpreter;
 mod parser;
@@ -44,7 +46,10 @@ pub(crate) mod tests
         std::env::temp_dir().to_str().unwrap(),
         rand
       ));
-      return Ok(path);
+      if !path.exists()
+      {
+        return Ok(path);
+      }
     }
   }
 }

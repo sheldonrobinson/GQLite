@@ -1,11 +1,15 @@
-use crate::error::InternalError;
+use crate::error::{CompileTimeError, InternalError};
 // use crate::graph::ToValue;
 use crate::interpreter::instructions::{Block, CreateAction, Instruction, Instructions};
 use crate::interpreter::validator;
 use crate::parser::ast;
-use crate::Result;
+use crate::{functions, Result};
 
-fn compile_expression(expression: &crate::parser::ast::Expression, instructions: &mut Instructions)
+fn compile_expression(
+  function_manager: &functions::Manager,
+  expression: &crate::parser::ast::Expression,
+  instructions: &mut Instructions,
+) -> Result<()>
 {
   let expr = match expression
   {
@@ -18,11 +22,22 @@ fn compile_expression(expression: &crate::parser::ast::Expression, instructions:
     ast::Expression::Parameter(parameter) => Instruction::GetParameter {
       name: parameter.name.clone(),
     },
+    ast::Expression::FunctionCall(function_call) =>
+    {
+      for v in function_call.arguments.iter()
+      {
+        compile_expression(function_manager, v, instructions)?;
+      }
+      Instruction::FunctionCall {
+        function: function_manager.get::<CompileTimeError>(&function_call.name)?,
+        arguments_count: function_call.arguments.len(),
+      }
+    }
     ast::Expression::Array(array) =>
     {
       for v in array.array.iter()
       {
-        compile_expression(v, instructions);
+        compile_expression(function_manager, v, instructions)?;
       }
       Instruction::CreateArray {
         length: array.array.len(),
@@ -33,30 +48,32 @@ fn compile_expression(expression: &crate::parser::ast::Expression, instructions:
       let mut keys = Vec::new();
       for (k, v) in map.map.iter()
       {
-        compile_expression(v, instructions);
+        compile_expression(function_manager, v, instructions)?;
         keys.push(k.to_owned());
       }
       Instruction::CreateMap { keys: keys }
     }
     ast::Expression::MemberAccess(member_access) =>
     {
-      compile_expression(&member_access.left, instructions);
+      compile_expression(function_manager, &member_access.left, instructions)?;
       Instruction::MemberAccess {
         path: member_access.path.to_owned(),
       }
     }
   };
   instructions.push(expr);
+  Ok(())
 }
 
 fn compile_optional_expression(
+  function_manager: &functions::Manager,
   properties: &Option<ast::Expression>,
   instructions: &mut Instructions,
-)
+) -> Result<()>
 {
   if let Some(expr) = properties
   {
-    compile_expression(expr, instructions);
+    compile_expression(function_manager, expr, instructions)?;
   }
   else
   {
@@ -64,6 +81,7 @@ fn compile_optional_expression(
       value: crate::graph::Value::Invalid,
     });
   }
+  Ok(())
 }
 
 fn has_variable(variables: &Vec<Option<String>>, var_name: &Option<String>) -> bool
@@ -88,6 +106,7 @@ fn has_variable(variables: &Vec<Option<String>>, var_name: &Option<String>) -> b
 }
 
 fn compile_create_node(
+  function_manager: &functions::Manager,
   validator: &mut validator::Validator,
   node: &crate::parser::ast::GraphNode,
   instructions: &mut Instructions,
@@ -96,7 +115,7 @@ fn compile_create_node(
 {
   validator.declare_node_variable(node)?;
   variables.push(node.variable.to_owned());
-  compile_optional_expression(&node.properties, instructions);
+  compile_optional_expression(function_manager, &node.properties, instructions)?;
   instructions.push(Instruction::CreateNodeLiteral {
     labels: node.labels.to_owned(),
   });
@@ -104,6 +123,7 @@ fn compile_create_node(
 }
 
 fn compile_create_patterns(
+  function_manager: &functions::Manager,
   validator: &mut validator::Validator,
   patterns: &Vec<crate::parser::ast::Pattern>,
 ) -> Result<Block>
@@ -115,7 +135,13 @@ fn compile_create_patterns(
     {
       crate::parser::ast::Pattern::GraphNode(node) =>
       {
-        compile_create_node(validator, node, &mut instructions, &mut variables)?;
+        compile_create_node(
+          function_manager,
+          validator,
+          node,
+          &mut instructions,
+          &mut variables,
+        )?;
       }
       crate::parser::ast::Pattern::GraphEdge(edge) =>
       {
@@ -127,7 +153,13 @@ fn compile_create_patterns(
         }
         else
         {
-          compile_create_node(validator, &edge.source, &mut instructions, &mut variables)?;
+          compile_create_node(
+            function_manager,
+            validator,
+            &edge.source,
+            &mut instructions,
+            &mut variables,
+          )?;
           instructions.push(Instruction::Duplicate);
         }
         if edge.source.variable.is_some()
@@ -145,6 +177,7 @@ fn compile_create_patterns(
         else
         {
           compile_create_node(
+            function_manager,
             validator,
             &edge.destination,
             &mut instructions,
@@ -155,7 +188,7 @@ fn compile_create_patterns(
         }
         validator.declare_edge_variable(edge)?;
         variables.push(edge.variable.to_owned());
-        compile_optional_expression(&edge.properties, &mut instructions);
+        compile_optional_expression(function_manager, &edge.properties, &mut instructions)?;
         instructions.push(Instruction::CreateEdgeLiteral {
           labels: edge.labels.to_owned(),
         });
@@ -180,15 +213,22 @@ fn compile_create_patterns(
   })
 }
 
-fn compile_match_node(node: &crate::parser::ast::GraphNode, instructions: &mut Instructions)
+fn compile_match_node(
+  function_manager: &functions::Manager,
+  node: &crate::parser::ast::GraphNode,
+  instructions: &mut Instructions,
+) -> Result<()>
 {
-  compile_optional_expression(&node.properties, instructions);
+  compile_optional_expression(function_manager, &node.properties, instructions)?;
   instructions.push(Instruction::CreateNodeLiteral {
     labels: node.labels.to_owned(),
   });
+  Ok(())
 }
 
 fn compile_match_edge(
+  function_manager: &functions::Manager,
+
   validator: &mut validator::Validator,
   path_variable: Option<String>,
   edge: &crate::parser::ast::GraphEdge,
@@ -206,7 +246,7 @@ fn compile_match_edge(
   else
   {
     source_variable = edge.source.variable.to_owned();
-    compile_match_node(&edge.source, &mut instructions);
+    compile_match_node(function_manager, &edge.source, &mut instructions)?;
   }
   let mut destination_variable = None;
   if validator.check_existing_node(&edge.destination)?
@@ -218,9 +258,9 @@ fn compile_match_edge(
   else
   {
     destination_variable = edge.destination.variable.to_owned();
-    compile_match_node(&edge.destination, &mut instructions);
+    compile_match_node(function_manager, &edge.destination, &mut instructions)?;
   }
-  compile_optional_expression(&edge.properties, &mut instructions);
+  compile_optional_expression(function_manager, &edge.properties, &mut instructions)?;
   instructions.push(Instruction::CreateEdgeLiteral {
     labels: edge.labels.to_owned(),
   });
@@ -234,6 +274,8 @@ fn compile_match_edge(
 }
 
 fn compile_match_patterns(
+  function_manager: &functions::Manager,
+
   validator: &mut validator::Validator,
   patterns: &Vec<crate::parser::ast::Pattern>,
 ) -> Result<Vec<Block>>
@@ -246,23 +288,31 @@ fn compile_match_patterns(
       {
         let mut instructions = Instructions::new();
         validator.declare_node_variable(node)?;
-        compile_match_node(node, &mut instructions);
+        compile_match_node(function_manager, node, &mut instructions)?;
         Ok(Block::MatchNode {
           instructions: instructions,
           variable: node.variable.to_owned(),
         })
       }
-      crate::parser::ast::Pattern::GraphEdge(edge) => compile_match_edge(validator, None, &edge),
-      crate::parser::ast::Pattern::GraphPath(path) =>
+      crate::parser::ast::Pattern::GraphEdge(edge) =>
       {
-        compile_match_edge(validator, Some(path.variable.to_owned()), &path.edge)
+        compile_match_edge(function_manager, validator, None, &edge)
       }
+      crate::parser::ast::Pattern::GraphPath(path) => compile_match_edge(
+        function_manager,
+        validator,
+        Some(path.variable.to_owned()),
+        &path.edge,
+      ),
     })
     .collect::<Result<Vec<Block>>>()?;
   Ok(blocks)
 }
 
-pub(crate) fn compile(statements: crate::parser::ast::Statements) -> Result<super::Program>
+pub(crate) fn compile(
+  function_manager: &functions::Manager,
+  statements: crate::parser::ast::Statements,
+) -> Result<super::Program>
 {
   let mut validator = validator::Validator::default();
   let mut statements_err = Ok(());
@@ -273,7 +323,7 @@ pub(crate) fn compile(statements: crate::parser::ast::Statements) -> Result<supe
       {
         ast::Statement::Create(create) =>
         {
-          let cp = compile_create_patterns(&mut validator, &create.patterns);
+          let cp = compile_create_patterns(function_manager, &mut validator, &create.patterns);
           match cp
           {
             Ok(cp) => Ok(Vec::from([cp]).into_iter()),
@@ -282,7 +332,8 @@ pub(crate) fn compile(statements: crate::parser::ast::Statements) -> Result<supe
         }
         ast::Statement::Match(match_statement) =>
         {
-          let cm = compile_match_patterns(&mut validator, &match_statement.patterns);
+          let cm =
+            compile_match_patterns(function_manager, &mut validator, &match_statement.patterns);
           match cm
           {
             Ok(cm) => Ok(cm.into_iter()),
@@ -296,7 +347,7 @@ pub(crate) fn compile(statements: crate::parser::ast::Statements) -> Result<supe
           for expr in return_statement.expressions.iter()
           {
             let mut instructions = Instructions::new();
-            compile_expression(&expr.expression, &mut instructions);
+            compile_expression(function_manager, &expr.expression, &mut instructions)?;
             variables.insert(expr.name.to_owned(), instructions);
           }
 
@@ -312,7 +363,7 @@ pub(crate) fn compile(statements: crate::parser::ast::Statements) -> Result<supe
           let mut instructions = Instructions::new();
           for e in call.arguments.iter().rev()
           {
-            compile_expression(e, &mut instructions);
+            compile_expression(function_manager, e, &mut instructions)?;
           }
           Ok(
             Vec::from([Block::Call {
@@ -333,7 +384,7 @@ pub(crate) fn compile(statements: crate::parser::ast::Statements) -> Result<supe
           for e in with.expressions.iter()
           {
             let mut instructions = Instructions::new();
-            compile_expression(&e.expression, &mut instructions);
+            compile_expression(function_manager, &e.expression, &mut instructions)?;
             variables.insert(e.name.to_owned(), instructions);
             val_variables.insert(e.name.to_owned(), validator.evaluate(&e.expression)?);
           }
@@ -349,7 +400,7 @@ pub(crate) fn compile(statements: crate::parser::ast::Statements) -> Result<supe
         ast::Statement::Unwind(unwind) =>
         {
           let mut instructions = Instructions::new();
-          compile_expression(&unwind.expression, &mut instructions);
+          compile_expression(function_manager, &unwind.expression, &mut instructions)?;
           Ok(
             Vec::from([Block::Unwind {
               name: unwind.name.to_owned(),
@@ -368,6 +419,9 @@ pub(crate) fn compile(statements: crate::parser::ast::Statements) -> Result<supe
     .flatten();
   let program = program.collect::<super::Program>();
   statements_err?;
-  println!("program = {:#?}", program);
+  if crate::consts::SHOW_PROGRAM
+  {
+    println!("program = {:#?}", program);
+  }
   Ok(program)
 }
