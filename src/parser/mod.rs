@@ -308,6 +308,38 @@ fn build_pattern(
           properties: edge_pattern.2,
         }));
       }
+      Rule::bidirection_edge_pattern =>
+      {
+        let source_node_key = pair.as_span().start_pos().pos();
+        let mut it = pair.into_inner();
+        let destination_left_node = build_node_pattern(it.next().unwrap())?;
+        let edge_left_pattern = build_edge_pattern(it.next().unwrap())?;
+        let mut source_node = build_node_pattern(it.next().unwrap())?;
+        let edge_right_pattern = build_edge_pattern(it.next().unwrap())?;
+        let destination_right_node = build_node_pattern(it.next().unwrap())?;
+
+        if source_node.variable.is_none()
+        {
+          source_node.variable = Some(format!("__gqlite_{}", source_node_key));
+        }
+
+        vec.push(ast::Pattern::GraphEdge(ast::GraphEdge {
+          variable: edge_left_pattern.0,
+          source: source_node.clone(),
+          destination: destination_left_node,
+          directivity: ast::EdgeDirectivity::Directed,
+          labels: edge_left_pattern.1,
+          properties: edge_left_pattern.2,
+        }));
+        vec.push(ast::Pattern::GraphEdge(ast::GraphEdge {
+          variable: edge_right_pattern.0,
+          source: source_node,
+          destination: destination_right_node,
+          directivity: ast::EdgeDirectivity::Directed,
+          labels: edge_right_pattern.1,
+          properties: edge_right_pattern.2,
+        }));
+      }
       Rule::undirected_edge_pattern =>
       {
         if allow_undirected_edge
@@ -352,6 +384,7 @@ fn build_pattern(
           },
         }));
       }
+
       unknown_expression =>
       {
         return Err(crate::Error::UnxpectedExpression(
