@@ -8,7 +8,8 @@ crate-type = ["cdylib", "lib"]
 name = "gqlite"
 
 [features]
-default = ["persy"]
+default = ["persy", "capi"]
+capi = []
 persy = [ "dep:persy" ]
 pgql = [ "dep:pgrx" ]
 pg12 = [ "pgrx/pg12" ]
@@ -16,7 +17,7 @@ pg13 = [ "pgrx/pg13" ]
 pg14 = [ "pgrx/pg14" ]
 pg15 = [ "pgrx/pg15" ]
 pg16 = [ "pgrx/pg16" ]
-
+pg17 = [ "pgrx/pg17" ]
 
 [dependencies]
 ciborium = "0.2"

@@ -5,6 +5,7 @@
 #![warn(missing_docs)]
 // #![deny(warnings)]
 
+#[cfg(feature = "capi")]
 mod capi;
 mod connection;
 mod consts;
