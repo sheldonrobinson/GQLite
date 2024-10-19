@@ -26,20 +26,6 @@ struct GraphInfo
   edges_destination_uuid_index: String,
 }
 
-//  ____  _        _   _     _   _
-// / ___|| |_ __ _| |_(_)___| |_(_) ___ ___
-// \___ \| __/ _` | __| / __| __| |/ __/ __|
-//  ___) | || (_| | |_| \__ \ |_| | (__\__ \
-// |____/ \__\__,_|\__|_|___/\__|_|\___|___/
-
-pub(crate) struct Statistics
-{
-  pub nodes_count: usize,
-  pub edges_count: usize,
-  pub labels_nodes_count: usize,
-  pub properties_count: usize,
-}
-
 fn persy_id_serialize<S>(x: &persy::PersyId, s: S) -> std::result::Result<S::Ok, S::Error>
 where
   S: serde::Serializer,
@@ -621,7 +607,7 @@ impl Store
   pub(crate) fn compute_statistics(
     &self,
     transaction: &mut persy::Transaction,
-  ) -> Result<Statistics>
+  ) -> Result<super::Statistics>
   {
     let mut edges_count = 0;
     let mut nodes_count = 0;
@@ -655,7 +641,7 @@ impl Store
         .count();
     }
 
-    Ok(Statistics {
+    Ok(super::Statistics {
       nodes_count,
       edges_count,
       labels_nodes_count: labels.len(),
