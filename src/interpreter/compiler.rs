@@ -108,18 +108,48 @@ fn has_variable(variables: &Vec<Option<String>>, var_name: &Option<String>) -> b
 fn compile_create_node(
   function_manager: &functions::Manager,
   validator: &mut validator::Validator,
-  node: &crate::parser::ast::GraphNode,
+  node: &crate::parser::ast::NodePattern,
   instructions: &mut Instructions,
   variables: &mut Vec<Option<String>>,
 ) -> Result<()>
 {
-  validator.declare_node_variable(node)?;
+  validator.declare_node_variable(&node)?;
   variables.push(node.variable.to_owned());
-  compile_optional_expression(function_manager, &node.properties, instructions)?;
-  instructions.push(Instruction::CreateNodeLiteral {
-    labels: node.labels.to_owned(),
-  });
+  compile_optional_expression(function_manager, &node.properties, instructions);
+  let mut labels = Default::default();
+  compile_create_labels(&mut labels, &node.labels)?;
+  instructions.push(Instruction::CreateNodeLiteral { labels });
   Ok(())
+}
+
+fn compile_create_labels(
+  labels: &mut Vec<String>,
+  label_expressions: &ast::LabelExpression,
+) -> Result<()>
+{
+  match &label_expressions
+  {
+    &ast::LabelExpression::And(expressions) =>
+    {
+      for expr in expressions.iter()
+      {
+        compile_create_labels(labels, &expr)?;
+      }
+      Ok(())
+    }
+    &ast::LabelExpression::String(label) =>
+    {
+      labels.push(label.to_owned());
+      Ok(())
+    }
+    &ast::LabelExpression::None => Ok(()),
+    _ => Err(
+      InternalError::InvalidCreateLabels {
+        context: "compile_create_labels",
+      }
+      .into(),
+    ),
+  }
 }
 
 fn compile_create_patterns(
@@ -133,7 +163,7 @@ fn compile_create_patterns(
     let mut variables = Vec::<Option<String>>::new();
     match c
     {
-      crate::parser::ast::Pattern::GraphNode(node) =>
+      crate::parser::ast::Pattern::Node(node) =>
       {
         compile_create_node(
           function_manager,
@@ -143,7 +173,7 @@ fn compile_create_patterns(
           &mut variables,
         )?;
       }
-      crate::parser::ast::Pattern::GraphEdge(edge) =>
+      crate::parser::ast::Pattern::Edge(edge) =>
       {
         if validator.check_existing_node(&edge.source)?
         {
@@ -188,12 +218,12 @@ fn compile_create_patterns(
         }
         validator.declare_edge_variable(edge)?;
         variables.push(edge.variable.to_owned());
-        compile_optional_expression(function_manager, &edge.properties, &mut instructions)?;
-        instructions.push(Instruction::CreateEdgeLiteral {
-          labels: edge.labels.to_owned(),
-        });
+        compile_optional_expression(function_manager, &edge.properties, &mut instructions);
+        let mut labels = Default::default();
+        compile_create_labels(&mut labels, &edge.labels)?;
+        instructions.push(Instruction::CreateEdgeLiteral { labels });
       }
-      crate::parser::ast::Pattern::GraphPath(_) =>
+      crate::parser::ast::Pattern::Path(_) =>
       {
         return Err(
           InternalError::PathPatternInCreateExpression {
@@ -215,14 +245,14 @@ fn compile_create_patterns(
 
 fn compile_match_node(
   function_manager: &functions::Manager,
-  node: &crate::parser::ast::GraphNode,
+  node: &crate::parser::ast::NodePattern,
   instructions: &mut Instructions,
 ) -> Result<()>
 {
   compile_optional_expression(function_manager, &node.properties, instructions)?;
-  instructions.push(Instruction::CreateNodeLiteral {
-    labels: node.labels.to_owned(),
-  });
+  let mut labels = Default::default();
+  compile_create_labels(&mut labels, &node.labels)?;
+  instructions.push(Instruction::CreateNodeLiteral { labels });
   Ok(())
 }
 
@@ -231,7 +261,7 @@ fn compile_match_edge(
 
   validator: &mut validator::Validator,
   path_variable: Option<String>,
-  edge: &crate::parser::ast::GraphEdge,
+  edge: &crate::parser::ast::EdgePattern,
 ) -> Result<Block>
 {
   let mut instructions = Instructions::new();
@@ -261,9 +291,9 @@ fn compile_match_edge(
     compile_match_node(function_manager, &edge.destination, &mut instructions)?;
   }
   compile_optional_expression(function_manager, &edge.properties, &mut instructions)?;
-  instructions.push(Instruction::CreateEdgeLiteral {
-    labels: edge.labels.to_owned(),
-  });
+  let mut labels = Default::default();
+  compile_create_labels(&mut labels, &edge.labels)?;
+  instructions.push(Instruction::CreateEdgeLiteral { labels });
   Ok(Block::MatchEdge {
     instructions: instructions,
     left_variable: source_variable,
@@ -284,7 +314,7 @@ fn compile_match_patterns(
     .iter()
     .map(|c| match c
     {
-      crate::parser::ast::Pattern::GraphNode(node) =>
+      crate::parser::ast::Pattern::Node(node) =>
       {
         let mut instructions = Instructions::new();
         validator.declare_node_variable(node)?;
@@ -294,11 +324,11 @@ fn compile_match_patterns(
           variable: node.variable.to_owned(),
         })
       }
-      crate::parser::ast::Pattern::GraphEdge(edge) =>
+      crate::parser::ast::Pattern::Edge(edge) =>
       {
         compile_match_edge(function_manager, validator, None, &edge)
       }
-      crate::parser::ast::Pattern::GraphPath(path) => compile_match_edge(
+      crate::parser::ast::Pattern::Path(path) => compile_match_edge(
         function_manager,
         validator,
         Some(path.variable.to_owned()),

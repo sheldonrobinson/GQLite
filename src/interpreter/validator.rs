@@ -34,11 +34,11 @@ pub(crate) enum Variable
 {
   Node
   {
-    node: ast::GraphNode,
+    node: ast::NodePattern,
   },
   Edge
   {
-    edge: ast::GraphEdge,
+    edge: ast::EdgePattern,
   },
   Number,
   String,
@@ -60,17 +60,17 @@ impl Variable
   }
 }
 
-impl From<ast::GraphNode> for Variable
+impl From<ast::NodePattern> for Variable
 {
-  fn from(value: ast::GraphNode) -> Self
+  fn from(value: ast::NodePattern) -> Self
   {
     Self::Node { node: value }
   }
 }
 
-impl From<ast::GraphEdge> for Variable
+impl From<ast::EdgePattern> for Variable
 {
-  fn from(value: ast::GraphEdge) -> Self
+  fn from(value: ast::EdgePattern) -> Self
   {
     Self::Edge { edge: value }
   }
@@ -125,7 +125,7 @@ impl Validator
       }
     }
   }
-  pub(crate) fn declare_edge_variable(&mut self, edge: &ast::GraphEdge) -> Result<()>
+  pub(crate) fn declare_edge_variable(&mut self, edge: &ast::EdgePattern) -> Result<()>
   {
     if let Some(var_name) = &edge.variable
     {
@@ -160,7 +160,7 @@ impl Validator
       Ok(())
     }
   }
-  pub(crate) fn declare_node_variable(&mut self, node: &ast::GraphNode) -> Result<()>
+  pub(crate) fn declare_node_variable(&mut self, node: &ast::NodePattern) -> Result<()>
   {
     if let Some(var_name) = &node.variable
     {
@@ -195,7 +195,7 @@ impl Validator
       Ok(())
     }
   }
-  pub(crate) fn check_node_variable(&self, node: &ast::GraphNode) -> Result<()>
+  pub(crate) fn check_node_variable(&self, node: &ast::NodePattern) -> Result<()>
   {
     if let Some(var_name) = &node.variable
     {
@@ -205,7 +205,7 @@ impl Validator
         {
           Variable::Node { node: var_node } =>
           {
-            if (!node.labels.is_empty() || !node.properties.is_none())
+            if (!node.labels.is_none() || !node.properties.is_none())
               && (var_node.labels != node.labels || var_node.properties != node.properties)
             {
               Err(
@@ -234,13 +234,13 @@ impl Validator
     //   if self.existing_variable(&node.variable, Some(VariableType::Node))?
     //   {
     //     let var = self.variables.get(var_name).unwrap();
-    //     let VariableInformation::GraphNode { node } = var.information;
+    //     let VariableInformation::NodePattern { node } = var.information;
     //   }
     // }
     Ok(())
   }
 
-  pub(crate) fn check_existing_node(&self, node: &ast::GraphNode) -> Result<bool>
+  pub(crate) fn check_existing_node(&self, node: &ast::NodePattern) -> Result<bool>
   {
     if let Some(var_name) = &node.variable
     {
@@ -259,118 +259,4 @@ impl Validator
       Ok(false)
     }
   }
-  // pub(crate) fn existing_variable(
-  //   &self,
-  //   var_name: &Option<String>,
-  //   expected_var_type: Option<VariableType>,
-  // ) -> Result<bool>
-  // {
-  //   if let Some(var_name) = var_name
-  //   {
-  //     if let Some(var) = self.variables.get(var_name)
-  //     {
-  //       if let Some(expected_var_type) = expected_var_type
-  //       {
-  //         if var.as_type() == expected_var_type
-  //         {
-  //           Ok(true)
-  //         }
-  //         else
-  //         {
-  //           Err(Error::Unknown("Unexpected type, expected node."))
-  //         }
-  //       }
-  //       else
-  //       {
-  //         Ok(true)
-  //       }
-  //     }
-  //     else
-  //     {
-  //       Ok(false)
-  //     }
-  //   }
-  //   else
-  //   {
-  //     Ok(false)
-  //   }
-  // }
-
-  // fn check_variable_type(
-  //   &mut self,
-  //   var_name: &String,
-  //   expected_var_type: VariableType,
-  //   allow_existing: bool,
-  // ) -> Result<()>
-  // {
-  //   if let Some(var) = self.variables.get(var_name)
-  //   {
-  //     if allow_existing
-  //     {
-  //       if var.as_type() != expected_var_type
-  //       {
-  //         return Err(Error::Unknown("Unexpected type, expected node."));
-  //       }
-  //     }
-  //     else
-  //     {
-  //       return Err(
-  //         CompileTimeError::VariableAlreadyBound {
-  //           name: var_name.to_owned(),
-  //         }
-  //         .into(),
-  //       );
-  //     }
-  //   }
-  //   else
-  //   {
-  //     self
-  //       .variables
-  //       .insert(var_name.to_owned(), expected_var_type);
-  //   }
-  //   Ok(())
-  // }
-
-  //   pub(crate) fn check_graph_node(
-  //     &mut self,
-  //     graph_node: &ast::GraphNode,
-  //     allow_existing: bool,
-  //   ) -> Result<()>
-  //   {
-  //     if let Some(var_name) = graph_node.variable.borrow()
-  //     {
-  //       self.check_variable_type(var_name, VariableType::Node, allow_existing)?;
-  //     }
-  //     Ok(())
-  //   }
-  // }
-  // fn build_context(
-  //   statement: &ast::Statement,
-  //   previous_context: Context,
-  // ) -> Result<Context> {
-  //   let mut context = previous_context;
-  //   match statement {
-  //     Statement::CreateGraph(_) => {}
-  //     Statement::UseGraph(_) => {}
-  //     Statement::Create(create) => {
-  //       for pat in create.patterns.iter() {
-  //         match pat {
-  //           ast::Pattern::GraphNode(graph_node) => {
-  //             check_graph_node(&mut context, graph_node, false)?;
-  //           }
-  //           ast::Pattern::GraphEdge(graph_edge) => {
-  //             check_graph_node(&mut context, graph_edge.source.borrow(), true)?;
-  //             check_graph_node(&mut context, graph_edge.destination.borrow(), true)?;
-  //             if let Some(var_name) = graph_edge.variable.borrow() {
-  //               check_variable_type(&mut context, var_name, VariableType::Edge, false)?;
-  //             }
-  //           }
-  //         }
-  //         // create.
-  //       }
-  //     }
-  //     Statement::Match(match_statement) => {}
-  //     Statement::Return(return_statement) => {}
-  //   }
-  //   Ok(context)
 }
