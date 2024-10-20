@@ -117,12 +117,12 @@ fn compile_create_node(
   variables.push(node.variable.to_owned());
   compile_optional_expression(function_manager, &node.properties, instructions);
   let mut labels = Default::default();
-  compile_create_labels(&mut labels, &node.labels)?;
+  compile_labels_expression(&mut labels, &node.labels)?;
   instructions.push(Instruction::CreateNodeLiteral { labels });
   Ok(())
 }
 
-fn compile_create_labels(
+fn compile_labels_expression(
   labels: &mut Vec<String>,
   label_expressions: &ast::LabelExpression,
 ) -> Result<()>
@@ -133,7 +133,7 @@ fn compile_create_labels(
     {
       for expr in expressions.iter()
       {
-        compile_create_labels(labels, &expr)?;
+        compile_labels_expression(labels, &expr)?;
       }
       Ok(())
     }
@@ -149,6 +149,77 @@ fn compile_create_labels(
       }
       .into(),
     ),
+  }
+}
+
+// Assume top of the stack contains an edge or node
+fn compile_filter_layers(
+  instructions: &mut Instructions,
+  label_expressions: &ast::LabelExpression,
+  has_label_function: &functions::Function,
+) -> Result<()>
+{
+  match &label_expressions
+  {
+    &ast::LabelExpression::And(expressions) =>
+    {
+      instructions.push(Instruction::Push { value: true.into() });
+      instructions.push(Instruction::Swap);
+      for expr in expressions.iter()
+      {
+        compile_filter_layers(instructions, expr, has_label_function)?;
+        // stack contains (a: bool) (b: labels) (c: bool)
+        instructions.push(Instruction::InverseRot3);
+        // stack contains (c: bool) (a: bool) (b: labels)
+        instructions.push(Instruction::AndBinaryOperator);
+        // stack contains (a&c: bool) (b: labels)
+        instructions.push(Instruction::Swap);
+        // stack contains (b: labels) (a&&c: bool)
+      }
+      Ok(())
+    }
+    &ast::LabelExpression::Or(expressions) =>
+    {
+      instructions.push(Instruction::Push {
+        value: false.into(),
+      });
+      instructions.push(Instruction::Swap);
+      for expr in expressions.iter()
+      {
+        compile_filter_layers(instructions, expr, has_label_function)?;
+        // stack contains (a: bool) (b: labels) (c: bool)
+        instructions.push(Instruction::InverseRot3);
+        // stack contains (c: bool) (a: bool) (b: labels)
+        instructions.push(Instruction::OrBinaryOperator);
+        // stack contains (a||c: bool) (b: labels)
+        instructions.push(Instruction::Swap);
+        // stack contains (b: labels) (a||c: bool)
+      }
+      Ok(())
+    }
+    &ast::LabelExpression::Not(expr) =>
+    {
+      compile_filter_layers(instructions, expr, has_label_function)?;
+      instructions.push(Instruction::NotUnaryOperator);
+      Ok(())
+    }
+    &ast::LabelExpression::String(label) =>
+    {
+      instructions.push(Instruction::Duplicate);
+      instructions.push(Instruction::Push {
+        value: label.to_owned().into(),
+      });
+      instructions.push(Instruction::FunctionCall {
+        function: has_label_function.to_owned(),
+        arguments_count: 2,
+      });
+      Ok(())
+    }
+    &ast::LabelExpression::None =>
+    {
+      instructions.push(Instruction::Push { value: true.into() });
+      Ok(())
+    }
   }
 }
 
@@ -220,7 +291,7 @@ fn compile_create_patterns(
         variables.push(edge.variable.to_owned());
         compile_optional_expression(function_manager, &edge.properties, &mut instructions);
         let mut labels = Default::default();
-        compile_create_labels(&mut labels, &edge.labels)?;
+        compile_labels_expression(&mut labels, &edge.labels)?;
         instructions.push(Instruction::CreateEdgeLiteral { labels });
       }
       crate::parser::ast::Pattern::Path(_) =>
@@ -247,18 +318,41 @@ fn compile_match_node(
   function_manager: &functions::Manager,
   node: &crate::parser::ast::NodePattern,
   instructions: &mut Instructions,
+  filter: &mut Instructions,
+  get_node_function_name: Option<&'static str>,
 ) -> Result<()>
 {
   compile_optional_expression(function_manager, &node.properties, instructions)?;
   let mut labels = Default::default();
-  compile_create_labels(&mut labels, &node.labels)?;
+  if node.labels.is_all_inclusive()
+  {
+    compile_labels_expression(&mut labels, &node.labels)?;
+  }
+  else
+  {
+    let empty_filter = filter.is_empty();
+    if let Some(get_node_function_name) = get_node_function_name
+    {
+      filter.push(Instruction::Duplicate);
+      filter.push(Instruction::FunctionCall {
+        function: function_manager.get::<CompileTimeError>(get_node_function_name)?,
+        arguments_count: 1,
+      });
+    }
+    let has_label_function = function_manager.get::<CompileTimeError>("has_label")?;
+    compile_filter_layers(filter, &node.labels, &has_label_function);
+    filter.push(Instruction::Swap);
+    if !empty_filter
+    {
+      filter.push(Instruction::AndBinaryOperator);
+    }
+  }
   instructions.push(Instruction::CreateNodeLiteral { labels });
   Ok(())
 }
 
 fn compile_match_edge(
   function_manager: &functions::Manager,
-
   validator: &mut validator::Validator,
   path_variable: Option<String>,
   edge: &crate::parser::ast::EdgePattern,
@@ -267,6 +361,7 @@ fn compile_match_edge(
   let mut instructions = Instructions::new();
   validator.declare_edge_variable(edge)?;
   let mut source_variable = None;
+  let mut filter = Instructions::new();
   if validator.check_existing_node(&edge.source)?
   {
     instructions.push(Instruction::GetVariable {
@@ -276,7 +371,13 @@ fn compile_match_edge(
   else
   {
     source_variable = edge.source.variable.to_owned();
-    compile_match_node(function_manager, &edge.source, &mut instructions)?;
+    compile_match_node(
+      function_manager,
+      &edge.source,
+      &mut instructions,
+      &mut filter,
+      Some("get_source"),
+    )?;
   }
   let mut destination_variable = None;
   if validator.check_existing_node(&edge.destination)?
@@ -288,24 +389,43 @@ fn compile_match_edge(
   else
   {
     destination_variable = edge.destination.variable.to_owned();
-    compile_match_node(function_manager, &edge.destination, &mut instructions)?;
+    compile_match_node(
+      function_manager,
+      &edge.destination,
+      &mut instructions,
+      &mut filter,
+      Some("get_destination"),
+    )?;
   }
   compile_optional_expression(function_manager, &edge.properties, &mut instructions)?;
   let mut labels = Default::default();
-  compile_create_labels(&mut labels, &edge.labels)?;
+  if edge.labels.is_all_inclusive()
+  {
+    compile_labels_expression(&mut labels, &edge.labels)?;
+  }
+  else
+  {
+    let empty_filter = filter.is_empty();
+    let has_label_function = function_manager.get::<CompileTimeError>("has_label")?;
+    compile_filter_layers(&mut filter, &edge.labels, &has_label_function);
+    if !empty_filter
+    {
+      filter.push(Instruction::AndBinaryOperator);
+    }
+  }
   instructions.push(Instruction::CreateEdgeLiteral { labels });
   Ok(Block::MatchEdge {
     instructions: instructions,
     left_variable: source_variable,
     edge_variable: edge.variable.to_owned(),
     right_variable: destination_variable,
-    path_variable: path_variable,
+    path_variable,
+    filter,
   })
 }
 
 fn compile_match_patterns(
   function_manager: &functions::Manager,
-
   validator: &mut validator::Validator,
   patterns: &Vec<crate::parser::ast::Pattern>,
 ) -> Result<Vec<Block>>
@@ -318,10 +438,12 @@ fn compile_match_patterns(
       {
         let mut instructions = Instructions::new();
         validator.declare_node_variable(node)?;
-        compile_match_node(function_manager, node, &mut instructions)?;
+        let mut filter = Instructions::new();
+        compile_match_node(function_manager, node, &mut instructions, &mut filter, None)?;
         Ok(Block::MatchNode {
           instructions: instructions,
           variable: node.variable.to_owned(),
+          filter,
         })
       }
       crate::parser::ast::Pattern::Edge(edge) =>

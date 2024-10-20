@@ -2,6 +2,8 @@ use std::borrow::Borrow;
 
 use serde::{Deserialize, Serialize};
 
+use crate::error::InternalError;
+
 /// Represent a value in a properties for a Node or an Edge.
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, Clone)]
 #[serde(untagged)]
@@ -73,6 +75,14 @@ impl Value
       _ => None,
     }
   }
+  pub fn to_boolean(&self) -> Option<bool>
+  {
+    match self
+    {
+      Value::Boolean(b) => Some(*b),
+      _ => None,
+    }
+  }
   pub(crate) fn access<'a>(&self, mut path: impl Iterator<Item = &'a String>) -> Value
   {
     match path.next()
@@ -128,6 +138,32 @@ impl std::fmt::Display for Value
   }
 }
 
+pub(crate) trait ValueTryIntoRef<T>
+{
+  fn try_into_ref<'a>(&'a self) -> Result<&'a T, crate::error::Error>;
+}
+
+impl ValueTryIntoRef<Value> for Value
+{
+  fn try_into_ref<'a>(&'a self) -> Result<&'a Value, crate::error::Error>
+  {
+    Ok(self)
+  }
+}
+
+impl TryInto<bool> for Value
+{
+  type Error = crate::error::Error;
+  fn try_into(self) -> Result<bool, Self::Error>
+  {
+    match self
+    {
+      Value::Boolean(v) => Ok(v),
+      _ => Err(InternalError::InvalidValueCast.into()),
+    }
+  }
+}
+
 macro_rules! impl_to_value {
   ($type:tt, $vn:tt) => {
     impl Into<Value> for $type
@@ -135,6 +171,17 @@ macro_rules! impl_to_value {
       fn into(self) -> Value
       {
         Value::$vn(self.clone())
+      }
+    }
+    impl ValueTryIntoRef<$type> for Value
+    {
+      fn try_into_ref<'a>(&'a self) -> Result<&'a $type, crate::error::Error>
+      {
+        match self
+        {
+          Value::$vn(v) => Ok(v),
+          _ => Err(crate::error::InternalError::InvalidValueCast.into()),
+        }
       }
     }
   };

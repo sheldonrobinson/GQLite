@@ -43,7 +43,13 @@ pub(crate) enum Instruction
     path: Vec<String>,
   },
   Duplicate,
-  Rot3,
+  Rot3,        // If a is the top of the stack, then a b c -> b c a
+  InverseRot3, // If a is the top of the stack, then a b c -> c a b
+  Swap,
+  Drop,
+  AndBinaryOperator,
+  OrBinaryOperator,
+  NotUnaryOperator,
 }
 
 pub(crate) type Instructions = Vec<Instruction>;
@@ -66,6 +72,7 @@ pub(crate) enum Block
   {
     instructions: Instructions,
     variable: Option<String>,
+    filter: Instructions,
   },
   MatchEdge
   {
@@ -74,6 +81,7 @@ pub(crate) enum Block
     edge_variable: Option<String>,
     right_variable: Option<String>,
     path_variable: Option<String>,
+    filter: Instructions,
   },
   Return
   {

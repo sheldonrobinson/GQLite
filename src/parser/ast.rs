@@ -299,6 +299,17 @@ impl LabelExpression
   {
     Box::new(self)
   }
+  pub(crate) fn is_all_inclusive(&self) -> bool
+  {
+    match self
+    {
+      LabelExpression::None => true,
+      LabelExpression::And(exprs) => !exprs.iter().any(|f| !f.is_all_inclusive()),
+      LabelExpression::Or(_) => false,
+      LabelExpression::String(_) => true,
+      LabelExpression::Not(_) => false,
+    }
+  }
 }
 
 // Values
