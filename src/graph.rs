@@ -4,6 +4,13 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::InternalError;
 
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum EdgeDirectivity
+{
+  Undirected,
+  Directed,
+}
+
 /// Represent a value in a properties for a Node or an Edge.
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, Clone)]
 #[serde(untagged)]
@@ -235,6 +242,14 @@ impl Default for Key
 impl From<&Key> for u128
 {
   fn from(value: &Key) -> Self
+  {
+    value.uuid
+  }
+}
+
+impl From<Key> for u128
+{
+  fn from(value: Key) -> Self
   {
     value.uuid
   }

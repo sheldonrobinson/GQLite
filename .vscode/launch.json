@@ -59,10 +59,18 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "/usr/bin/ruby",
-            "args": ["${env:LRS_PKG_ROOT}/src/gqlite/tests/rb/gqlite-tck.rb", "--abort-on-first-error"],
+            "args": [
+                "${env:LRS_PKG_ROOT}/src/gqlite/tests/rb/gqlite-tck.rb",
+                "--abort-on-first-error"
+            ],
             "stopAtEntry": false,
             "cwd": "${env:LRS_PKG_ROOT}/src/gqlite/tests/rb",
-            "environment": [],
+            "environment": [
+                {
+                    "name": "RUST_BACKTRACE",
+                    "value": "1"
+                }
+            ],
             "externalConsole": false,
             "MIMode": "gdb",
             "setupCommands": [
@@ -84,7 +92,10 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "/usr/bin/ruby",
-            "args": ["/usr/bin/rspec", "${env:LRS_PKG_ROOT}/src/gqlite/tests/rb/gqlite-rspec.rb"],
+            "args": [
+                "/usr/bin/rspec",
+                "${env:LRS_PKG_ROOT}/src/gqlite/tests/rb/gqlite-rspec.rb"
+            ],
             "stopAtEntry": false,
             "cwd": "${env:LRS_PKG_ROOT}/src/gqlite/tests/rb",
             "environment": [],
@@ -109,7 +120,9 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "/usr/bin/ruby",
-            "args": ["${env:LRS_PKG_ROOT}/src/gqlite/tests/rb/gqlite-bench.rb"],
+            "args": [
+                "${env:LRS_PKG_ROOT}/src/gqlite/tests/rb/gqlite-bench.rb"
+            ],
             "stopAtEntry": false,
             "cwd": "${env:LRS_PKG_ROOT}/src/gqlite/tests/rb",
             "environment": [],
@@ -129,6 +142,5 @@
             ],
             "showDisplayString": true
         }
-  ]
-  }
-  
+    ]
+}

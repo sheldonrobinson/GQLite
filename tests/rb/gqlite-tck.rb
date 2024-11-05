@@ -45,7 +45,7 @@ expressions = [
 
 # In progress
 # gql = []
-# features = [ ]
+# features = ['match/Match3']
 # expressions = []
 # Current dev
 # gql = []

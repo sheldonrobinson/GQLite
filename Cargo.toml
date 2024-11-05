@@ -10,19 +10,20 @@ name = "gqlite"
 [features]
 default = ["persy", "capi"]
 capi = []
-persy = [ "dep:persy" ]
-pgql = [ "dep:pgrx" ]
-pg12 = [ "pgrx/pg12" ]
-pg13 = [ "pgrx/pg13" ]
-pg14 = [ "pgrx/pg14" ]
-pg15 = [ "pgrx/pg15" ]
-pg16 = [ "pgrx/pg16" ]
-pg17 = [ "pgrx/pg17" ]
+persy = ["dep:persy"]
+pgql = ["dep:pgrx"]
+pg12 = ["pgrx/pg12"]
+pg13 = ["pgrx/pg13"]
+pg14 = ["pgrx/pg14"]
+pg15 = ["pgrx/pg15"]
+pg16 = ["pgrx/pg16"]
+pg17 = ["pgrx/pg17"]
 
 [dependencies]
 ciborium = "0.2"
-persy = {version = "1", optional = true}
-pgrx = {version = "0.12", optional = true}
+itertools = "0.13"
+persy = { version = "1", optional = true }
+pgrx = { version = "0.12", optional = true }
 pest = "2"
 pest_derive = "2"
 rand = "0.8"
