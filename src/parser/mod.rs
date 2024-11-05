@@ -293,6 +293,20 @@ fn build_pattern(
           properties: edge_pattern.2,
         }));
       }
+      Rule::edge_empty_pattern =>
+      {
+        let mut it = pair.into_inner();
+        let source_node = build_node_pattern(it.next().unwrap())?;
+        let destination_node = build_node_pattern(it.next().unwrap())?;
+        vec.push(ast::Pattern::Edge(ast::EdgePattern {
+          variable: None,
+          source: source_node,
+          destination: destination_node,
+          directivity: graph::EdgeDirectivity::Directed,
+          labels: ast::LabelExpression::None,
+          properties: None,
+        }));
+      }
       Rule::reverse_edge_pattern =>
       {
         let mut it = pair.into_inner();
