@@ -289,19 +289,20 @@ fn compile_create_patterns(
         }
         validator.declare_edge_variable(edge)?;
         variables.push(edge.variable.to_owned());
-        compile_optional_expression(function_manager, &edge.properties, &mut instructions);
+        compile_optional_expression(function_manager, &edge.properties, &mut instructions)?;
+        if !edge.labels.is_string()
+        {
+          Err(CompileTimeError::NoSingleRelationshipType)?;
+        }
         let mut labels = Default::default();
         compile_labels_expression(&mut labels, &edge.labels)?;
         instructions.push(Instruction::CreateEdgeLiteral { labels });
       }
       crate::parser::ast::Pattern::Path(_) =>
       {
-        return Err(
-          InternalError::PathPatternInCreateExpression {
-            context: "compiler/compile_create_patterns",
-          }
-          .into(),
-        );
+        Err(InternalError::PathPatternInCreateExpression {
+          context: "compiler/compile_create_patterns",
+        })?;
       }
     }
     Ok(CreateAction {

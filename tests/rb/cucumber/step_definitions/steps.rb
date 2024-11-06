@@ -445,7 +445,7 @@ end
 Then(/^a SyntaxError should be raised at compile time: NoSingleRelationshipType$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
-  expect(@exception.message).to match(/^CompileTime: ParseError:.*$/)
+  expect(@exception.message).to match(/^CompileTime: NoSingleRelationshipType:.*$/)
 end
 
 Then(/^a SyntaxError should be raised at compile time: RequiresDirectedRelationship$/) do
