@@ -525,25 +525,41 @@ pub(crate) fn eval_program(
             {
               new_row.insert(
                 left_variable,
-                crate::graph::Value::Node(edge.source.to_owned()),
+                if edge.reversed
+                {
+                  edge.edge.destination.to_owned()
+                }
+                else
+                {
+                  edge.edge.source.to_owned()
+                }
+                .into(),
               );
             }
             if let Some(right_variable) = right_variable.to_owned()
             {
               new_row.insert(
                 right_variable,
-                crate::graph::Value::Node(edge.destination.to_owned()),
+                if edge.reversed
+                {
+                  edge.edge.source.to_owned()
+                }
+                else
+                {
+                  edge.edge.destination.to_owned()
+                }
+                .into(),
               );
             }
             if let Some(edge_variable) = edge_variable.to_owned()
             {
-              new_row.insert(edge_variable, crate::graph::Value::Edge(edge.to_owned()));
+              new_row.insert(edge_variable, edge.edge.to_owned().into());
             }
             if let Some(path_variable) = path_variable.to_owned()
             {
               new_row.insert(
                 path_variable,
-                crate::graph::Value::Path(edge.to_owned().into()),
+                crate::graph::Value::Path(edge.edge.to_owned().into()),
               );
             }
             let should_add_row = if filter.is_empty()
@@ -554,7 +570,7 @@ pub(crate) fn eval_program(
             {
               let mut stack = Vec::<crate::graph::Value>::default();
               stack.push(true.into());
-              stack.push(edge.to_owned().into());
+              stack.push(edge.edge.to_owned().into());
               eval_instructions(&mut stack, &new_row, &filter, &parameters)?;
               stack.pop(); // Get rid of the edge
               stack

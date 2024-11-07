@@ -227,6 +227,49 @@ struct PersistentEdge
   pub properties: graph::ValueObject,
 }
 
+struct EdgeIdResult
+{
+  edge_data: Vec<u8>,
+  reversed: Option<bool>,
+  source_id: Option<graph::Key>,
+  destination_id: Option<graph::Key>,
+}
+
+impl EdgeIdResult
+{
+  fn new(
+    edge_data: Vec<u8>,
+    reversed: Option<bool>,
+    source_id: Option<graph::Key>,
+    destination_id: Option<graph::Key>,
+  ) -> EdgeIdResult
+  {
+    assert!(reversed.is_some() || source_id.is_some() || destination_id.is_some());
+    EdgeIdResult {
+      edge_data,
+      reversed,
+      source_id,
+      destination_id,
+    }
+  }
+  fn is_reversed(&self, edge: &graph::Edge) -> bool
+  {
+    match self.reversed
+    {
+      Some(v) => v,
+      None => match self.source_id
+      {
+        Some(v) => edge.destination.key == v,
+        None => match self.destination_id
+        {
+          Some(v) => edge.source.key == v,
+          None => panic!("is_reversed"),
+        },
+      },
+    }
+  }
+}
+
 //  ____  _
 // / ___|| |_ ___  _ __ ___
 // \___ \| __/ _ \| '__/ _ \
@@ -550,7 +593,7 @@ impl Store
       TDestinationProperties,
     >,
     directivity: graph::EdgeDirectivity,
-  ) -> Result<Vec<crate::graph::Edge>>
+  ) -> Result<Vec<super::EdgeResult>>
   where
     TSourceKeys: Iterator<Item = &'a crate::graph::Key>,
     TSourceLabels: Iterator<Item = &'a String>,
@@ -577,6 +620,7 @@ impl Store
       ),
     };
 
+    // Get the UUID of the edges
     let edges_raw = {
       // let mut transaction = transaction.borrow_mut();
       match query.keys
@@ -589,7 +633,7 @@ impl Store
                 .borrow_mut()
                 .read(graph_info.edges_segment, key.borrow())?
               {
-                Ok(v)
+                Ok(EdgeIdResult::new(v, Some(false), None, None))
               }
               else
               {
@@ -601,7 +645,7 @@ impl Store
               Err(Error::UnknownNode)
             }
           })
-          .collect::<Result<Vec<Vec<u8>>>>()?,
+          .collect::<Result<Vec<EdgeIdResult>>>()?,
         None =>
         {
           if query.source.is_select_all() && query.destination.is_select_all()
@@ -609,8 +653,15 @@ impl Store
             transaction
               .borrow_mut()
               .scan(graph_info.edges_segment)?
-              .map(|(_, content)| Ok::<Vec<u8>, crate::Error>(content))
-              .collect::<Result<Vec<Vec<u8>>>>()?
+              .map(|(_, content)| {
+                Ok::<EdgeIdResult, crate::Error>(EdgeIdResult::new(
+                  content,
+                  Some(false),
+                  None,
+                  None,
+                ))
+              })
+              .collect::<Result<Vec<EdgeIdResult>>>()?
           }
           else
           {
@@ -633,18 +684,28 @@ impl Store
               Box::new(
                 nodes
                   .into_iter()
-                  .map(|n| edges_source_uuid_index.get(transaction.clone(), n.key))
+                  .map(|n| {
+                    let nkey = n.key;
+                    Ok::<_, crate::Error>(
+                      edges_source_uuid_index
+                        .get(transaction.clone(), nkey)?
+                        .map(move |k| (k, Some(nkey), None)),
+                    )
+                  })
                   .map(|id_iter| {
                     Ok({
                       let dest_it = dest_it.clone();
-                      id_iter?.filter(move |id| dest_it.contains(id))
+                      id_iter?.filter(move |(id, _, _)| dest_it.contains(id))
                     })
                   })
                   .collect::<Vec<Result<_>>>()
                   .into_iter()
                   .flatten()
                   .flatten(),
-              ) as Box<dyn Iterator<Item = persy::PersyId>>
+              )
+                as Box<
+                  dyn Iterator<Item = (persy::PersyId, Option<graph::Key>, Option<graph::Key>)>,
+                >
             }
             else if !query.source.is_select_all()
             {
@@ -653,11 +714,21 @@ impl Store
               Box::new(
                 nodes
                   .into_iter()
-                  .map(|n| edges_source_uuid_index.get(transaction.clone(), n.key))
+                  .map(|n| {
+                    let nkey = n.key;
+                    Ok(
+                      edges_source_uuid_index
+                        .get(transaction.clone(), nkey)?
+                        .map(move |k| (k, Some(nkey), None)),
+                    )
+                  })
                   .collect::<Result<Vec<_>>>()?
                   .into_iter()
                   .flatten(),
-              ) as Box<dyn Iterator<Item = persy::PersyId>>
+              )
+                as Box<
+                  dyn Iterator<Item = (persy::PersyId, Option<graph::Key>, Option<graph::Key>)>,
+                >
             }
             else
             {
@@ -666,43 +737,57 @@ impl Store
               Box::new(
                 nodes
                   .into_iter()
-                  .map(|n| edges_destination_uuid_index.get(transaction.clone(), n.key))
+                  .map(|n| {
+                    let nkey = n.key;
+                    Ok(
+                      edges_destination_uuid_index
+                        .get(transaction.clone(), nkey)?
+                        .map(move |k| (k, None, Some(nkey))),
+                    )
+                  })
                   .collect::<Result<Vec<_>>>()?
                   .into_iter()
                   .flatten(),
-              ) as Box<dyn Iterator<Item = persy::PersyId>>
+              )
+                as Box<
+                  dyn Iterator<Item = (persy::PersyId, Option<graph::Key>, Option<graph::Key>)>,
+                >
             };
             edges_ids
-              .map(|key| {
+              .map(|(edge_key, ks, kd)| {
                 if let Some(v) = transaction
                   .borrow_mut()
-                  .read(graph_info.edges_segment, &key)?
+                  .read(graph_info.edges_segment, &edge_key)?
                 {
-                  Ok(v)
+                  Ok(EdgeIdResult::new(v, None, ks, kd))
                 }
                 else
                 {
                   Err(Error::UnknownNode)
                 }
               })
-              .collect::<Result<Vec<Vec<u8>>>>()?
+              .collect::<Result<Vec<_>>>()?
           }
         }
       }
     };
+    // Get the edges
     let r = edges_raw.into_iter().map(|v| {
-      Ok::<graph::Edge, crate::Error>({
-        let edge = ciborium::from_reader::<PersistentEdge, &[u8]>(&mut v.as_ref())?;
+      Ok::<super::EdgeResult, crate::Error>({
+        let edge = ciborium::from_reader::<PersistentEdge, &[u8]>(&mut &v.edge_data.as_ref())?;
         let mut transaction = transaction.borrow_mut();
-        graph::Edge {
+        let edge = graph::Edge {
           key: edge.key,
           source: self.fetch_node(&mut transaction, graph_info, edge.source)?,
           destination: self.fetch_node(&mut transaction, graph_info, edge.destination)?,
           labels: edge.labels,
           properties: edge.properties,
-        }
+        };
+        let reversed = v.is_reversed(&edge);
+        super::EdgeResult { edge, reversed }
       })
     });
+    // Filter using the labels
     let r = match query.labels
     {
       Some(labels) =>
@@ -714,7 +799,7 @@ impl Store
           {
             for l in labels.iter()
             {
-              if !e.labels.contains(l)
+              if !e.edge.labels.contains(l)
               {
                 return false;
               }
@@ -722,9 +807,9 @@ impl Store
             true
           }
           Err(_) => true,
-        })) as Box<dyn Iterator<Item = Result<crate::graph::Edge>>>
+        })) as Box<dyn Iterator<Item = Result<super::EdgeResult>>>
       }
-      None => Box::new(r) as Box<dyn Iterator<Item = Result<crate::graph::Edge>>>,
+      None => Box::new(r) as Box<dyn Iterator<Item = Result<super::EdgeResult>>>,
     };
     let r = match query.properties
     {
@@ -737,7 +822,7 @@ impl Store
           {
             for (k, v) in properties.iter()
             {
-              match e.properties.get(*k)
+              match e.edge.properties.get(*k)
               {
                 Some(val) =>
                 {
@@ -755,9 +840,9 @@ impl Store
             true
           }
           Err(_) => true,
-        })) as Box<dyn Iterator<Item = Result<crate::graph::Edge>>>
+        })) as Box<dyn Iterator<Item = Result<super::EdgeResult>>>
       }
-      None => Box::new(r) as Box<dyn Iterator<Item = Result<crate::graph::Edge>>>,
+      None => Box::new(r) as Box<dyn Iterator<Item = Result<super::EdgeResult>>>,
     };
     r.collect()
   }
@@ -797,6 +882,7 @@ impl Store
       edges_count += 1;
 
       properties_count += e
+        .edge
         .properties
         .iter()
         .filter(|(_, v)| **v != graph::Value::Invalid)
