@@ -163,6 +163,7 @@ impl TryInto<bool> for Value
   type Error = crate::error::Error;
   fn try_into(self) -> Result<bool, Self::Error>
   {
+    println!("{:#?}", self);
     match self
     {
       Value::Boolean(v) => Ok(v),
@@ -184,6 +185,7 @@ macro_rules! impl_to_value {
     {
       fn try_into_ref<'a>(&'a self) -> Result<&'a $type, crate::error::Error>
       {
+        println!("{:#?}", self);
         match self
         {
           Value::$vn(v) => Ok(v),

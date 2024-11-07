@@ -50,6 +50,8 @@ pub(crate) enum Instruction
   AndBinaryOperator,
   OrBinaryOperator,
   NotUnaryOperator,
+  EqualBinaryOperator,
+  NotEqualBinaryOperator,
 }
 
 pub(crate) type Instructions = Vec<Instruction>;

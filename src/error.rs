@@ -93,6 +93,11 @@ pub enum InternalError
   {
     context: &'static str
   },
+  #[error("Expected a value to be an edge in {context}.")]
+  ExpectedEdge
+  {
+    context: &'static str
+  },
   #[error("Missing a pair from pest parsing in {context}.")]
   MissingPair
   {

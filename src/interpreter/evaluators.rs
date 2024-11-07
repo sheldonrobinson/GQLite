@@ -26,6 +26,20 @@ fn execute_boolean_operator(
   Ok(())
 }
 
+fn execute_binary_operator(
+  stack: &mut Vec<crate::graph::Value>,
+  operand: impl FnOnce(crate::graph::Value, crate::graph::Value) -> bool,
+) -> Result<()>
+{
+  let a = stack.pop().ok_or(InternalError::EmptyStack {
+    context: "in BooleanBinaryOperator a",
+  })?;
+  let b = stack.pop().ok_or(InternalError::EmptyStack {
+    context: "in BooleanBinaryOperator b",
+  })?;
+  stack.push(operand(a, b).into());
+  Ok(())
+}
 fn eval_instructions(
   stack: &mut Vec<crate::graph::Value>,
   row: &crate::value_table::Row,
@@ -33,8 +47,16 @@ fn eval_instructions(
   parameters: &crate::graph::ValueObject,
 ) -> Result<()>
 {
+  if crate::consts::SHOW_EVALUATOR_STATE
+  {
+    println!("-----------");
+  }
   for instruction in instructions
   {
+    if crate::consts::SHOW_EVALUATOR_STATE
+    {
+      println!("-- {:#?} {:#?}", instruction, stack);
+    }
     match instruction
     {
       instructions::Instruction::CreateEdgeLiteral { labels } =>
@@ -232,6 +254,14 @@ fn eval_instructions(
         })?;
         stack.push((!a).into());
       }
+      &instructions::Instruction::EqualBinaryOperator =>
+      {
+        execute_binary_operator(stack, |a, b| a == b)?;
+      }
+      &instructions::Instruction::NotEqualBinaryOperator =>
+      {
+        execute_binary_operator(stack, |a, b| a != b)?;
+      }
     }
   }
   Ok(())
@@ -340,7 +370,7 @@ pub(crate) fn eval_program(
             {
               let mut stack = Vec::<crate::graph::Value>::default();
               stack.push(node.to_owned().into());
-              eval_instructions(&mut stack, &new_row, &filter, &parameters);
+              eval_instructions(&mut stack, &new_row, &filter, &parameters)?;
               println!("{:#?}", stack);
               todo!();
             }
@@ -362,14 +392,16 @@ pub(crate) fn eval_program(
         let mut output_table = crate::value_table::ValueTable::new();
         for row in input_table.iter()
         {
+          println!("{:#?} {:#?}", stack, instructions);
           eval_instructions(&mut stack, row, &instructions, &parameters)?;
+          println!("{:#?}", stack);
           let template = stack
             .pop()
             .ok_or_else(|| InternalError::MissingStackValue {
               context: "eval_program/MatchEdge",
             })?
             .to_edge()
-            .ok_or_else(|| InternalError::ExpectedNode {
+            .ok_or_else(|| InternalError::ExpectedEdge {
               context: "eval_program/MatchEdge",
             })?;
 
@@ -514,16 +546,17 @@ pub(crate) fn eval_program(
                 crate::graph::Value::Path(edge.to_owned().into()),
               );
             }
-            let mut should_add_row = if filter.is_empty()
+            let should_add_row = if filter.is_empty()
             {
               true
             }
             else
             {
               let mut stack = Vec::<crate::graph::Value>::default();
+              stack.push(true.into());
               stack.push(edge.to_owned().into());
               eval_instructions(&mut stack, &new_row, &filter, &parameters)?;
-              stack.pop();
+              stack.pop(); // Get rid of the edge
               stack
                 .pop()
                 .ok_or(Error::EmptyStack("in filtering edge".to_string()))?
