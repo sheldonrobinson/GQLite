@@ -388,6 +388,14 @@ fn build_ast_from_statement(pair: pest::iterators::Pair<Rule>) -> Result<ast::St
       patterns: build_pattern(pair.into_inner(), true)?,
       optional: false,
     })),
+    Rule::optional_match_statement => Ok(ast::Statement::Match(ast::Match {
+      where_expression: None,
+      patterns: build_pattern(
+        pair.into_inner().into_iter().next().unwrap().into_inner(),
+        true,
+      )?,
+      optional: true,
+    })),
     Rule::return_statement =>
     {
       let named_expressions = pair

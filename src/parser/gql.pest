@@ -14,31 +14,32 @@ nothing = { nothing_ident? }
 
 // fragments
 
-labels                       =  { ":" ~ label_expression }
-pattern                      =  { ident? ~ labels? ~ map? }
-node_pattern                 =  { "(" ~ pattern ~ ")" }
+labels       = { ":" ~ label_expression }
+pattern      = { ident? ~ labels? ~ map? }
+node_pattern = { "(" ~ pattern ~ ")" }
 
-directed_edge_pattern        =  { (")-[" ~ pattern ~ "]->(" ) | (nothing ~ ")-->(") }
-reversed_edge_pattern        =  { (")<-[" ~ pattern ~ "]-(" ) | (nothing ~ ")<--(") }
-undirected_edge_pattern      =  { (")-[" ~ pattern ~ "]-(" ) | (")<-[" ~ pattern ~ "]->(" ) | (nothing ~ ")--(") }
-edge_pattern                 =  { "(" ~ pattern ~ ( (directed_edge_pattern | reversed_edge_pattern | undirected_edge_pattern) ~ pattern )+ ~")" }
+directed_edge_pattern   = { (")-[" ~ pattern ~ "]->(") | (nothing ~ ")-->(") }
+reversed_edge_pattern   = { (")<-[" ~ pattern ~ "]-(") | (nothing ~ ")<--(") }
+undirected_edge_pattern = { (")-[" ~ pattern ~ "]-(") | (")<-[" ~ pattern ~ "]->(") | (nothing ~ ")--(") }
+edge_pattern            = { "(" ~ pattern ~ ((directed_edge_pattern | reversed_edge_pattern | undirected_edge_pattern) ~ pattern)+ ~ ")" }
 
-path_pattern                 =  { ident ~ "=" ~ edge_pattern }
+path_pattern = { ident ~ "=" ~ edge_pattern }
 
 node_or_edge_pattern         = _{ edge_pattern | node_pattern }
 node_or_edge_or_path_pattern = _{ edge_pattern | node_pattern | path_pattern }
 
 // Statements
-statement = { create_statement | match_statement | return_statement | call_statement | with_statement | unwind_statement }
+statement = { create_statement | optional_match_statement | match_statement | return_statement | call_statement | with_statement | unwind_statement }
 
 star = { "*" }
 
-create_statement = { "CREATE" ~ node_or_edge_pattern ~ ("," ~ node_or_edge_pattern)* }
-match_statement  = { "MATCH" ~ node_or_edge_or_path_pattern ~ ("," ~ node_or_edge_or_path_pattern)* }
-return_statement = { "RETURN" ~ named_expression ~ ("," ~ named_expression)* }
-call_statement   = { "CALL" ~ function_name ~ "()" }
-with_statement   = { "WITH" ~ (star | named_expression) ~ ("," ~ named_expression)* }
-unwind_statement = { "UNWIND" ~ named_expression }
+create_statement         = { "CREATE" ~ node_or_edge_pattern ~ ("," ~ node_or_edge_pattern)* }
+match_statement          = { "MATCH" ~ node_or_edge_or_path_pattern ~ ("," ~ node_or_edge_or_path_pattern)* }
+optional_match_statement = { "OPTIONAL" ~ match_statement }
+return_statement         = { "RETURN" ~ named_expression ~ ("," ~ named_expression)* }
+call_statement           = { "CALL" ~ function_name ~ "()" }
+with_statement           = { "WITH" ~ (star | named_expression) ~ ("," ~ named_expression)* }
+unwind_statement         = { "UNWIND" ~ named_expression }
 
 // literals
 int            =  { ("+" | "-")? ~ ASCII_DIGIT+ }
