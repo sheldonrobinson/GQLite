@@ -31,6 +31,12 @@ fn build_expression(pair: pest::iterators::Pair<Rule>) -> Result<ast::Expression
     Rule::false_lit => Ok(ast::Expression::Value(ast::Value {
       value: graph::Value::Boolean(false),
     })),
+    Rule::int => Ok(ast::Expression::Value(ast::Value {
+      value: graph::Value::Integer(pair.as_str().parse()?),
+    })),
+    Rule::num => Ok(ast::Expression::Value(ast::Value {
+      value: graph::Value::Float(pair.as_str().parse()?),
+    })),
     Rule::ident => Ok(ast::Expression::Variable(ast::Variable {
       identifier: pair.as_str().to_string(),
     })),
@@ -67,33 +73,6 @@ fn build_expression(pair: pest::iterators::Pair<Rule>) -> Result<ast::Expression
     Rule::string_literal => Ok(ast::Expression::Value(ast::Value {
       value: graph::Value::String(pair.into_inner().next().unwrap().as_str().to_string()),
     })),
-    Rule::num =>
-    {
-      let mut it = pair.into_inner();
-      let num_str = it
-        .next()
-        .ok_or_else(|| crate::Error::InternalError("Missing first element of number."))?
-        .as_str();
-      match it.next()
-      {
-        Some(frag) =>
-        {
-          let num_str = num_str.to_owned() + frag.as_str();
-          match it.next()
-          {
-            Some(frag) => Ok(ast::Expression::Value(ast::Value {
-              value: graph::Value::Float((num_str + frag.as_str()).as_str().parse()?),
-            })),
-            None => Ok(ast::Expression::Value(ast::Value {
-              value: graph::Value::Float(num_str.as_str().parse()?),
-            })),
-          }
-        }
-        None => Ok(ast::Expression::Value(ast::Value {
-          value: graph::Value::Integer(num_str.parse()?),
-        })),
-      }
-    }
     Rule::function_call =>
     {
       let mut it = pair.into_inner();
@@ -113,6 +92,32 @@ fn build_expression(pair: pest::iterators::Pair<Rule>) -> Result<ast::Expression
       format!("{unknown_expression:?}"),
     )),
   }
+}
+
+fn build_modifiers(pair: pest::iterators::Pair<Rule>) -> Result<ast::Modifiers>
+{
+  let skip = None;
+  let mut limit = None;
+  let order_by = None;
+  for subpair in pair.into_inner()
+  {
+    match subpair.as_rule()
+    {
+      Rule::limit => limit = Some(build_expression(subpair.into_inner().next().unwrap())?),
+      _ => Err::<(), crate::Error>(
+        InternalError::UnexpectedPair {
+          context: "build_modifiers",
+          pair: format!("{:#?}", subpair),
+        }
+        .into(),
+      )?,
+    }
+  }
+  Ok(ast::Modifiers {
+    skip,
+    limit,
+    order_by,
+  })
 }
 
 fn build_named_expression(pair: pest::iterators::Pair<Rule>) -> Result<ast::NamedExpression>
@@ -411,33 +416,26 @@ fn build_ast_from_statement(pair: pest::iterators::Pair<Rule>) -> Result<ast::St
     {
       let mut all = false;
       let mut expressions = vec![];
-      let mut it = pair.into_inner();
-      let first = it.next();
-      match first
+      let mut modifiers = Default::default();
+
+      for sub_pair in pair.into_inner()
       {
-        Some(pair) => match pair.as_rule()
+        match sub_pair.as_rule()
         {
           Rule::star => all = true,
-          Rule::named_expression => expressions.push(build_named_expression(pair)?),
+          Rule::named_expression => expressions.push(build_named_expression(sub_pair)?),
+          Rule::modifiers => modifiers = build_modifiers(sub_pair)?,
           _ => Err(InternalError::UnexpectedPair {
             context: "build_ast_from_statement/with_statement",
-            pair: pair.as_str().to_string(),
+            pair: sub_pair.as_str().to_string(),
           })?,
-        },
-        _ => Err(InternalError::MissingPair {
-          context: "build_ast_from_statement/with_statement",
-        })?,
+        }
       }
-      expressions.append(
-        &mut it
-          .map(|pair| build_named_expression(pair))
-          .collect::<Result<Vec<ast::NamedExpression>>>()?,
-      );
 
       Ok(ast::Statement::With(ast::With {
         all,
         expressions,
-        modifiers: ast::Modifiers::default(),
+        modifiers,
       }))
     }
     Rule::unwind_statement =>
