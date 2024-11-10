@@ -2,48 +2,214 @@ use std::collections::HashMap;
 
 use crate::{
   error::{InternalError, RunTimeError},
-  graph, Error, Result, Value,
+  graph,
+  store::{self, SelectEdgeQuery},
+  Error, Result,
 };
 
 use super::instructions;
 
+#[derive(Debug, Clone)]
+enum Value
+{
+  GraphValue(graph::Value),
+  NodeQuery(store::SelectNodeQuery),
+  EdgeQuery(store::SelectEdgeQuery),
+}
+
+impl Value {}
+
+impl<T> From<T> for Value
+where
+  T: Into<graph::Value>,
+{
+  fn from(value: T) -> Self
+  {
+    Self::GraphValue(value.into())
+  }
+}
+
+// impl<T> TryInto<T> for Value
+// where
+//   T: TryFrom<graph::Value, Error = crate::Error>,
+// {
+//   type Error = crate::Error;
+//   fn try_into(self) -> std::result::Result<T, Self::Error>
+//   {
+//     match self
+//     {
+//       Self::GraphValue(gv) => gv.try_into(),
+//       _ => Err(
+//         InternalError::ExpectedGraphValue {
+//           context: "try_into",
+//         }
+//         .into(),
+//       ),
+//     }
+//   }
+// }
+
+macro_rules! try_into_gv_impl {
+  ($vn:ty) => {
+    impl TryInto<$vn> for Value
+    {
+      type Error = crate::Error;
+      fn try_into(self) -> std::result::Result<$vn, Self::Error>
+      {
+        let a: graph::Value = self.try_into()?;
+        a.try_into()
+      }
+    }
+    impl TryPopInto<$vn> for Stack
+    {
+      fn try_pop_into(&mut self) -> Result<$vn>
+      {
+        self.try_pop()?.try_into()
+      }
+      fn try_drain_into(&mut self, n: usize) -> Result<Vec<$vn>>
+      {
+        self.try_drain(n)?.map(|x| x.try_into()).collect()
+      }
+    }
+  };
+}
+
+try_into_gv_impl! {bool}
+try_into_gv_impl! {String}
+try_into_gv_impl! {graph::Node}
+try_into_gv_impl! {graph::Edge}
+
+macro_rules! try_into_impl {
+  ($typename:tt, $type:ty, $errorname:tt) => {
+    impl TryInto<$type> for Value
+    {
+      type Error = crate::Error;
+      fn try_into(self) -> std::result::Result<$type, Self::Error>
+      {
+        match self
+        {
+          Self::$typename(gv) => Ok(gv),
+          _ => Err(
+            InternalError::$errorname {
+              context: "try_into",
+            }
+            .into(),
+          ),
+        }
+      }
+    }
+    impl TryPopInto<$type> for Stack
+    {
+      fn try_pop_into(&mut self) -> Result<$type>
+      {
+        self.try_pop()?.try_into()
+      }
+      fn try_drain_into(&mut self, n: usize) -> Result<Vec<$type>>
+      {
+        self.try_drain(n)?.map(|x| x.try_into()).collect()
+      }
+    }
+  };
+}
+
+try_into_impl! {GraphValue, graph::Value, ExpectedGraphValue}
+try_into_impl! {NodeQuery, store::SelectNodeQuery, ExpectedNodeQuery}
+try_into_impl! {EdgeQuery, store::SelectEdgeQuery, ExpectedEdgeQuery}
+
+impl From<store::SelectNodeQuery> for Value
+{
+  fn from(value: store::SelectNodeQuery) -> Self
+  {
+    Self::NodeQuery(value.into())
+  }
+}
+
+impl From<store::SelectEdgeQuery> for Value
+{
+  fn from(value: store::SelectEdgeQuery) -> Self
+  {
+    Self::EdgeQuery(value.into())
+  }
+}
+
+#[derive(Default, Debug)]
+struct Stack
+{
+  stack: Vec<Value>,
+}
+
+impl Stack
+{
+  fn push(&mut self, value: Value)
+  {
+    self.stack.push(value);
+  }
+  fn try_pop(&mut self) -> Result<Value>
+  {
+    self.stack.pop().ok_or(InternalError::EmptyStack.into())
+  }
+  fn try_last(&self) -> Result<&Value>
+  {
+    self.stack.last().ok_or(InternalError::EmptyStack.into())
+  }
+  fn try_drain(&mut self, len: usize) -> Result<std::vec::Drain<'_, Value>>
+  {
+    if len > self.stack.len()
+    {
+      Err(InternalError::EmptyStack.into())
+    }
+    else
+    {
+      Ok(self.stack.drain((self.stack.len() - len)..))
+    }
+  }
+}
+
+trait TryPopInto<T>
+{
+  fn try_pop_into(&mut self) -> Result<T>;
+  fn try_drain_into(&mut self, n: usize) -> Result<Vec<T>>;
+}
+
+impl<T> TryPopInto<T> for Stack
+where
+  T: TryFrom<Value, Error = Error>,
+{
+  fn try_pop_into(&mut self) -> Result<T>
+  {
+    self.try_pop()?.try_into()
+  }
+  fn try_drain_into(&mut self, n: usize) -> Result<Vec<T>>
+  {
+    self.try_drain(n)?.map(|x| x.try_into()).collect()
+  }
+}
+
 fn execute_boolean_operator(
-  stack: &mut Vec<crate::graph::Value>,
+  stack: &mut Stack,
   operand: impl FnOnce(bool, bool) -> bool,
 ) -> Result<()>
 {
-  let a = stack.pop().ok_or(InternalError::EmptyStack {
-    context: "in BooleanBinaryOperator a",
-  })?;
-  let b = stack.pop().ok_or(InternalError::EmptyStack {
-    context: "in BooleanBinaryOperator b",
-  })?;
-  let a = a.to_boolean().ok_or(InternalError::ExpectedBoolean {
-    context: "in BooleanBinaryOperator a",
-  })?;
-  let b = b.to_boolean().ok_or(InternalError::ExpectedBoolean {
-    context: "in BooleanBinaryOperator b",
-  })?;
-  stack.push(operand(a, b).into());
+  let a = stack.try_pop()?;
+  let b = stack.try_pop()?;
+  let a: graph::Value = a.try_into()?;
+  let b: graph::Value = b.try_into()?;
+  stack.push(operand(a.try_into()?, b.try_into()?).into());
   Ok(())
 }
 
 fn execute_binary_operator(
-  stack: &mut Vec<crate::graph::Value>,
+  stack: &mut Stack,
   operand: impl FnOnce(crate::graph::Value, crate::graph::Value) -> bool,
 ) -> Result<()>
 {
-  let a = stack.pop().ok_or(InternalError::EmptyStack {
-    context: "in BooleanBinaryOperator a",
-  })?;
-  let b = stack.pop().ok_or(InternalError::EmptyStack {
-    context: "in BooleanBinaryOperator b",
-  })?;
-  stack.push(operand(a, b).into());
+  let a = stack.try_pop()?;
+  let b = stack.try_pop()?;
+  stack.push(operand(a.try_into()?, b.try_into()?).into());
   Ok(())
 }
 fn eval_instructions(
-  stack: &mut Vec<crate::graph::Value>,
+  stack: &mut Stack,
   row: &crate::value_table::Row,
   instructions: &instructions::Instructions,
   parameters: &crate::graph::ValueObject,
@@ -51,29 +217,24 @@ fn eval_instructions(
 {
   if crate::consts::SHOW_EVALUATOR_STATE
   {
-    println!("-----------");
+    println!("----------- eval_instructions");
   }
   for instruction in instructions
   {
     if crate::consts::SHOW_EVALUATOR_STATE
     {
-      println!("-- {:#?} {:#?}", instruction, stack);
+      println!(
+        "-- instruction {:#?}\n-- stack {:#?}\n-- row {:#?}",
+        instruction, stack, row
+      );
     }
     match instruction
     {
       instructions::Instruction::CreateEdgeLiteral { labels } =>
       {
-        let props = stack.pop().unwrap();
-        let dst: graph::Node = stack
-          .pop()
-          .unwrap()
-          .to_node()
-          .ok_or(Error::Unknown("Expected node on stack."))?;
-        let src: graph::Node = stack
-          .pop()
-          .unwrap()
-          .to_node()
-          .ok_or(Error::Unknown("Expected node on stack."))?;
+        let props: graph::Value = stack.try_pop_into()?;
+        let dst: graph::Node = stack.try_pop_into()?;
+        let src: graph::Node = stack.try_pop_into()?;
         stack.push(
           crate::graph::Edge {
             key: graph::Key::default(),
@@ -87,7 +248,7 @@ fn eval_instructions(
       }
       instructions::Instruction::CreateNodeLiteral { labels } =>
       {
-        let props = stack.pop().unwrap();
+        let props: graph::Value = stack.try_pop_into()?;
         stack.push(
           crate::graph::Node {
             key: crate::graph::Key::default(),
@@ -97,29 +258,83 @@ fn eval_instructions(
           .into(),
         );
       }
+      instructions::Instruction::CreateEdgeQuery { labels } =>
+      {
+        let props: graph::Value = stack.try_pop_into()?;
+        let dst: store::SelectNodeQuery = stack.try_pop_into()?;
+        let src: store::SelectNodeQuery = stack.try_pop_into()?;
+        match props
+        {
+          graph::Value::Edge(ed) =>
+          {
+            stack.push(
+              SelectEdgeQuery::select_source_destination_keys(src, [ed.key].into(), dst).into(),
+            );
+          }
+          graph::Value::Object(ob) =>
+          {
+            stack.push(
+              SelectEdgeQuery::select_source_destination_labels_properties(
+                src,
+                labels.clone(),
+                ob,
+                dst,
+              )
+              .into(),
+            );
+          }
+          graph::Value::Invalid =>
+          {
+            stack.push(SelectEdgeQuery::select_none().into());
+          }
+          _ => Err(InternalError::InvalidValueCast)?,
+        }
+      }
+      instructions::Instruction::CreateNodeQuery { labels } =>
+      {
+        let props: graph::Value = stack.try_pop_into()?;
+        match props
+        {
+          graph::Value::Node(no) =>
+          {
+            stack.push(crate::store::SelectNodeQuery::select_keys([no.key].into()).into());
+          }
+          graph::Value::Object(ob) =>
+          {
+            stack.push(
+              crate::store::SelectNodeQuery::select_labels_properties(labels.clone(), ob).into(),
+            );
+          }
+          graph::Value::Invalid =>
+          {
+            stack.push(crate::store::SelectNodeQuery::select_none().into());
+          }
+          _ => Err(InternalError::InvalidValueCast)?,
+        }
+      }
       instructions::Instruction::FunctionCall {
         function,
         arguments_count,
       } =>
       {
-        let args: Vec<graph::Value> = stack.drain((stack.len() - arguments_count)..).collect();
+        let args: Vec<graph::Value> = stack.try_drain_into(*arguments_count)?;
         if args.len() != *arguments_count
         {
           Err(InternalError::MissingStackValue {
             context: "eval_instructions/FunctionCall",
           })?;
         }
-        stack.push(function.call(args)?);
+        stack.push(function.call(args)?.into());
       }
       instructions::Instruction::Push { value } =>
       {
-        stack.push(value.clone());
+        stack.push(value.clone().into());
       }
       instructions::Instruction::GetVariable { name } =>
       {
         if let Some(value) = row.get(name)
         {
-          stack.push(value.to_owned());
+          stack.push(value.to_owned().into());
         }
         else
         {
@@ -135,7 +350,7 @@ fn eval_instructions(
       {
         if let Some(value) = parameters.get(name)
         {
-          stack.push(value.to_owned());
+          stack.push(value.to_owned().into());
         }
         else
         {
@@ -152,91 +367,53 @@ fn eval_instructions(
         let mut m = vec![];
         for _ in 0..*length
         {
-          m.push(
-            stack
-              .pop()
-              .ok_or_else(|| InternalError::MissingStackValue {
-                context: "eval_instructions/CreateArray",
-              })?,
-          );
+          m.push(stack.try_pop_into()?);
         }
-        stack.push(graph::Value::Array(m));
+        stack.push(graph::Value::Array(m).into());
       }
       instructions::Instruction::CreateMap { keys } =>
       {
         let mut m = crate::graph::ValueObject::new();
         for k in keys.iter().rev()
         {
-          if let Some(value) = stack.pop()
-          {
-            m.insert(k.to_owned(), value);
-          }
-          else
-          {
-            return Err(Error::EmptyStack(format!("Missing value for key {:?}", k)));
-          }
+          m.insert(k.to_owned(), stack.try_pop_into()?);
         }
-        stack.push(graph::Value::Object(m));
+        stack.push(graph::Value::Object(m).into());
       }
       instructions::Instruction::MemberAccess { path } =>
       {
-        let v = stack
-          .pop()
-          .ok_or_else(|| Error::InternalError("Missing stack value for member access."))?;
-        stack.push(v.access(path.iter()));
+        let v: graph::Value = stack.try_pop_into()?;
+        stack.push(v.access(path.iter()).into());
       }
-      instructions::Instruction::Duplicate => stack.push(
-        stack
-          .last()
-          .ok_or(Error::EmptyStack("in duplicate".to_string()))?
-          .clone(),
-      ),
+      instructions::Instruction::Duplicate => stack.push(stack.try_last()?.clone()),
       &instructions::Instruction::Rot3 =>
       {
-        let a = stack
-          .pop()
-          .ok_or(Error::EmptyStack("in Rot3 a".to_string()))?;
-        let b = stack
-          .pop()
-          .ok_or(Error::EmptyStack("in Rot3 b".to_string()))?;
-        let c = stack
-          .pop()
-          .ok_or(Error::EmptyStack("in Rot3 c".to_string()))?;
+        let a = stack.try_pop()?;
+        let b = stack.try_pop()?;
+        let c = stack.try_pop()?;
         stack.push(a);
         stack.push(c);
         stack.push(b);
       }
       &instructions::Instruction::InverseRot3 =>
       {
-        let a = stack
-          .pop()
-          .ok_or(Error::EmptyStack("in InverseRot3 a".to_string()))?;
-        let b = stack
-          .pop()
-          .ok_or(Error::EmptyStack("in InverseRot3 b".to_string()))?;
-        let c = stack
-          .pop()
-          .ok_or(Error::EmptyStack("in InverseRot3 c".to_string()))?;
+        let a = stack.try_pop()?;
+        let b = stack.try_pop()?;
+        let c = stack.try_pop()?;
         stack.push(b);
         stack.push(a);
         stack.push(c);
       }
       &instructions::Instruction::Swap =>
       {
-        let a = stack
-          .pop()
-          .ok_or(Error::EmptyStack("in Swap a".to_string()))?;
-        let b = stack
-          .pop()
-          .ok_or(Error::EmptyStack("in Swap b".to_string()))?;
+        let a = stack.try_pop()?;
+        let b = stack.try_pop()?;
         stack.push(a);
         stack.push(b);
       }
       &instructions::Instruction::Drop =>
       {
-        stack
-          .pop()
-          .ok_or(Error::EmptyStack("in drop".to_string()))?;
+        stack.try_pop()?;
       }
       &instructions::Instruction::AndBinaryOperator =>
       {
@@ -248,12 +425,7 @@ fn eval_instructions(
       }
       &instructions::Instruction::NotUnaryOperator =>
       {
-        let a = stack.pop().ok_or(InternalError::EmptyStack {
-          context: "in NotUnaryOperator a",
-        })?;
-        let a = a.to_boolean().ok_or(InternalError::ExpectedBoolean {
-          context: "in NotUnaryOperator a",
-        })?;
+        let a: bool = stack.try_pop_into()?;
         stack.push((!a).into());
       }
       &instructions::Instruction::EqualBinaryOperator =>
@@ -271,16 +443,24 @@ fn eval_instructions(
 
 trait HashMapExt
 {
-  fn insert_none(&mut self, k: Option<String>);
+  fn noreplace_insert(&mut self, k: &String, v: graph::Value);
+  fn insert_none(&mut self, k: &Option<String>);
 }
 
-impl HashMapExt for HashMap<String, Value>
+impl HashMapExt for HashMap<String, graph::Value>
 {
-  fn insert_none(&mut self, k: Option<String>)
+  fn noreplace_insert(&mut self, k: &String, v: graph::Value)
+  {
+    if !self.contains_key(k)
+    {
+      self.insert(k.to_owned(), v);
+    }
+  }
+  fn insert_none(&mut self, k: &Option<String>)
   {
     if let Some(k) = k
     {
-      self.insert(k, Value::Invalid);
+      let _ = self.noreplace_insert(k, graph::Value::Invalid.into());
     }
   }
 }
@@ -294,9 +474,14 @@ pub(crate) fn eval_program(
   let mut input_table = crate::value_table::ValueTable::new();
   input_table.add_row(crate::value_table::Row::new());
   let mut tx = store.begin()?;
-  let mut stack = Vec::<crate::graph::Value>::new();
+  let mut stack = Default::default();
   for block in program
   {
+    if crate::consts::SHOW_EVALUATOR_STATE
+    {
+      println!("--- block {:#?}", block);
+      println!("input_table: {:#?}", input_table);
+    }
     match block
     {
       instructions::Block::Create { actions } =>
@@ -309,7 +494,8 @@ pub(crate) fn eval_program(
           {
             eval_instructions(&mut stack, &new_row, &action.instructions, &parameters)?;
             for (v, var) in stack
-              .drain(stack.len() - action.variables.len()..)
+              .try_drain_into(action.variables.len())?
+              .into_iter()
               .zip(action.variables.iter())
             {
               match v
@@ -319,7 +505,7 @@ pub(crate) fn eval_program(
                   store.add_nodes(&mut tx, "default", vec![n.to_owned()].iter())?;
                   if let Some(var) = var
                   {
-                    new_row.insert(var.to_owned(), crate::graph::Value::Node(n));
+                    let _ = new_row.noreplace_insert(&var, crate::graph::Value::Node(n));
                   }
                 }
                 crate::graph::Value::Edge(e) =>
@@ -352,28 +538,13 @@ pub(crate) fn eval_program(
         for row in input_table.iter()
         {
           eval_instructions(&mut stack, row, &instructions, &parameters)?;
-          let template = stack
-            .pop()
-            .ok_or_else(|| InternalError::MissingStackValue {
-              context: "eval_program/match_node",
-            })?
-            .to_node()
-            .ok_or_else(|| InternalError::ExpectedNode {
-              context: "eval_program/MatchNode",
-            })?;
-          let nodes = store.select_nodes(
-            &mut tx,
-            "default",
-            crate::store::SelectNodeQuery::select_labels_properties(
-              template.labels.iter(),
-              template.properties.iter(),
-            ),
-          )?;
+          let query: crate::store::SelectNodeQuery = stack.try_pop_into()?;
+          let nodes = store.select_nodes(&mut tx, "default", query)?;
 
           if nodes.len() == 0 && optional
           {
             let mut new_row = row.clone();
-            new_row.insert_none(variable.clone());
+            new_row.insert_none(&variable);
             output_table.add_row(new_row);
           }
           else
@@ -385,7 +556,7 @@ pub(crate) fn eval_program(
               {
                 Some(variable) =>
                 {
-                  new_row.insert(variable.to_owned(), node.to_owned().into());
+                  new_row.noreplace_insert(&variable, node.to_owned().into());
                 }
                 None =>
                 {}
@@ -396,15 +567,12 @@ pub(crate) fn eval_program(
               }
               else
               {
-                let mut stack = Vec::<crate::graph::Value>::default();
+                let mut stack = Stack::default();
                 stack.push(true.into());
                 stack.push(node.to_owned().into());
                 eval_instructions(&mut stack, &new_row, &filter, &parameters)?;
-                stack.pop(); // Get rid of the edge
-                stack
-                  .pop()
-                  .ok_or(Error::EmptyStack("in filtering edge".to_string()))?
-                  .try_into()?
+                stack.try_pop()?; // Get rid of the edge
+                stack.try_pop_into()?
               };
               if should_add_row
               {
@@ -430,136 +598,17 @@ pub(crate) fn eval_program(
         for row in input_table.iter()
         {
           eval_instructions(&mut stack, row, &instructions, &parameters)?;
-          let template = stack
-            .pop()
-            .ok_or_else(|| InternalError::MissingStackValue {
-              context: "eval_program/MatchEdge",
-            })?
-            .to_edge()
-            .ok_or_else(|| InternalError::ExpectedEdge {
-              context: "eval_program/MatchEdge",
-            })?;
+          let query = stack.try_pop_into()?;
 
-          let edges = if left_variable.is_some()
-            && row.contains_key(&left_variable.clone().unwrap())
-          {
-            if right_variable.is_some() && row.contains_key(&right_variable.clone().unwrap())
-            {
-              store.select_edges(
-                &mut tx,
-                "default",
-                crate::store::SelectEdgeQuery::select_source_destination_labels_properties(
-                  crate::store::SelectNodeQuery::select_keys(
-                    [&row
-                      .get(&left_variable.clone().unwrap())
-                      .unwrap()
-                      .to_node()
-                      .ok_or(InternalError::ExpectedNode {
-                        context: "MatchEdge",
-                      })?
-                      .key]
-                    .into_iter(),
-                  ),
-                  template.labels.iter(),
-                  template.properties.iter(),
-                  crate::store::SelectNodeQuery::select_keys(
-                    [&row
-                      .get(&right_variable.clone().unwrap())
-                      .unwrap()
-                      .to_node()
-                      .ok_or(InternalError::ExpectedNode {
-                        context: "MatchEdge",
-                      })?
-                      .key]
-                    .into_iter(),
-                  ),
-                ),
-                directivity,
-              )?
-            }
-            else
-            {
-              store.select_edges(
-                &mut tx,
-                "default",
-                crate::store::SelectEdgeQuery::select_source_destination_labels_properties(
-                  crate::store::SelectNodeQuery::select_keys(
-                    [&row
-                      .get(&left_variable.clone().unwrap())
-                      .unwrap()
-                      .to_node()
-                      .ok_or(InternalError::ExpectedNode {
-                        context: "MatchEdge",
-                      })?
-                      .key]
-                    .into_iter(),
-                  ),
-                  template.labels.iter(),
-                  template.properties.iter(),
-                  crate::store::SelectNodeQuery::select_labels_properties(
-                    template.destination.labels.iter(),
-                    template.destination.properties.iter(),
-                  ),
-                ),
-                directivity,
-              )?
-            }
-          }
-          else if right_variable.is_some() && row.contains_key(&right_variable.clone().unwrap())
-          {
-            store.select_edges(
-              &mut tx,
-              "default",
-              crate::store::SelectEdgeQuery::select_source_destination_labels_properties(
-                crate::store::SelectNodeQuery::select_labels_properties(
-                  template.source.labels.iter(),
-                  template.source.properties.iter(),
-                ),
-                template.labels.iter(),
-                template.properties.iter(),
-                crate::store::SelectNodeQuery::select_keys(
-                  [&row
-                    .get(&right_variable.clone().unwrap())
-                    .unwrap()
-                    .to_node()
-                    .ok_or(InternalError::ExpectedNode {
-                      context: "MatchEdge",
-                    })?
-                    .key]
-                  .into_iter(),
-                ),
-              ),
-              directivity,
-            )?
-          }
-          else
-          {
-            store.select_edges(
-              &mut tx,
-              "default",
-              crate::store::SelectEdgeQuery::select_source_destination_labels_properties(
-                crate::store::SelectNodeQuery::select_labels_properties(
-                  template.source.labels.iter(),
-                  template.source.properties.iter(),
-                ),
-                template.labels.iter(),
-                template.properties.iter(),
-                crate::store::SelectNodeQuery::select_labels_properties(
-                  template.destination.labels.iter(),
-                  template.destination.properties.iter(),
-                ),
-              ),
-              directivity,
-            )?
-          };
+          let edges = store.select_edges(&mut tx, "default", query, directivity)?;
 
           if edges.len() == 0 && optional
           {
             let mut new_row = row.clone();
-            new_row.insert_none(left_variable.clone());
-            new_row.insert_none(right_variable.clone());
-            new_row.insert_none(edge_variable.clone());
-            new_row.insert_none(path_variable.clone());
+            new_row.insert_none(&left_variable);
+            new_row.insert_none(&right_variable);
+            new_row.insert_none(&edge_variable);
+            new_row.insert_none(&path_variable);
             output_table.add_row(new_row);
           }
           else
@@ -614,15 +663,12 @@ pub(crate) fn eval_program(
               }
               else
               {
-                let mut stack = Vec::<crate::graph::Value>::default();
+                let mut stack = Stack::default();
                 stack.push(true.into());
                 stack.push(edge.edge.to_owned().into());
                 eval_instructions(&mut stack, &new_row, &filter, &parameters)?;
-                stack.pop(); // Get rid of the edge
-                stack
-                  .pop()
-                  .ok_or(Error::EmptyStack("in filtering edge".to_string()))?
-                  .try_into()?
+                stack.try_pop()?; // Get rid of the edge
+                stack.try_pop_into()?
               };
               if should_add_row
               {
@@ -641,13 +687,9 @@ pub(crate) fn eval_program(
           let mut out_row = crate::value_table::Row::new();
           for (name, instructions) in variables.iter()
           {
-            let mut stack = Vec::<crate::graph::Value>::new();
+            let mut stack = Stack::default();
             eval_instructions(&mut stack, row, instructions, &parameters)?;
-            let value = stack
-              .first()
-              .ok_or_else(|| InternalError::MissingStackValue {
-                context: "eval_program/return",
-              })?;
+            let value: graph::Value = stack.try_pop_into()?;
             out_row.insert(name.to_owned(), value.to_owned());
           }
           output_table.add_row(out_row);
@@ -690,13 +732,9 @@ pub(crate) fn eval_program(
           };
           for (name, instructions) in variables.iter()
           {
-            let mut stack = Vec::<crate::graph::Value>::new();
+            let mut stack = Stack::default();
             eval_instructions(&mut stack, row, instructions, &parameters)?;
-            let value = stack
-              .first()
-              .ok_or_else(|| InternalError::MissingStackValue {
-                context: "eval_program/with",
-              })?;
+            let value: graph::Value = stack.try_pop_into()?;
             out_row.insert(name.to_owned(), value.to_owned());
           }
           output_table.add_row(out_row);
@@ -708,13 +746,9 @@ pub(crate) fn eval_program(
         let mut output_table = crate::value_table::ValueTable::new();
         for row in input_table.iter()
         {
-          let mut stack = Vec::<crate::graph::Value>::new();
+          let mut stack = Stack::default();
           eval_instructions(&mut stack, row, &instructions, &parameters)?;
-          let value = stack
-            .pop()
-            .ok_or_else(|| InternalError::MissingStackValue {
-              context: "eval_program/unwind",
-            })?;
+          let value = stack.try_pop_into()?;
           match value
           {
             graph::Value::Array(arr) =>
