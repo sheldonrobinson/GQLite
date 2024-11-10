@@ -1,8 +1,9 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, default, hash::Hash};
 
 use crate::{
   error::{InternalError, RunTimeError},
   graph,
+  interpreter::instructions::BlockMatch,
   store::{self, SelectEdgeQuery},
   Error, Result,
 };
@@ -527,154 +528,171 @@ pub(crate) fn eval_program(
         }
         input_table = output_table;
       }
-      instructions::Block::MatchNode {
-        instructions,
-        variable,
-        filter,
-        optional,
-      } =>
+      instructions::Block::BlockMatch { blocks, optional } =>
       {
         let mut output_table = crate::value_table::ValueTable::new();
-        for row in input_table.iter()
+        for row in input_table.into_iter()
         {
-          eval_instructions(&mut stack, row, &instructions, &parameters)?;
-          let query: crate::store::SelectNodeQuery = stack.try_pop_into()?;
-          let nodes = store.select_nodes(&mut tx, "default", query)?;
-
-          if nodes.len() == 0 && optional
+          let mut current_rows: Vec<HashMap<String, graph::Value>> = vec![row.clone()];
+          for block in blocks.iter()
           {
-            let mut new_row = row.clone();
-            new_row.insert_none(&variable);
-            output_table.add_row(new_row);
-          }
-          else
-          {
-            for node in nodes.iter()
+            let mut new_rows = Vec::<HashMap<String, graph::Value>>::default();
+            for row in current_rows
             {
-              let mut new_row = row.clone();
-              match &variable
+              match block
               {
-                Some(variable) =>
+                instructions::BlockMatch::MatchNode {
+                  instructions,
+                  variable,
+                  filter,
+                } =>
                 {
-                  new_row.noreplace_insert(&variable, node.to_owned().into());
+                  eval_instructions(&mut stack, &row, &instructions, &parameters)?;
+                  let query: crate::store::SelectNodeQuery = stack.try_pop_into()?;
+                  let nodes = store.select_nodes(&mut tx, "default", query)?;
+
+                  for node in nodes.iter()
+                  {
+                    let mut new_row = row.clone();
+                    match &variable
+                    {
+                      Some(variable) =>
+                      {
+                        new_row.noreplace_insert(&variable, node.to_owned().into());
+                      }
+                      None =>
+                      {}
+                    }
+                    let should_add_row = if filter.is_empty()
+                    {
+                      true
+                    }
+                    else
+                    {
+                      let mut stack = Stack::default();
+                      stack.push(true.into());
+                      stack.push(node.to_owned().into());
+                      eval_instructions(&mut stack, &new_row, &filter, &parameters)?;
+                      stack.try_pop()?; // Get rid of the edge
+                      stack.try_pop_into()?
+                    };
+                    if should_add_row
+                    {
+                      new_rows.push(new_row);
+                    }
+                  }
                 }
-                None =>
-                {}
-              }
-              let should_add_row = if filter.is_empty()
-              {
-                true
-              }
-              else
-              {
-                let mut stack = Stack::default();
-                stack.push(true.into());
-                stack.push(node.to_owned().into());
-                eval_instructions(&mut stack, &new_row, &filter, &parameters)?;
-                stack.try_pop()?; // Get rid of the edge
-                stack.try_pop_into()?
-              };
-              if should_add_row
-              {
-                output_table.add_row(new_row);
+                instructions::BlockMatch::MatchEdge {
+                  instructions,
+                  left_variable,
+                  edge_variable,
+                  right_variable,
+                  path_variable,
+                  filter,
+                  directivity,
+                } =>
+                {
+                  eval_instructions(&mut stack, &row, &instructions, &parameters)?;
+                  let query = stack.try_pop_into()?;
+
+                  let edges = store.select_edges(&mut tx, "default", query, *directivity)?;
+
+                  for edge in edges.iter()
+                  {
+                    let mut new_row = row.clone();
+                    if let Some(left_variable) = left_variable.to_owned()
+                    {
+                      new_row.insert(
+                        left_variable,
+                        if edge.reversed
+                        {
+                          edge.edge.destination.to_owned()
+                        }
+                        else
+                        {
+                          edge.edge.source.to_owned()
+                        }
+                        .into(),
+                      );
+                    }
+                    if let Some(right_variable) = right_variable.to_owned()
+                    {
+                      new_row.insert(
+                        right_variable,
+                        if edge.reversed
+                        {
+                          edge.edge.source.to_owned()
+                        }
+                        else
+                        {
+                          edge.edge.destination.to_owned()
+                        }
+                        .into(),
+                      );
+                    }
+                    if let Some(edge_variable) = edge_variable.to_owned()
+                    {
+                      new_row.insert(edge_variable, edge.edge.to_owned().into());
+                    }
+                    if let Some(path_variable) = path_variable.to_owned()
+                    {
+                      new_row.insert(
+                        path_variable,
+                        crate::graph::Value::Path(edge.edge.to_owned().into()),
+                      );
+                    }
+                    let should_add_row = if filter.is_empty()
+                    {
+                      true
+                    }
+                    else
+                    {
+                      let mut stack = Stack::default();
+                      stack.push(true.into());
+                      stack.push(edge.edge.to_owned().into());
+                      eval_instructions(&mut stack, &new_row, &filter, &parameters)?;
+                      stack.try_pop()?; // Get rid of the edge
+                      stack.try_pop_into()?
+                    };
+                    if should_add_row
+                    {
+                      new_rows.push(new_row);
+                    }
+                  }
+                }
               }
             }
+            current_rows = new_rows;
           }
-        }
-        input_table = output_table;
-      }
-      instructions::Block::MatchEdge {
-        instructions,
-        left_variable,
-        edge_variable,
-        right_variable,
-        path_variable,
-        filter,
-        directivity,
-        optional,
-      } =>
-      {
-        let mut output_table = crate::value_table::ValueTable::new();
-        for row in input_table.iter()
-        {
-          eval_instructions(&mut stack, row, &instructions, &parameters)?;
-          let query = stack.try_pop_into()?;
-
-          let edges = store.select_edges(&mut tx, "default", query, directivity)?;
-
-          if edges.len() == 0 && optional
+          if current_rows.is_empty() && optional
           {
-            let mut new_row = row.clone();
-            new_row.insert_none(&left_variable);
-            new_row.insert_none(&right_variable);
-            new_row.insert_none(&edge_variable);
-            new_row.insert_none(&path_variable);
+            let mut new_row = row;
+            for block in blocks.iter()
+            {
+              match block
+              {
+                BlockMatch::MatchNode { variable, .. } =>
+                {
+                  new_row.insert_none(&variable);
+                }
+                BlockMatch::MatchEdge {
+                  left_variable,
+                  edge_variable,
+                  right_variable,
+                  ..
+                } =>
+                {
+                  new_row.insert_none(left_variable);
+                  new_row.insert_none(edge_variable);
+                  new_row.insert_none(right_variable);
+                }
+              }
+            }
             output_table.add_row(new_row);
           }
           else
           {
-            for edge in edges.iter()
-            {
-              let mut new_row = row.clone();
-              if let Some(left_variable) = left_variable.to_owned()
-              {
-                new_row.insert(
-                  left_variable,
-                  if edge.reversed
-                  {
-                    edge.edge.destination.to_owned()
-                  }
-                  else
-                  {
-                    edge.edge.source.to_owned()
-                  }
-                  .into(),
-                );
-              }
-              if let Some(right_variable) = right_variable.to_owned()
-              {
-                new_row.insert(
-                  right_variable,
-                  if edge.reversed
-                  {
-                    edge.edge.source.to_owned()
-                  }
-                  else
-                  {
-                    edge.edge.destination.to_owned()
-                  }
-                  .into(),
-                );
-              }
-              if let Some(edge_variable) = edge_variable.to_owned()
-              {
-                new_row.insert(edge_variable, edge.edge.to_owned().into());
-              }
-              if let Some(path_variable) = path_variable.to_owned()
-              {
-                new_row.insert(
-                  path_variable,
-                  crate::graph::Value::Path(edge.edge.to_owned().into()),
-                );
-              }
-              let should_add_row = if filter.is_empty()
-              {
-                true
-              }
-              else
-              {
-                let mut stack = Stack::default();
-                stack.push(true.into());
-                stack.push(edge.edge.to_owned().into());
-                eval_instructions(&mut stack, &new_row, &filter, &parameters)?;
-                stack.try_pop()?; // Get rid of the edge
-                stack.try_pop_into()?
-              };
-              if should_add_row
-              {
-                output_table.add_row(new_row);
-              }
-            }
+            output_table.add_rows(&mut current_rows);
           }
         }
         input_table = output_table;

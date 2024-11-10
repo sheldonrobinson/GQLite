@@ -18,6 +18,10 @@ impl ValueTable
   {
     self.data.push(row);
   }
+  pub(crate) fn add_rows(&mut self, rows: &mut Vec<Row>)
+  {
+    self.data.append(rows);
+  }
   pub(crate) fn iter(&self) -> core::slice::Iter<'_, Row>
   {
     self.data.iter()

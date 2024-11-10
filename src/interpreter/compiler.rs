@@ -7,6 +7,8 @@ use crate::interpreter::validator;
 use crate::parser::ast;
 use crate::{functions, Result};
 
+use super::instructions::BlockMatch;
+
 static fake_variable_counter: AtomicU64 = AtomicU64::new(0);
 
 fn compile_expression(
@@ -362,8 +364,7 @@ fn compile_match_edge(
   edge: &crate::parser::ast::EdgePattern,
   single_match: bool,
   previous_edges: &mut Vec<String>,
-  optional: bool,
-) -> Result<Block>
+) -> Result<BlockMatch>
 {
   let mut instructions = Instructions::new();
   let mut source_variable = None;
@@ -460,7 +461,7 @@ fn compile_match_edge(
     Some(edge_variable)
   };
   // Create block
-  Ok(Block::MatchEdge {
+  Ok(BlockMatch::MatchEdge {
     instructions: instructions,
     left_variable: source_variable,
     edge_variable,
@@ -468,7 +469,6 @@ fn compile_match_edge(
     path_variable,
     filter,
     directivity: edge.directivity,
-    optional,
   })
 }
 
@@ -477,48 +477,45 @@ fn compile_match_patterns(
   validator: &mut validator::Validator,
   patterns: &Vec<crate::parser::ast::Pattern>,
   optional: bool,
-) -> Result<Vec<Block>>
+) -> Result<Block>
 {
   let is_single_match = patterns.len() == 1;
   let mut edge_variables = vec![];
-  let blocks = patterns
-    .iter()
-    .map(|c| match c
+  let blocks = patterns.iter().map(|c| match c
+  {
+    crate::parser::ast::Pattern::Node(node) =>
     {
-      crate::parser::ast::Pattern::Node(node) =>
-      {
-        let mut instructions = Instructions::new();
-        validator.validate_node(node)?;
-        let mut filter = Instructions::new();
-        compile_match_node(function_manager, node, &mut instructions, &mut filter, None)?;
-        Ok(Block::MatchNode {
-          instructions: instructions,
-          variable: node.variable.to_owned(),
-          filter,
-          optional,
-        })
-      }
-      crate::parser::ast::Pattern::Edge(edge) => compile_match_edge(
-        function_manager,
-        validator,
-        None,
-        &edge,
-        is_single_match,
-        &mut edge_variables,
-        optional,
-      ),
-      crate::parser::ast::Pattern::Path(path) => compile_match_edge(
-        function_manager,
-        validator,
-        Some(path.variable.to_owned()),
-        &path.edge,
-        is_single_match,
-        &mut edge_variables,
-        optional,
-      ),
-    })
-    .collect::<Result<Vec<Block>>>()?;
-  Ok(blocks)
+      let mut instructions = Instructions::new();
+      validator.validate_node(node)?;
+      let mut filter = Instructions::new();
+      compile_match_node(function_manager, node, &mut instructions, &mut filter, None)?;
+      Ok(BlockMatch::MatchNode {
+        instructions: instructions,
+        variable: node.variable.to_owned(),
+        filter,
+      })
+    }
+    crate::parser::ast::Pattern::Edge(edge) => compile_match_edge(
+      function_manager,
+      validator,
+      None,
+      &edge,
+      is_single_match,
+      &mut edge_variables,
+    ),
+    crate::parser::ast::Pattern::Path(path) => compile_match_edge(
+      function_manager,
+      validator,
+      Some(path.variable.to_owned()),
+      &path.edge,
+      is_single_match,
+      &mut edge_variables,
+    ),
+  });
+  Ok(Block::BlockMatch {
+    blocks: blocks.collect::<Result<_>>()?,
+    optional,
+  })
 }
 
 pub(crate) fn compile(
@@ -535,27 +532,14 @@ pub(crate) fn compile(
       {
         ast::Statement::Create(create) =>
         {
-          let cp = compile_create_patterns(function_manager, &mut validator, &create.patterns);
-          match cp
-          {
-            Ok(cp) => Ok(Vec::from([cp]).into_iter()),
-            Err(e) => Err(e),
-          }
+          compile_create_patterns(function_manager, &mut validator, &create.patterns)
         }
-        ast::Statement::Match(match_statement) =>
-        {
-          let cm = compile_match_patterns(
-            function_manager,
-            &mut validator,
-            &match_statement.patterns,
-            match_statement.optional,
-          );
-          match cm
-          {
-            Ok(cm) => Ok(cm.into_iter()),
-            Err(e) => Err(e),
-          }
-        }
+        ast::Statement::Match(match_statement) => compile_match_patterns(
+          function_manager,
+          &mut validator,
+          &match_statement.patterns,
+          match_statement.optional,
+        ),
         ast::Statement::Return(return_statement) =>
         {
           let mut variables = Vec::<(String, Instructions)>::new();
@@ -567,12 +551,9 @@ pub(crate) fn compile(
             variables.push((expr.name.to_owned(), instructions));
           }
 
-          Ok(
-            Vec::from([Block::Return {
-              variables: variables,
-            }])
-            .into_iter(),
-          )
+          Ok(Block::Return {
+            variables: variables,
+          })
         }
         ast::Statement::Call(call) =>
         {
@@ -581,13 +562,10 @@ pub(crate) fn compile(
           {
             compile_expression(function_manager, e, &mut instructions)?;
           }
-          Ok(
-            Vec::from([Block::Call {
-              arguments: instructions,
-              name: call.name.to_owned(),
-            }])
-            .into_iter(),
-          )
+          Ok(Block::Call {
+            arguments: instructions,
+            name: call.name.to_owned(),
+          })
         }
         ast::Statement::With(with) =>
         {
@@ -605,25 +583,19 @@ pub(crate) fn compile(
             val_variables.insert(e.name.to_owned(), validator.evaluate(&e.expression)?);
           }
           validator.set_variables(val_variables);
-          Ok(
-            Vec::from([Block::With {
-              all: with.all,
-              variables,
-            }])
-            .into_iter(),
-          )
+          Ok(Block::With {
+            all: with.all,
+            variables,
+          })
         }
         ast::Statement::Unwind(unwind) =>
         {
           let mut instructions = Instructions::new();
           compile_expression(function_manager, &unwind.expression, &mut instructions)?;
-          Ok(
-            Vec::from([Block::Unwind {
-              name: unwind.name.to_owned(),
-              instructions,
-            }])
-            .into_iter(),
-          )
+          Ok(Block::Unwind {
+            name: unwind.name.to_owned(),
+            instructions,
+          })
         }
         _ => Err(crate::Error::Unimplemented("compile")),
       };
@@ -631,8 +603,7 @@ pub(crate) fn compile(
     })
     .scan(&mut statements_err, |err, gp| {
       gp.map_err(|e| **err = Err(e)).ok()
-    })
-    .flatten();
+    });
   let program = program.collect::<super::Program>();
   statements_err?;
   if crate::consts::SHOW_PROGRAM

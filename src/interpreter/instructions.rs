@@ -72,18 +72,13 @@ pub(crate) struct CreateAction
 }
 
 #[derive(Debug)]
-pub(crate) enum Block
+pub(crate) enum BlockMatch
 {
-  Create
-  {
-    actions: Vec<CreateAction>
-  },
   MatchNode
   {
     instructions: Instructions,
     variable: Option<String>,
     filter: Instructions,
-    optional: bool,
   },
   MatchEdge
   {
@@ -94,6 +89,19 @@ pub(crate) enum Block
     path_variable: Option<String>,
     filter: Instructions,
     directivity: graph::EdgeDirectivity,
+  },
+}
+
+#[derive(Debug)]
+pub(crate) enum Block
+{
+  Create
+  {
+    actions: Vec<CreateAction>
+  },
+  BlockMatch
+  {
+    blocks: Vec<BlockMatch>,
     optional: bool,
   },
   Return
