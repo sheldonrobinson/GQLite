@@ -202,7 +202,6 @@ IgnoredScenario = [
   # "[16] Optionally matching named paths - null result",
   # "[17] Optionally matching named paths - existing result",
   # "[18] Named paths inside optional matches with node predicates",
-  # "[19] Optionally matching named paths with single and variable length patterns",
   # "[9] `labels()` failing on invalid arguments",
   # "[6] `type()` failing on invalid arguments",
   # # paths are not supported in where
@@ -219,6 +218,7 @@ IgnoredScenario = [
   "[13] Variable length optional relationships with bound nodes",
   "[14] Variable length optional relationships with length predicates",
   "[15] Variable length patterns and nulls",
+  "[19] Optionally matching named paths with single and variable length patterns",
   "[20] Variable length optional relationships with bound nodes, no matches",
   # WITH not eliminating conflicts
   "[7] Matching twice with conflicting relationship types on same relationship",
