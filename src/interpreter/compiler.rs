@@ -72,6 +72,12 @@ fn compile_expression(
       compile_expression(function_manager, &relational_different.left, instructions)?;
       Instruction::NotEqualBinaryOperator
     }
+    ast::Expression::RelationalIn(relational_in) =>
+    {
+      compile_expression(function_manager, &relational_in.right, instructions)?;
+      compile_expression(function_manager, &relational_in.left, instructions)?;
+      Instruction::InBinaryOperator
+    }
   };
   instructions.push(expr);
   Ok(())

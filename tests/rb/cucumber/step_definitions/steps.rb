@@ -78,7 +78,8 @@ module GQLiteTest
   def GQLiteTest.parse_results_table(table)
     table = table.raw
     r_node = /^\((\w*)((:\w*)*)(\s*{.*})?\)$/
-    r_edge = /^\[(\w*)(:(\w*))?(\s*{.*})?\]$/
+    r_edge = /^\[(\w*)((:\w*)*)(\s*{.*})?\]$/
+    r_path = /^\<\((\w*)((:\w*)*)(\s*{.*})?\)\-\[(\w*)((:\w*)*)(\s*{.*})?\]\-\>\((\w*)((:\w*)*)(\s*{.*})?\)\>$/
     first_row = true
     return table.map do |c|
       if first_row
@@ -102,18 +103,69 @@ module GQLiteTest
             end
             { "type"=>"node", "properties" => properties, "labels" => labels }
           elsif v != "[]" && (arr = v.scan(r_edge)).size > 0
-            label = arr[0][2]
+            labels = arr[0][1]
             properties = arr[0][3]
-            unless label.nil? && properties.nil?
+            unless labels.nil? && properties.nil?
+              if labels.nil?
+                labels = []
+              else
+                labels = labels.split(":").reject(&:empty?)
+              end
               if properties.nil?
                 properties = {}
               else
                 properties = YAML.load properties
               end
-              { "type"=>"edge", "properties" => properties, "labels" => [label] }
+              { "type"=>"edge", "properties" => properties, "labels" => labels }
             else
               YAML.load v
             end
+          elsif (arr = v.scan(r_path)).size > 0
+            # Parse source
+            source_labels = arr[0][1]
+            if source_labels.nil?
+              source_labels = []
+            else
+              source_labels = source_labels.split(":").reject(&:empty?)
+            end
+            source_properties = arr[0][3] 
+            if source_properties.nil?
+              source_properties = {}
+            else
+              source_properties = YAML.load source_properties
+            end
+            # Parse edge
+            edge_labels = arr[0][5]
+            if edge_labels.nil?
+              edge_labels = []
+            else
+              edge_labels = edge_labels.split(":").reject(&:empty?)
+            end
+            edge_properties = arr[0][7] 
+            if edge_properties.nil?
+              edge_properties = {}
+            else
+              edge_properties = YAML.load edge_properties
+            end
+            # Parse destination
+            destination_labels = arr[0][9]
+            if destination_labels.nil?
+              destination_labels = []
+            else
+              destination_labels = destination_labels.split(":").reject(&:empty?)
+            end
+            destination_properties = arr[0][11] 
+            if destination_properties.nil?
+              destination_properties = {}
+            else
+              destination_properties = YAML.load destination_properties
+            end
+            {
+              "type"=>"path",
+              "source" => { "type"=>"node", "properties" => source_properties, "labels" => source_labels },
+              "properties" => edge_properties, "labels" => edge_labels,
+              "destination" => { "type"=>"node", "properties" => destination_properties, "labels" => destination_labels }
+            }
           else
             YAML.load v
           end

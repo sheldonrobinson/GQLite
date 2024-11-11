@@ -61,7 +61,8 @@ function_name  =  { ident ~ ("." ~ ident)* }
 
 expression = { different_bin_op_expression }
 
-different_bin_op_expression = { expression_term ~ ("<>" ~ expression_term)? }
+different_bin_op_expression = { in_bin_op_expression ~ ("<>" ~ expression)? }
+in_bin_op_expression = { expression_term ~ ("IN" ~ expression)? }
 
 named_expression =  { (expression ~ "AS" ~ ident) | expression }
 function_call    =  { function_name ~ "(" ~ expression ~ ("," ~ expression)* ~ ")" }

@@ -203,14 +203,15 @@ fn execute_boolean_operator(
 
 fn execute_binary_operator(
   stack: &mut Stack,
-  operand: impl FnOnce(crate::graph::Value, crate::graph::Value) -> bool,
+  operand: impl FnOnce(crate::graph::Value, crate::graph::Value) -> Result<bool>,
 ) -> Result<()>
 {
   let a = stack.try_pop()?;
   let b = stack.try_pop()?;
-  stack.push(operand(a.try_into()?, b.try_into()?).into());
+  stack.push(operand(a.try_into()?, b.try_into()?)?.into());
   Ok(())
 }
+
 fn eval_instructions(
   stack: &mut Stack,
   row: &crate::value_table::Row,
@@ -433,11 +434,18 @@ fn eval_instructions(
       }
       &instructions::Instruction::EqualBinaryOperator =>
       {
-        execute_binary_operator(stack, |a, b| a == b)?;
+        execute_binary_operator(stack, |a, b| Ok(a == b))?;
       }
       &instructions::Instruction::NotEqualBinaryOperator =>
       {
-        execute_binary_operator(stack, |a, b| a != b)?;
+        execute_binary_operator(stack, |a, b| Ok(a != b))?;
+      }
+      &instructions::Instruction::InBinaryOperator =>
+      {
+        execute_binary_operator(stack, |a, b| {
+          let b_arr: Vec<graph::Value> = b.try_into()?;
+          Ok(b_arr.contains(&a))
+        })?;
       }
     }
   }
