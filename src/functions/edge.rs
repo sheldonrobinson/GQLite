@@ -1,6 +1,6 @@
 use crate::{error::RunTimeError, graph};
 
-use super::FResult;
+use super::{FResult, FunctionTypeTrait};
 
 #[derive(Debug, Default)]
 pub(super) struct Type {}
@@ -17,4 +17,4 @@ impl Type
   }
 }
 
-super::declare_function!(type, Type, (crate::graph::Edge));
+super::declare_function!(type, Type, call_impl(crate::graph::Edge) -> String);

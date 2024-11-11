@@ -4,7 +4,7 @@ use crate::error::{CompileTimeError, InternalError};
 // use crate::graph::ToValue;
 use crate::interpreter::instructions::{Block, CreateAction, Instruction, Instructions};
 use crate::interpreter::validator;
-use crate::parser::{self, ast};
+use crate::parser::ast;
 use crate::{functions, Result};
 
 use super::instructions::BlockMatch;
@@ -542,7 +542,7 @@ pub(crate) fn compile(
   statements: crate::parser::ast::Statements,
 ) -> Result<super::Program>
 {
-  let mut validator = validator::Validator::default();
+  let mut validator = validator::Validator::new(function_manager.clone());
   let mut statements_err = Ok(());
   let program = statements
     .iter()

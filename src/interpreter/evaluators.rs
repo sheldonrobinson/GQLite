@@ -1,9 +1,7 @@
-use std::{collections::HashMap, default, hash::Hash};
-
-use itertools::Itertools;
+use std::collections::HashMap;
 
 use crate::{
-  error::{InternalError, RunTimeError},
+  error::InternalError,
   graph,
   interpreter::instructions::BlockMatch,
   store::{self, SelectEdgeQuery},

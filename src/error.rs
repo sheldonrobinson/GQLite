@@ -1,7 +1,5 @@
 //! Errors used for gqlite.
 
-use crate::graph;
-
 /// Represent compile time errors.
 #[derive(thiserror::Error, Debug)]
 pub enum CompileTimeError
