@@ -4,7 +4,7 @@ use crate::error::{CompileTimeError, InternalError};
 // use crate::graph::ToValue;
 use crate::interpreter::instructions::{Block, CreateAction, Instruction, Instructions};
 use crate::interpreter::validator;
-use crate::parser::ast;
+use crate::parser::{self, ast};
 use crate::{functions, Result};
 
 use super::instructions::BlockMatch;
@@ -65,6 +65,12 @@ fn compile_expression(
       Instruction::MemberAccess {
         path: member_access.path.to_owned(),
       }
+    }
+    ast::Expression::RelationalDifferent(relational_different) =>
+    {
+      compile_expression(function_manager, &relational_different.right, instructions)?;
+      compile_expression(function_manager, &relational_different.left, instructions)?;
+      Instruction::NotEqualBinaryOperator
     }
   };
   instructions.push(expr);
@@ -476,6 +482,7 @@ fn compile_match_patterns(
   function_manager: &functions::Manager,
   validator: &mut validator::Validator,
   patterns: &Vec<crate::parser::ast::Pattern>,
+  where_expression: &Option<crate::parser::ast::Expression>,
   optional: bool,
 ) -> Result<Block>
 {
@@ -512,8 +519,14 @@ fn compile_match_patterns(
       &mut edge_variables,
     ),
   });
+  let mut filter = Instructions::new();
+  if let Some(where_expression) = where_expression
+  {
+    compile_expression(function_manager, where_expression, &mut filter)?;
+  }
   Ok(Block::BlockMatch {
     blocks: blocks.collect::<Result<_>>()?,
+    filter,
     optional,
   })
 }
@@ -538,6 +551,7 @@ pub(crate) fn compile(
           function_manager,
           &mut validator,
           &match_statement.patterns,
+          &match_statement.where_expression,
           match_statement.optional,
         ),
         ast::Statement::Return(return_statement) =>

@@ -156,6 +156,8 @@ pub(crate) enum Expression
   Parameter(Parameter),
   Value(Value),
   Variable(Variable),
+
+  RelationalDifferent(Box<RelationalDifferent>),
 }
 
 // Order By Expression
@@ -393,13 +395,21 @@ pub(crate) struct FunctionCall
 #[macro_export]
 macro_rules! create_binary_op {
   ( $x:tt ) => {
-    #[derive(Debug)]
+    #[derive(Debug, Clone, PartialEq)]
     pub(crate) struct $x
     {
       pub(crate) left: Expression,
       pub(crate) right: Expression,
     }
   };
+}
+
+impl Into<Expression> for RelationalDifferent
+{
+  fn into(self) -> Expression
+  {
+    Expression::RelationalDifferent(Box::new(self))
+  }
 }
 
 create_binary_op! {LogicalAnd}

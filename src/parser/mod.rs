@@ -20,6 +20,23 @@ fn build_pair(pair: pest::iterators::Pair<Rule>) -> Result<(String, ast::Express
 
 fn build_expression(pair: pest::iterators::Pair<Rule>) -> Result<ast::Expression>
 {
+  println!("build_expression {:#?}", pair);
+  let inner_pair = pair.into_inner().next().unwrap();
+  let mut it = inner_pair.into_inner();
+  let left = build_expression_term(it.next().unwrap())?;
+  if let Some(right) = it.next()
+  {
+    let right = build_expression_term(right)?;
+    Ok(ast::RelationalDifferent { left, right }.into())
+  }
+  else
+  {
+    Ok(left)
+  }
+}
+
+fn build_expression_term(pair: pest::iterators::Pair<Rule>) -> Result<ast::Expression>
+{
   match pair.as_rule()
   {
     Rule::null_lit => Ok(ast::Expression::Value(ast::Value {
@@ -62,7 +79,7 @@ fn build_expression(pair: pest::iterators::Pair<Rule>) -> Result<ast::Expression
     {
       let mut it = pair.into_inner();
       let left =
-        build_expression(it.next().ok_or_else(|| {
+        build_expression_term(it.next().ok_or_else(|| {
           crate::Error::InternalError("Missing first element of member access.")
         })?)?;
       Ok(ast::Expression::MemberAccess(Box::new(ast::MemberAccess {
@@ -88,7 +105,7 @@ fn build_expression(pair: pest::iterators::Pair<Rule>) -> Result<ast::Expression
       }))
     }
     unknown_expression => Err(crate::Error::UnxpectedExpression(
-      "build_expression",
+      "build_expression_term",
       format!("{unknown_expression:?}"),
     )),
   }
@@ -133,7 +150,7 @@ fn build_named_expression(pair: pest::iterators::Pair<Rule>) -> Result<ast::Name
         {
           let expr = inner.next().unwrap();
           Ok(ast::NamedExpression {
-            name: expr.as_str().to_string(),
+            name: expr.as_str().trim().to_string(),
             expression: build_expression(expr)?,
           })
         }
@@ -214,7 +231,7 @@ fn build_node_pattern(pair: pest::iterators::Pair<Rule>) -> Result<ast::NodePatt
       {
         labels = build_labels(pair)?;
       }
-      Rule::map => properties = Some(build_expression(pair)?),
+      Rule::map => properties = Some(build_expression_term(pair)?),
       unknown_expression =>
       {
         return Err(crate::Error::UnxpectedExpression(
@@ -252,7 +269,7 @@ fn build_edge_pattern(
       {
         labels = build_labels(pair)?;
       }
-      Rule::map => properties = Some(build_expression(pair)?),
+      Rule::map => properties = Some(build_expression_term(pair)?),
       unknown_expression =>
       {
         return Err(crate::Error::UnxpectedExpression(
@@ -265,119 +282,152 @@ fn build_edge_pattern(
   Ok((variable, labels, properties))
 }
 
-fn build_pattern(
-  mut iterator: pest::iterators::Pairs<Rule>,
+fn build_patterns(
+  iterator: &mut pest::iterators::Pairs<Rule>,
   allow_undirected_edge: bool,
 ) -> Result<Vec<ast::Pattern>>
 {
   let mut vec = vec![];
 
-  while let Some(pair) = iterator.next()
+  for pair in iterator
+  {
+    vec.append(&mut build_pattern(pair, allow_undirected_edge)?);
+  }
+  Ok(vec)
+}
+
+fn build_pattern(
+  pair: pest::iterators::Pair<Rule>,
+  allow_undirected_edge: bool,
+) -> Result<Vec<ast::Pattern>>
+{
+  let mut vec = vec![];
+
+  match pair.as_rule()
+  {
+    Rule::node_pattern =>
+    {
+      vec.push(ast::Pattern::Node(build_node_pattern(
+        pair.into_inner().next().unwrap(),
+      )?));
+    }
+    Rule::edge_pattern =>
+    {
+      let mut it = pair.into_inner();
+      let mut source_node = build_node_pattern(it.next().unwrap())?;
+
+      while let Some(next) = it.next()
+      {
+        let rule = next.as_rule();
+        let mut it_edge = next.into_inner();
+        let edge_pattern = build_edge_pattern(it_edge.next().unwrap())?;
+        let destination_node = build_node_pattern(it.next().unwrap())?;
+
+        match rule
+        {
+          Rule::directed_edge_pattern =>
+          {
+            vec.push(ast::Pattern::Edge(ast::EdgePattern {
+              variable: edge_pattern.0,
+              source: source_node,
+              destination: destination_node.clone(),
+              directivity: graph::EdgeDirectivity::Directed,
+              labels: edge_pattern.1,
+              properties: edge_pattern.2,
+            }));
+          }
+          Rule::reversed_edge_pattern =>
+          {
+            vec.push(ast::Pattern::Edge(ast::EdgePattern {
+              variable: edge_pattern.0,
+              source: destination_node.clone(),
+              destination: source_node,
+              directivity: graph::EdgeDirectivity::Directed,
+              labels: edge_pattern.1,
+              properties: edge_pattern.2,
+            }));
+          }
+          Rule::undirected_edge_pattern =>
+          {
+            if !allow_undirected_edge
+            {
+              Err(CompileTimeError::RequiresDirectedRelationship {
+                context: "creation",
+              })?;
+            }
+            vec.push(ast::Pattern::Edge(ast::EdgePattern {
+              variable: edge_pattern.0,
+              source: source_node,
+              destination: destination_node.clone(),
+              directivity: graph::EdgeDirectivity::Undirected,
+              labels: edge_pattern.1,
+              properties: edge_pattern.2,
+            }));
+          }
+          unknown_expression =>
+          {
+            return Err(crate::Error::UnxpectedExpression(
+              "build_pattern/edge_pattern",
+              format!("{unknown_expression:?}"),
+            ));
+          }
+        }
+        source_node = destination_node;
+      }
+    }
+    Rule::path_pattern =>
+    {
+      let mut it = pair.into_inner();
+      let variable = it.next().unwrap().as_str().to_string();
+      let mut it = it.next().unwrap().into_inner();
+      let source_node = build_node_pattern(it.next().unwrap())?;
+      let edge_pattern = build_edge_pattern(it.next().unwrap())?;
+      let destination_node = build_node_pattern(it.next().unwrap())?;
+      vec.push(ast::Pattern::Path(ast::PathPattern {
+        variable,
+        edge: ast::EdgePattern {
+          variable: edge_pattern.0,
+          source: source_node,
+          destination: destination_node,
+          directivity: graph::EdgeDirectivity::Directed,
+          labels: edge_pattern.1,
+          properties: edge_pattern.2,
+        },
+      }));
+    }
+    unknown_expression =>
+    {
+      return Err(crate::Error::UnxpectedExpression(
+        "build_node_or_edge_vec",
+        format!("{unknown_expression:?}"),
+      ));
+    }
+  };
+  Ok(vec)
+}
+
+fn build_match(pair: pest::iterators::Pair<Rule>, optional: bool) -> Result<ast::Statement>
+{
+  let inner = pair.into_inner();
+  let mut where_expression = None;
+  let mut patterns = vec![];
+  for pair in inner
   {
     match pair.as_rule()
     {
-      Rule::node_pattern =>
+      Rule::where_modifier =>
       {
-        vec.push(ast::Pattern::Node(build_node_pattern(
-          pair.into_inner().next().unwrap(),
-        )?));
+        where_expression = Some(build_expression(pair.into_inner().next().unwrap())?)
       }
-      Rule::edge_pattern =>
-      {
-        let mut it = pair.into_inner();
-        let mut source_node = build_node_pattern(it.next().unwrap())?;
-
-        while let Some(next) = it.next()
-        {
-          let rule = next.as_rule();
-          let mut it_edge = next.into_inner();
-          let edge_pattern = build_edge_pattern(it_edge.next().unwrap())?;
-          let destination_node = build_node_pattern(it.next().unwrap())?;
-
-          match rule
-          {
-            Rule::directed_edge_pattern =>
-            {
-              vec.push(ast::Pattern::Edge(ast::EdgePattern {
-                variable: edge_pattern.0,
-                source: source_node,
-                destination: destination_node.clone(),
-                directivity: graph::EdgeDirectivity::Directed,
-                labels: edge_pattern.1,
-                properties: edge_pattern.2,
-              }));
-            }
-            Rule::reversed_edge_pattern =>
-            {
-              vec.push(ast::Pattern::Edge(ast::EdgePattern {
-                variable: edge_pattern.0,
-                source: destination_node.clone(),
-                destination: source_node,
-                directivity: graph::EdgeDirectivity::Directed,
-                labels: edge_pattern.1,
-                properties: edge_pattern.2,
-              }));
-            }
-            Rule::undirected_edge_pattern =>
-            {
-              if !allow_undirected_edge
-              {
-                Err(CompileTimeError::RequiresDirectedRelationship {
-                  context: "creation",
-                })?;
-              }
-              vec.push(ast::Pattern::Edge(ast::EdgePattern {
-                variable: edge_pattern.0,
-                source: source_node,
-                destination: destination_node.clone(),
-                directivity: graph::EdgeDirectivity::Undirected,
-                labels: edge_pattern.1,
-                properties: edge_pattern.2,
-              }));
-            }
-            unknown_expression =>
-            {
-              return Err(crate::Error::UnxpectedExpression(
-                "build_pattern/edge_pattern",
-                format!("{unknown_expression:?}"),
-              ));
-            }
-          }
-          source_node = destination_node;
-        }
-      }
-      Rule::path_pattern =>
-      {
-        let mut it = pair.into_inner();
-        let variable = it.next().unwrap().as_str().to_string();
-        let mut it = it.next().unwrap().into_inner();
-        let source_node = build_node_pattern(it.next().unwrap())?;
-        let edge_pattern = build_edge_pattern(it.next().unwrap())?;
-        let destination_node = build_node_pattern(it.next().unwrap())?;
-        vec.push(ast::Pattern::Path(ast::PathPattern {
-          variable,
-          edge: ast::EdgePattern {
-            variable: edge_pattern.0,
-            source: source_node,
-            destination: destination_node,
-            directivity: graph::EdgeDirectivity::Directed,
-            labels: edge_pattern.1,
-            properties: edge_pattern.2,
-          },
-        }));
-      }
-
-      unknown_expression =>
-      {
-        return Err(crate::Error::UnxpectedExpression(
-          "build_node_or_edge_vec",
-          format!("{unknown_expression:?}"),
-        ));
-      }
+      _ => patterns.append(&mut build_pattern(pair, true)?),
     }
   }
 
-  Ok(vec)
+  Ok(ast::Statement::Match(ast::Match {
+    patterns,
+    where_expression,
+    optional,
+  }))
 }
 
 fn build_ast_from_statement(pair: pest::iterators::Pair<Rule>) -> Result<ast::Statement>
@@ -385,21 +435,10 @@ fn build_ast_from_statement(pair: pest::iterators::Pair<Rule>) -> Result<ast::St
   match pair.as_rule()
   {
     Rule::create_statement => Ok(ast::Statement::Create(ast::Create {
-      patterns: build_pattern(pair.into_inner(), false)?,
+      patterns: build_patterns(&mut pair.into_inner(), false)?,
     })),
-    Rule::match_statement => Ok(ast::Statement::Match(ast::Match {
-      where_expression: None,
-      patterns: build_pattern(pair.into_inner(), true)?,
-      optional: false,
-    })),
-    Rule::optional_match_statement => Ok(ast::Statement::Match(ast::Match {
-      where_expression: None,
-      patterns: build_pattern(
-        pair.into_inner().into_iter().next().unwrap().into_inner(),
-        true,
-      )?,
-      optional: true,
-    })),
+    Rule::match_statement => build_match(pair, false),
+    Rule::optional_match_statement => build_match(pair.into_inner().next().unwrap(), true),
     Rule::return_statement =>
     {
       let named_expressions = pair

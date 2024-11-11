@@ -102,6 +102,7 @@ pub(crate) enum Block
   BlockMatch
   {
     blocks: Vec<BlockMatch>,
+    filter: Instructions,
     optional: bool,
   },
   Return
