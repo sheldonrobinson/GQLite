@@ -7,6 +7,7 @@ use crate::interpreter::validator;
 use crate::parser::ast;
 use crate::{functions, Result};
 
+use super::expression_analyser;
 use super::instructions::BlockMatch;
 
 static fake_variable_counter: AtomicU64 = AtomicU64::new(0);
@@ -35,7 +36,7 @@ fn compile_expression(
         compile_expression(function_manager, v, instructions)?;
       }
       Instruction::FunctionCall {
-        function: function_manager.get::<CompileTimeError>(&function_call.name)?,
+        function: function_manager.get_function::<CompileTimeError>(&function_call.name)?,
         arguments_count: function_call.arguments.len(),
       }
     }
@@ -360,11 +361,11 @@ fn compile_match_node(
     {
       filter.push(Instruction::Duplicate);
       filter.push(Instruction::FunctionCall {
-        function: function_manager.get::<CompileTimeError>(get_node_function_name)?,
+        function: function_manager.get_function::<CompileTimeError>(get_node_function_name)?,
         arguments_count: 1,
       });
     }
-    let has_label_function = function_manager.get::<CompileTimeError>("has_label")?;
+    let has_label_function = function_manager.get_function::<CompileTimeError>("has_label")?;
     compile_filter_labels(filter, &node.labels, &has_label_function)?;
     filter.push(Instruction::Rot3);
     filter.push(Instruction::AndBinaryOperator);
@@ -442,7 +443,7 @@ fn compile_match_edge(
     }
     else
     {
-      let has_label_function = function_manager.get::<CompileTimeError>("has_label")?;
+      let has_label_function = function_manager.get_function::<CompileTimeError>("has_label")?;
       compile_filter_labels(&mut filter, &edge.labels, &has_label_function)?;
       filter.push(Instruction::Rot3);
       filter.push(Instruction::AndBinaryOperator);
@@ -605,7 +606,16 @@ pub(crate) fn compile(
             let mut instructions = Instructions::new();
             compile_expression(function_manager, &e.expression, &mut instructions)?;
             variables.push((e.name.to_owned(), instructions));
-            val_variables.insert(e.name.to_owned(), validator.evaluate(&e.expression)?);
+            val_variables.insert(
+              e.name.to_owned(),
+              expression_analyser::ExpressionInfo::analyse(
+                validator.variables_ref(),
+                &function_manager,
+                &e.expression,
+              )?
+              .expression_type
+              .into(),
+            );
           }
           validator.set_variables(val_variables);
           Ok(Block::With {

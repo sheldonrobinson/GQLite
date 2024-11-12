@@ -1,40 +1,78 @@
 use std::collections::HashMap;
-use std::default;
 
 use crate::error::{CompileTimeError, InternalError};
+use crate::interpreter::expression_analyser::ExpressionType;
 use crate::parser::ast;
 use crate::{functions, Result};
 
-use self::ast::EdgePattern;
-
-// __     __         _       _     _     _____
-// \ \   / /_ _ _ __(_) __ _| |__ | | __|_   _|   _ _ __   ___
-//  \ \ / / _` | '__| |/ _` | '_ \| |/ _ \| || | | | '_ \ / _ \
-//   \ V / (_| | |  | | (_| | |_) | |  __/| || |_| | |_) |  __/
-//    \_/ \__,_|_|  |_|\__,_|_.__/|_|\___||_| \__, | .__/ \___|
-//                                            |___/|_|
-
-#[derive(Debug, PartialEq)]
-#[allow(unused)]
-pub(crate) enum VariableType
+impl crate::interpreter::expression_analyser::Variables for HashMap<String, Variable>
 {
-  Node,
-  Edge,
-  Boolean,
-  Number,
-  String,
-  Variant,
+  fn expression_type(&self, name: impl Into<String>) -> Result<ExpressionType>
+  {
+    let name = name.into();
+    Ok(
+      self
+        .get(&name)
+        .ok_or_else(|| InternalError::UnknownVariable {
+          context: "Validator/evaluate",
+          variable: name.to_owned(),
+        })?
+        .variable_type,
+    )
+  }
 }
 
-impl Into<Variable> for VariableType
+// __     __         _       _     _
+// \ \   / /_ _ _ __(_) __ _| |__ | | ___
+//  \ \ / / _` | '__| |/ _` | '_ \| |/ _ \
+//   \ V / (_| | |  | | (_| | |_) | |  __/
+//    \_/ \__,_|_|  |_|\__,_|_.__/|_|\___|
+
+#[derive(Debug, Clone)]
+pub(crate) enum VariableContent
 {
-  fn into(self) -> Variable
+  Node(ast::NodePattern),
+  Edge(ast::EdgePattern),
+  None,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct Variable
+{
+  content: VariableContent,
+  variable_type: ExpressionType,
+}
+
+impl From<ast::NodePattern> for Variable
+{
+  fn from(value: ast::NodePattern) -> Self
   {
-    match self
+    Self {
+      content: VariableContent::Node(value),
+      variable_type: ExpressionType::Node,
+    }
+  }
+}
+
+impl From<ast::EdgePattern> for Variable
+{
+  fn from(value: ast::EdgePattern) -> Self
+  {
+    Self {
+      content: VariableContent::Edge(value),
+      variable_type: ExpressionType::Edge,
+    }
+  }
+}
+
+impl From<ExpressionType> for Variable
+{
+  fn from(value: ExpressionType) -> Self
+  {
+    match value
     {
-      Self::Boolean => Variable::Boolean,
-      Self::Edge => Variable::Edge {
-        edge: ast::EdgePattern {
+      ExpressionType::Edge => Self {
+        content: VariableContent::Edge(ast::EdgePattern {
           variable: None,
           labels: ast::LabelExpression::None,
           properties: None,
@@ -49,75 +87,22 @@ impl Into<Variable> for VariableType
             properties: None,
           },
           directivity: crate::graph::EdgeDirectivity::Directed,
-        },
+        }),
+        variable_type: ExpressionType::Edge,
       },
-      Self::Node => Variable::Node {
-        node: ast::NodePattern {
+      ExpressionType::Node => Self {
+        content: VariableContent::Node(ast::NodePattern {
           variable: None,
           labels: ast::LabelExpression::None,
           properties: None,
-        },
+        }),
+        variable_type: ExpressionType::Node,
       },
-      Self::Number => Variable::Number,
-      Self::String => Variable::String,
-      Self::Variant => Variable::Variant,
+      variable_type => Self {
+        content: VariableContent::None,
+        variable_type,
+      },
     }
-  }
-}
-
-// __     __         _       _     _
-// \ \   / /_ _ _ __(_) __ _| |__ | | ___
-//  \ \ / / _` | '__| |/ _` | '_ \| |/ _ \
-//   \ V / (_| | |  | | (_| | |_) | |  __/
-//    \_/ \__,_|_|  |_|\__,_|_.__/|_|\___|
-
-#[derive(Debug, Clone)]
-#[allow(unused)]
-pub(crate) enum Variable
-{
-  Node
-  {
-    node: ast::NodePattern,
-  },
-  Edge
-  {
-    edge: ast::EdgePattern,
-  },
-  Boolean,
-  Number,
-  String,
-  Variant,
-}
-
-impl Into<VariableType> for Variable
-{
-  fn into(self) -> VariableType
-  {
-    match self
-    {
-      Variable::Node { node: _ } => VariableType::Node,
-      Variable::Edge { edge: _ } => VariableType::Edge,
-      Variable::Boolean => VariableType::Boolean,
-      Variable::Number => VariableType::Number,
-      Variable::String => VariableType::String,
-      Variable::Variant => VariableType::Variant,
-    }
-  }
-}
-
-impl From<ast::NodePattern> for Variable
-{
-  fn from(value: ast::NodePattern) -> Self
-  {
-    Self::Node { node: value }
-  }
-}
-
-impl From<ast::EdgePattern> for Variable
-{
-  fn from(value: ast::EdgePattern) -> Self
-  {
-    Self::Edge { edge: value }
   }
 }
 
@@ -147,55 +132,13 @@ impl Validator
   {
     self.variables.to_owned()
   }
+  pub(crate) fn variables_ref(&self) -> &HashMap<String, Variable>
+  {
+    &self.variables
+  }
   pub(crate) fn set_variables(&mut self, variables: HashMap<String, Variable>)
   {
     self.variables = variables;
-  }
-  pub(crate) fn evaluate(&self, expression: &ast::Expression) -> Result<Variable>
-  {
-    match expression
-    {
-      ast::Expression::Array(_) => Ok(Variable::Variant),
-      ast::Expression::FunctionCall(call) =>
-      {
-        let func = self
-          .function_manager
-          .get::<crate::error::CompileTimeError>(&call.name)?;
-        Ok(
-          func
-            .validate_arguments(
-              call
-                .arguments
-                .iter()
-                .map(|x| -> Result<VariableType> {
-                  let r: VariableType = self.evaluate(x)?.into();
-                  Ok(r)
-                })
-                .collect::<Result<_>>()?,
-            )?
-            .into(),
-        )
-      }
-      ast::Expression::LogicalNegation(_) => Ok(Variable::Boolean),
-      ast::Expression::RelationalDifferent(_) => Ok(Variable::Boolean),
-      ast::Expression::RelationalIn(_) => Ok(Variable::Boolean),
-      ast::Expression::Map(_) => Ok(Variable::Variant),
-      ast::Expression::MemberAccess(_) => Ok(Variable::Variant),
-      ast::Expression::Parameter(_) => Ok(Variable::Variant),
-      ast::Expression::Value(_) => Ok(Variable::Variant),
-      ast::Expression::Variable(var) =>
-      {
-        let v =
-          self
-            .variables
-            .get(&var.identifier)
-            .ok_or_else(|| InternalError::UnknownVariable {
-              context: "Validator/evaluate",
-              variable: var.identifier.to_owned(),
-            })?;
-        Ok(v.clone())
-      }
-    }
   }
   // Validate a node variable, and if unknown, declare it
   pub(crate) fn validate_node(&mut self, node: &ast::NodePattern) -> Result<()>
@@ -204,25 +147,35 @@ impl Validator
     {
       if let Some(var) = self.variables.get(var_name)
       {
-        match var
+        match var.variable_type
         {
-          Variable::Node { node: var_node } =>
+          ExpressionType::Node => match &var.content
           {
-            if (!node.labels.is_none() || !node.properties.is_none())
-              && (var_node.labels != node.labels || var_node.properties != node.properties)
+            VariableContent::Node(var_node) =>
             {
-              Err(
-                CompileTimeError::VariableAlreadyBound {
-                  name: var_name.to_owned(),
-                }
-                .into(),
-              )
+              if (!node.labels.is_none() || !node.properties.is_none())
+                && (node.labels != var_node.labels || node.properties != var_node.properties)
+              {
+                Err(
+                  CompileTimeError::VariableAlreadyBound {
+                    name: var_name.to_owned(),
+                  }
+                  .into(),
+                )
+              }
+              else
+              {
+                Ok(())
+              }
             }
-            else
-            {
-              Ok(())
-            }
-          }
+            _ => Err(
+              InternalError::ExpectedNode {
+                context: "validate_node",
+              }
+              .into(),
+            ),
+          },
+          ExpressionType::Variant => Ok(()), // Cannot be checked at compile time
           _ => Err(
             CompileTimeError::VariableTypeConflict {
               name: var_name.to_owned(),
@@ -252,9 +205,9 @@ impl Validator
     {
       if let Some(var) = self.variables.get(var_name)
       {
-        match var
+        match var.content
         {
-          Variable::Edge { .. } => Err(
+          VariableContent::Edge { .. } => Err(
             CompileTimeError::VariableAlreadyBound {
               name: var_name.to_owned(),
             }
@@ -289,25 +242,35 @@ impl Validator
     {
       if let Some(var) = self.variables.get(var_name)
       {
-        match var
+        match var.variable_type
         {
-          Variable::Node { node: var_node } =>
+          ExpressionType::Node => match &var.content
           {
-            if (!node.labels.is_none() || !node.properties.is_none())
-              && (var_node.labels != node.labels || var_node.properties != node.properties)
+            VariableContent::Node(var_node) =>
             {
-              Err(
-                CompileTimeError::VariableAlreadyBound {
-                  name: var_name.to_owned(),
-                }
-                .into(),
-              )
+              if (!node.labels.is_none() || !node.properties.is_none())
+                && (node.labels != var_node.labels || node.properties != var_node.properties)
+              {
+                Err(
+                  CompileTimeError::VariableAlreadyBound {
+                    name: var_name.to_owned(),
+                  }
+                  .into(),
+                )
+              }
+              else
+              {
+                Ok(true)
+              }
             }
-            else
-            {
-              Ok(true)
-            }
-          }
+            _ => Err(
+              InternalError::ExpectedNode {
+                context: "is_valid_existing_node",
+              }
+              .into(),
+            ),
+          },
+          ExpressionType::Variant => Ok(true), // Cannot be checked at compile time
           _ => Err(
             CompileTimeError::VariableTypeConflict {
               name: var_name.to_owned(),
@@ -334,25 +297,35 @@ impl Validator
     {
       if let Some(var) = self.variables.get(var_name)
       {
-        match var
+        match var.variable_type
         {
-          Variable::Edge { edge: var_edge } =>
+          ExpressionType::Edge => match &var.content
           {
-            if (!edge.labels.is_none() || !edge.properties.is_none())
-              && (var_edge.labels != edge.labels || var_edge.properties != edge.properties)
+            VariableContent::Edge(var_edge) =>
             {
-              Err(
-                CompileTimeError::VariableAlreadyBound {
-                  name: var_name.to_owned(),
-                }
-                .into(),
-              )
+              if (!edge.labels.is_none() || !edge.properties.is_none())
+                && (var_edge.labels != edge.labels || var_edge.properties != edge.properties)
+              {
+                Err(
+                  CompileTimeError::VariableAlreadyBound {
+                    name: var_name.to_owned(),
+                  }
+                  .into(),
+                )
+              }
+              else
+              {
+                Ok(true)
+              }
             }
-            else
-            {
-              Ok(true)
-            }
-          }
+            _ => Err(
+              InternalError::ExpectedEdge {
+                context: "is_valid_existing_edge",
+              }
+              .into(),
+            ),
+          },
+          ExpressionType::Variant => Ok(true), // Cannot be checked at compile time
           _ => Err(
             CompileTimeError::VariableTypeConflict {
               name: var_name.to_owned(),
