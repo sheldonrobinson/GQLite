@@ -62,11 +62,15 @@ function_name  =  { ident ~ ("." ~ ident)* }
 expression = { different_bin_op_expression }
 
 different_bin_op_expression = { in_bin_op_expression ~ ("<>" ~ expression)? }
-in_bin_op_expression = { expression_term ~ ("IN" ~ expression)? }
+in_bin_op_expression        = { expression_term ~ ("IN" ~ expression)? }
 
-named_expression =  { (expression ~ "AS" ~ ident) | expression }
-function_call    =  { function_name ~ "(" ~ expression ~ ("," ~ expression)* ~ ")" }
-expression_term  = _{ null_lit | true_lit | false_lit | num | int | string_literal | map | array | function_call | member_access | ident | parameter }
+not_expression         = { "NOT" ~ expression_term }
+label_check_expression = { ident ~ (":" ~ ident)+ }
+
+parenthesised_expression =  { "(" ~ expression ~ ")" }
+named_expression         =  { (expression ~ "AS" ~ ident) | expression }
+function_call            =  { function_name ~ "(" ~ expression ~ ("," ~ expression)* ~ ")" }
+expression_term          = _{ null_lit | true_lit | false_lit | num | int | string_literal | map | array | member_access | label_check_expression | parameter | parenthesised_expression | not_expression | function_call | ident }
 
 parameter     = { "$" ~ ident }
 member_access = { ident ~ ("." ~ ident)+ }

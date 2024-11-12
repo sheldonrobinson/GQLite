@@ -176,6 +176,7 @@ impl Validator
             .into(),
         )
       }
+      ast::Expression::LogicalNegation(_) => Ok(Variable::Boolean),
       ast::Expression::RelationalDifferent(_) => Ok(Variable::Boolean),
       ast::Expression::RelationalIn(_) => Ok(Variable::Boolean),
       ast::Expression::Map(_) => Ok(Variable::Variant),

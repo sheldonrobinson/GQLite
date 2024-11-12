@@ -126,7 +126,46 @@ fn build_expression_term(pair: pest::iterators::Pair<Rule>) -> Result<ast::Expre
         name: function_name.to_string(),
         arguments: it
           .map(|pair| build_expression(pair))
-          .collect::<Result<Vec<ast::Expression>>>()?,
+          .collect::<Result<_>>()?,
+      }))
+    }
+    Rule::parenthesised_expression =>
+    {
+      let mut it = pair.into_inner();
+      build_expression(it.next().unwrap())
+    }
+    Rule::not_expression =>
+    {
+      let mut it = pair.into_inner();
+      Ok(
+        ast::LogicalNegation {
+          value: build_expression_term(it.next().unwrap())?,
+        }
+        .into(),
+      )
+    }
+    Rule::label_check_expression =>
+    {
+      let it = pair.into_inner();
+      Ok(ast::Expression::FunctionCall(ast::FunctionCall {
+        name: "has_labels".into(),
+        arguments: it
+          .enumerate()
+          .map(|(i, pair)| {
+            if i == 0
+            {
+              ast::Expression::Variable(ast::Variable {
+                identifier: pair.as_str().into(),
+              })
+            }
+            else
+            {
+              ast::Expression::Value(ast::Value {
+                value: graph::Value::String(pair.as_str().into()),
+              })
+            }
+          })
+          .collect(),
       }))
     }
     unknown_expression => Err(crate::Error::UnxpectedExpression(
