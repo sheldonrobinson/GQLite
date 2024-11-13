@@ -1,11 +1,14 @@
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use crate::error::{CompileTimeError, InternalError};
+use crate::error::{self, CompileTimeError, InternalError, RunTimeError};
 // use crate::graph::ToValue;
-use crate::interpreter::instructions::{Block, CreateAction, Instruction, Instructions};
+use crate::interpreter::instructions::{
+  self, Block, CreateAction, Instruction, Instructions, RWAggregation, RWExpression,
+};
 use crate::interpreter::validator;
 use crate::parser::ast;
-use crate::{functions, Result};
+use crate::{functions, graph, Result};
 
 use super::expression_analyser;
 use super::instructions::BlockMatch;
@@ -16,6 +19,7 @@ fn compile_expression(
   function_manager: &functions::Manager,
   expression: &crate::parser::ast::Expression,
   instructions: &mut Instructions,
+  aggregations: &mut Option<&mut HashMap<String, RWAggregation>>,
 ) -> Result<()>
 {
   let expr = match expression
@@ -31,20 +35,70 @@ fn compile_expression(
     },
     ast::Expression::FunctionCall(function_call) =>
     {
-      for v in function_call.arguments.iter()
+      let aggregator = function_manager.get_aggregator::<CompileTimeError>(&function_call.name);
+      match aggregator
       {
-        compile_expression(function_manager, v, instructions)?;
-      }
-      Instruction::FunctionCall {
-        function: function_manager.get_function::<CompileTimeError>(&function_call.name)?,
-        arguments_count: function_call.arguments.len(),
+        Ok(aggregator) =>
+        {
+          let var_name = format!(
+            "__gqlite_aggregator_{}",
+            fake_variable_counter.fetch_add(1, Ordering::Relaxed)
+          );
+          let mut init_instructions = Instructions::new();
+          let mut argument_instructions = Instructions::new();
+
+          compile_expression(
+            function_manager,
+            function_call
+              .arguments
+              .get(0)
+              .ok_or(error::InternalError::MissingAggregationArgument)?,
+            &mut argument_instructions,
+            aggregations,
+          )?;
+          if let Some(init_arg) = function_call.arguments.get(1)
+          {
+            compile_expression(
+              function_manager,
+              init_arg,
+              &mut init_instructions,
+              aggregations,
+            )?;
+          }
+
+          aggregations
+            .as_mut()
+            .ok_or(error::InternalError::MissingAggregations)?
+            .insert(
+              var_name.to_owned(),
+              RWAggregation {
+                init_instructions,
+                aggregator,
+                argument_instructions,
+              },
+            );
+          Instruction::GetVariable { name: var_name }
+        }
+        Err(_) =>
+        {
+          for v in function_call.arguments.iter()
+          {
+            compile_expression(function_manager, v, instructions, aggregations)?;
+          }
+
+          let function = function_manager.get_function::<CompileTimeError>(&function_call.name)?;
+          Instruction::FunctionCall {
+            function,
+            arguments_count: function_call.arguments.len(),
+          }
+        }
       }
     }
     ast::Expression::Array(array) =>
     {
       for v in array.array.iter()
       {
-        compile_expression(function_manager, v, instructions)?;
+        compile_expression(function_manager, v, instructions, aggregations)?;
       }
       Instruction::CreateArray {
         length: array.array.len(),
@@ -55,34 +109,72 @@ fn compile_expression(
       let mut keys = Vec::new();
       for (k, v) in map.map.iter()
       {
-        compile_expression(function_manager, v, instructions)?;
+        compile_expression(function_manager, v, instructions, aggregations)?;
         keys.push(k.to_owned());
       }
       Instruction::CreateMap { keys: keys }
     }
     ast::Expression::MemberAccess(member_access) =>
     {
-      compile_expression(function_manager, &member_access.left, instructions)?;
+      compile_expression(
+        function_manager,
+        &member_access.left,
+        instructions,
+        aggregations,
+      )?;
       Instruction::MemberAccess {
         path: member_access.path.to_owned(),
       }
     }
     ast::Expression::RelationalDifferent(relational_different) =>
     {
-      compile_expression(function_manager, &relational_different.right, instructions)?;
-      compile_expression(function_manager, &relational_different.left, instructions)?;
+      compile_expression(
+        function_manager,
+        &relational_different.right,
+        instructions,
+        aggregations,
+      )?;
+      compile_expression(
+        function_manager,
+        &relational_different.left,
+        instructions,
+        aggregations,
+      )?;
       Instruction::NotEqualBinaryOperator
     }
     ast::Expression::RelationalIn(relational_in) =>
     {
-      compile_expression(function_manager, &relational_in.right, instructions)?;
-      compile_expression(function_manager, &relational_in.left, instructions)?;
+      compile_expression(
+        function_manager,
+        &relational_in.right,
+        instructions,
+        aggregations,
+      )?;
+      compile_expression(
+        function_manager,
+        &relational_in.left,
+        instructions,
+        aggregations,
+      )?;
       Instruction::InBinaryOperator
     }
     ast::Expression::LogicalNegation(logical_negation) =>
     {
-      compile_expression(function_manager, &logical_negation.value, instructions)?;
+      compile_expression(
+        function_manager,
+        &logical_negation.value,
+        instructions,
+        aggregations,
+      )?;
       Instruction::NotUnaryOperator
+    }
+    ast::Expression::IsNull(is_null) =>
+    {
+      compile_expression(function_manager, &is_null.value, instructions, aggregations)?;
+      instructions.push(Instruction::Push {
+        value: graph::Value::Invalid,
+      });
+      Instruction::EqualBinaryOperator
     }
   };
   instructions.push(expr);
@@ -97,7 +189,7 @@ fn compile_optional_expression(
 {
   if let Some(expr) = properties
   {
-    compile_expression(function_manager, expr, instructions)?;
+    compile_expression(function_manager, expr, instructions, &mut None)?;
   }
   else
   {
@@ -384,6 +476,14 @@ fn compile_match_edge(
   previous_edges: &mut Vec<String>,
 ) -> Result<BlockMatch>
 {
+  if let Some(path_variable) = &path_variable
+  {
+    validator.declare_variable(
+      path_variable.to_owned(),
+      expression_analyser::ExpressionType::Path,
+    )?;
+  }
+
   let mut instructions = Instructions::new();
   let mut source_variable = None;
   let mut filter = Instructions::new();
@@ -426,6 +526,14 @@ fn compile_match_edge(
   }
   if validator.is_valid_existing_edge(edge)?
   {
+    if !validator.is_valid_existing_node(&edge.source)?
+    {
+      validator.validate_node(&edge.source)?;
+    }
+    if !validator.is_valid_existing_node(&edge.destination)?
+    {
+      validator.validate_node(&edge.destination)?;
+    }
     instructions.push(Instruction::GetVariable {
       name: edge.variable.as_ref().unwrap().to_owned(),
     });
@@ -534,7 +642,7 @@ fn compile_match_patterns(
   let mut filter = Instructions::new();
   if let Some(where_expression) = where_expression
   {
-    compile_expression(function_manager, where_expression, &mut filter)?;
+    compile_expression(function_manager, where_expression, &mut filter, &mut None)?;
   }
   Ok(Block::BlockMatch {
     blocks: blocks.collect::<Result<_>>()?,
@@ -568,25 +676,33 @@ pub(crate) fn compile(
         ),
         ast::Statement::Return(return_statement) =>
         {
-          let mut variables = Vec::<(String, Instructions)>::new();
+          let mut variables = Vec::<instructions::RWExpression>::new();
 
           for expr in return_statement.expressions.iter()
           {
             let mut instructions = Instructions::new();
-            compile_expression(function_manager, &expr.expression, &mut instructions)?;
-            variables.push((expr.name.to_owned(), instructions));
+            let mut aggregations = HashMap::<String, RWAggregation>::new();
+            compile_expression(
+              function_manager,
+              &expr.expression,
+              &mut instructions,
+              &mut Some(&mut aggregations),
+            )?;
+            variables.push(instructions::RWExpression {
+              name: expr.name.clone(),
+              instructions,
+              aggregations,
+            });
           }
 
-          Ok(Block::Return {
-            variables: variables,
-          })
+          Ok(Block::Return { variables })
         }
         ast::Statement::Call(call) =>
         {
           let mut instructions = Instructions::new();
           for e in call.arguments.iter().rev()
           {
-            compile_expression(function_manager, e, &mut instructions)?;
+            compile_expression(function_manager, e, &mut instructions, &mut None)?;
           }
           Ok(Block::Call {
             arguments: instructions,
@@ -600,12 +716,22 @@ pub(crate) fn compile(
           {
             val_variables = validator.to_variables();
           }
-          let mut variables = Vec::<(String, Instructions)>::new();
+          let mut variables = Vec::<RWExpression>::new();
           for e in with.expressions.iter()
           {
             let mut instructions = Instructions::new();
-            compile_expression(function_manager, &e.expression, &mut instructions)?;
-            variables.push((e.name.to_owned(), instructions));
+            let mut aggregations = HashMap::<String, RWAggregation>::new();
+            compile_expression(
+              function_manager,
+              &e.expression,
+              &mut instructions,
+              &mut Some(&mut aggregations),
+            )?;
+            variables.push(RWExpression {
+              name: e.name.to_owned(),
+              instructions,
+              aggregations,
+            });
             val_variables.insert(
               e.name.to_owned(),
               expression_analyser::ExpressionInfo::analyse(
@@ -626,7 +752,12 @@ pub(crate) fn compile(
         ast::Statement::Unwind(unwind) =>
         {
           let mut instructions = Instructions::new();
-          compile_expression(function_manager, &unwind.expression, &mut instructions)?;
+          compile_expression(
+            function_manager,
+            &unwind.expression,
+            &mut instructions,
+            &mut None,
+          )?;
           Ok(Block::Unwind {
             name: unwind.name.to_owned(),
             instructions,

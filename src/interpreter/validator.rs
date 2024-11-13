@@ -140,6 +140,28 @@ impl Validator
   {
     self.variables = variables;
   }
+  pub(crate) fn declare_variable(
+    &mut self,
+    variable: impl Into<String>,
+    expression_type: ExpressionType,
+  ) -> Result<()>
+  {
+    let variable = variable.into();
+    if self.variables.contains_key(&variable)
+    {
+      Err(
+        CompileTimeError::VariableAlreadyBound {
+          name: variable.to_owned(),
+        }
+        .into(),
+      )
+    }
+    else
+    {
+      self.variables.insert(variable, expression_type.into());
+      Ok(())
+    }
+  }
   // Validate a node variable, and if unknown, declare it
   pub(crate) fn validate_node(&mut self, node: &ast::NodePattern) -> Result<()>
   {

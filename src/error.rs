@@ -86,6 +86,12 @@ pub enum RunTimeError
 #[derive(thiserror::Error, Debug)]
 pub enum InternalError
 {
+  #[error("Aggregation state is missing.")]
+  MissingAggregationState,
+  #[error("Aggregation is missing an argument.")]
+  MissingAggregationArgument,
+  #[error("Aggregations are missing.")]
+  MissingAggregations,
   #[error("Expected a value to be a node in {context}.")]
   ExpectedNode
   {
