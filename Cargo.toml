@@ -1,11 +1,15 @@
 [package]
 name = "gqlitedb"
-version = "2.0.0"
+version = "0.1.0"
 edition = "2021"
+license = "MIT"
+description = "GQLite is a Rust-language library, with a C interface, that implements a small, fast, self-contained, high-reliability, full-featured, Graph Query database engine."
+readme = "README.md"
+homepage = "https://gqlite.org"
+repository = "https://gitlab.com/gqlite/gqlite"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "gqlite"
 
 [features]
 default = ["persy", "capi"]

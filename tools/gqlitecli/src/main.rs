@@ -15,7 +15,7 @@ To execute a query, write the query and end it with a ';'"
 
 fn main_loop(rl: &mut rustyline::DefaultEditor) -> rustyline::Result<()>
 {
-  let mut connection: Option<gqlite::Connection> = None;
+  let mut connection: Option<gqlitedb::Connection> = None;
   loop
   {
     let line = rl.readline("gqlite> ")?;
@@ -38,7 +38,7 @@ fn main_loop(rl: &mut rustyline::DefaultEditor) -> rustyline::Result<()>
               println!("Missing argument to .open");
             }
             let connection_res =
-              gqlite::Connection::open(splited_line[1], gqlite::ValueObject::new());
+              gqlitedb::Connection::open(splited_line[1], gqlitedb::ValueObject::new());
             match connection_res
             {
               Ok(c) =>
@@ -106,27 +106,27 @@ fn main_loop(rl: &mut rustyline::DefaultEditor) -> rustyline::Result<()>
           {
             Some(ref c) =>
             {
-              let qr = c.execute_query(query, gqlite::ValueObject::new());
+              let qr = c.execute_query(query, gqlitedb::ValueObject::new());
               match qr
               {
                 Ok(value) =>
                 {
                   match value
                   {
-                    gqlite::Value::Array(arr) =>
+                    gqlitedb::Value::Array(arr) =>
                     {
                       let mut builder = tabled::builder::Builder::new();
                       // let mut it = arr.iter();
                       // let keys = it.next().map_or(Vec::<String>::new(), |v| {
                       //   match v {
-                      //     gqlite::Value::Array(arr) => arr.iter().map(|x| x.to_string()).collect(),
+                      //     gqlitedb::Value::Array(arr) => arr.iter().map(|x| x.to_string()).collect(),
                       //     _ => vec![]
                       //   }
                       // });
                       // builder.push_record(keys.iter());
                       // it.for_each(|row| {
                       //   match row {
-                      //     gqlite::Value::Object(obj) => {
+                      //     gqlitedb::Value::Object(obj) => {
                       //       builder.push_record(keys.iter().map(|k| obj[k].to_string()));
                       //     },
                       //     _ => {
@@ -136,7 +136,7 @@ fn main_loop(rl: &mut rustyline::DefaultEditor) -> rustyline::Result<()>
                       // });
                       arr.iter().for_each(|row| match row
                       {
-                        gqlite::Value::Array(arr) =>
+                        gqlitedb::Value::Array(arr) =>
                         {
                           builder.push_record(arr.iter().map(|x| x.to_string()))
                         }
@@ -177,7 +177,7 @@ fn main() -> rustyline::Result<()>
 {
   // `()` can be used when no completer is required
   let mut rl = rustyline::DefaultEditor::new()?;
-  let gqlite_history = standard_paths::StandardPaths::new("gqlite-cmd", "gqlite.org")
+  let gqlite_history = standard_paths::StandardPaths::new("gqlitecli", "gqlite.org")
     .writable_location(standard_paths::LocationType::ConfigLocation)?
     .join("gqlite_history");
   if rl.load_history(&gqlite_history).is_err()

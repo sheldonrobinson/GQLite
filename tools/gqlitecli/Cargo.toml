@@ -1,10 +1,14 @@
 [package]
-name = "gqlite-cmd"
+name = "gqlitecli"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "gqlite"
+path = "src/main.rs"
+
 [dependencies]
-gqlitedb = { path = "../.." }
+gqlitedb = { version = "0.1", path = "../.." }
 rustyline = "14.0.0"
 standard_paths = "2.1.0"
 tabled = "0.15.0"

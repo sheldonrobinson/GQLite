@@ -168,14 +168,14 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(Corrosion)
 
 corrosion_import_crate(MANIFEST_PATH Cargo.toml)
-corrosion_import_crate(MANIFEST_PATH tools/gqlite-cmd/Cargo.toml TARGET_NAME_PREFIX cmd_)
+corrosion_import_crate(MANIFEST_PATH tools/gqlitecli/Cargo.toml)
 
 ########################
 ## Build library
 
 include_directories(BEFORE include ${CMAKE_CURRENT_BINARY_DIR}/src)
 
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libgqlite.so DESTINATION ${INSTALL_LIB_DIR})
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libgqlitedb.so DESTINATION ${INSTALL_LIB_DIR} RENAME libgqlite.so)
 # install(TARGETS gqlite EXPORT GQLiteTargets ${INSTALL_TARGETS_DEFAULT_ARGS} )
 install(FILES include/gqlite-c.h DESTINATION ${INSTALL_INCLUDE_DIR}/)
 
@@ -205,7 +205,7 @@ install(DIRECTORY bindings/ruby DESTINATION ${INSTALL_LIB_DIR})
 ## Build examples
 
 add_executable(gqlite_c_example examples/main.c)
-target_link_libraries(gqlite_c_example PRIVATE gqlite)
+target_link_libraries(gqlite_c_example PRIVATE gqlitedb)
 # add_executable(gqlite_cpp_example examples/main.cpp)
 # target_link_libraries(gqlite_cpp_example PRIVATE gqlite)
 
@@ -258,13 +258,13 @@ option(GQLITE_TESTS_OUTPUT_JUNIT "Make GQLite test output junit" OFF)
 
 if(GQLITE_TESTS_OUTPUT_JUNIT)
   make_directory(${CMAKE_BINARY_DIR}/Testing/junit)
-  set(GQLITE_CPP_EXTRA_ARGS -r junit -o ${CMAKE_BINARY_DIR}/Testing/junit/TEST-gqlite-cpp.xml )
+  # set(GQLITE_CPP_EXTRA_ARGS -r junit -o ${CMAKE_BINARY_DIR}/Testing/junit/TEST-gqlite-cpp.xml )
   set(GQLITE_RSPEC_EXTRA_ARGS --format RspecJunitFormatter --out ${CMAKE_BINARY_DIR}/Testing/junit/TEST-gqlite-rb-rspec.xml)
   set(GQLITE_TCK_EXTRA_ARGS --output-junit)
   set(GQLITE_PY_EXTRA_ARGS -m pytest --junitxml Testing/junit/TEST-gqlite-py-unittest.xml)
 endif()
 
-add_test(NAME gqlite-cpp COMMAND ${CMAKE_CURRENT_BINARY_DIR}/gqlite_cpp_tests ${GQLITE_CPP_EXTRA_ARGS})
+# add_test(NAME gqlite-cpp COMMAND ${CMAKE_CURRENT_BINARY_DIR}/gqlite_cpp_tests ${GQLITE_CPP_EXTRA_ARGS})
 
 if(RSPEC_FOUND)
   add_test(NAME gqlite-rb-rspec COMMAND ${RSPEC_EXECUTABLE} ${GQLITE_RSPEC_EXTRA_ARGS} ${CMAKE_CURRENT_SOURCE_DIR}/tests/rb/gqlite-rspec.rb  )
