@@ -935,7 +935,7 @@ mod tests
       .select_nodes(
         store.begin().unwrap().borrow_mut(),
         "default",
-        crate::store::SelectNodeQuery::select_keys([nodes[0].key].iter()),
+        crate::store::SelectNodeQuery::select_keys([nodes[0].key]),
       )
       .unwrap();
 
@@ -946,7 +946,7 @@ mod tests
       .select_nodes(
         store.begin().unwrap().borrow_mut(),
         "default",
-        crate::store::SelectNodeQuery::select_labels(["not".to_string()].iter()),
+        crate::store::SelectNodeQuery::select_labels(["not".to_string()]),
       )
       .unwrap();
 
@@ -995,12 +995,13 @@ mod tests
       .select_edges(
         store.begin().unwrap().borrow_mut(),
         "default",
-        crate::store::SelectEdgeQuery::select_keys([edge.key].iter()),
+        crate::store::SelectEdgeQuery::select_keys([edge.key]),
         graph::EdgeDirectivity::Directed,
       )
       .unwrap();
 
     assert_eq!(1, selected_edges.len());
-    assert_eq!(edge, selected_edges[0]);
+    assert_eq!(edge, selected_edges[0].edge);
+    assert!(!selected_edges[0].reversed);
   }
 }
