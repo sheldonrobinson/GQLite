@@ -51,8 +51,7 @@
     {
       "type": "cargo",
       "command": "build",
-      "args": [
-      ],
+      "args": [],
       "problemMatcher": [
         "$rustc"
       ],
@@ -61,13 +60,11 @@
       },
       "group": "build",
       "label": "rust: cargo build"
-    }
-    ,
+    },
     {
       "type": "cargo",
       "command": "test",
-      "args": [
-      ],
+      "args": [],
       "problemMatcher": [
         "$rustc"
       ],
@@ -76,6 +73,24 @@
       },
       "group": "test",
       "label": "GQLite: cargo test"
+    },
+    {
+      "type": "shell",
+      "command": "ruby",
+      "args": [
+        "gqlite-tck.rb"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}/tests/rb"
+      },
+      "problemMatcher": [
+        "$rustc"
+      ],
+      "presentation": {
+        "clear": true
+      },
+      "group": "test",
+      "label": "GQLite: tck"
     }
   ]
 }
