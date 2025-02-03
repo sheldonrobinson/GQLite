@@ -223,7 +223,6 @@ impl Validator
               Ok(())
             }
           }
-          Variable::Variant => Ok(()), // Cannot be checked at compile time
           _ => Err(
             CompileTimeError::VariableTypeConflict {
               name: var_name.to_owned(),
@@ -309,7 +308,6 @@ impl Validator
               Ok(true)
             }
           }
-          Variable::Variant => Ok(true), // Cannot be checked at compile time
           _ => Err(
             CompileTimeError::VariableTypeConflict {
               name: var_name.to_owned(),
@@ -355,7 +353,6 @@ impl Validator
               Ok(true)
             }
           }
-          Variable::Variant => Ok(true), // Cannot be checked at compile time
           _ => Err(
             CompileTimeError::VariableTypeConflict {
               name: var_name.to_owned(),
