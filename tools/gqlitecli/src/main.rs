@@ -1,5 +1,3 @@
-use std::borrow::BorrowMut;
-
 fn print_help()
 {
   println!(
@@ -156,10 +154,17 @@ fn main_loop(rl: &mut rustyline::DefaultEditor) -> rustyline::Result<()>
                     {}
                   }
                 }
-                Err(err) =>
+                Err(err) => match err
                 {
-                  println!("Query execution failed: {:?}", err);
-                }
+                  gqlitedb::Error::CompileTime(ct) =>
+                  {
+                    println!("Compilation error:\n{}", ct.to_string());
+                  }
+                  _ =>
+                  {
+                    println!("Query execution failed: {:?}", err);
+                  }
+                },
               }
             }
             None =>
@@ -183,7 +188,7 @@ fn main() -> rustyline::Result<()>
   if rl.load_history(&gqlite_history).is_err()
   {}
   println!("Enter '.help' for usage hints.");
-  match main_loop(rl.borrow_mut())
+  match main_loop(&mut rl)
   {
     Ok(_) =>
     {}
