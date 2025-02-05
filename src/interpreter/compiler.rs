@@ -15,6 +15,13 @@ use super::instructions::BlockMatch;
 
 static fake_variable_counter: AtomicU64 = AtomicU64::new(0);
 
+macro_rules! compile_binary_op {
+  ( $x:tt, $function_manager:tt, $instructions:tt, $aggregations:tt ) => {
+    compile_expression($function_manager, &$x.right, $instructions, $aggregations)?;
+    compile_expression($function_manager, &$x.left, $instructions, $aggregations)?;
+  };
+}
+
 fn compile_expression(
   function_manager: &functions::Manager,
   expression: &crate::parser::ast::Expression,
@@ -126,38 +133,123 @@ fn compile_expression(
         path: member_access.path.to_owned(),
       }
     }
+    ast::Expression::LogicalAnd(logical_and) =>
+    {
+      compile_binary_op!(logical_and, function_manager, instructions, aggregations);
+      Instruction::AndBinaryOperator
+    }
+    ast::Expression::LogicalOr(logical_or) =>
+    {
+      compile_binary_op!(logical_or, function_manager, instructions, aggregations);
+      Instruction::OrBinaryOperator
+    }
+    ast::Expression::LogicalXor(logical_xor) =>
+    {
+      compile_binary_op!(logical_xor, function_manager, instructions, aggregations);
+      Instruction::XorBinaryOperator
+    }
+    ast::Expression::RelationalEqual(relational_equal) =>
+    {
+      compile_binary_op!(
+        relational_equal,
+        function_manager,
+        instructions,
+        aggregations
+      );
+      Instruction::EqualBinaryOperator
+    }
     ast::Expression::RelationalDifferent(relational_different) =>
     {
-      compile_expression(
+      compile_binary_op!(
+        relational_different,
         function_manager,
-        &relational_different.right,
         instructions,
-        aggregations,
-      )?;
-      compile_expression(
-        function_manager,
-        &relational_different.left,
-        instructions,
-        aggregations,
-      )?;
+        aggregations
+      );
       Instruction::NotEqualBinaryOperator
+    }
+    ast::Expression::RelationalInferior(relational_inferior) =>
+    {
+      compile_binary_op!(
+        relational_inferior,
+        function_manager,
+        instructions,
+        aggregations
+      );
+      Instruction::InferiorBinaryOperator
+    }
+    ast::Expression::RelationalSuperior(relational_superior) =>
+    {
+      compile_binary_op!(
+        relational_superior,
+        function_manager,
+        instructions,
+        aggregations
+      );
+      Instruction::SuperiorBinaryOperator
+    }
+    ast::Expression::RelationalInferiorEqual(relational_inferior_equal) =>
+    {
+      compile_binary_op!(
+        relational_inferior_equal,
+        function_manager,
+        instructions,
+        aggregations
+      );
+      Instruction::InferiorEqualBinaryOperator
+    }
+    ast::Expression::RelationalSuperiorEqual(relational_superior_equal) =>
+    {
+      compile_binary_op!(
+        relational_superior_equal,
+        function_manager,
+        instructions,
+        aggregations
+      );
+      Instruction::SuperiorEqualBinaryOperator
     }
     ast::Expression::RelationalIn(relational_in) =>
     {
-      compile_expression(
-        function_manager,
-        &relational_in.right,
-        instructions,
-        aggregations,
-      )?;
-      compile_expression(
-        function_manager,
-        &relational_in.left,
-        instructions,
-        aggregations,
-      )?;
+      compile_binary_op!(relational_in, function_manager, instructions, aggregations);
       Instruction::InBinaryOperator
     }
+    ast::Expression::RelationalNotIn(relational_not_in) =>
+    {
+      compile_binary_op!(
+        relational_not_in,
+        function_manager,
+        instructions,
+        aggregations
+      );
+      Instruction::NotInBinaryOperator
+    }
+
+    ast::Expression::Addition(addition) =>
+    {
+      compile_binary_op!(addition, function_manager, instructions, aggregations);
+      Instruction::AdditionBinaryOperator
+    }
+    ast::Expression::Substraction(substraction) =>
+    {
+      compile_binary_op!(substraction, function_manager, instructions, aggregations);
+      Instruction::SubstractionBinaryOperator
+    }
+    ast::Expression::Multiplication(multiplication) =>
+    {
+      compile_binary_op!(multiplication, function_manager, instructions, aggregations);
+      Instruction::MultiplicationBinaryOperator
+    }
+    ast::Expression::Division(division) =>
+    {
+      compile_binary_op!(division, function_manager, instructions, aggregations);
+      Instruction::DivisionBinaryOperator
+    }
+    ast::Expression::Modulo(modulo) =>
+    {
+      compile_binary_op!(modulo, function_manager, instructions, aggregations);
+      Instruction::ModuloBinaryOperator
+    }
+
     ast::Expression::LogicalNegation(logical_negation) =>
     {
       compile_expression(

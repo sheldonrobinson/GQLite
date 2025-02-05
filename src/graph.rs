@@ -1,8 +1,11 @@
-use std::borrow::Borrow;
+use std::{
+  borrow::Borrow,
+  ops::{Add, Div, Mul, Rem, Sub},
+};
 
 use serde::{Deserialize, Serialize};
 
-use crate::error::InternalError;
+use crate::error::{InternalError, RunTimeError};
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum EdgeDirectivity
@@ -49,6 +52,14 @@ fn value_object_display(obj: &ValueObject, f: &mut std::fmt::Formatter<'_>) -> s
 
 impl Value
 {
+  pub(crate) fn is_null(&self) -> bool
+  {
+    match self
+    {
+      Value::Invalid => true,
+      _ => false,
+    }
+  }
   /// Return an object from the value, or an empty object
   pub fn to_object_safe(&self) -> ValueObject
   {
@@ -116,7 +127,123 @@ impl Value
       None => self.to_owned(),
     }
   }
+  pub(crate) fn partial_compare<E: crate::error::GenericErrors>(
+    &self,
+    rhs: &Self,
+  ) -> crate::Result<std::cmp::Ordering>
+  {
+    match self
+    {
+      Value::Invalid
+      | Value::Node(..)
+      | Value::Edge(..)
+      | Value::Array(..)
+      | Value::Object(..)
+      | Value::Path(..) => Err(E::not_comparable().into()),
+      Value::Boolean(lhs) => match rhs
+      {
+        Value::Boolean(rhs) => lhs.partial_cmp(rhs).ok_or(E::not_comparable().into()),
+        _ => Err(E::not_comparable().into()),
+      },
+      Value::Integer(lhs) => match rhs
+      {
+        Value::Integer(rhs) => lhs.partial_cmp(rhs).ok_or(E::not_comparable().into()),
+        Value::Float(rhs) => (*lhs as f64)
+          .partial_cmp(rhs)
+          .ok_or(E::not_comparable().into()),
+        _ => Err(E::not_comparable().into()),
+      },
+      Value::Float(lhs) => match rhs
+      {
+        Value::Integer(rhs) => lhs
+          .partial_cmp(&(*rhs as f64))
+          .ok_or(E::not_comparable().into()),
+        Value::Float(rhs) => lhs.partial_cmp(rhs).ok_or(E::not_comparable().into()),
+        _ => Err(E::not_comparable().into()),
+      },
+      Value::String(lhs) => match rhs
+      {
+        Value::String(rhs) => lhs.partial_cmp(rhs).ok_or(E::not_comparable().into()),
+        _ => Err(E::not_comparable().into()),
+      },
+    }
+  }
 }
+
+impl Add for Value
+{
+  type Output = crate::Result<Value>;
+  fn add(self, rhs: Self) -> Self::Output
+  {
+    match self
+    {
+      Value::Invalid
+      | Value::Boolean(..)
+      | Value::Node(..)
+      | Value::Edge(..)
+      | Value::Array(..)
+      | Value::Object(..)
+      | Value::Path(..) => Err(RunTimeError::InvalidBinaryOperands.into()),
+      Self::Float(lhs) => match rhs
+      {
+        Self::Float(rhs) => Ok((lhs + rhs).into()),
+        Self::Integer(rhs) => Ok((lhs + rhs as f64).into()),
+        _ => Err(RunTimeError::InvalidBinaryOperands.into()),
+      },
+      Self::Integer(lhs) => match rhs
+      {
+        Self::Float(rhs) => Ok((lhs as f64 + rhs).into()),
+        Self::Integer(rhs) => Ok((lhs + rhs).into()),
+        _ => Err(RunTimeError::InvalidBinaryOperands.into()),
+      },
+      Self::String(lhs) => match rhs
+      {
+        Self::String(rhs) => Ok((lhs + &rhs).into()),
+        _ => Err(RunTimeError::InvalidBinaryOperands.into()),
+      },
+    }
+  }
+}
+
+macro_rules! impl_mdsr {
+  ($x:tt, $op:tt) => {
+    impl $x for Value
+    {
+      type Output = crate::Result<Value>;
+      fn $op(self, rhs: Self) -> Self::Output
+      {
+        match self
+        {
+          Value::Invalid
+          | Value::Boolean(..)
+          | Value::String(..)
+          | Value::Node(..)
+          | Value::Edge(..)
+          | Value::Array(..)
+          | Value::Object(..)
+          | Value::Path(..) => Err(RunTimeError::InvalidBinaryOperands.into()),
+          Self::Float(lhs) => match rhs
+          {
+            Self::Float(rhs) => Ok(lhs.$op(rhs).into()),
+            Self::Integer(rhs) => Ok(lhs.$op(rhs as f64).into()),
+            _ => Err(RunTimeError::InvalidBinaryOperands.into()),
+          },
+          Self::Integer(lhs) => match rhs
+          {
+            Self::Float(rhs) => Ok((lhs as f64).$op(rhs).into()),
+            Self::Integer(rhs) => Ok(lhs.$op(rhs).into()),
+            _ => Err(RunTimeError::InvalidBinaryOperands.into()),
+          },
+        }
+      }
+    }
+  };
+}
+
+impl_mdsr!(Mul, mul);
+impl_mdsr!(Sub, sub);
+impl_mdsr!(Div, div);
+impl_mdsr!(Rem, rem);
 
 impl std::fmt::Display for Value
 {
@@ -159,7 +286,7 @@ impl ValueTryIntoRef<Value> for Value
 }
 
 macro_rules! impl_to_value {
-  ($type:ty, $vn:tt) => {
+  ($type:ty, $vn:tt $(, null_into: $null_into:tt)?) => {
     impl Into<Value> for $type
     {
       fn into(self) -> Value
@@ -174,6 +301,7 @@ macro_rules! impl_to_value {
       {
         match self
         {
+          $(Value::Invalid => Ok($null_into),)?
           Value::$vn(v) => Ok(v),
           _ => Err(InternalError::InvalidValueCast.into()),
         }
@@ -194,7 +322,7 @@ macro_rules! impl_to_value {
   };
 }
 
-impl_to_value!(bool, Boolean);
+impl_to_value!(bool, Boolean, null_into: false);
 impl_to_value!(i64, Integer);
 impl_to_value!(f64, Float);
 impl_to_value!(String, String);

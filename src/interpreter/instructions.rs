@@ -57,10 +57,21 @@ pub(crate) enum Instruction
   Drop,
   AndBinaryOperator,
   OrBinaryOperator,
+  XorBinaryOperator,
   NotUnaryOperator,
   EqualBinaryOperator,
   NotEqualBinaryOperator,
+  InferiorBinaryOperator,
+  SuperiorBinaryOperator,
+  InferiorEqualBinaryOperator,
+  SuperiorEqualBinaryOperator,
   InBinaryOperator,
+  NotInBinaryOperator,
+  AdditionBinaryOperator,
+  SubstractionBinaryOperator,
+  MultiplicationBinaryOperator,
+  DivisionBinaryOperator,
+  ModuloBinaryOperator,
 }
 
 pub(crate) type Instructions = Vec<Instruction>;

@@ -8,10 +8,10 @@
             "name": "gqlite c++ (gdb)",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${env:LRS_PKG_ROOT}/host-build-debug/gqlite/gqlite_cpp_tests",
+            "program": "${env:CC_PKG_ROOT}/host-build-debug/gqlite/gqlite_cpp_tests",
             "args": [],
             "stopAtEntry": false,
-            "cwd": "${env:LRS_PKG_ROOT}/src/gqlite/tests/",
+            "cwd": "${env:CC_PKG_ROOT}/src/gqlite/tests/",
             "environment": [],
             "externalConsole": false,
             "MIMode": "gdb",
@@ -33,7 +33,7 @@
             "name": "gqlite cmd (gdb)",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${env:LRS_PKG_ROOT}/host-build-debug/gqlite/cargo/build/x86_64-unknown-linux-gnu/debug/gqlitecli",
+            "program": "${env:CC_PKG_ROOT}/host-build-debug/gqlite/gqlite",
             "args": [],
             "stopAtEntry": false,
             "cwd": "/tmp",
@@ -60,11 +60,11 @@
             "request": "launch",
             "program": "/usr/bin/ruby",
             "args": [
-                "${env:LRS_PKG_ROOT}/src/gqlite/tests/rb/gqlite-tck.rb",
+                "${env:CC_PKG_ROOT}/src/gqlite/tests/rb/gqlite-tck.rb",
                 "--abort-on-first-error"
             ],
             "stopAtEntry": false,
-            "cwd": "${env:LRS_PKG_ROOT}/src/gqlite/tests/rb",
+            "cwd": "${env:CC_PKG_ROOT}/src/gqlite/tests/rb",
             "environment": [
                 {
                     "name": "RUST_BACKTRACE",
@@ -94,10 +94,10 @@
             "program": "/usr/bin/ruby",
             "args": [
                 "/usr/bin/rspec",
-                "${env:LRS_PKG_ROOT}/src/gqlite/tests/rb/gqlite-rspec.rb"
+                "${env:CC_PKG_ROOT}/src/gqlite/tests/rb/gqlite-rspec.rb"
             ],
             "stopAtEntry": false,
-            "cwd": "${env:LRS_PKG_ROOT}/src/gqlite/tests/rb",
+            "cwd": "${env:CC_PKG_ROOT}/src/gqlite/tests/rb",
             "environment": [],
             "externalConsole": false,
             "MIMode": "gdb",
@@ -121,10 +121,10 @@
             "request": "launch",
             "program": "/usr/bin/ruby",
             "args": [
-                "${env:LRS_PKG_ROOT}/src/gqlite/tests/rb/gqlite-bench.rb"
+                "${env:CC_PKG_ROOT}/src/gqlite/tests/rb/gqlite-bench.rb"
             ],
             "stopAtEntry": false,
-            "cwd": "${env:LRS_PKG_ROOT}/src/gqlite/tests/rb",
+            "cwd": "${env:CC_PKG_ROOT}/src/gqlite/tests/rb",
             "environment": [],
             "externalConsole": false,
             "MIMode": "gdb",

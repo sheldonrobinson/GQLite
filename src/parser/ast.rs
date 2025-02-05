@@ -157,8 +157,23 @@ pub(crate) enum Expression
   Value(Value),
   Variable(Variable),
 
+  LogicalAnd(Box<LogicalAnd>),
+  LogicalOr(Box<LogicalOr>),
+  LogicalXor(Box<LogicalXor>),
+  RelationalEqual(Box<RelationalEqual>),
   RelationalDifferent(Box<RelationalDifferent>),
+  RelationalInferior(Box<RelationalInferior>),
+  RelationalSuperior(Box<RelationalSuperior>),
+  RelationalInferiorEqual(Box<RelationalInferiorEqual>),
+  RelationalSuperiorEqual(Box<RelationalSuperiorEqual>),
   RelationalIn(Box<RelationalIn>),
+  RelationalNotIn(Box<RelationalNotIn>),
+
+  Addition(Box<Addition>),
+  Substraction(Box<Substraction>),
+  Multiplication(Box<Multiplication>),
+  Division(Box<Division>),
+  Modulo(Box<Modulo>),
 
   LogicalNegation(Box<LogicalNegation>),
   IsNull(Box<IsNull>),
@@ -396,7 +411,6 @@ pub(crate) struct FunctionCall
   pub(crate) arguments: Vec<Expression>,
 }
 
-#[macro_export]
 macro_rules! create_binary_op {
   ( $x:tt ) => {
     #[derive(Debug, Clone, PartialEq)]
@@ -405,23 +419,15 @@ macro_rules! create_binary_op {
       pub(crate) left: Expression,
       pub(crate) right: Expression,
     }
+
+    impl Into<Expression> for $x
+    {
+      fn into(self) -> Expression
+      {
+        Expression::$x(Box::new(self))
+      }
+    }
   };
-}
-
-impl Into<Expression> for RelationalDifferent
-{
-  fn into(self) -> Expression
-  {
-    Expression::RelationalDifferent(Box::new(self))
-  }
-}
-
-impl Into<Expression> for RelationalIn
-{
-  fn into(self) -> Expression
-  {
-    Expression::RelationalIn(Box::new(self))
-  }
 }
 
 create_binary_op! {LogicalAnd}

@@ -35,6 +35,8 @@ pub enum CompileTimeError
   },
   #[error("NoSingleRelationshipType: an edge type need to be specified.")]
   NoSingleRelationshipType,
+  #[error("NotComparable: values are not comparable.")]
+  NotComparable,
   #[error("UnknownFunction: {name}")]
   UnknownFunction
   {
@@ -77,9 +79,18 @@ pub enum RunTimeError
     expected_type: &'static str,
     value: String,
   },
+  #[error("NotComparable: values are not comparable.")]
+  NotComparable,
   /// Edge has no label
   #[error("MissingEdgeLabel")]
   MissingEdgeLabel,
+  #[error("UnknownFunction: {name}")]
+  UnknownFunction
+  {
+    name: String
+  },
+  #[error("InvalidBinaryOperands: operands for binary operation are not compatible.")]
+  InvalidBinaryOperands,
 }
 
 /// Internal errors, should be treated as bugs.
@@ -212,6 +223,7 @@ impl From<pest::error::Error<crate::parser::Rule>> for Error
 pub(crate) trait GenericErrors: Into<Error>
 {
   fn unknown_function(name: impl Into<String>) -> Self;
+  fn not_comparable() -> Self;
 }
 
 impl GenericErrors for CompileTimeError
@@ -219,5 +231,21 @@ impl GenericErrors for CompileTimeError
   fn unknown_function(name: impl Into<String>) -> Self
   {
     Self::UnknownFunction { name: name.into() }
+  }
+  fn not_comparable() -> Self
+  {
+    Self::NotComparable
+  }
+}
+
+impl GenericErrors for RunTimeError
+{
+  fn unknown_function(name: impl Into<String>) -> Self
+  {
+    Self::UnknownFunction { name: name.into() }
+  }
+  fn not_comparable() -> Self
+  {
+    Self::NotComparable
   }
 }
