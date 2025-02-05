@@ -249,7 +249,16 @@ fn compile_expression(
       compile_binary_op!(modulo, function_manager, instructions, aggregations);
       Instruction::ModuloBinaryOperator
     }
-
+    ast::Expression::Negation(logical_negation) =>
+    {
+      compile_expression(
+        function_manager,
+        &logical_negation.value,
+        instructions,
+        aggregations,
+      )?;
+      Instruction::NegationUnaryOperator
+    }
     ast::Expression::LogicalNegation(logical_negation) =>
     {
       compile_expression(
@@ -263,10 +272,13 @@ fn compile_expression(
     ast::Expression::IsNull(is_null) =>
     {
       compile_expression(function_manager, &is_null.value, instructions, aggregations)?;
-      instructions.push(Instruction::Push {
-        value: graph::Value::Invalid,
-      });
-      Instruction::EqualBinaryOperator
+      Instruction::IsNullUnaryOperator
+    }
+    ast::Expression::IsNotNull(is_null) =>
+    {
+      compile_expression(function_manager, &is_null.value, instructions, aggregations)?;
+      instructions.push(Instruction::IsNullUnaryOperator);
+      Instruction::NotUnaryOperator
     }
   };
   instructions.push(expr);

@@ -467,6 +467,16 @@ fn eval_instructions(
         let a: bool = stack.try_pop_into()?;
         stack.push((!a).into());
       }
+      &instructions::Instruction::NegationUnaryOperator =>
+      {
+        let a: crate::graph::Value = stack.try_pop_into()?;
+        stack.push((-a)?.into());
+      }
+      &instructions::Instruction::IsNullUnaryOperator =>
+      {
+        let a: crate::graph::Value = stack.try_pop_into()?;
+        stack.push((a.is_null()).into());
+      }
       &instructions::Instruction::EqualBinaryOperator =>
       {
         execute_binary_operator(stack, |a, b| Ok(a == b))?;

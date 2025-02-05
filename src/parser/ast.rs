@@ -175,8 +175,10 @@ pub(crate) enum Expression
   Division(Box<Division>),
   Modulo(Box<Modulo>),
 
+  Negation(Box<Negation>),
   LogicalNegation(Box<LogicalNegation>),
   IsNull(Box<IsNull>),
+  IsNotNull(Box<IsNotNull>),
 }
 
 // Order By Expression
@@ -456,23 +458,14 @@ macro_rules! create_unary_op {
     {
       pub(crate) value: Expression,
     }
+    impl Into<Expression> for $x
+    {
+      fn into(self) -> Expression
+      {
+        Expression::$x(Box::new(self))
+      }
+    }
   };
-}
-
-impl Into<Expression> for LogicalNegation
-{
-  fn into(self) -> Expression
-  {
-    Expression::LogicalNegation(Box::new(self))
-  }
-}
-
-impl Into<Expression> for IsNull
-{
-  fn into(self) -> Expression
-  {
-    Expression::IsNull(Box::new(self))
-  }
 }
 
 create_unary_op! {LogicalNegation}
