@@ -171,13 +171,18 @@ corrosion_import_crate(MANIFEST_PATH Cargo.toml)
 corrosion_import_crate(MANIFEST_PATH tools/gqlitecli/Cargo.toml)
 
 ########################
-## Build library
+## Install library
 
 include_directories(BEFORE include ${CMAKE_CURRENT_BINARY_DIR}/src)
 
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libgqlitedb.so DESTINATION ${INSTALL_LIB_DIR} RENAME libgqlite.so)
 # install(TARGETS gqlite EXPORT GQLiteTargets ${INSTALL_TARGETS_DEFAULT_ARGS} )
 install(FILES include/gqlite-c.h DESTINATION ${INSTALL_INCLUDE_DIR}/)
+
+########################
+## Install cmd line tool
+
+INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/gqlite DESTINATION ${INSTALL_BIN_DIR} PERMISSIONS OWNER_EXECUTE GROUP_EXECUTE WORLD_EXECUTE)
 
 ########################
 ## Build python
