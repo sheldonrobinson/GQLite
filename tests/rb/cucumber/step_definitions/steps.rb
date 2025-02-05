@@ -187,9 +187,9 @@ IgnoredScenario = [
   "[24] Fail when creating a relationship using undefined variable in pattern",
   # Variable lenght not supported
   "[22] Fail when creating a variable-length relationship",
+  "[14] Fail when filtering path with property predicate",
   # # Path assignment is not implemented yet
   # "[4] Forwarding a path variable",
-  # "[14] Fail when filtering path with property predicate",
   # "[8] `labels()` failing on a path",
   # "[5] Fail for `size()` on paths",
   # "[3] Delete relationship with bidirectional matching",
@@ -197,8 +197,6 @@ IgnoredScenario = [
   # "[14] Direction of traversed relationship is not significant for path equality, simple",
   # "[12] Aggregation of named paths",
   # # p = ()-[]->() not supported (named path)
-  # "[12] Filter path with path length predicate on multi variables with one binding",
-  # "[13] Filter path with false path length predicate on multi variables with one binding",
   # "[16] Optionally matching named paths - null result",
   # "[17] Optionally matching named paths - existing result",
   # "[18] Named paths inside optional matches with node predicates",
