@@ -202,8 +202,8 @@ IgnoredScenario = [
   # "[18] Named paths inside optional matches with node predicates",
   # "[9] `labels()` failing on invalid arguments",
   # "[6] `type()` failing on invalid arguments",
-  # # paths are not supported in where
-  # "[2] Join with disjunctive multi-part predicates including patterns",
+  # paths are not supported in where
+  "[2] Join with disjunctive multi-part predicates including patterns",
   # Path assignment and variable length path are not implemented
   "[8] Fail when a path has the same variable in a preceding MATCH",
   "[9] Fail when a relationship has the same variable in the same pattern",

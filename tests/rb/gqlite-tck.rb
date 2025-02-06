@@ -37,6 +37,8 @@ features = [
   'create/Create1', 'create/Create2', 'create/Create3',
   # Match
   'match/Match1', 'match/Match2', 'match/Match3', 'match/Match7',
+  # MatchWhere
+  'match-where/MatchWhere1', 'match-where/MatchWhere2', 'match-where/MatchWhere3', 'match-where/MatchWhere4',
 ]
 
 expressions = [
@@ -45,7 +47,8 @@ expressions = [
 
 # In progress
 # gql = []
-# features = []
+# features = [
+# ]
 # expressions = []
 # Current dev
 # gql = []
@@ -61,10 +64,6 @@ expressions = [
 # Validated
 # gql = ['Graph1']
 # features = [
-#   # Match
-#   'match/Match2', 'match/Match3', 'match/Match7',
-#   # MatchWhere
-#   'match-where/MatchWhere1', 'match-where/MatchWhere2', 'match-where/MatchWhere3', 'match-where/MatchWhere4',
 #   # WITH
 #   'with/With1', 'with/With2', 'with/With3', 'with/With4',
 #   # DELETE
