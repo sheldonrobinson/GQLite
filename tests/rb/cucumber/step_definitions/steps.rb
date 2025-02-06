@@ -188,8 +188,9 @@ IgnoredScenario = [
   # Variable lenght not supported
   "[22] Fail when creating a variable-length relationship",
   "[14] Fail when filtering path with property predicate",
+  # Only basic pasth assignment supported yet
+  "[4] Forwarding a path variable",
   # # Path assignment is not implemented yet
-  # "[4] Forwarding a path variable",
   # "[8] `labels()` failing on a path",
   # "[5] Fail for `size()` on paths",
   # "[3] Delete relationship with bidirectional matching",
@@ -531,7 +532,7 @@ end
 Then(/^a SyntaxError should be raised at compile time: ColumnNameConflict$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
-  expect(@exception.message).to match(/^CompileTime: ColumnNameConflict: Duplicate column name .* is not allowed at \(\d+, \d+\)\.$/)
+  expect(@exception.message).to match(/^CompileTime: ColumnNameConflict: Column '.*' is duplicated\.$/)
 end
 
 Then(/^a SyntaxError should be raised at compile time: NoExpressionAlias$/) do

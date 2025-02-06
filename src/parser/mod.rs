@@ -686,6 +686,11 @@ fn build_ast_from_statement(
         modifiers: ast::Modifiers::default(),
       }))
     }
+    Rule::return_all_statement => Ok(ast::Statement::Return(ast::Return {
+      all: true,
+      expressions: Default::default(),
+      modifiers: ast::Modifiers::default(),
+    })),
     Rule::with_statement =>
     {
       let mut all = false;

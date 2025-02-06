@@ -44,6 +44,11 @@ pub enum CompileTimeError
   },
   #[error("InvalidAggregation: aggregation is not accepted in this expression.")]
   InvalidAggregation,
+  #[error("ColumnNameConflict: Column '{name}' is duplicated.")]
+  ColumnNameConflict
+  {
+    name: String
+  },
 }
 
 /// Runtime errors.
