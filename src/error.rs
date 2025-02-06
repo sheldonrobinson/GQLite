@@ -42,6 +42,8 @@ pub enum CompileTimeError
   {
     name: String
   },
+  #[error("InvalidAggregation: aggregation is not accepted in this expression.")]
+  InvalidAggregation,
 }
 
 /// Runtime errors.
