@@ -4,6 +4,10 @@
 
 ## [Unreleased] - ReleaseDate
 
+- Support for aggregation (count)
+- Improved support for WHERE and WITH
+- Most binary/unary expressions are supported
+
 ## [0.1.0] - 2025-02-01
 
 - Basic support Create/Match
