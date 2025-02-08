@@ -4,6 +4,9 @@
 
 ## [Unreleased] - ReleaseDate
 
+- `persy` backend is removed
+- `redb` backend
+
 ## [0.1.1] - 2025-02-06
 
 - Support for aggregation (count)

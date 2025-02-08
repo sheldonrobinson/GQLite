@@ -354,7 +354,7 @@ impl_to_value!(Vec<Value>, Array);
 #[derive(Debug, Eq, PartialEq, Clone, Copy, Hash)]
 pub struct Key
 {
-  uuid: u128,
+  pub(crate) uuid: u128,
 }
 
 impl Serialize for Key
