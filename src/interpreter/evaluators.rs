@@ -1091,14 +1091,14 @@ pub(crate) fn eval_program(
                   {
                     let mut n = n.to_owned();
                     n.properties.update_value(piter.next(), piter, value)?;
-                    store.update_node(&mut tx, graph_name, n.to_owned())?;
+                    store.update_node(&mut tx, graph_name, &n)?;
                     out_row.insert(target.to_owned(), n.into());
                   }
                   graph::Value::Edge(e) =>
                   {
                     let mut e = e.to_owned();
                     e.properties.update_value(piter.next(), piter, value)?;
-                    store.update_edge(&mut tx, graph_name, e.to_owned())?;
+                    store.update_edge(&mut tx, graph_name, &e)?;
                     out_row.insert(target.to_owned(), e.into());
                   }
                   graph::Value::Invalid =>
