@@ -5,14 +5,15 @@ use crate::graph;
 #[derive(Debug)]
 pub(crate) enum Statement
 {
-  CreateGraph(CreateGraph),
-  UseGraph(UseGraph),
+  // CreateGraph(CreateGraph),
+  // UseGraph(UseGraph),
   Create(Create),
   Match(Match),
   Return(Return),
   Call(Call),
   With(With),
   Unwind(Unwind),
+  Delete(Delete),
 }
 
 pub(crate) type Statements = Vec<Statement>;
@@ -73,19 +74,19 @@ pub(crate) struct Unwind
 pub(crate) struct Delete
 {
   pub(crate) detach: bool,
-  pub(crate) expressions: Vec<Node>,
+  pub(crate) expressions: Vec<Expression>,
 }
 
 #[derive(Debug)]
 pub(crate) struct Set
 {
-  pub(crate) expressions: Vec<Node>,
+  pub(crate) expressions: Vec<Expression>,
 }
 
 #[derive(Debug)]
 pub(crate) struct Remove
 {
-  pub(crate) expressions: Vec<Node>,
+  pub(crate) expressions: Vec<Expression>,
 }
 
 #[derive(Debug)]

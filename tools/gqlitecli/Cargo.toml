@@ -1,6 +1,6 @@
 [package]
 name = "gqlitecli"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2021"
 license = "MIT"
 description = "Command Line Interface tool for GQLite"
@@ -13,7 +13,7 @@ name = "gqlite"
 path = "src/main.rs"
 
 [dependencies]
-gqlitedb = { version = "0.1.1", path = "../.." }
+gqlitedb = { version = "0.2.0", path = "../.." }
 rustyline = "15"
 standard_paths = "2.1.0"
 tabled = "0.17"

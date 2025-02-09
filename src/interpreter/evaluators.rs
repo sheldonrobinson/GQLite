@@ -1014,6 +1014,44 @@ pub(crate) fn eval_program(
         }
         input_table = output_table;
       }
+      instructions::Block::Delete {
+        detach,
+        instructions,
+      } =>
+      {
+        let mut nodes_keys = Vec::<graph::Key>::new();
+        let mut edges_keys = Vec::<graph::Key>::new();
+        for row in input_table.iter()
+        {
+          for instructions in instructions.iter()
+          {
+            let mut stack = Stack::default();
+            eval_instructions(&mut stack, row, &instructions, &parameters)?;
+            let value: graph::Value = stack.try_pop_into()?;
+            match value
+            {
+              graph::Value::Node(node) => nodes_keys.push(node.key),
+              graph::Value::Edge(edge) => edges_keys.push(edge.key),
+              graph::Value::Invalid =>
+              {}
+              _ => return Err(RunTimeError::InvalidDelete.into()),
+            }
+          }
+        }
+
+        store.delete_edges(
+          &mut tx,
+          "default",
+          store::SelectEdgeQuery::select_keys(edges_keys),
+          graph::EdgeDirectivity::Directed,
+        )?;
+        store.delete_nodes(
+          &mut tx,
+          "default",
+          store::SelectNodeQuery::select_keys(nodes_keys),
+          detach,
+        )?;
+      }
       instructions::Block::Call { arguments: _, name } =>
       {
         if name == "gqlite.internal.stats"

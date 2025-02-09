@@ -723,7 +723,7 @@ fn build_ast_from_statement(
         .into_inner()
         .next()
         .ok_or_else(|| InternalError::MissingPair {
-          context: "build_ast_from_statement/inner",
+          context: "build_ast_from_statement/unwind_statement",
         })?;
 
       let ne = match pair.as_rule()
@@ -740,6 +740,36 @@ fn build_ast_from_statement(
       Ok(ast::Statement::Unwind(ast::Unwind {
         expression: ne.expression,
         name: ne.name,
+      }))
+    }
+    Rule::delete_statement | Rule::detach_delete_statement =>
+    {
+      let detach = match pair.as_rule()
+      {
+        Rule::delete_statement => false,
+        Rule::detach_delete_statement => true,
+        _ =>
+        {
+          return Err(
+            InternalError::UnexpectedPair {
+              context: "build_ast_from_statement/delete_statement",
+              pair: pair.to_string(),
+            }
+            .into(),
+          )
+        }
+      };
+
+      let pairs = pair.into_inner();
+
+      let expressions = pairs
+        .into_iter()
+        .map(|pair| build_expression(pair.into_inner(), pratt))
+        .collect::<Result<_>>()?;
+
+      Ok(ast::Statement::Delete(ast::Delete {
+        detach,
+        expressions,
       }))
     }
     Rule::call_statement =>

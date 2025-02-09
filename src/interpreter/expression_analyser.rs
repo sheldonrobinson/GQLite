@@ -22,6 +22,7 @@ pub(crate) enum ExpressionType
   Variant,
 }
 
+#[derive(Debug)]
 pub(crate) struct ExpressionInfo
 {
   pub(crate) expression_type: ExpressionType,

@@ -49,6 +49,8 @@ pub enum CompileTimeError
   {
     name: String
   },
+  #[error("InvalidDelete: invalid delete argument, expected node or edge.")]
+  InvalidDelete,
 }
 
 /// Runtime errors.
@@ -100,6 +102,10 @@ pub enum RunTimeError
   InvalidBinaryOperands,
   #[error("InvalidNegationOperands: operands for negation operation are not compatible.")]
   InvalidNegationOperands,
+  #[error("InvalidDelete: invalid delete argument, expected node or edge.")]
+  InvalidDelete,
+  #[error("DeleteConnectedNode: node is still connected and cannot be deleted.")]
+  DeleteConnectedNode,
 }
 
 /// Internal errors, should be treated as bugs.
@@ -172,6 +178,11 @@ pub enum InternalError
   EmptyStack,
   #[error("Invalid value cast")]
   InvalidValueCast,
+  #[error("Code is not reachable in {context}.")]
+  Unreachable
+  {
+    context: &'static str
+  },
 }
 
 /// GQLite errors

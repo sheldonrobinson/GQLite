@@ -39,8 +39,11 @@ features = [
   'match/Match1', 'match/Match2', 'match/Match3', 'match/Match7',
   # MatchWhere
   'match-where/MatchWhere1', 'match-where/MatchWhere2', 'match-where/MatchWhere3', 'match-where/MatchWhere4',
-   # WITH
-   'with/With1', 'with/With2',  'with/With4',
+  # WITH
+  'with/With1', 'with/With2',  'with/With4',
+  # DELETE
+  'delete/Delete1', 'delete/Delete2',
+
 ]
 
 expressions = [
@@ -66,8 +69,6 @@ expressions = [
 # Validated
 # gql = ['Graph1']
 # features = [
-#   # DELETE
-#   'delete/Delete1', 'delete/Delete2',
 #   # SET
 #   'set/Set1', 'set/Set2', 'set/Set3', 'set/Set4', 'set/Set5',
 #   # REMOVE

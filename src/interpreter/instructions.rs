@@ -154,4 +154,9 @@ pub(crate) enum Block
     name: String,
     instructions: Instructions,
   },
+  Delete
+  {
+    detach: bool,
+    instructions: Vec<Instructions>,
+  },
 }
