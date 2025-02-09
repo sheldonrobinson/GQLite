@@ -78,7 +78,7 @@ function_name  =  { ident ~ ("." ~ ident)* }
 
 set_expression       = _{ set_eq_expression | set_label_expression }
 set_eq_expression    =  { member_access ~ "=" ~ expression }
-set_label_expression =  { expression ~ (":" ~ ident)+ }
+set_label_expression =  { ident ~ (":" ~ ident)+ }
 
 expression = { prefix? ~ expression_term ~ postfix? ~ (infix ~ prefix? ~ expression_term ~ postfix?)* }
 

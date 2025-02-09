@@ -794,9 +794,10 @@ fn build_ast_from_statement(
           }
           Rule::set_label_expression =>
           {
-            println!("pair {:#?}", pair);
-            println!("see");
-            todo!()
+            let mut pair = pair.into_inner();
+            let target = pair.try_next()?.as_str().to_string();
+            let labels = pair.map(|el| el.as_str().to_string()).collect();
+            updates.push(ast::OneUpdate::AddLabels(ast::AddLabels { target, labels }));
           }
           unknown_expression => Err(crate::Error::UnxpectedExpression(
             "build_ast_from_statement/set_statement",
