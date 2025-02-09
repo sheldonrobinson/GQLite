@@ -4,6 +4,9 @@
 
 ## [Unreleased] - ReleaseDate
 
+- Change in backend serialization.
+- Support for SET to add properties and labels
+
 ## [0.2.0] - 2025-02-08
 
 - `persy` backend is removed
