@@ -36,7 +36,19 @@ modifiers      = { limit }
 where_modifier = { "WHERE" ~ expression }
 
 // Statements
-statement = { create_statement | optional_match_statement | match_statement | return_statement | return_all_statement | call_statement | with_statement | unwind_statement | delete_statement | detach_delete_statement }
+statement = {
+    create_statement
+  | optional_match_statement
+  | match_statement
+  | return_statement
+  | return_all_statement
+  | call_statement
+  | with_statement
+  | unwind_statement
+  | delete_statement
+  | detach_delete_statement
+  | set_statement
+}
 
 star = { "*" }
 
@@ -50,6 +62,7 @@ with_statement           = { "WITH" ~ (star | named_expression) ~ ("," ~ named_e
 unwind_statement         = { "UNWIND" ~ named_expression }
 delete_statement         = { "DELETE" ~ expression ~ ("," ~ expression)* }
 detach_delete_statement  = { "DETACH" ~ "DELETE" ~ expression ~ ("," ~ expression)* }
+set_statement            = { "SET" ~ set_expression ~ ("," ~ set_expression)* }
 
 // literals
 int            = @{ ("+" | "-")? ~ ('0'..'9')+ }
@@ -62,6 +75,10 @@ inner          = @{ char* }
 function_name  =  { ident ~ ("." ~ ident)* }
 
 // Expression
+
+set_expression       = _{ set_eq_expression | set_label_expression }
+set_eq_expression    =  { member_access ~ "=" ~ expression }
+set_label_expression =  { expression ~ (":" ~ ident)+ }
 
 expression = { prefix? ~ expression_term ~ postfix? ~ (infix ~ prefix? ~ expression_term ~ postfix?)* }
 
@@ -101,7 +118,7 @@ count_star               = { "count" ~ "(" ~ "*" ~ ")" }
 expression_term          = { null_lit | true_lit | false_lit | num | int | string_literal | map | array | member_access | label_check_expression | parameter | parenthesised_expression | function_call | count_star | ident }
 
 parameter     = { "$" ~ parameter_name }
-member_access = { ident ~ ("." ~ ident)+ }
+member_access = { "("? ~ ident ~ ")"? ~ ("." ~ ident)+ }
 
 pair = { ident ~ ":" ~ expression }
 

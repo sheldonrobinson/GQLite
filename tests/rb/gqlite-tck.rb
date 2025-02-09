@@ -43,6 +43,8 @@ features = [
   'with/With1', 'with/With2',  'with/With4',
   # DELETE
   'delete/Delete1', 'delete/Delete2',
+  # SET
+  'set/Set1', 'set/Set2',
 
 ]
 
@@ -53,6 +55,8 @@ expressions = [
 # In progress
 # gql = []
 # features = [
+#   # SET
+#   'set/Set3', 'set/Set4', 'set/Set5',
 # ]
 # expressions = []
 # Current dev
@@ -69,8 +73,6 @@ expressions = [
 # Validated
 # gql = ['Graph1']
 # features = [
-#   # SET
-#   'set/Set1', 'set/Set2', 'set/Set3', 'set/Set4', 'set/Set5',
 #   # REMOVE
 #   'remove/Remove1', 'remove/Remove2',
 #   # RETURN ORDER BY

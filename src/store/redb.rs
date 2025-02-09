@@ -281,6 +281,22 @@ impl Store
     }
     Ok(())
   }
+  /// Create nodes and add them to a graph
+  pub(crate) fn update_node(
+    &self,
+    transaction: &mut redb::WriteTransaction,
+    graph_name: impl Into<String>,
+    node: graph::Node,
+  ) -> Result<()>
+  {
+    let graph_name = graph_name.into();
+    let graph_info = self.graphs.get(&graph_name).unwrap();
+    let mut table = transaction.open_table(graph_info.nodes_table_definition())?;
+    let mut data = Vec::<u8>::new();
+    ciborium::into_writer(&node, &mut data)?;
+    table.insert(node.key, data.as_slice())?;
+    Ok(())
+  }
   /// Delete nodes according to a given query
   pub(crate) fn delete_nodes(
     &self,
@@ -511,6 +527,30 @@ impl Store
       keys.push(x.key);
       table_destination.insert(x.destination.key, keys)?;
     }
+    Ok(())
+  }
+  pub(crate) fn update_edge(
+    &self,
+    transaction: &mut redb::WriteTransaction,
+    graph_name: impl Into<String>,
+    edge: graph::Edge,
+  ) -> Result<()>
+  {
+    let graph_name = graph_name.into();
+    let graph_info = self.graphs.get(&graph_name).unwrap();
+    let mut table = transaction.open_table(graph_info.edges_table_definition())?;
+    let mut data = Vec::<u8>::new();
+    ciborium::into_writer(
+      &PersistentEdge {
+        key: edge.key,
+        source: edge.source.key,
+        destination: edge.destination.key,
+        labels: edge.labels,
+        properties: edge.properties,
+      },
+      &mut data,
+    )?;
+    table.insert(edge.key, data.as_slice())?;
     Ok(())
   }
   /// Delete nodes according to a given query

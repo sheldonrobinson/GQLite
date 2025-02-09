@@ -123,6 +123,25 @@ pub(crate) struct RWExpression
 }
 
 #[derive(Debug)]
+pub(crate) enum UpdateOne
+{
+  SetProperty
+  {
+    target: String,
+    path: Vec<String>,
+    instructions: Instructions,
+  },
+  RemoveProperty
+  {
+    target: String, path: Vec<String>
+  },
+  AddLabels
+  {
+    target: String, labels: Vec<String>
+  },
+}
+
+#[derive(Debug)]
 pub(crate) enum Block
 {
   Create
@@ -158,5 +177,9 @@ pub(crate) enum Block
   {
     detach: bool,
     instructions: Vec<Instructions>,
+  },
+  Update
+  {
+    updates: Vec<UpdateOne>
   },
 }
