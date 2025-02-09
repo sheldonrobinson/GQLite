@@ -315,6 +315,14 @@ macro_rules! impl_to_value {
         Value::$vn(self.clone())
       }
     }
+
+    impl Into<Value> for Vec<$type>
+    {
+      fn into(self) -> Value
+      {
+        Value::Array(self.into_iter().map(|v| v.into()).collect())
+      }
+    }
     impl TryInto<$type> for Value
     {
       type Error = crate::error::Error;
