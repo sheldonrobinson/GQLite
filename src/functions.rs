@@ -4,6 +4,7 @@ use crate::{aggregators, error, graph, Result};
 
 mod containers;
 mod edge;
+mod node;
 mod value;
 
 pub(crate) type FResult<T> = std::result::Result<T, error::RunTimeError>;
@@ -98,6 +99,7 @@ impl Manager
           containers::Length::new(),
           containers::Range::new(),
           edge::Type::new(),
+          node::Labels::new(),
           value::Coalesce::new(),
           value::HasLabel::new(),
           value::HasLabels::new(),
