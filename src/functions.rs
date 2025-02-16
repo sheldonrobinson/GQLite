@@ -5,6 +5,7 @@ use crate::{aggregators, error, graph, Result};
 mod containers;
 mod edge;
 mod node;
+mod path;
 mod value;
 
 pub(crate) type FResult<T> = std::result::Result<T, error::RunTimeError>;
@@ -96,10 +97,12 @@ impl Manager
     Self {
       inner: std::rc::Rc::new(ManagerInner {
         functions: HashMap::from([
-          containers::Length::new(),
+          containers::Keys::new(),
           containers::Range::new(),
+          containers::Size::new(),
           edge::Type::new(),
           node::Labels::new(),
+          path::Length::new(),
           value::Coalesce::new(),
           value::HasLabel::new(),
           value::HasLabels::new(),
