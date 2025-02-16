@@ -4,6 +4,8 @@
 
 ## [Unreleased] - ReleaseDate
 
+## [0.3.1] - 2025-02-16
+
 - Add support for += in SET
 - Add support for REMOVE
 
@@ -29,7 +31,8 @@
 - `persy` backend
 
 <!-- next-url -->
-[Unreleased]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.3.0...dev/2
+[Unreleased]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.3.1...dev/2
+[0.3.1]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.3.0...gqlitedb-v0.3.1
 [0.3.0]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.2.0...gqlitedb-v0.3.0
 [0.2.0]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.1.1...gqlitedb-v0.2.0
 [0.1.1]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.1.0...gqlitedb-v0.1.1
