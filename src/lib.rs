@@ -3,7 +3,8 @@
 //! Implementation of GQL (Graph Query Language), embeddable in applications.
 
 #![warn(missing_docs)]
-// #![deny(warnings)]
+#![allow(dead_code)]
+#![deny(warnings)]
 
 mod aggregators;
 #[cfg(feature = "capi")]

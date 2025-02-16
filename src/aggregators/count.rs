@@ -1,4 +1,4 @@
-use super::{AggregatorState, AggregatorTrait};
+use super::AggregatorState;
 
 use crate::Result;
 

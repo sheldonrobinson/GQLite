@@ -1,4 +1,4 @@
-use ast::{EdgePattern, Expression, LabelExpression, NodePattern};
+use ast::{EdgePattern, LabelExpression, NodePattern};
 use pest::{
   pratt_parser::{Assoc, Op, PrattParser},
   Parser,
@@ -7,8 +7,7 @@ use pest_derive::Parser;
 
 use crate::{
   error::{CompileTimeError, InternalError},
-  graph::{self, Edge},
-  Result,
+  graph, Result,
 };
 
 trait TryNext: Iterator

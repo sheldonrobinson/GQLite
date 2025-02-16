@@ -4,12 +4,10 @@ use crate::{
   aggregators,
   error::{InternalError, RunTimeError},
   graph,
-  interpreter::instructions::BlockMatch,
+  interpreter::instructions::{self, BlockMatch},
   store::{self, SelectEdgeQuery},
   Error, Result,
 };
-
-use super::{instructions, validator};
 
 #[derive(Debug, Clone)]
 enum Value
@@ -144,6 +142,7 @@ impl From<store::SelectEdgeQuery> for Value
   }
 }
 
+#[allow(unused_macros)]
 macro_rules! check_for_null {
   ($a: expr) => {
     if $a.is_null() {
@@ -1170,7 +1169,7 @@ pub(crate) fn eval_program(
                   false,
                 )?;
               }
-              instructions::UpdateOne::RemoveProperty { target, path } =>
+              instructions::UpdateOne::RemoveProperty { target: _, path: _ } =>
               {}
               instructions::UpdateOne::AddLabels { target, labels } =>
               {
