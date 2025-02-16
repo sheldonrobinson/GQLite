@@ -1169,8 +1169,38 @@ pub(crate) fn eval_program(
                   false,
                 )?;
               }
-              instructions::UpdateOne::RemoveProperty { target: _, path: _ } =>
-              {}
+              instructions::UpdateOne::RemoveProperty { target, path } =>
+              {
+                let var = out_row.get(target).ok_or_else(|| {
+                  crate::error::RunTimeError::UndefinedVariable {
+                    name: target.to_owned(),
+                  }
+                })?;
+                use crate::graph::ValueObjectExtension;
+                let mut piter = path.iter();
+                match var
+                {
+                  graph::Value::Node(n) =>
+                  {
+                    let mut n = n.to_owned();
+                    n.properties.remove_value(piter.next(), piter)?;
+                    store.update_node(&mut tx, &graph_name, &n)?;
+                    out_row.insert(target.to_owned(), n.into());
+                  }
+                  graph::Value::Edge(e) =>
+                  {
+                    let mut e = e.to_owned();
+                    e.properties.remove_value(piter.next(), piter)?;
+                    store.update_edge(&mut tx, &graph_name, &e)?;
+                    out_row.insert(target.to_owned(), e.into());
+                  }
+                  graph::Value::Invalid =>
+                  {}
+                  _ => Err(InternalError::ExpectedEdge {
+                    context: "evaluator/eval_program",
+                  })?,
+                }
+              }
               instructions::UpdateOne::AddLabels { target, labels } =>
               {
                 let var = out_row.get(target).ok_or_else(|| {
