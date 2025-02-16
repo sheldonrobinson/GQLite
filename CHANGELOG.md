@@ -4,6 +4,8 @@
 
 ## [Unreleased] - ReleaseDate
 
+- Add support for += in SET
+
 ## [0.3.0] - 2025-02-09
 
 - Change in backend serialization.

@@ -103,13 +103,14 @@ pub(crate) struct Call
 #[derive(Debug)]
 pub(crate) enum OneUpdate
 {
-  SetProperty(SetProperty),
+  SetProperty(UpdateProperty),
+  AddProperty(UpdateProperty),
   RemoveProperty(RemoveProperty),
   AddLabels(AddLabels),
 }
 
 #[derive(Debug)]
-pub(crate) struct SetProperty
+pub(crate) struct UpdateProperty
 {
   pub(crate) target: String,
   pub(crate) path: Vec<String>,

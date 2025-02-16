@@ -6,7 +6,7 @@ mod pgql;
 mod redb;
 
 #[cfg(feature = "redb")]
-pub(crate) use redb::Store;
+pub(crate) use redb::{Store, Transaction};
 
 #[cfg(feature = "pgql")]
 pub(crate) use pgql::Store;

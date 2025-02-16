@@ -131,6 +131,12 @@ pub(crate) enum UpdateOne
     path: Vec<String>,
     instructions: Instructions,
   },
+  AddProperty
+  {
+    target: String,
+    path: Vec<String>,
+    instructions: Instructions,
+  },
   RemoveProperty
   {
     target: String, path: Vec<String>

@@ -2,7 +2,7 @@ use itertools::Itertools;
 use pest::pratt_parser::Op;
 use redb::{ReadableTable, ReadableTableMetadata};
 use serde::{Deserialize, Serialize};
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc, str::FromStr};
 
 use crate::{error, graph, Result};
 
@@ -276,6 +276,8 @@ pub(crate) struct Store
   graphs: HashMap<String, GraphInfo>,
 }
 
+pub(crate) type Transaction = redb::WriteTransaction;
+
 impl Store
 {
   /// Crate a new store, with a default graph
@@ -317,12 +319,11 @@ impl Store
   pub(crate) fn create_nodes<'a, T: Iterator<Item = &'a crate::graph::Node>>(
     &self,
     transaction: &mut redb::WriteTransaction,
-    graph_name: impl Into<String>,
+    graph_name: &String,
     nodes_iter: T,
   ) -> Result<()>
   {
-    let graph_name = graph_name.into();
-    let graph_info = self.graphs.get(&graph_name).unwrap();
+    let graph_info = self.graphs.get(graph_name).unwrap();
     let mut table = transaction.open_table(graph_info.nodes_table_definition())?;
     let mut table_source = transaction.open_table(graph_info.edges_source_index_definition())?;
     let mut table_destination =
@@ -339,12 +340,11 @@ impl Store
   pub(crate) fn update_node(
     &self,
     transaction: &mut redb::WriteTransaction,
-    graph_name: impl Into<String>,
+    graph_name: &String,
     node: &graph::Node,
   ) -> Result<()>
   {
-    let graph_name = graph_name.into();
-    let graph_info = self.graphs.get(&graph_name).unwrap();
+    let graph_info = self.graphs.get(graph_name).unwrap();
     let mut table = transaction.open_table(graph_info.nodes_table_definition())?;
     table.insert(node.key, node)?;
     Ok(())
@@ -353,13 +353,12 @@ impl Store
   pub(crate) fn delete_nodes(
     &self,
     transaction: &mut redb::WriteTransaction,
-    graph_name: impl Into<String>,
+    graph_name: &String,
     query: super::SelectNodeQuery,
     detach: bool,
   ) -> Result<()>
   {
-    let graph_name = graph_name.into();
-    let graph_info = self.graphs.get(&graph_name).unwrap();
+    let graph_info = self.graphs.get(graph_name).unwrap();
 
     if query.is_select_all()
     {
@@ -396,7 +395,7 @@ impl Store
       else
       {
         self
-          .select_nodes(transaction, &graph_name, query)?
+          .select_nodes(transaction, graph_name, query)?
           .into_iter()
           .map(|x| x.key)
           .collect()
@@ -454,12 +453,11 @@ impl Store
   pub(crate) fn select_nodes(
     &self,
     transaction: &mut redb::WriteTransaction,
-    graph_name: impl Into<String>,
+    graph_name: &String,
     query: super::SelectNodeQuery,
   ) -> Result<Vec<crate::graph::Node>>
   {
-    let graph_name = graph_name.into();
-    let graph_info = self.graphs.get(&graph_name).unwrap();
+    let graph_info = self.graphs.get(graph_name).unwrap();
     let nodes_table = transaction.open_table(graph_info.nodes_table_definition())?;
     self.select_nodes_from_table(&nodes_table, query)
   }
@@ -539,12 +537,11 @@ impl Store
   pub(crate) fn create_edges<'a, T: Iterator<Item = &'a crate::graph::Edge>>(
     &self,
     transaction: &mut redb::WriteTransaction,
-    graph_name: impl Into<String>,
+    graph_name: &String,
     edges_iter: T,
   ) -> Result<()>
   {
-    let graph_name = graph_name.into();
-    let graph_info = self.graphs.get(&graph_name).unwrap();
+    let graph_info = self.graphs.get(graph_name).unwrap();
     let mut table = transaction.open_table(graph_info.edges_table_definition())?;
     let mut table_source = transaction.open_table(graph_info.edges_source_index_definition())?;
     let mut table_destination =
@@ -580,12 +577,11 @@ impl Store
   pub(crate) fn update_edge(
     &self,
     transaction: &mut redb::WriteTransaction,
-    graph_name: impl Into<String>,
+    graph_name: &String,
     edge: &graph::Edge,
   ) -> Result<()>
   {
-    let graph_name = graph_name.into();
-    let graph_info = self.graphs.get(&graph_name).unwrap();
+    let graph_info = self.graphs.get(graph_name).unwrap();
     let mut table = transaction.open_table(graph_info.edges_table_definition())?;
     table.insert(
       edge.key,
@@ -603,13 +599,12 @@ impl Store
   pub(crate) fn delete_edges(
     &self,
     transaction: &mut redb::WriteTransaction,
-    graph_name: impl Into<String>,
+    graph_name: &String,
     query: super::SelectEdgeQuery,
     directivity: graph::EdgeDirectivity,
   ) -> Result<()>
   {
-    let graph_name = graph_name.into();
-    let graph_info = self.graphs.get(&graph_name).unwrap();
+    let graph_info = self.graphs.get(graph_name).unwrap();
     let edges = self.select_edges(transaction, graph_name, query, directivity)?;
 
     let mut table = transaction.open_table(graph_info.edges_table_definition())?;
@@ -649,7 +644,7 @@ impl Store
   pub(crate) fn select_edges(
     &self,
     transaction: &mut redb::WriteTransaction,
-    graph_name: impl Into<String>,
+    graph_name: &String,
     query: super::SelectEdgeQuery,
     directivity: graph::EdgeDirectivity,
   ) -> Result<Vec<super::EdgeResult>>
@@ -658,8 +653,7 @@ impl Store
     {
       return Ok(Default::default());
     }
-    let graph_name = graph_name.into();
-    let graph_info = self.graphs.get(&graph_name).unwrap();
+    let graph_info = self.graphs.get(graph_name).unwrap();
     let edges_table = transaction.open_table(graph_info.edges_table_definition())?;
     let nodes_table = transaction.open_table(graph_info.nodes_table_definition())?;
 
@@ -925,7 +919,11 @@ impl Store
     let mut labels = Vec::new();
     let mut properties_count = 0;
 
-    for n in self.select_nodes(transaction, "default", super::SelectNodeQuery::select_all())?
+    for n in self.select_nodes(
+      transaction,
+      &"default".into(),
+      super::SelectNodeQuery::select_all(),
+    )?
     {
       nodes_count += 1;
       for l in n.labels.iter()
@@ -943,7 +941,7 @@ impl Store
     }
     for e in self.select_edges(
       transaction,
-      "default",
+      &"default".into(),
       super::SelectEdgeQuery::select_all(),
       graph::EdgeDirectivity::Directed,
     )?
@@ -994,14 +992,14 @@ mod tests
 
     let mut tx = store.begin().unwrap();
     store
-      .create_nodes(tx.borrow_mut(), "default", nodes.iter())
+      .create_nodes(tx.borrow_mut(), &"default".into(), nodes.iter())
       .unwrap();
     tx.commit().unwrap();
 
     let selected_nodes = store
       .select_nodes(
         store.begin().unwrap().borrow_mut(),
-        "default",
+        &"default".into(),
         crate::store::SelectNodeQuery::select_keys([nodes[0].key]),
       )
       .unwrap();
@@ -1012,7 +1010,7 @@ mod tests
     let selected_nodes = store
       .select_nodes(
         store.begin().unwrap().borrow_mut(),
-        "default",
+        &"default".into(),
         crate::store::SelectNodeQuery::select_labels(["not".to_string()]),
       )
       .unwrap();
@@ -1044,24 +1042,24 @@ mod tests
 
     let mut tx = store.begin().unwrap();
     store
-      .create_edges(tx.borrow_mut(), "default", [edge.clone()].iter())
+      .create_edges(tx.borrow_mut(), &"default".into(), [edge.clone()].iter())
       .expect_err("expect missing node");
     store
       .create_nodes(
         tx.borrow_mut(),
-        "default",
+        &"default".into(),
         [source_node, destination_node].iter(),
       )
       .unwrap();
     store
-      .create_edges(tx.borrow_mut(), "default", [edge.clone()].iter())
+      .create_edges(tx.borrow_mut(), &"default".into(), [edge.clone()].iter())
       .unwrap();
     tx.commit().unwrap();
 
     let selected_edges = store
       .select_edges(
         store.begin().unwrap().borrow_mut(),
-        "default",
+        &"default".into(),
         crate::store::SelectEdgeQuery::select_keys([edge.key]),
         graph::EdgeDirectivity::Directed,
       )
@@ -1074,7 +1072,7 @@ mod tests
     let selected_edges = store
       .select_edges(
         store.begin().unwrap().borrow_mut(),
-        "default",
+        &"default".into(),
         crate::store::SelectEdgeQuery::select_source_destination_labels_properties(
           crate::store::SelectNodeQuery::select_all(),
           vec![],
@@ -1092,7 +1090,7 @@ mod tests
     let selected_edges = store
       .select_edges(
         store.begin().unwrap().borrow_mut(),
-        "default",
+        &"default".into(),
         crate::store::SelectEdgeQuery::select_source_destination_labels_properties(
           crate::store::SelectNodeQuery::select_labels_properties(vec![], Default::default()),
           vec![],
