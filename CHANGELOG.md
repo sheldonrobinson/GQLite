@@ -5,6 +5,7 @@
 ## [Unreleased] - ReleaseDate
 
 - Add support for += in SET
+- Add support for REMOVE
 
 ## [0.3.0] - 2025-02-09
 

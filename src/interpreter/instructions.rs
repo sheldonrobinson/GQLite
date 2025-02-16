@@ -145,6 +145,10 @@ pub(crate) enum UpdateOne
   {
     target: String, labels: Vec<String>
   },
+  RemoveLabels
+  {
+    target: String, labels: Vec<String>
+  },
 }
 
 #[derive(Debug)]

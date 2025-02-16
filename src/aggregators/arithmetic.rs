@@ -28,23 +28,20 @@ impl AggregatorState for SumState
       | Value::Array(..)
       | Value::String(..)
       | Value::Object(..)
-      | Value::Path(..) =>
-      {
-        Err::<(), crate::error::Error>(RunTimeError::InvalidBinaryOperands.into())?
-      }
+      | Value::Path(..) => Err(RunTimeError::InvalidBinaryOperands)?,
       Value::Invalid =>
       {}
       Value::Float(lhs) => match value
       {
         Value::Float(rhs) => self.value = (lhs + rhs).into(),
         Value::Integer(rhs) => self.value = (lhs + rhs as f64).into(),
-        _ => Err::<(), crate::error::Error>(RunTimeError::InvalidBinaryOperands.into())?,
+        _ => Err(RunTimeError::InvalidBinaryOperands)?,
       },
       Value::Integer(lhs) => match value
       {
         Value::Float(rhs) => self.value = (lhs as f64 + rhs).into(),
         Value::Integer(rhs) => self.value = (lhs + rhs).into(),
-        _ => Err::<(), crate::error::Error>(RunTimeError::InvalidBinaryOperands.into())?,
+        _ => Err(RunTimeError::InvalidBinaryOperands)?,
       },
     }
     Ok(())
