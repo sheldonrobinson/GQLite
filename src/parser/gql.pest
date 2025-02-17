@@ -1,4 +1,5 @@
 WHITESPACE     = _{ " " | "\t" | "\n" }
+ONESPACE       = _{ " " | "\t" | "\n" }
 ident          = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
 parameter_name = @{ (ASCII_ALPHANUMERIC | "_")* }
 char           =  {
@@ -31,8 +32,17 @@ node_or_edge_or_path_pattern = _{ edge_pattern | node_pattern | path_pattern }
 
 // Modifiers
 
-limit          = { "LIMIT" ~ expression }
-modifiers      = { limit }
+order_by_kw = @{ "ORDER" ~ WHITESPACE+ ~ "BY" ~ !ASCII_ALPHA }
+limit_kw    = @{ "LIMIT" ~ !ASCII_ALPHA }
+skip_kw     = @{ "SKIP" ~ !ASCII_ALPHA }
+
+limit                    = { limit_kw ~ expression }
+order_by                 = { order_by_kw ~ (order_by_desc_expression | order_by_asc_expression) ~ ("," ~ (order_by_desc_expression | order_by_asc_expression))* }
+order_by_asc_expression  = { expression ~ "ASC"? }
+order_by_desc_expression = { expression ~ "DESC" }
+skip                     = { skip_kw ~ expression }
+modifiers                = { limit? ~ order_by? ~ skip? }
+// modifiers      = { (limit ~ order_by? ~ skip?) | (order_by ~ (limit? ~ skip?) | (skip ~ limit?)) | (skip ~ (limit? ~ order_by?) | (order_by | limit?)) }
 where_modifier = { "WHERE" ~ expression }
 
 // Statements
@@ -41,7 +51,6 @@ statement = {
   | optional_match_statement
   | match_statement
   | return_statement
-  | return_all_statement
   | call_statement
   | with_statement
   | unwind_statement
@@ -56,8 +65,7 @@ star = { "*" }
 create_statement         = { "CREATE" ~ node_or_edge_pattern ~ ("," ~ node_or_edge_pattern)* }
 match_statement          = { "MATCH" ~ node_or_edge_or_path_pattern ~ ("," ~ node_or_edge_or_path_pattern)* ~ where_modifier? }
 optional_match_statement = { "OPTIONAL" ~ match_statement }
-return_statement         = { "RETURN" ~ named_expression ~ ("," ~ named_expression)* }
-return_all_statement     = { "RETURN" ~ "*" }
+return_statement         = { "RETURN" ~ (star | named_expression) ~ ("," ~ named_expression)* ~ modifiers? }
 call_statement           = { "CALL" ~ function_name ~ "()" }
 with_statement           = { "WITH" ~ (star | named_expression) ~ ("," ~ named_expression)* ~ modifiers? }
 unwind_statement         = { "UNWIND" ~ named_expression }
@@ -98,16 +106,18 @@ multiplication = { "*" }
 division       = { "/" }
 modulo         = { "%" }
 
-or             = { "OR" }
-and            = { "AND" }
-equal          = { "=" }
-different      = { "<>" }
-inferior       = { "<" }
-superior       = { ">" }
-inferior_equal = { "<=" }
-superior_equal = { ">=" }
-not_in         = { "NOT" ~ "IN" }
-in_            = { "IN" }
+or_kw          = @{ "OR" ~ !ASCII_ALPHA }
+or             =  { or_kw }
+and_kw         = @{ "AND" ~ !ASCII_ALPHA }
+and            =  { and_kw }
+equal          =  { "=" }
+different      =  { "<>" }
+inferior       =  { "<" }
+superior       =  { ">" }
+inferior_equal =  { "<=" }
+superior_equal =  { ">=" }
+not_in         =  { "NOT" ~ "IN" }
+in_            =  { "IN" }
 
 negation = { "-" }
 not      = { "NOT" }

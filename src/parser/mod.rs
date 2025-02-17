@@ -1,4 +1,3 @@
-use ast::{EdgePattern, LabelExpression, NodePattern};
 use pest::{
   pratt_parser::{Assoc, Op, PrattParser},
   Parser,
@@ -321,27 +320,57 @@ fn build_modifiers(
   pratt: &PrattParser<Rule>,
 ) -> Result<ast::Modifiers>
 {
-  let skip = None;
+  let mut skip = None;
   let mut limit = None;
-  let order_by = None;
+  let mut order_by = None;
   for subpair in pair.into_inner()
   {
     match subpair.as_rule()
     {
       Rule::limit =>
       {
-        limit = Some(build_expression(
-          subpair.into_inner().try_next()?.into_inner(),
-          pratt,
-        )?)
+        let mut subpair = subpair.into_inner();
+        subpair.try_next()?; // eat limit_kw
+
+        limit = Some(build_expression(subpair.try_next()?.into_inner(), pratt)?)
       }
-      _ => Err::<(), crate::Error>(
-        InternalError::UnexpectedPair {
-          context: "build_modifiers",
-          pair: format!("{:#?}", subpair),
-        }
-        .into(),
-      )?,
+      Rule::skip =>
+      {
+        let mut subpair = subpair.into_inner();
+        subpair.try_next()?; // eat limit_kw
+
+        skip = Some(build_expression(subpair.try_next()?.into_inner(), pratt)?)
+      }
+      Rule::order_by =>
+      {
+        order_by = Some(ast::OrderBy {
+          expressions: subpair
+            .into_inner()
+            .map(|r| match r.as_rule()
+            {
+              // Rule::order_by_asc_expression => Ok(ast::OrderByExpression {
+              //   asc: true,
+              //   expression: build_expression(r.into_inner().try_next()?.into_inner(), pratt)?,
+              // }),
+              // Rule::order_by_desc_expression => Ok(ast::OrderByExpression {
+              //   asc: false,
+              //   expression: build_expression(r.into_inner().try_next()?.into_inner(), pratt)?,
+              // }),
+              _ => Err::<_, crate::Error>(
+                InternalError::UnexpectedPair {
+                  context: "build_modifiers/order_by",
+                  pair: format!("{:#?}", r),
+                }
+                .into(),
+              ),
+            })
+            .collect::<Result<_>>()?,
+        })
+      }
+      _ => Err(InternalError::UnexpectedPair {
+        context: "build_modifiers",
+        pair: format!("{:#?}", subpair),
+      })?,
     }
   }
   Ok(ast::Modifiers {
@@ -469,17 +498,17 @@ fn build_node_pattern(
 }
 
 fn build_edge_pattern(
-  source_node: NodePattern,
+  source_node: ast::NodePattern,
   edge_pair: pest::iterators::Pair<Rule>,
-  destination_node: NodePattern,
+  destination_node: ast::NodePattern,
   allow_undirected_edge: bool,
   pratt: &PrattParser<Rule>,
-) -> Result<EdgePattern>
+) -> Result<ast::EdgePattern>
 {
   let edge_rule = edge_pair.as_rule();
   let it = edge_pair.into_inner().try_next()?.into_inner();
   let mut variable = None;
-  let mut labels = LabelExpression::None;
+  let mut labels = ast::LabelExpression::None;
   let mut properties = None;
 
   for pair in it
@@ -661,6 +690,31 @@ fn build_match(
   }))
 }
 
+fn build_return_with_statement(
+  pairs: pest::iterators::Pairs<Rule>,
+  pratt: &PrattParser<Rule>,
+) -> Result<(bool, Vec<ast::NamedExpression>, ast::Modifiers)>
+{
+  let mut all = false;
+  let mut expressions = vec![];
+  let mut modifiers = Default::default();
+
+  for sub_pair in pairs
+  {
+    match sub_pair.as_rule()
+    {
+      Rule::star => all = true,
+      Rule::named_expression => expressions.push(build_named_expression(sub_pair, pratt)?),
+      Rule::modifiers => modifiers = build_modifiers(sub_pair, pratt)?,
+      _ => Err(InternalError::UnexpectedPair {
+        context: "build_ast_from_statement/with_statement",
+        pair: sub_pair.as_str().to_string(),
+      })?,
+    }
+  }
+  Ok((all, expressions, modifiers))
+}
+
 fn build_ast_from_statement(
   pair: pest::iterators::Pair<Rule>,
   pratt: &PrattParser<Rule>,
@@ -675,40 +729,17 @@ fn build_ast_from_statement(
     Rule::optional_match_statement => build_match(pair.into_inner().try_next()?, true, pratt),
     Rule::return_statement =>
     {
-      let named_expressions = pair
-        .into_inner()
-        .map(|pair| build_named_expression(pair, pratt))
-        .collect::<Result<Vec<ast::NamedExpression>>>()?;
+      let (all, expressions, modifiers) = build_return_with_statement(pair.into_inner(), pratt)?;
+
       Ok(ast::Statement::Return(ast::Return {
-        all: false,
-        expressions: named_expressions,
-        modifiers: ast::Modifiers::default(),
+        all,
+        expressions,
+        modifiers,
       }))
     }
-    Rule::return_all_statement => Ok(ast::Statement::Return(ast::Return {
-      all: true,
-      expressions: Default::default(),
-      modifiers: ast::Modifiers::default(),
-    })),
     Rule::with_statement =>
     {
-      let mut all = false;
-      let mut expressions = vec![];
-      let mut modifiers = Default::default();
-
-      for sub_pair in pair.into_inner()
-      {
-        match sub_pair.as_rule()
-        {
-          Rule::star => all = true,
-          Rule::named_expression => expressions.push(build_named_expression(sub_pair, pratt)?),
-          Rule::modifiers => modifiers = build_modifiers(sub_pair, pratt)?,
-          _ => Err(InternalError::UnexpectedPair {
-            context: "build_ast_from_statement/with_statement",
-            pair: sub_pair.as_str().to_string(),
-          })?,
-        }
-      }
+      let (all, expressions, modifiers) = build_return_with_statement(pair.into_inner(), pratt)?;
 
       Ok(ast::Statement::With(ast::With {
         all,

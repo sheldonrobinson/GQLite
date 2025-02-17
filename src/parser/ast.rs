@@ -190,8 +190,8 @@ pub(crate) enum Expression
 #[derive(Debug)]
 pub(crate) struct OrderByExpression
 {
-  asc: bool,
-  expression: Expression,
+  pub asc: bool,
+  pub expression: Expression,
 }
 
 // Values: CreatePatterns
