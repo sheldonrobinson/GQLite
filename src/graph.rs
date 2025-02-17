@@ -412,9 +412,18 @@ impl Add for Value
       | Value::Boolean(..)
       | Value::Node(..)
       | Value::Edge(..)
-      | Value::Array(..)
       | Value::Object(..)
       | Value::Path(..) => Err(RunTimeError::InvalidBinaryOperands.into()),
+      Self::Array(lhs) => match rhs
+      {
+        Self::Array(rhs) =>
+        {
+          let mut lhs = lhs.clone();
+          lhs.append(&mut rhs.clone());
+          Ok(lhs.into())
+        }
+        _ => Err(RunTimeError::InvalidBinaryOperands.into()),
+      },
       Self::Float(lhs) => match rhs
       {
         Self::Float(rhs) => Ok((lhs + rhs).into()),

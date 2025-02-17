@@ -5,6 +5,7 @@
 ## [Unreleased] - ReleaseDate
 
 - Fix order of arrays.
+- Support for array concatenation.
 
 ## [0.3.1] - 2025-02-16
 
