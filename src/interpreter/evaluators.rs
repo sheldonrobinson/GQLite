@@ -403,6 +403,7 @@ fn eval_instructions(
         {
           m.push(stack.try_pop_into()?);
         }
+        m.reverse();
         stack.push(graph::Value::Array(m).into());
       }
       instructions::Instruction::CreateMap { keys } =>
