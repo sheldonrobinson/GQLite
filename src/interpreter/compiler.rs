@@ -841,12 +841,22 @@ pub(crate) fn compile(
         }
         ast::Statement::With(with) =>
         {
+          let mut variables = Vec::<RWExpression>::new();
           let mut val_variables = Default::default();
           if with.all
           {
             val_variables = validator.to_variables();
+            for (name, _) in validator.variables_ref()
+            {
+              variables.push(instructions::RWExpression {
+                name: name.to_owned(),
+                instructions: vec![Instruction::GetVariable {
+                  name: name.to_owned(),
+                }],
+                aggregations: Default::default(),
+              });
+            }
           }
-          let mut variables = Vec::<RWExpression>::new();
           let mut variable_names = Vec::<String>::new();
           for e in with.expressions.iter()
           {
@@ -885,10 +895,7 @@ pub(crate) fn compile(
             );
           }
           validator.set_variables(val_variables);
-          Ok(Block::With {
-            all: with.all,
-            variables,
-          })
+          Ok(Block::With { variables })
         }
         ast::Statement::Unwind(unwind) =>
         {

@@ -655,6 +655,100 @@ pub(crate) fn eval_update_property(
   Ok(())
 }
 
+fn compute_return_with_table(
+  variables: &Vec<instructions::RWExpression>,
+  input_table: crate::value_table::ValueTable,
+  parameters: &crate::graph::ValueObject,
+) -> Result<crate::value_table::ValueTable>
+{
+  let mut output_table = crate::value_table::ValueTable::new();
+  if variables.iter().any(|v| v.aggregations.len() > 0)
+  {
+    // Initialise aggregation states
+    let mut aggregations_states: Vec<HashMap<String, Box<dyn aggregators::AggregatorState>>> =
+      variables
+        .iter()
+        .map(|rw_expr| {
+          rw_expr
+            .aggregations
+            .iter()
+            .map(|(name, agg)| {
+              let mut stack = Stack::default();
+
+              eval_instructions(
+                &mut stack,
+                &Default::default(),
+                &agg.init_instructions,
+                parameters,
+              )?;
+              let state = agg.aggregator.create(
+                stack
+                  .to_vec()
+                  .into_iter()
+                  .map(|v| v.try_into())
+                  .collect::<Result<_>>()?,
+              )?;
+
+              Ok((name.to_owned(), state))
+            })
+            .collect::<Result<HashMap<_, _>>>()
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+    // Compute aggregations
+    for row in input_table.iter()
+    {
+      for (rw_expr, aggregation_states) in variables.iter().zip(aggregations_states.iter_mut())
+      {
+        for (name, agg) in rw_expr.aggregations.iter()
+        {
+          let mut stack = Stack::default();
+          eval_instructions(&mut stack, row, &agg.argument_instructions, parameters)?;
+          let value: graph::Value = stack.try_pop_into()?;
+          aggregation_states
+            .get_mut(name)
+            .ok_or(InternalError::MissingAggregationState)?
+            .next(value)?;
+        }
+      }
+    }
+    // Export the end result
+    let mut out_row = crate::value_table::Row::new();
+    for (rw_expr, aggregation_states) in variables.iter().zip(aggregations_states.into_iter())
+    {
+      let mut in_row = input_table
+        .first_row()
+        .map_or_else(|| Default::default(), |m| m.to_owned());
+      for (name, s) in aggregation_states.into_iter()
+      {
+        in_row.insert(name, s.finalise()?);
+      }
+      let mut stack = Stack::default();
+      eval_instructions(&mut stack, &in_row, &rw_expr.instructions, &parameters)?;
+      let value: graph::Value = stack.try_pop_into()?;
+      out_row.insert(rw_expr.name.to_owned(), value.to_owned());
+    }
+    output_table.add_row(out_row);
+  }
+  else
+  {
+    for row in input_table.iter()
+    {
+      let mut out_row = crate::value_table::Row::new();
+      for rw_expr in variables.iter()
+      {
+        assert_eq!(rw_expr.aggregations.len(), 0);
+        let mut stack = Stack::default();
+        eval_instructions(&mut stack, row, &rw_expr.instructions, &parameters)?;
+        let value: graph::Value = stack.try_pop_into()?;
+        out_row.insert(rw_expr.name.to_owned(), value.to_owned());
+      }
+      output_table.add_row(out_row);
+    }
+  }
+  Ok(output_table)
+}
+
 pub(crate) fn eval_program(
   store: &crate::store::Store,
   program: super::Program,
@@ -923,92 +1017,7 @@ pub(crate) fn eval_program(
       }
       instructions::Block::Return { variables } =>
       {
-        let mut output_table = crate::value_table::ValueTable::new();
-        if variables.iter().any(|v| v.aggregations.len() > 0)
-        {
-          // Initialise aggregation states
-          let mut aggregations_states: Vec<HashMap<String, Box<dyn aggregators::AggregatorState>>> =
-            variables
-              .iter()
-              .map(|rw_expr| {
-                rw_expr
-                  .aggregations
-                  .iter()
-                  .map(|(name, agg)| {
-                    let mut stack = Stack::default();
-
-                    eval_instructions(
-                      &mut stack,
-                      &Default::default(),
-                      &agg.init_instructions,
-                      &parameters,
-                    )?;
-                    let state = agg.aggregator.create(
-                      stack
-                        .to_vec()
-                        .into_iter()
-                        .map(|v| v.try_into())
-                        .collect::<Result<_>>()?,
-                    )?;
-
-                    Ok((name.to_owned(), state))
-                  })
-                  .collect::<Result<HashMap<_, _>>>()
-              })
-              .collect::<Result<Vec<_>>>()?;
-
-          // Compute aggregations
-          for row in input_table.iter()
-          {
-            for (rw_expr, aggregation_states) in
-              variables.iter().zip(aggregations_states.iter_mut())
-            {
-              for (name, agg) in rw_expr.aggregations.iter()
-              {
-                let mut stack = Stack::default();
-                eval_instructions(&mut stack, row, &agg.argument_instructions, &parameters)?;
-                let value: graph::Value = stack.try_pop_into()?;
-                aggregation_states
-                  .get_mut(name)
-                  .ok_or(InternalError::MissingAggregationState)?
-                  .next(value)?;
-              }
-            }
-          }
-          // Export the end result
-          let mut out_row = crate::value_table::Row::new();
-          for (rw_expr, aggregation_states) in variables.iter().zip(aggregations_states.into_iter())
-          {
-            let mut in_row = input_table
-              .first_row()
-              .map_or_else(|| Default::default(), |m| m.to_owned());
-            for (name, s) in aggregation_states.into_iter()
-            {
-              in_row.insert(name, s.finalise()?);
-            }
-            let mut stack = Stack::default();
-            eval_instructions(&mut stack, &in_row, &rw_expr.instructions, &parameters)?;
-            let value: graph::Value = stack.try_pop_into()?;
-            out_row.insert(rw_expr.name.to_owned(), value.to_owned());
-          }
-          output_table.add_row(out_row);
-        }
-        else
-        {
-          for row in input_table.iter()
-          {
-            let mut out_row = crate::value_table::Row::new();
-            for rw_expr in variables.iter()
-            {
-              assert_eq!(rw_expr.aggregations.len(), 0);
-              let mut stack = Stack::default();
-              eval_instructions(&mut stack, row, &rw_expr.instructions, &parameters)?;
-              let value: graph::Value = stack.try_pop_into()?;
-              out_row.insert(rw_expr.name.to_owned(), value.to_owned());
-            }
-            output_table.add_row(out_row);
-          }
-        }
+        let output_table = compute_return_with_table(&variables, input_table, &parameters)?;
         let mut r = Vec::<crate::graph::Value>::new();
         r.push(crate::graph::Value::Array(
           variables
@@ -1032,30 +1041,9 @@ pub(crate) fn eval_program(
         tx.commit()?;
         return Ok(crate::graph::Value::Array(r));
       }
-      instructions::Block::With { all, variables } =>
+      instructions::Block::With { variables } =>
       {
-        let mut output_table = crate::value_table::ValueTable::new();
-        for row in input_table.iter()
-        {
-          let mut out_row = if all
-          {
-            row.clone()
-          }
-          else
-          {
-            crate::value_table::Row::new()
-          };
-          for rw_expr in variables.iter()
-          {
-            assert_eq!(rw_expr.aggregations.len(), 0);
-            let mut stack = Stack::default();
-            eval_instructions(&mut stack, row, &rw_expr.instructions, &parameters)?;
-            let value: graph::Value = stack.try_pop_into()?;
-            out_row.insert(rw_expr.name.to_owned(), value.to_owned());
-          }
-          output_table.add_row(out_row);
-        }
-        input_table = output_table;
+        input_table = compute_return_with_table(&variables, input_table, &parameters)?;
       }
       instructions::Block::Unwind { name, instructions } =>
       {

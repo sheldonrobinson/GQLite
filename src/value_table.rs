@@ -14,6 +14,12 @@ impl ValueTable
       data: Vec::<Row>::default(),
     }
   }
+  pub(crate) fn from_rows(rows: impl Iterator<Item = Row>) -> Self
+  {
+    Self {
+      data: rows.collect(),
+    }
+  }
   pub(crate) fn add_row(&mut self, row: Row)
   {
     self.data.push(row);
