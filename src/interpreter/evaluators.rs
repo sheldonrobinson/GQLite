@@ -1076,6 +1076,8 @@ pub(crate) fn eval_program(
                 output_table.add_row(out_row);
               }
             }
+            graph::Value::Invalid =>
+            {}
             _ =>
             {
               let mut out_row = row.clone();
