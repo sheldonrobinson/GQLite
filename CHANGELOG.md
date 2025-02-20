@@ -7,6 +7,7 @@
 - Fix order of arrays.
 - Support for array concatenation.
 - Improve support of UNWIND.
+- Add support for ORDER BY, LIMIT and SKIP
 
 ## [0.3.1] - 2025-02-16
 

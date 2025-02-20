@@ -51,6 +51,10 @@ pub enum CompileTimeError
   },
   #[error("InvalidDelete: invalid delete argument, expected node or edge.")]
   InvalidDelete,
+  #[error("NonConstantExpression: statement expect a constant expression.")]
+  NonConstantExpression,
+  #[error("InvalidArgumentType: invalid argument type.")]
+  InvalidArgumentType,
 }
 
 /// Runtime errors.
@@ -106,6 +110,10 @@ pub enum RunTimeError
   InvalidDelete,
   #[error("DeleteConnectedNode: node is still connected and cannot be deleted.")]
   DeleteConnectedNode,
+  #[error("NegativeIntegerArgument: statement expect a positive integer.")]
+  NegativeIntegerArgument,
+  #[error("InvalidArgumentType: invalid argument type.")]
+  InvalidArgumentType,
 }
 
 /// Internal errors, should be treated as bugs.

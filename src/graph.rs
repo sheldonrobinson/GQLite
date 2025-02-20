@@ -5,7 +5,10 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
-use crate::error::{InternalError, RunTimeError};
+use crate::{
+  error::{InternalError, RunTimeError},
+  serialize_with,
+};
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum EdgeDirectivity
@@ -23,6 +26,10 @@ pub enum Value
   Invalid,
   Boolean(bool),
   Integer(i64),
+  #[serde(
+    serialize_with = "serialize_with::serialize_float",
+    deserialize_with = "serialize_with::deserialize_float"
+  )]
   Float(f64),
   String(String),
   Array(Vec<Value>),
@@ -358,7 +365,7 @@ impl Value
       None => self.to_owned(),
     }
   }
-  pub(crate) fn partial_compare<E: crate::error::GenericErrors>(
+  pub(crate) fn try_compare<E: crate::error::GenericErrors>(
     &self,
     rhs: &Self,
   ) -> crate::Result<std::cmp::Ordering>
@@ -396,6 +403,165 @@ impl Value
       {
         Value::String(rhs) => lhs.partial_cmp(rhs).ok_or(E::not_comparable().into()),
         _ => Err(E::not_comparable().into()),
+      },
+    }
+  }
+
+  fn orderability_map(lhs: &ValueObject, rhs: &ValueObject) -> std::cmp::Ordering
+  {
+    let o = lhs.len().cmp(&rhs.len());
+    match o
+    {
+      std::cmp::Ordering::Equal => lhs
+        .iter()
+        .map(|(key, value)| value.orderability(rhs.get(key).unwrap_or(&Value::Invalid)))
+        .find(|p| *p != std::cmp::Ordering::Equal)
+        .unwrap_or(std::cmp::Ordering::Equal),
+      o => o,
+    }
+  }
+  fn orderability_float(lhs: &f64, rhs: &f64) -> std::cmp::Ordering
+  {
+    if lhs.is_nan()
+    {
+      if rhs.is_nan()
+      {
+        std::cmp::Ordering::Equal
+      }
+      else
+      {
+        std::cmp::Ordering::Greater
+      }
+    }
+    else if rhs.is_nan()
+    {
+      std::cmp::Ordering::Less
+    }
+    else
+    {
+      lhs.total_cmp(rhs)
+    }
+  }
+  /// Compute the order between self and rhs, for OrderBy, according to the OpenCypher specification.
+  /// This order is total.
+  pub(crate) fn orderability(&self, rhs: &Value) -> std::cmp::Ordering
+  {
+    match self
+    {
+      Value::Invalid => match rhs
+      {
+        Value::Invalid => std::cmp::Ordering::Equal,
+        _ => std::cmp::Ordering::Greater,
+      },
+      Value::Integer(lhs) => match rhs
+      {
+        Value::Invalid => std::cmp::Ordering::Less,
+        Value::Integer(rhs) => lhs.cmp(rhs),
+        Value::Float(rhs) => Self::orderability_float(&(*lhs as f64), rhs),
+        _ => std::cmp::Ordering::Greater,
+      },
+      Value::Float(lhs) => match rhs
+      {
+        Value::Invalid => std::cmp::Ordering::Less,
+        Value::Integer(rhs) => Self::orderability_float(lhs, &(*rhs as f64)),
+        Value::Float(rhs) => Self::orderability_float(lhs, rhs),
+        _ => std::cmp::Ordering::Greater,
+      },
+      Value::Boolean(lhs) => match rhs
+      {
+        Value::Invalid | Value::Integer(..) | Value::Float(..) => std::cmp::Ordering::Less,
+        Value::Boolean(rhs) => lhs.cmp(rhs),
+        _ => std::cmp::Ordering::Greater,
+      },
+      Value::String(lhs) => match rhs
+      {
+        Value::Invalid | Value::Integer(..) | Value::Float(..) | Value::Boolean(..) =>
+        {
+          std::cmp::Ordering::Less
+        }
+        Value::String(rhs) => lhs.cmp(rhs),
+        _ => std::cmp::Ordering::Greater,
+      },
+      Value::Path(lhs) => match rhs
+      {
+        Value::Invalid
+        | Value::Integer(..)
+        | Value::Float(..)
+        | Value::Boolean(..)
+        | Value::String(..) => std::cmp::Ordering::Less,
+        Value::Path(rhs) =>
+        {
+          match Self::orderability_map(&lhs.source.properties, &rhs.source.properties)
+          {
+            std::cmp::Ordering::Equal =>
+            {
+              match Self::orderability_map(&lhs.properties, &rhs.properties)
+              {
+                std::cmp::Ordering::Equal =>
+                {
+                  Self::orderability_map(&lhs.destination.properties, &rhs.destination.properties)
+                }
+                o => o,
+              }
+            }
+            o => o,
+          }
+        }
+        _ => std::cmp::Ordering::Greater,
+      },
+      Value::Array(lhs) => match rhs
+      {
+        Value::Invalid
+        | Value::Integer(..)
+        | Value::Float(..)
+        | Value::Boolean(..)
+        | Value::String(..)
+        | Value::Path(..) => std::cmp::Ordering::Less,
+        Value::Array(rhs) => lhs
+          .iter()
+          .zip(rhs.iter())
+          .map(|(lhs, rhs)| Self::orderability(lhs, rhs))
+          .find(|p| *p != std::cmp::Ordering::Equal)
+          .unwrap_or(lhs.len().cmp(&rhs.len())),
+        _ => std::cmp::Ordering::Greater,
+      },
+      Value::Edge(lhs) => match rhs
+      {
+        Value::Invalid
+        | Value::Integer(..)
+        | Value::Float(..)
+        | Value::Boolean(..)
+        | Value::String(..)
+        | Value::Path(..)
+        | Value::Array(..) => std::cmp::Ordering::Less,
+        Value::Edge(rhs) => Self::orderability_map(&lhs.properties, &rhs.properties),
+        _ => std::cmp::Ordering::Greater,
+      },
+      Value::Node(lhs) => match rhs
+      {
+        Value::Invalid
+        | Value::Integer(..)
+        | Value::Float(..)
+        | Value::Boolean(..)
+        | Value::String(..)
+        | Value::Path(..)
+        | Value::Array(..)
+        | Value::Edge(..) => std::cmp::Ordering::Less,
+        Value::Node(rhs) => Self::orderability_map(&lhs.properties, &rhs.properties),
+        _ => std::cmp::Ordering::Greater,
+      },
+      Value::Object(lhs) => match rhs
+      {
+        Value::Invalid
+        | Value::Integer(..)
+        | Value::Float(..)
+        | Value::Boolean(..)
+        | Value::String(..)
+        | Value::Path(..)
+        | Value::Array(..)
+        | Value::Edge(..)
+        | Value::Node(..) => std::cmp::Ordering::Less,
+        Value::Object(rhs) => Self::orderability_map(lhs, rhs),
       },
     }
   }

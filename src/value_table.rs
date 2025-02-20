@@ -14,12 +14,6 @@ impl ValueTable
       data: Vec::<Row>::default(),
     }
   }
-  pub(crate) fn from_rows(rows: impl Iterator<Item = Row>) -> Self
-  {
-    Self {
-      data: rows.collect(),
-    }
-  }
   pub(crate) fn add_row(&mut self, row: Row)
   {
     self.data.push(row);
@@ -36,6 +30,28 @@ impl ValueTable
   {
     self.data.first()
   }
+  pub(crate) fn remove_first_rows(&mut self, n: usize)
+  {
+    if n < self.data.len()
+    {
+      self.data.drain(0..n);
+    }
+    else
+    {
+      self.data.clear();
+    }
+  }
+  pub(crate) fn truncate(&mut self, n: usize)
+  {
+    self.data.truncate(n);
+  }
+  pub(crate) fn sort_by_cached_key<K, F>(&mut self, f: F)
+  where
+    F: FnMut(&Row) -> K,
+    K: Ord,
+  {
+    self.data.sort_by_cached_key(f);
+  }
 }
 
 impl IntoIterator for ValueTable
@@ -45,5 +61,15 @@ impl IntoIterator for ValueTable
   fn into_iter(self) -> Self::IntoIter
   {
     self.data.into_iter()
+  }
+}
+
+impl FromIterator<Row> for ValueTable
+{
+  fn from_iter<T: IntoIterator<Item = Row>>(iter: T) -> Self
+  {
+    Self {
+      data: iter.into_iter().collect(),
+    }
   }
 }

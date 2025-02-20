@@ -77,9 +77,9 @@ module GQLiteTest
   end
   def GQLiteTest.parse_results_table(table)
     table = table.raw
-    r_node = /^\((\w*)((:\w*)*)(\s*{.*})?\)$/
-    r_edge = /^\[(\w*)((:\w*)*)(\s*{.*})?\]$/
-    r_path = /^\<\((\w*)((:\w*)*)(\s*{.*})?\)\-\[(\w*)((:\w*)*)(\s*{.*})?\]\-\>\((\w*)((:\w*)*)(\s*{.*})?\)\>$/
+    r_node = /^\(((\:\w*)*)(\s*{.*})?\)$/
+    r_edge = /^\[((\:\w*)*)(\s*{.*})?\]$/
+    r_path = /^\<\(((\:\w*)*)(\s*{.*})?\)\-\[((\:\w*)*)(\s*{.*})?\]\-\>\(((\:\w*)*)(\s*{.*})?\)\>$/
     first_row = true
     return table.map do |c|
       if first_row
@@ -89,13 +89,13 @@ module GQLiteTest
         c.map do |v|
           arr = v.scan r_node
           if arr.size > 0
-            labels = arr[0][1]
+            labels = arr[0][0]
             if labels.nil?
               labels = []
             else
               labels = labels.split(":").reject(&:empty?)
             end
-            properties = arr[0][3] 
+            properties = arr[0][2] 
             if properties.nil?
               properties = {}
             else
@@ -103,8 +103,8 @@ module GQLiteTest
             end
             { "type"=>"node", "properties" => properties, "labels" => labels }
           elsif v != "[]" && (arr = v.scan(r_edge)).size > 0
-            labels = arr[0][1]
-            properties = arr[0][3]
+            labels = arr[0][0]
+            properties = arr[0][2]
             unless labels.nil? && properties.nil?
               if labels.nil?
                 labels = []
@@ -122,39 +122,39 @@ module GQLiteTest
             end
           elsif (arr = v.scan(r_path)).size > 0
             # Parse source
-            source_labels = arr[0][1]
+            source_labels = arr[0][0]
             if source_labels.nil?
               source_labels = []
             else
               source_labels = source_labels.split(":").reject(&:empty?)
             end
-            source_properties = arr[0][3] 
+            source_properties = arr[0][2] 
             if source_properties.nil?
               source_properties = {}
             else
               source_properties = YAML.load source_properties
             end
             # Parse edge
-            edge_labels = arr[0][5]
+            edge_labels = arr[0][3]
             if edge_labels.nil?
               edge_labels = []
             else
               edge_labels = edge_labels.split(":").reject(&:empty?)
             end
-            edge_properties = arr[0][7] 
+            edge_properties = arr[0][5] 
             if edge_properties.nil?
               edge_properties = {}
             else
               edge_properties = YAML.load edge_properties
             end
             # Parse destination
-            destination_labels = arr[0][9]
+            destination_labels = arr[0][6]
             if destination_labels.nil?
               destination_labels = []
             else
               destination_labels = destination_labels.split(":").reject(&:empty?)
             end
-            destination_properties = arr[0][11] 
+            destination_properties = arr[0][8] 
             if destination_properties.nil?
               destination_properties = {}
             else
@@ -181,7 +181,49 @@ RSpec::Matchers.matcher :eq_in_any_order do |expected|
   end
 end
 
+RSpec::Matchers.matcher :eq_in_order do |expected|
+  match do |actual|
+    compare_table_in_order(actual, expected)
+  end
+end
+
 IgnoredScenario = [
+  # Regressions for gqlite 1.2:
+  # aggregation not supported in ORDER BY
+  "[3] Sort on aggregated function",
+  "[6] Count star should count everything in scope",
+  "[7] Ordering with aggregation",
+  "[14] Fail on aggregation in ORDER BY after RETURN",
+  "[1] Sort on aggregate function and normal property",
+  "[4] Ordering and limiting on aggregate",
+  # Missing dates functions
+  "[11] Sort dates in ascending order",
+  "[12] Sort dates in descending order",
+  "[13] Sort local times in ascending order",
+  "[14] Sort local times in descending order",
+  "[15] Sort times in ascending order",
+  "[16] Sort times in descending order",
+  "[17] Sort local date times in ascending order",
+  "[18] Sort local date times in descending order",
+  "[19] Sort date times in ascending order",
+  "[20] Sort date times in descending order",
+  "[33] Sort by a date variable projected from a node property in ascending order",
+  "[34] Sort by a date variable projected from a node property in descending order",
+  "[35] Sort by a local time variable projected from a node property in ascending order",
+  "[36] Sort by a local time variable projected from a node property in descending order",
+  "[37] Sort by a time variable projected from a node property in ascending order",
+  "[38] Sort by a time variable projected from a node property in descending order",
+  "[39] Sort by a local date time variable projected from a node property in ascending order",
+  "[40] Sort by a local date time variable projected from a node property in descending order",
+  "[41] Sort by a date time variable projected from a node property in ascending order",
+  "[42] Sort by a date time variable projected from a node property in descending order",
+  "[43] Sort by a variable that is only partially orderable on a non-distinct binding table",
+  "[44] Sort by a variable that is only partially orderable on a non-distinct binding table, but made distinct",
+  # Missing min function
+  "[13] Fail on sorting by a non-projected aggregation on a variable",
+  "[14] Fail on sorting by a non-projected aggregation on an expression",
+
+  # Not currently supported:
   "[5] Match relationship with inline property value",
   # Triggers a different error first, as MATCH (a) return an empty list, it fails in creation
   "[24] Fail when creating a relationship using undefined variable in pattern",
@@ -196,7 +238,6 @@ IgnoredScenario = [
   # "[3] Delete relationship with bidirectional matching",
   # "[3] Comparing across types yields null, except numbers",
   # "[14] Direction of traversed relationship is not significant for path equality, simple",
-  # "[12] Aggregation of named paths",
   # # p = ()-[]->() not supported (named path)
   # "[16] Optionally matching named paths - null result",
   # "[17] Optionally matching named paths - existing result",
@@ -206,6 +247,7 @@ IgnoredScenario = [
   # paths are not supported in where
   "[2] Join with disjunctive multi-part predicates including patterns",
   # Path assignment and variable length path are not implemented
+  "[12] Aggregation of named paths",
   "[8] Fail when a path has the same variable in a preceding MATCH",
   "[9] Fail when a relationship has the same variable in the same pattern",
   "[10] Fail when a path has the same variable in the same pattern",
@@ -368,6 +410,9 @@ IgnoredScenario = [
   "[9] Fail when indexing with a non-integer given by a parameter",
   # Multi-edge not supported yet, aka ()-[]-()-[]-()
   "[7] Fail when a relationship has the same variable in a preceding MATCH",
+  # [x IN values] not supported
+  "[45] Sort order should be consistent with comparisons where comparisons are defined #Example: <exampleName>",
+
 ]
 
 Before do |scenario|
@@ -462,21 +507,21 @@ Then(/^the result should be, in order:$/) do |table|
   pending if @ignored_scenario
   expect(@exception).to be_nil
   expect(@query_result).not_to be_nil
-  expect(@query_result).to eq(GQLiteTest.parse_results_table table)
+  expect(@query_result).to eq_in_order(GQLiteTest.parse_results_table table)
 end
 
 Then(/^the result should be \(ignoring element order for lists\):$/) do |table|
   pending if @ignored_scenario
   expect(@exception).to be_nil
   expect(@query_result).not_to be_nil
-  expect(@query_result).to eq(GQLiteTest.parse_results_table table)
+  expect(@query_result).to eq_in_order(GQLiteTest.parse_results_table table)
 end
 
 Then(/^the result should be, in order \(ignoring element order for lists\):$/) do |table|
   pending if @ignored_scenario
   expect(@exception).to be_nil
   expect(@query_result).not_to be_nil
-  expect(@query_result).to eq(GQLiteTest.parse_results_table table)
+  expect(@query_result).to eq_in_order(GQLiteTest.parse_results_table table)
 end
 
 Then(/^a SyntaxError should be raised at compile time: VariableAlreadyBound$/) do
@@ -635,13 +680,13 @@ end
 Then(/^an ArgumentError should be raised at runtime: InvalidArgumentType$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
-  expect(@exception.message).to match(/^CompileTime: InvalidArgumentType: .*\.$/)
+  expect(@exception.message).to match(/^RunTime: InvalidArgumentType: .*\.$/)
 end
 
 Then(/^a ArgumentError should be raised at runtime: NegativeIntegerArgument$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
-  expect(@exception.message).to match(/^CompileTime: NegativeIntegerArgument: .*\.$/)
+  expect(@exception.message).to match(/^RunTime: NegativeIntegerArgument: .*\.$/)
 end
 
 Then(/^a SyntaxError should be raised at compile time: AmbiguousAggregationExpression$/) do

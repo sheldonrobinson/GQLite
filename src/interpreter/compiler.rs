@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use crate::interpreter::instructions::Modifiers;
 use crate::{
   error::{self, CompileTimeError, InternalError},
   functions,
@@ -704,6 +705,73 @@ fn compile_match_edge(
   })
 }
 
+fn compile_return_with(
+  function_manager: &functions::Manager,
+  validator: &mut validator::Validator,
+  all: bool,
+  expressions: &Vec<ast::NamedExpression>,
+  modifiers: &ast::Modifiers,
+) -> Result<(Vec<RWExpression>, Modifiers)>
+{
+  let mut variables = Vec::<RWExpression>::new();
+  let mut val_variables = Default::default();
+  if all
+  {
+    val_variables = validator.to_variables();
+    for (name, _) in validator.variables_ref()
+    {
+      variables.push(instructions::RWExpression {
+        name: name.to_owned(),
+        instructions: vec![Instruction::GetVariable {
+          name: name.to_owned(),
+        }],
+        aggregations: Default::default(),
+      });
+    }
+  }
+  let mut variable_names = Vec::<String>::new();
+  for e in expressions.iter()
+  {
+    let mut instructions = Instructions::new();
+    let mut aggregations = HashMap::<String, RWAggregation>::new();
+    compile_expression(
+      function_manager,
+      &e.expression,
+      &mut instructions,
+      &mut Some(&mut aggregations),
+    )?;
+    if variable_names.contains(&e.name)
+    {
+      return Err(
+        CompileTimeError::ColumnNameConflict {
+          name: e.name.to_owned(),
+        }
+        .into(),
+      );
+    }
+    variable_names.push(e.name.to_owned());
+    variables.push(RWExpression {
+      name: e.name.to_owned(),
+      instructions,
+      aggregations,
+    });
+    val_variables.insert(
+      e.name.to_owned(),
+      expression_analyser::ExpressionInfo::analyse(
+        validator.variables_ref(),
+        &function_manager,
+        &e.expression,
+      )?
+      .expression_type
+      .into(),
+    );
+  }
+  validator.set_variables(val_variables);
+  let modifiers = compile_modifiers(function_manager, validator, &modifiers)?;
+
+  Ok((variables, modifiers))
+}
+
 fn compile_match_patterns(
   function_manager: &functions::Manager,
   validator: &mut validator::Validator,
@@ -767,6 +835,85 @@ fn compile_match_patterns(
   })
 }
 
+fn check_for_constant_integer_expression(
+  function_manager: &functions::Manager,
+  validator: &mut validator::Validator,
+  x: &ast::Expression,
+) -> Result<()>
+{
+  let ei =
+    expression_analyser::ExpressionInfo::analyse(validator.variables_ref(), function_manager, &x)?;
+  if !ei.constant
+  {
+    Err(error::CompileTimeError::NonConstantExpression.into())
+  }
+  else
+  {
+    match ei.expression_type
+    {
+      expression_analyser::ExpressionType::Integer
+      | expression_analyser::ExpressionType::Variant => Ok(()),
+      _ => Err(error::CompileTimeError::InvalidArgumentType.into()),
+    }
+  }
+}
+
+pub(crate) fn compile_modifiers(
+  function_manager: &functions::Manager,
+  validator: &mut validator::Validator,
+  modifiers: &ast::Modifiers,
+) -> Result<instructions::Modifiers>
+{
+  let limit = modifiers
+    .limit
+    .as_ref()
+    .map(|x| {
+      check_for_constant_integer_expression(function_manager, validator, x)?;
+      let mut instructions = Instructions::new();
+      compile_expression(function_manager, &x, &mut instructions, &mut None)?;
+      Ok::<_, error::Error>(instructions)
+    })
+    .transpose()?;
+  let skip = modifiers
+    .skip
+    .as_ref()
+    .map(|x| {
+      check_for_constant_integer_expression(function_manager, validator, x)?;
+      let mut instructions = Instructions::new();
+      compile_expression(function_manager, &x, &mut instructions, &mut None)?;
+      Ok::<_, error::Error>(instructions)
+    })
+    .transpose()?;
+  let order_by = modifiers.order_by.as_ref().map_or_else(
+    || Ok(Default::default()),
+    |x| {
+      x.expressions
+        .iter()
+        .map(|x| {
+          let mut instructions = Instructions::new();
+
+          compile_expression(
+            function_manager,
+            &x.expression,
+            &mut instructions,
+            &mut None,
+          )?;
+
+          Ok(instructions::OrderBy {
+            asc: x.asc,
+            instructions,
+          })
+        })
+        .collect::<Result<_>>()
+    },
+  )?;
+  Ok(instructions::Modifiers {
+    limit,
+    skip,
+    order_by,
+  })
+}
+
 pub(crate) fn compile(
   function_manager: &functions::Manager,
   statements: crate::parser::ast::Statements,
@@ -792,40 +939,17 @@ pub(crate) fn compile(
         ),
         ast::Statement::Return(return_statement) =>
         {
-          let mut variables = Vec::<instructions::RWExpression>::new();
-
-          if return_statement.all
-          {
-            for (name, _) in validator.variables_ref()
-            {
-              variables.push(instructions::RWExpression {
-                name: name.to_owned(),
-                instructions: vec![Instruction::GetVariable {
-                  name: name.to_owned(),
-                }],
-                aggregations: Default::default(),
-              });
-            }
-          }
-
-          for expr in return_statement.expressions.iter()
-          {
-            let mut instructions = Instructions::new();
-            let mut aggregations = HashMap::<String, RWAggregation>::new();
-            compile_expression(
-              function_manager,
-              &expr.expression,
-              &mut instructions,
-              &mut Some(&mut aggregations),
-            )?;
-            variables.push(instructions::RWExpression {
-              name: expr.name.clone(),
-              instructions,
-              aggregations,
-            });
-          }
-
-          Ok(Block::Return { variables })
+          let (variables, modifiers) = compile_return_with(
+            function_manager,
+            &mut validator,
+            return_statement.all,
+            &return_statement.expressions,
+            &return_statement.modifiers,
+          )?;
+          Ok(Block::Return {
+            variables,
+            modifiers,
+          })
         }
         ast::Statement::Call(call) =>
         {
@@ -841,61 +965,17 @@ pub(crate) fn compile(
         }
         ast::Statement::With(with) =>
         {
-          let mut variables = Vec::<RWExpression>::new();
-          let mut val_variables = Default::default();
-          if with.all
-          {
-            val_variables = validator.to_variables();
-            for (name, _) in validator.variables_ref()
-            {
-              variables.push(instructions::RWExpression {
-                name: name.to_owned(),
-                instructions: vec![Instruction::GetVariable {
-                  name: name.to_owned(),
-                }],
-                aggregations: Default::default(),
-              });
-            }
-          }
-          let mut variable_names = Vec::<String>::new();
-          for e in with.expressions.iter()
-          {
-            let mut instructions = Instructions::new();
-            let mut aggregations = HashMap::<String, RWAggregation>::new();
-            compile_expression(
-              function_manager,
-              &e.expression,
-              &mut instructions,
-              &mut Some(&mut aggregations),
-            )?;
-            if variable_names.contains(&e.name)
-            {
-              return Err(
-                CompileTimeError::ColumnNameConflict {
-                  name: e.name.to_owned(),
-                }
-                .into(),
-              );
-            }
-            variable_names.push(e.name.to_owned());
-            variables.push(RWExpression {
-              name: e.name.to_owned(),
-              instructions,
-              aggregations,
-            });
-            val_variables.insert(
-              e.name.to_owned(),
-              expression_analyser::ExpressionInfo::analyse(
-                validator.variables_ref(),
-                &function_manager,
-                &e.expression,
-              )?
-              .expression_type
-              .into(),
-            );
-          }
-          validator.set_variables(val_variables);
-          Ok(Block::With { variables })
+          let (variables, modifiers) = compile_return_with(
+            function_manager,
+            &mut validator,
+            with.all,
+            &with.expressions,
+            &with.modifiers,
+          )?;
+          Ok(Block::With {
+            variables,
+            modifiers,
+          })
         }
         ast::Statement::Unwind(unwind) =>
         {

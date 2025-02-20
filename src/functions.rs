@@ -37,7 +37,7 @@ impl FunctionTypeTrait for i64
 {
   fn result_type() -> ExpressionType
   {
-    ExpressionType::Number
+    ExpressionType::Integer
   }
 }
 
