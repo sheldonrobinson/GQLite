@@ -193,6 +193,26 @@ pub enum InternalError
   },
 }
 
+#[derive(thiserror::Error, Debug)]
+pub enum ConnectionError
+{
+  #[error("UnknownBackend: backend '{backend}' is unknown.")]
+  UnknownBackend
+  {
+    backend: String
+  },
+  #[error("UnavailableBackend: backend '{backend}' is unavailable, and was not built.")]
+  UnavailableBackend
+  {
+    backend: &'static str
+  },
+  #[error("OpeningError: could not open database, got the following error messages from the backends: {errors}")]
+  OpeningError
+  {
+    errors: String
+  },
+}
+
 /// GQLite errors
 #[derive(thiserror::Error, Debug)]
 pub enum Error
@@ -203,11 +223,14 @@ pub enum Error
   /// Error that occurs during runtime
   #[error("RunTime: {0}")]
   RunTime(#[from] RunTimeError),
+  /// Connection error
+  #[error("ConnectionError")]
+  ConnectionError(#[from] ConnectionError),
   /// Error that should not occurs and most likely correspond to a bug
   #[error("Internal: {0}")]
   Internal(#[from] InternalError),
 
-  // Errors from dependencies
+  // Errors from redb
   #[cfg(feature = "redb")]
   #[error("ReDB: {0}")]
   ReDBError(#[from] redb::Error),
@@ -305,4 +328,11 @@ impl GenericErrors for RunTimeError
   {
     Self::NotComparable
   }
+}
+
+/// Merge a list of error into a string error message
+pub(crate) fn vec_to_error<E: std::fmt::Display>(errs: &Vec<Error>) -> String
+{
+  let errs: Vec<String> = errs.iter().map(|x| format!("'{}'", x)).collect();
+  errs.join(", ")
 }
