@@ -1,0 +1,1 @@
+UPDATE gqlite_/%= _graph_name %/_edges AS tblu SET properties=json_remove(tblu.properties, "/%= _path %/") /%= _what %/ WHERE tblu.id = /%= _edge_id %/

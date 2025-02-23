@@ -1,0 +1,1 @@
+INSERT INTO gqlite_labels(label) VALUES (?001)

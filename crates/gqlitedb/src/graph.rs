@@ -799,6 +799,17 @@ impl From<Key> for u128
   }
 }
 
+#[cfg(feature = "sqlite")]
+impl rusqlite::ToSql for Key
+{
+  fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>>
+  {
+    Ok(rusqlite::types::ToSqlOutput::Owned(
+      rusqlite::types::Value::Blob(self.uuid.to_be_bytes().into()),
+    ))
+  }
+}
+
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, Clone)]
 #[serde(tag = "type", rename = "node")]
 pub struct Node

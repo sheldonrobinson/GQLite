@@ -274,11 +274,23 @@ pub enum Error
   #[error("ReDB:CommitError: {0}")]
   ReDBCommitError(#[from] redb::CommitError),
 
+  // Errors from sqlite
+  #[cfg(feature = "sqlite")]
+  #[error("Sqlite: {0}")]
+  SqliteError(#[from] rusqlite::Error),
+
+  // Errors from askama
+  #[cfg(feature = "sqlite")]
+  #[error("Askama: {0}")]
+  AskamaError(#[from] askama::Error),
+
   // Following errors need reviews, and most would fall in the internal error category
   #[error("An error occured while serialization to Cbor: {0}")]
   CborSerialisationError(#[from] ciborium::ser::Error<std::io::Error>),
   #[error("An error occured while deserialization from Cbor: {0}")]
   CborDeserialisationError(#[from] ciborium::de::Error<std::io::Error>),
+  #[error("An error occured while serialization to Json or deserialization from Json: {0}")]
+  JsonError(#[from] serde_json::Error),
   #[error("Parse int error: {0}")]
   ParseFloatError(#[from] std::num::ParseFloatError),
   #[error("Parse int error: {0}")]

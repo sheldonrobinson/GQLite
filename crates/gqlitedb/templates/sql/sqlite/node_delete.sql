@@ -1,0 +1,1 @@
+DELETE FROM gqlite_{{ graph_name }}_nodes WHERE key IN ({{ what }})

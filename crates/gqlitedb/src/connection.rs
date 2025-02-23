@@ -45,7 +45,7 @@ pub struct Connection
 
 impl Connection
 {
-  #[cfg(feature = "redb")]
+  #[cfg(any(feature = "redb", feature = "sqlite"))]
   pub fn open<P: AsRef<std::path::Path>>(
     path: P,
     options: crate::graph::ValueObject,
@@ -56,6 +56,7 @@ impl Connection
       let backend: &String = backend.try_into_ref()?;
       match backend.as_str()
       {
+        "sqlite" => Self::open_sqlite(path),
         "redb" => Self::open_redb(path),
         _ => Err(
           error::ConnectionError::UnknownBackend {
@@ -67,8 +68,31 @@ impl Connection
     }
     else
     {
-      Self::open_redb(path)
+      Self::open_sqlite(path.as_ref().to_owned()).or_else(|sq_e| {
+        Self::open_redb(path).map_err(|rb_e| {
+          error::ConnectionError::OpeningError {
+            errors: error::vec_to_error::<error::Error>(&vec![sq_e, rb_e]),
+          }
+          .into()
+        })
+      })
     }
+  }
+  #[cfg(feature = "sqlite")]
+  fn open_sqlite<P: AsRef<std::path::Path>>(path: P) -> crate::Result<Connection>
+  {
+    Ok(Connection {
+      connection: ConnectionImpl {
+        store: crate::store::sqlite::Store::new(path)?,
+        function_manager: crate::functions::Manager::new(),
+      }
+      .boxed(),
+    })
+  }
+  #[cfg(not(feature = "sqlite"))]
+  fn open_sqlite<P: AsRef<std::path::Path>>(_: P) -> crate::Result<Connection>
+  {
+    Err(error::ConnectionError::UnavailableBackend { backend: "sqlite" }.into())
   }
   #[cfg(feature = "redb")]
   fn open_redb<P: AsRef<std::path::Path>>(path: P) -> crate::Result<Connection>
