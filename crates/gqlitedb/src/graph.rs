@@ -713,7 +713,7 @@ impl ValueTryIntoRef<Value> for Value
 }
 
 macro_rules! impl_to_value {
-  ($type:ty, $vn:tt $(, null_into: $null_into:tt)?) => {
+  ($type:ty, $vn:tt) => {
     impl Into<Value> for $type
     {
       fn into(self) -> Value
@@ -736,9 +736,14 @@ macro_rules! impl_to_value {
       {
         match self
         {
-          $(Value::Invalid => Ok($null_into),)?
           Value::$vn(v) => Ok(v),
-          _ => Err(InternalError::InvalidValueCast.into()),
+          _ => Err(
+            InternalError::InvalidValueCast {
+              value: self,
+              typename: stringify!($type),
+            }
+            .into(),
+          ),
         }
       }
     }
@@ -750,14 +755,20 @@ macro_rules! impl_to_value {
         match self
         {
           Value::$vn(v) => Ok(v),
-          _ => Err(crate::error::InternalError::InvalidValueCast.into()),
+          _ => Err(
+            InternalError::InvalidValueCast {
+              value: self.clone(),
+              typename: stringify!($type),
+            }
+            .into(),
+          ),
         }
       }
     }
   };
 }
 
-impl_to_value!(bool, Boolean, null_into: false);
+impl_to_value!(bool, Boolean);
 impl_to_value!(i64, Integer);
 impl_to_value!(f64, Float);
 impl_to_value!(String, String);

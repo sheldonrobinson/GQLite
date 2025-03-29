@@ -184,8 +184,12 @@ pub enum InternalError
   },
   #[error("Empty stack.")]
   EmptyStack,
-  #[error("Invalid value cast")]
-  InvalidValueCast,
+  #[error("Invalid value cast, cannot cast {value} to {typename}.")]
+  InvalidValueCast
+  {
+    value: crate::Value,
+    typename: &'static str,
+  },
   #[error("Code is not reachable in {context}.")]
   Unreachable
   {
