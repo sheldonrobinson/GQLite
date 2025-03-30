@@ -80,6 +80,8 @@ remove_statement         = { "REMOVE" ~ remove_expression ~ ("," ~ remove_expres
 
 // literals
 int            = @{ ("+" | "-")? ~ ('0'..'9')+ }
+octa_int       = @{ ("+" | "-")? ~ "0o" ~ ('0'..'9' | 'a' .. 'f' | 'A' .. 'F')+ }
+hexa_int       = @{ ("+" | "-")? ~ "0x" ~ ('0'..'9' | 'a' .. 'f' | 'A' .. 'F')+ }
 null_lit       =  { "null" }
 true_lit       =  { "true" }
 false_lit      =  { "false" }
@@ -125,7 +127,7 @@ superior_equal =  { ">=" }
 not_in         =  { "NOT" ~ "IN" }
 in_            =  { "IN" }
 
-negation =  { "-" }
+negation =  { "-" ~ !int }
 not_kw   = @{ "NOT" ~ !ASCII_ALPHA }
 not      =  { not_kw }
 
@@ -142,7 +144,7 @@ parenthesised_expression = { "(" ~ expression ~ ")" }
 named_expression         = { (expression ~ "AS" ~ ident) | expression }
 function_call            = { function_name ~ "(" ~ (expression ~ ("," ~ expression)*)? ~ ")" }
 count_star               = { "count" ~ "(" ~ "*" ~ ")" }
-expression_term          = { null_lit | true_lit | false_lit | num | int | string_literal | map | array | label_check_expression | parameter | parenthesised_expression | function_call | count_star | ident }
+expression_term          = { null_lit | true_lit | false_lit | num | hexa_int | octa_int | int | string_literal | map | array | label_check_expression | parameter | parenthesised_expression | function_call | count_star | ident }
 
 parameter = { "$" ~ parameter_name }
 

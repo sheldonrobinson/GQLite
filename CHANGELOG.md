@@ -5,7 +5,7 @@
 ## [Unreleased] - ReleaseDate
 
 - Improve support for lists.
-- Fix support for boolean, conditional, null.
+- Fix support for boolean, conditional, null, integer literals.
 - Add ceil, floor, rand, toInteger functions.
 - Add collect aggregator.
 

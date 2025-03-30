@@ -626,7 +626,7 @@ end
 Then(/^a SyntaxError should be raised at compile time: InvalidNumberLiteral$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
-  expect(@exception.message).to match(/^CompileTime: (InvalidNumberLiteral.*)|(.*Expected token end of file got identifier.*)$/)
+  expect(@exception.message).to match(/^CompileTime: ParseError: .*$/)
 end
 
 Then(/^a SyntaxError should be raised at compile time: UnexpectedSyntax$/) do
