@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::error::{CompileTimeError, InternalError};
-use crate::interpreter::expression_analyser::ExpressionType;
+use crate::interpreter::expression_analyser::{ExpressionInfo, ExpressionType};
 use crate::parser::ast;
 use crate::{functions, Result};
 
@@ -13,9 +13,8 @@ impl crate::interpreter::expression_analyser::Variables for HashMap<String, Vari
     Ok(
       self
         .get(&name)
-        .ok_or_else(|| InternalError::UnknownVariable {
-          context: "Validator/evaluate",
-          variable: name.to_owned(),
+        .ok_or_else(|| CompileTimeError::UndefinedVariable {
+          name: name.to_owned(),
         })?
         .variable_type,
     )
@@ -208,6 +207,10 @@ impl Validator
       }
       else
       {
+        if let Some(props) = &node.properties
+        {
+          ExpressionInfo::analyse(&self.variables, &self.function_manager, &props)?;
+        }
         self
           .variables
           .insert(var_name.to_owned(), (*node).to_owned().into());
@@ -245,6 +248,10 @@ impl Validator
       }
       else
       {
+        if let Some(props) = &edge.properties
+        {
+          ExpressionInfo::analyse(&self.variables, &self.function_manager, &props)?;
+        }
         self
           .variables
           .insert(var_name.to_owned(), (*edge).to_owned().into());

@@ -222,15 +222,10 @@ IgnoredScenario = [
   # Missing min function
   "[13] Fail on sorting by a non-projected aggregation on a variable",
   "[14] Fail on sorting by a non-projected aggregation on an expression",
-
-  # Not currently supported:
-  "[5] Match relationship with inline property value",
-  # Triggers a different error first, as MATCH (a) return an empty list, it fails in creation
-  "[24] Fail when creating a relationship using undefined variable in pattern",
-  # Variable lenght not supported
+  # Variable length not supported
   "[22] Fail when creating a variable-length relationship",
   "[14] Fail when filtering path with property predicate",
-  # Only basic pasth assignment supported yet
+  # Only basic path assignment supported yet
   "[4] Forwarding a path variable",
   # # Path assignment is not implemented yet
   # "[8] `labels()` failing on a path",
@@ -277,8 +272,6 @@ IgnoredScenario = [
   "[5] Label expression on null",
   # TODO edge isomorphism
   "[29] Fail when re-using a relationship in the same pattern",
-  # WITH allow to reuse variable even with considering edge isomorphism, need a better way to handle that, might have to be tracked by the parser
-  "[3] Forwarding a relationship variable",
   # Unreported error
   "[5] Fail when not aliasing expressions in WITH",
   # aggregation (or function call) fail to access a variable when used in a WITH statement (such as ´count(you.age)´) https://gitlab.com/GQLite/GQLite/-/issues/16
@@ -295,6 +288,8 @@ IgnoredScenario = [
   "[4] Unwinding a collected unwound expression",
   # GROUP BY fails with WITH statement https://gitlab.com/GQLite/GQLite/-/issues/17
   "[2] Ordering and skipping on aggregate",
+  # Aggregation grouping is not implemented
+  "[1] ORDER BY of a column introduced in RETURN should return salient results in ascending order",
   # collect(nodes) returns an array with the node internal id as an integer (aka it loses the information that it is a ref)
   "[5] Unwinding a collected expression",
   # No validation of delete expression
@@ -316,14 +311,6 @@ IgnoredScenario = [
   "[13] Fail when sorting on variable removed by DISTINCT",
   "[24] Sort by an expression that is only partially orderable on a non-distinct binding table, but made distinct",
   "[1] Handle dependencies across WITH with SKIP",
-  # UNWIND not supported yet
-  "[1] ORDER BY of a column introduced in RETURN should return salient results in ascending order",
-  "[3] SKIP with an expression that does not depend on variables",
-  "[3] Limiting amount of rows when there are fewer left than the LIMIT argument",
-  "[1] Limit to two hits",
-  "[6] LIMIT with an expression that does not depend on variables",
-  "[7] The order direction cannot be overwritten",
-  "[12] Unwind does not remove variables from scope",
   # return modifiers (e.g. order by) must be done after computing expressions https://gitlab.com/gqlite/GQLite/-/issues/2
   "[7] Limit to more rows than actual results 1",
   "[8] Limit to more rows than actual results 2",
@@ -381,13 +368,8 @@ IgnoredScenario = [
   "[7] Comparing maps to maps, Examples (#15)",
   "[7] Comparing maps to maps, Examples (#16)",
   "[3] `properties()` on null",
-  # "[21] IN should return null if LHS and RHS are null - list version",
-  "[29] IN should return null if comparison with null is required, list version",
   # "[31] IN should return null when comparing two so-called identical lists where one element is null",
   # "[34] IN should return null if comparison with null is required, list version 2",
-  # variable inside the same CREATE statement are not accessible yet (https://gitlab.com/gqlite/GQLite/-/issues/9)
-  "[1] Forwarding a property to express a join",
-  "[2] Handle dependencies across WITH with LIMIT",
   # type of value stored in array/map is lost
   "[5] `type()` handling Any type",
   # Comparison
@@ -395,9 +377,6 @@ IgnoredScenario = [
   "[5] Comparing NaN",
   "[6] Comparability between numbers and strings",
   "[8] Equality and inequality of NaN",
-  # NULL and OPTIONAL
-  "[3] Property null check on null node",
-  "[3] Property not null check on null node",
   # MAX aggregation on list
   "[9] `max()` over list values", # Needs a custom max/min aggregator see https://gitlab.com/GQLite/GQLite/-/issues/12
   "[11] `max()` over mixed values",
@@ -406,9 +385,6 @@ IgnoredScenario = [
   "[25] Fail on sorting by an aggregation",
   "[19] Fail if not projected variables are used inside an order by item which contains an aggregation expression",
   "[20] Fail if more complex expressions, even if projected, are used inside an order by item which contains an aggregation expression",
-  # No checking of index type
-  "[8] Fail when indexing with a non-integer",
-  "[9] Fail when indexing with a non-integer given by a parameter",
   # Multi-edge not supported yet, aka ()-[]-()-[]-()
   "[7] Fail when a relationship has the same variable in a preceding MATCH",
   # [x IN values] not supported
@@ -535,8 +511,7 @@ end
 Then(/^a SyntaxError should be raised at compile time: UndefinedVariable$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
-  # TODO: should not match for RunTime
-  expect(@exception.message).to match(/^(RunTime)|(CompileTime): UndefinedVariable: Unknown variable '.*'\.$/)
+  expect(@exception.message).to match(/^CompileTime: UndefinedVariable: Unknown variable '.*'\.$/)
 end
 
 Then(/^a SyntaxError should be raised at compile time: NoSingleRelationshipType$/) do

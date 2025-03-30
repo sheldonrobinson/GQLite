@@ -31,66 +31,28 @@
         },
         {
             "name": "gqlite cmd (gdb)",
-            "type": "cppdbg",
+            "type": "lldb",
             "request": "launch",
             "program": "${env:CC_PKG_ROOT}/host-build-debug/gqlite/gqlite",
             "args": [],
-            "stopAtEntry": false,
             "cwd": "/tmp",
-            "environment": [
-                {
-                    "name": "RUST_BACKTRACE",
-                    "value": "1"
-                }
-            ],
-            "externalConsole": false,
-            "MIMode": "gdb",
-            "setupCommands": [
-                {
-                    "description": "Enable pretty-printing for gdb",
-                    "text": "-enable-pretty-printing",
-                    "ignoreFailures": true
-                },
-                {
-                    "description": "Set Disassembly Flavor to Intel",
-                    "text": "-gdb-set disassembly-flavor intel",
-                    "ignoreFailures": true
-                }
-            ],
-            "showDisplayString": true
+            "env": {
+                "RUST_BACKTRACE": "1"
+            },
         },
         {
             "name": "gqlite tck (gdb)",
-            "type": "cppdbg",
+            "type": "lldb",
             "request": "launch",
             "program": "/usr/bin/ruby",
             "args": [
                 "${env:CC_PKG_ROOT}/src/gqlite/tests/rb/gqlite-tck.rb",
                 "--abort-on-first-error"
             ],
-            "stopAtEntry": false,
             "cwd": "${env:CC_PKG_ROOT}/src/gqlite/tests/rb",
-            "environment": [
-                {
-                    "name": "RUST_BACKTRACE",
-                    "value": "1"
-                }
-            ],
-            "externalConsole": false,
-            "MIMode": "gdb",
-            "setupCommands": [
-                {
-                    "description": "Enable pretty-printing for gdb",
-                    "text": "-enable-pretty-printing",
-                    "ignoreFailures": true
-                },
-                {
-                    "description": "Set Disassembly Flavor to Intel",
-                    "text": "-gdb-set disassembly-flavor intel",
-                    "ignoreFailures": true
-                }
-            ],
-            "showDisplayString": true
+            "env": {
+                "RUST_BACKTRACE": "1"
+            },
         },
         {
             "name": "gqlite rspec (gdb)",

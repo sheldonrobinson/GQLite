@@ -66,7 +66,7 @@ expressions = [
   # conditonal
   'conditional/Conditional1', 'conditional/Conditional2',
   # null
-  'null/Null1', 'null/Null2',
+  'null/Null1', 'null/Null2', 'null/Null3',
   # list
   'list/List1', 'list/List2', 'list/List3', 'list/List4', 'list/List5', 'list/List6', 'list/List7',  'list/List8', 
 ]
@@ -100,15 +100,8 @@ expressions = [
 #   'comparison/Comparison1', 'comparison/Comparison2', 'comparison/Comparison3', 'comparison/Comparison4',
 #   # graph
 #   'graph/Graph1', 'graph/Graph2', 'graph/Graph3', 'graph/Graph4', 'graph/Graph5', 'graph/Graph7', 'graph/Graph9',
-#   # list
-#   'list/List1', 'list/List2', 'list/List3', 'list/List4', 'list/List5', 
-#   # 'list/List6',
-#    'list/List7',  'list/List8', 
-#   #  'list/List9',
 #   # literals
 #   'literals/Literals1', 'literals/Literals2', 'literals/Literals3', 'literals/Literals4', 
-#   # null
-#   'null/Null3',
 # ]
 
 # In progress
