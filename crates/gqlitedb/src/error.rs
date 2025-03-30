@@ -4,6 +4,12 @@
 #[derive(thiserror::Error, Debug)]
 pub enum CompileTimeError
 {
+  /// Floating point overflow
+  #[error("FloatingPointOverflow: '{text}' is too large.")]
+  FloatingPointOverflow
+  {
+    text: String
+  },
   /// Integer overflow
   #[error("IntegerOverflow: '{text}' is too large.")]
   IntegerOverflow

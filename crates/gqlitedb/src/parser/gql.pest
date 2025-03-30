@@ -2,12 +2,18 @@ WHITESPACE     = _{ " " | "\t" | "\n" }
 COMMENT        = _{ ("//" ~ (!"\n" ~ ANY)*) | ("/*" ~ (!"*/" ~ ANY)* ~ "*/") }
 ident          = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
 parameter_name = @{ (ASCII_ALPHANUMERIC | "_")* }
-char           =  {
+char_single    =  {
     !("'" | "\\") ~ ANY
-  | "\\" ~ ("\"" | "\\" | "/" | "b" | "f" | "n" | "r" | "t")
+  | "\\" ~ ("\"" | "\\" | "/" | "b" | "f" | "n" | "r" | "t" | "'")
   | "\\" ~ ("u" ~ ASCII_HEX_DIGIT{4})
 }
-nothing_ident  = @{ "###"+ }
+char_double    =  {
+    !("\"" | "\\") ~ ANY
+  | "\\" ~ ("\"" | "\\" | "/" | "b" | "f" | "n" | "r" | "t" | "'")
+  | "\\" ~ ("u" ~ ASCII_HEX_DIGIT{4})
+}
+
+nothing_ident = @{ "###"+ }
 
 // Query
 query = _{ SOI ~ statement* ~ ";"? ~ EOI }
@@ -85,9 +91,10 @@ hexa_int       = @{ ("+" | "-")? ~ "0x" ~ ('0'..'9' | 'a' .. 'f' | 'A' .. 'F')+ 
 null_lit       =  { "null" }
 true_lit       =  { "true" }
 false_lit      =  { "false" }
-num            = @{ int ~ "." ~ ASCII_DIGIT+ ~ (^"e" ~ int)? }
-string_literal = ${ "'" ~ inner ~ "'" }
-inner          = @{ char* }
+num            = @{ (int? ~ "." ~ ASCII_DIGIT+ ~ (^"e" ~ int)?) | (int ~ ^"e" ~ int) }
+string_literal = ${ ("'" ~ inner_single ~ "'") | ("\"" ~ inner_double ~ "\"") }
+inner_double   = @{ char_double* }
+inner_single   = @{ char_single* }
 function_name  =  { ident ~ ("." ~ ident)* }
 
 // Expression
