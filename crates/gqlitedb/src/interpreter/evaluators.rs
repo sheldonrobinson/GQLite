@@ -1,12 +1,7 @@
 use std::collections::HashMap;
 
-use crate::{
-  aggregators,
-  error::{InternalError, RunTimeError},
-  graph,
-  interpreter::instructions,
-  store, value_table, Error, Result,
-};
+use crate::prelude::*;
+use interpreter::instructions;
 
 #[derive(Debug, Clone)]
 enum Value
@@ -512,6 +507,89 @@ fn eval_instructions(
         let v: graph::Value = stack.try_pop_into()?;
         stack.push(v.access(path.iter()).into());
       }
+      instructions::Instruction::IndexAccess =>
+      {
+        let idx: i64 = stack.try_pop_into()?;
+        let v: graph::Value = stack.try_pop_into()?;
+        let v: Vec<graph::Value> = v.try_into()?;
+        stack.push(
+          v.get(idx as usize)
+            .ok_or(RunTimeError::OutOfBound)?
+            .to_owned()
+            .into(),
+        );
+      }
+      instructions::Instruction::RangeAccess { start, end } =>
+      {
+        let end: Option<graph::Value> = if *end
+        {
+          Some(stack.try_pop_into()?)
+        }
+        else
+        {
+          None
+        };
+        let start: Option<graph::Value> = if *start
+        {
+          Some(stack.try_pop_into()?)
+        }
+        else
+        {
+          None
+        };
+        // Get the array out of the stack
+        let v: graph::Value = stack.try_pop_into()?;
+        // if either end or start are null, return null
+        if end.as_ref().map_or(false, |e| e.is_null())
+          || start.as_ref().map_or(false, |s| s.is_null())
+        {
+          stack.push(graph::Value::Invalid.into());
+        }
+        else
+        {
+          let mut start: Option<i64> = start.map(|x| x.try_into()).transpose()?;
+          let mut end: Option<i64> = end.map(|x| x.try_into()).transpose()?;
+          let v: Vec<graph::Value> = v.try_into()?;
+          // Compute range length
+          let length = match (start, end)
+          {
+            (Some(start), Some(end)) => Some(end - start),
+            _ => None,
+          };
+          if length.map_or(false, |l| l >= v.len() as i64)
+          {
+            stack.push(v.into());
+          }
+          else
+          {
+            // If start is negative, it should be made into a positive number
+            while start.map_or(false, |x| x < 0)
+            {
+              start = start.map(|x| x + v.len() as i64);
+              end = end.map(|x| x + v.len() as i64);
+            }
+            let end = end.map(|x| x.min(v.len() as i64));
+            let v = match (start, end)
+            {
+              (Some(start), Some(end)) =>
+              {
+                if end < start
+                {
+                  Vec::<graph::Value>::default().into()
+                }
+                else
+                {
+                  v[start as usize..end as usize].to_owned().into()
+                }
+              }
+              (Some(start), None) => v[start as usize..].to_owned().into(),
+              (None, Some(end)) => v[..end as usize].to_owned().into(),
+              (None, None) => v.to_owned().into(),
+            };
+            stack.push(v);
+          }
+        }
+      }
       instructions::Instruction::Duplicate => stack.push(stack.try_last()?.clone()),
       &instructions::Instruction::Rot3 =>
       {
@@ -611,16 +689,16 @@ fn eval_instructions(
       }
       &instructions::Instruction::InBinaryOperator =>
       {
-        execute_binary_operator(stack, |a, b| {
+        execute_binary_operator::<graph::Value>(stack, |a, b| {
           let b_arr: Vec<graph::Value> = b.try_into()?;
-          Ok(b_arr.contains(&a))
+          Ok(value::contains(&b_arr, &a).into())
         })?;
       }
       &instructions::Instruction::NotInBinaryOperator =>
       {
-        execute_binary_operator(stack, |a, b| {
+        execute_binary_operator::<graph::Value>(stack, |a, b| {
           let b_arr: Vec<graph::Value> = b.try_into()?;
-          Ok(!b_arr.contains(&a))
+          Ok((!value::contains(&b_arr, &a)).into())
         })?;
       }
       &instructions::Instruction::AdditionBinaryOperator =>

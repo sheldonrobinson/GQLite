@@ -16,8 +16,10 @@ mod functions;
 mod graph;
 mod interpreter;
 mod parser;
+mod prelude;
 mod serialize_with;
 mod store;
+mod value;
 mod value_table;
 
 /// GQLite error

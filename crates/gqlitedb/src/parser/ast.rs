@@ -156,6 +156,8 @@ pub(crate) enum Expression
   Array(Array),
   FunctionCall(FunctionCall),
   Map(Map),
+  IndexAccess(Box<IndexAccess>),
+  RangeAccess(Box<RangeAccess>),
   MemberAccess(Box<MemberAccess>),
   Parameter(Parameter),
   Value(Value),
@@ -395,14 +397,20 @@ pub(crate) struct MemberAccess
   pub(crate) path: Vec<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) struct IndexAccess
 {
   pub(crate) left: Expression,
   pub(crate) index: Expression,
-  pub(crate) end: Expression,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct RangeAccess
+{
+  pub(crate) left: Expression,
+  pub(crate) start: Option<Expression>,
+  pub(crate) end: Option<Expression>,
+}
 #[derive(Debug)]
 pub(crate) struct HasLabels
 {

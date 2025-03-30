@@ -46,6 +46,12 @@ pub(crate) enum Instruction
   {
     keys: Vec<String>,
   },
+  IndexAccess,
+  RangeAccess
+  {
+    start: bool,
+    end: bool,
+  },
   MemberAccess
   {
     path: Vec<String>,

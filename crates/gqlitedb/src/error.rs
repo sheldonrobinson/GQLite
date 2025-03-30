@@ -114,6 +114,8 @@ pub enum RunTimeError
   NegativeIntegerArgument,
   #[error("InvalidArgumentType: invalid argument type.")]
   InvalidArgumentType,
+  #[error("OutOfBound: index is out of bound for array.")]
+  OutOfBound,
 }
 
 /// Internal errors, should be treated as bugs.

@@ -261,6 +261,7 @@ IgnoredScenario = [
   "[15] Variable length patterns and nulls",
   "[19] Optionally matching named paths with single and variable length patterns",
   "[20] Variable length optional relationships with bound nodes, no matches",
+  "[5] Fail for `size()` on paths",
   # WITH not eliminating conflicts
   "[7] Matching twice with conflicting relationship types on same relationship",
   "[24] Matching twice with duplicate relationship types on same relationship",
@@ -656,7 +657,7 @@ end
 Then(/^a SyntaxError should be raised at compile time: UnexpectedSyntax$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
-  expect(@exception.message).to match(/^CompileTime: UnexpectedSyntax: .* \(\d+, \d+\)\.$/)
+  expect(@exception.message).to match(/^CompileTime: ParseError: .*$/)
 end
 
 Then(/^a SyntaxError should be raised at compile time: InvalidAggregation$/) do

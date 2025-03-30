@@ -136,6 +136,51 @@ fn compile_expression(
         path: member_access.path.to_owned(),
       }
     }
+    ast::Expression::IndexAccess(index_access) =>
+    {
+      compile_expression(
+        function_manager,
+        &index_access.left,
+        instructions,
+        aggregations,
+      )?;
+      compile_expression(
+        function_manager,
+        &index_access.index,
+        instructions,
+        aggregations,
+      )?;
+      Instruction::IndexAccess
+    }
+    ast::Expression::RangeAccess(index_access) =>
+    {
+      compile_expression(
+        function_manager,
+        &index_access.left,
+        instructions,
+        aggregations,
+      )?;
+      let start = if let Some(start) = &index_access.start
+      {
+        compile_expression(function_manager, start, instructions, aggregations)?;
+        true
+      }
+      else
+      {
+        false
+      };
+      let end = if let Some(end) = &index_access.end
+      {
+        compile_expression(function_manager, end, instructions, aggregations)?;
+        true
+      }
+      else
+      {
+        false
+      };
+
+      Instruction::RangeAccess { start, end }
+    }
     ast::Expression::LogicalAnd(logical_and) =>
     {
       compile_binary_op!(logical_and, function_manager, instructions, aggregations);

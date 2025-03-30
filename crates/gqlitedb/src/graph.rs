@@ -588,7 +588,12 @@ impl Add for Value
           lhs.append(&mut rhs.clone());
           Ok(lhs.into())
         }
-        _ => Err(RunTimeError::InvalidBinaryOperands.into()),
+        _ =>
+        {
+          let mut lhs = lhs.clone();
+          lhs.push(rhs.clone());
+          Ok(lhs.into())
+        }
       },
       Self::Float(lhs) => match rhs
       {

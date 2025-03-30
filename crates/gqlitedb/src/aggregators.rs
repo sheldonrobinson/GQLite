@@ -3,8 +3,8 @@ mod count;
 
 use std::fmt::Debug;
 
-use crate::interpreter::expression_analyser::ExpressionType;
-use crate::{graph, Result};
+use crate::prelude::*;
+use interpreter::expression_analyser::ExpressionType;
 
 pub(crate) trait AggregatorState: Debug
 {
