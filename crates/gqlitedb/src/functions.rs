@@ -6,6 +6,7 @@ mod containers;
 mod edge;
 mod node;
 mod path;
+mod scalar;
 mod value;
 
 pub(crate) type FResult<T> = std::result::Result<T, error::RunTimeError>;
@@ -103,7 +104,8 @@ impl Manager
           edge::Type::new(),
           node::Labels::new(),
           path::Length::new(),
-          value::Coalesce::new(),
+          scalar::Coalesce::new(),
+          scalar::ToInteger::new(),
           value::HasLabel::new(),
           value::HasLabels::new(),
         ]),
