@@ -4,6 +4,8 @@
 
 ## [Unreleased] - ReleaseDate
 
+## [0.3.3] - 2025-03-31
+
 - Improve support for lists, float, strings and for graph patterns
 - Fix support for boolean, conditional, null, integer literals.
 - Add ceil, floor, rand, toInteger functions.
@@ -43,7 +45,8 @@
 - `persy` backend.
 
 <!-- next-url -->
-[Unreleased]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.3.2...dev/2
+[Unreleased]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.3.3...dev/2
+[0.3.3]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.3.2...gqlitedb-v0.3.3
 [0.3.2]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.3.1...gqlitedb-v0.3.2
 [0.3.1]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.3.0...gqlitedb-v0.3.1
 [0.3.0]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.2.0...gqlitedb-v0.3.0
