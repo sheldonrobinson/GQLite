@@ -40,7 +40,7 @@ macro_rules! declare_aggregator {
       #[allow(unused_variables)]
       fn create(&self, arguments: Vec<crate::graph::Value>) -> Result<Box<dyn AggregatorState>>
       {
-        Ok(Box::new($crate::functions::make_function_call!($state_type_name::new, arguments, $( $arg_type,)*)?))
+        Ok(Box::new($crate::functions::make_function_call!($function_name, $state_type_name::new, arguments, $( $arg_type,)*)?))
       }
       #[allow(unused_variables)]
       fn validate_arguments(
