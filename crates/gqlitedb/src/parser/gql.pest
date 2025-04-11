@@ -12,8 +12,12 @@ char_double    =  {
   | "\\" ~ ("\"" | "\\" | "/" | "b" | "f" | "n" | "r" | "t" | "'")
   | "\\" ~ ("u" ~ ASCII_HEX_DIGIT{4})
 }
-
-nothing_ident = @{ "###"+ }
+char_tick      =  {
+    !("`" | "\\") ~ ANY
+  | "\\" ~ ("\"" | "\\" | "/" | "b" | "f" | "n" | "r" | "t" | "'")
+  | "\\" ~ ("u" ~ ASCII_HEX_DIGIT{4})
+}
+nothing_ident  = @{ "###"+ }
 
 // Query
 query = _{ SOI ~ statement* ~ ";"? ~ EOI }
@@ -92,7 +96,8 @@ null_lit       =  { "null" }
 true_lit       =  { "true" }
 false_lit      =  { "false" }
 num            = @{ (int? ~ "." ~ ASCII_DIGIT+ ~ (^"e" ~ int)?) | (int ~ ^"e" ~ int) }
-string_literal = ${ ("'" ~ inner_single ~ "'") | ("\"" ~ inner_double ~ "\"") }
+string_literal = ${ ("'" ~ inner_single ~ "'") | ("\"" ~ inner_double ~ "\"") | ("`" ~ inner_tick ~ "`") }
+inner_tick     = @{ char_tick* }
 inner_double   = @{ char_double* }
 inner_single   = @{ char_single* }
 function_name  =  { ident ~ ("." ~ ident)* }
@@ -155,7 +160,7 @@ expression_term          = { null_lit | true_lit | false_lit | num | hexa_int | 
 
 parameter = { "$" ~ parameter_name }
 
-pair = { ident ~ ":" ~ expression }
+pair = { (ident | string_literal) ~ ":" ~ expression }
 
 array = {
     "[" ~ "]"
