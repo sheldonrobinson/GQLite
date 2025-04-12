@@ -57,7 +57,7 @@ ubuntu:build:
   <<: *build_definition
 
 ubuntu:test:   # This job runs in the test stage.
-  image: cyrilleberger/cyloncore-ci:ubuntu
+  image: cyrilleberger/cyloncore-ci:ubuntu-noble
   stage: test    # It only starts when the job in the build stage completes successfully.
   needs:
     - job: "ubuntu:build"
