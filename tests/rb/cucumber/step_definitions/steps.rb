@@ -288,14 +288,10 @@ IgnoredScenario = [
   "[1] ORDER BY of a column introduced in RETURN should return salient results in ascending order",
   # collect(nodes) returns an array with the node internal id as an integer (aka it loses the information that it is a ref)
   "[5] Unwinding a collected expression",
-  # No validation of delete expression
-  "[8] Failing when deleting a label",
   # Missing variables should be handled by the parser
   "[9] Failing when using undefined variable in SET",
   # Lists are not supported in expressions
   "[5] Adding a list property",
-  "[6] Concatenate elements onto a list property",
-  "[7] Concatenate elements in reverse onto a list property",
   "[10] Failing when setting a list of maps as a property",
   # Distinct is not supported
   "[4] Support sort and distinct",
@@ -306,9 +302,7 @@ IgnoredScenario = [
   "[24] Sort by an expression that is only partially orderable on a non-distinct binding table, but made distinct",
   "[1] Handle dependencies across WITH with SKIP",
   # return modifiers (e.g. order by) must be done after computing expressions https://gitlab.com/gqlite/GQLite/-/issues/2
-  "[7] Limit to more rows than actual results 1",
   "[8] Limit to more rows than actual results 2",
-  "[15] Floating point parameter for LIMIT with ORDER BY should fail",
   # non-projected variable are not accessible
   "[21] Sort by an expression that is only partially orderable on a non-distinct binding table",
   "[8] Sort by non-projected existing variable",
@@ -332,16 +326,6 @@ IgnoredScenario = [
   "[11] WITH-MERGE-CREATE: A bound node should be recognized after projection with WITH + MERGE node",
   "[12] WITH-MERGE-CREATE: A bound node should be recognized after projection with WITH + MERGE pattern",
   "[13] Merge followed by multiple creates",
-  # WITH WHERE not supported
-  "[5] Conjunction is commutative on null",
-  "[7] Conjunction is associative on null",
-  "[5] Disjunction is commutative on null",
-  "[7] Disjunction is associative on null",
-  "[5] Exclusive disjunction is commutative on null",
-  "[7] Exclusive disjunction is associative on null",
-  "[2] Disjunction is distributive over conjunction on null",
-  "[4] Conjunction is distributive over disjunction on null",
-  "[6] Conjunction is not distributive over exclusive disjunction on null",
   # CASE WHEN THEN
   "[1] Simple cases over integers",
   # No compile time argument check
