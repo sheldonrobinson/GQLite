@@ -30,7 +30,7 @@
             "showDisplayString": true
         },
         {
-            "name": "gqlite cmd (gdb)",
+            "name": "gqlite cmd (lldb)",
             "type": "lldb",
             "request": "launch",
             "program": "${env:CC_PKG_ROOT}/host-build-debug/gqlite/gqlite",

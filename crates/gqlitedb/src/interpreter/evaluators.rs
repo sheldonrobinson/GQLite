@@ -151,6 +151,29 @@ macro_rules! check_for_null {
 }
 }
 
+macro_rules! ordering_to_value {
+  ($expression:expr, $true_pattern:pat, $null_value:expr ) => {
+    match $expression
+    {
+      $true_pattern => true.into(),
+      value::Ordering::ComparedNull => graph::Value::Invalid,
+      value::Ordering::Null => $null_value,
+      _ => false.into(),
+    }
+  };
+}
+
+macro_rules! contain_to_value {
+  ($expression:expr, $true_pattern:pat ) => {
+    match $expression
+    {
+      $true_pattern => true.into(),
+      value::ContainResult::ComparedNull => graph::Value::Invalid,
+      _ => false.into(),
+    }
+  };
+}
+
 #[derive(Default, Debug)]
 struct Stack
 {
@@ -185,6 +208,16 @@ impl Stack
   fn to_vec(self) -> Vec<Value>
   {
     self.stack
+  }
+  fn try_pop_as_boolean(&mut self) -> Result<bool>
+  {
+    let v = self.try_pop()?;
+    match v
+    {
+      Value::GraphValue(graph::Value::Invalid)
+      | Value::GraphValue(graph::Value::Boolean(false)) => Ok(false),
+      _ => Ok(true),
+    }
   }
 }
 
@@ -313,14 +346,7 @@ fn execute_binary_operator<T: Into<crate::graph::Value>>(
 {
   let a = stack.try_pop()?;
   let b = stack.try_pop()?;
-  if a.is_null() && b.is_null()
-  {
-    stack.push(graph::Value::Invalid.into());
-  }
-  else
-  {
-    stack.push(operand(a.try_into()?, b.try_into()?)?.into().into());
-  }
+  stack.push(operand(a.try_into()?, b.try_into()?)?.into().into());
   Ok(())
 }
 
@@ -331,7 +357,6 @@ fn eval_instructions(
   parameters: &crate::graph::ValueObject,
 ) -> Result<()>
 {
-  use std::cmp::Ordering;
   if crate::consts::SHOW_EVALUATOR_STATE
   {
     println!("----------- eval_instructions");
@@ -648,57 +673,96 @@ fn eval_instructions(
       }
       &instructions::Instruction::EqualBinaryOperator =>
       {
-        execute_binary_operator(stack, |a, b| Ok(a == b))?;
+        execute_binary_operator(stack, |a, b| {
+          Ok(ordering_to_value!(
+            a.compare(&b),
+            value::Ordering::Equal,
+            false.into()
+          ))
+        })?;
       }
       &instructions::Instruction::NotEqualBinaryOperator =>
       {
-        execute_binary_operator(stack, |a, b| Ok(a != b))?;
+        execute_binary_operator(stack, |a, b| {
+          Ok(ordering_to_value!(
+            a.compare(&b),
+            value::Ordering::Less | value::Ordering::Greater | value::Ordering::Different,
+            true.into()
+          ))
+        })?;
       }
       &instructions::Instruction::InferiorBinaryOperator =>
       {
         execute_binary_operator(stack, |a, b| {
-          Ok(matches!(a.try_compare::<RunTimeError>(&b)?, Ordering::Less))
+          Ok(ordering_to_value!(
+            a.compare(&b),
+            value::Ordering::Less,
+            graph::Value::Invalid
+          ))
         })?;
       }
       &instructions::Instruction::SuperiorBinaryOperator =>
       {
         execute_binary_operator(stack, |a, b| {
-          Ok(matches!(
-            a.try_compare::<RunTimeError>(&b)?,
-            Ordering::Greater
+          Ok(ordering_to_value!(
+            a.compare(&b),
+            value::Ordering::Greater,
+            graph::Value::Invalid
           ))
         })?;
       }
       &instructions::Instruction::InferiorEqualBinaryOperator =>
       {
         execute_binary_operator(stack, |a, b| {
-          Ok(matches!(
-            a.try_compare::<RunTimeError>(&b)?,
-            Ordering::Less | Ordering::Equal
+          Ok(ordering_to_value!(
+            a.compare(&b),
+            value::Ordering::Equal | value::Ordering::Less,
+            graph::Value::Invalid
           ))
         })?;
       }
       &instructions::Instruction::SuperiorEqualBinaryOperator =>
       {
         execute_binary_operator(stack, |a, b| {
-          Ok(matches!(
-            a.try_compare::<RunTimeError>(&b)?,
-            Ordering::Greater | Ordering::Equal
+          Ok(ordering_to_value!(
+            a.compare(&b),
+            value::Ordering::Equal | value::Ordering::Greater,
+            graph::Value::Invalid
           ))
         })?;
       }
       &instructions::Instruction::InBinaryOperator =>
       {
         execute_binary_operator::<graph::Value>(stack, |a, b| {
-          let b_arr: Vec<graph::Value> = b.try_into()?;
-          Ok(value::contains(&b_arr, &a).into())
+          if b.is_null()
+          {
+            Ok(graph::Value::Invalid.into())
+          }
+          else
+          {
+            let b_arr: Vec<graph::Value> = b.try_into()?;
+            Ok(contain_to_value!(
+              value::contains(&b_arr, &a),
+              value::ContainResult::True
+            ))
+          }
         })?;
       }
       &instructions::Instruction::NotInBinaryOperator =>
       {
         execute_binary_operator::<graph::Value>(stack, |a, b| {
-          let b_arr: Vec<graph::Value> = b.try_into()?;
-          Ok((!value::contains(&b_arr, &a)).into())
+          if b.is_null()
+          {
+            Ok(graph::Value::Invalid.into())
+          }
+          else
+          {
+            let b_arr: Vec<graph::Value> = b.try_into()?;
+            Ok(contain_to_value!(
+              value::contains(&b_arr, &a),
+              value::ContainResult::False
+            ))
+          }
         })?;
       }
       &instructions::Instruction::AdditionBinaryOperator =>
@@ -854,6 +918,7 @@ fn compute_order_by(
 
 fn compute_return_with_table(
   variables: &Vec<instructions::RWExpression>,
+  filter: &instructions::Instructions,
   modifiers: &instructions::Modifiers,
   input_table: value_table::ValueTable,
   parameters: &crate::graph::ValueObject,
@@ -946,6 +1011,11 @@ fn compute_return_with_table(
       })
       .collect::<Result<_>>()?;
   }
+  // Apply filter
+  if !filter.is_empty()
+  {
+    output_table = filter_rows(output_table.into_iter(), &filter, &parameters)?.into();
+  }
   // Apply modifiers
   // Sort the table according to order_by
   if !modifiers.order_by.is_empty()
@@ -1024,6 +1094,40 @@ fn compute_return_with_table(
   )
 }
 
+fn filter_rows(
+  current_rows: impl IntoIterator<Item = HashMap<String, graph::Value>>,
+  filter: &instructions::Instructions,
+  parameters: &crate::graph::ValueObject,
+) -> Result<Vec<HashMap<String, graph::Value>>>
+{
+  current_rows
+    .into_iter()
+    .filter_map(|row| {
+      let res: Result<bool> = (|| {
+        let mut stack = Stack::default();
+        eval_instructions(&mut stack, &row, &filter, &parameters)?;
+        stack.try_pop_as_boolean()
+      })();
+      match res
+      {
+        Err(x) => Some(Err(x)),
+        Ok(v) =>
+        {
+          if v
+          {
+            Some(Ok(row))
+          }
+          else
+          {
+            None
+          }
+        }
+      }
+    })
+    .collect()
+}
+
+///
 pub(crate) fn eval_program<TStore: store::Store>(
   store: &TStore,
   program: super::Program,
@@ -1229,32 +1333,8 @@ pub(crate) fn eval_program<TStore: store::Store>(
           }
           if !filter.is_empty()
           {
-            current_rows = current_rows
-              .into_iter()
-              .filter_map(|row| {
-                let res: Result<bool> = (|| {
-                  let mut stack = Stack::default();
-                  eval_instructions(&mut stack, &row, &filter, &parameters)?;
-                  stack.try_pop_into()
-                })();
-                match res
-                {
-                  Err(x) => Some(Err(x)),
-                  Ok(v) =>
-                  {
-                    if v
-                    {
-                      Some(Ok(row))
-                    }
-                    else
-                    {
-                      None
-                    }
-                  }
-                }
-              })
-              .collect::<Result<_>>()?
-          };
+            current_rows = filter_rows(current_rows, &filter, &parameters)?;
+          }
           if current_rows.is_empty() && optional
           {
             let mut new_row = row;
@@ -1292,11 +1372,12 @@ pub(crate) fn eval_program<TStore: store::Store>(
       }
       instructions::Block::Return {
         variables,
+        filter,
         modifiers,
       } =>
       {
         let output_table =
-          compute_return_with_table(&variables, &modifiers, input_table, &parameters)?;
+          compute_return_with_table(&variables, &filter, &modifiers, input_table, &parameters)?;
         let mut r = Vec::<crate::graph::Value>::new();
         r.push(crate::graph::Value::Array(
           variables
@@ -1322,10 +1403,12 @@ pub(crate) fn eval_program<TStore: store::Store>(
       }
       instructions::Block::With {
         variables,
+        filter,
         modifiers,
       } =>
       {
-        input_table = compute_return_with_table(&variables, &modifiers, input_table, &parameters)?;
+        input_table =
+          compute_return_with_table(&variables, &filter, &modifiers, input_table, &parameters)?;
       }
       instructions::Block::Unwind { name, instructions } =>
       {

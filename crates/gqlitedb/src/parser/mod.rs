@@ -794,11 +794,17 @@ fn build_match(
 fn build_return_with_statement(
   pairs: pest::iterators::Pairs<Rule>,
   pratt: &PrattParser<Rule>,
-) -> Result<(bool, Vec<ast::NamedExpression>, ast::Modifiers)>
+) -> Result<(
+  bool,
+  Vec<ast::NamedExpression>,
+  ast::Modifiers,
+  Option<ast::Expression>,
+)>
 {
   let mut all = false;
   let mut expressions = vec![];
   let mut modifiers = Default::default();
+  let mut where_expression = Default::default();
 
   for sub_pair in pairs
   {
@@ -807,13 +813,20 @@ fn build_return_with_statement(
       Rule::star => all = true,
       Rule::named_expression => expressions.push(build_named_expression(sub_pair, pratt)?),
       Rule::modifiers => modifiers = build_modifiers(sub_pair, pratt)?,
+      Rule::where_modifier =>
+      {
+        where_expression = Some(build_expression(
+          sub_pair.into_inner().try_next()?.into_inner(),
+          pratt,
+        )?)
+      }
       _ => Err(InternalError::UnexpectedPair {
         context: "build_ast_from_statement/with_statement",
         pair: sub_pair.as_str().to_string(),
       })?,
     }
   }
-  Ok((all, expressions, modifiers))
+  Ok((all, expressions, modifiers, where_expression))
 }
 
 fn build_ast_from_statement(
@@ -830,22 +843,26 @@ fn build_ast_from_statement(
     Rule::optional_match_statement => build_match(pair.into_inner().try_next()?, true, pratt),
     Rule::return_statement =>
     {
-      let (all, expressions, modifiers) = build_return_with_statement(pair.into_inner(), pratt)?;
+      let (all, expressions, modifiers, where_expression) =
+        build_return_with_statement(pair.into_inner(), pratt)?;
 
       Ok(ast::Statement::Return(ast::Return {
         all,
         expressions,
         modifiers,
+        where_expression,
       }))
     }
     Rule::with_statement =>
     {
-      let (all, expressions, modifiers) = build_return_with_statement(pair.into_inner(), pratt)?;
+      let (all, expressions, modifiers, where_expression) =
+        build_return_with_statement(pair.into_inner(), pratt)?;
 
       Ok(ast::Statement::With(ast::With {
         all,
         expressions,
         modifiers,
+        where_expression,
       }))
     }
     Rule::unwind_statement =>

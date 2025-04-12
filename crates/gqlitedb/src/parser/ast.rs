@@ -54,6 +54,7 @@ pub(crate) struct Return
   pub(crate) all: bool,
   pub(crate) expressions: Vec<NamedExpression>,
   pub(crate) modifiers: Modifiers,
+  pub(crate) where_expression: Option<Expression>,
 }
 
 #[derive(Debug)]
@@ -62,6 +63,7 @@ pub(crate) struct With
   pub(crate) all: bool,
   pub(crate) expressions: Vec<NamedExpression>,
   pub(crate) modifiers: Modifiers,
+  pub(crate) where_expression: Option<Expression>,
 }
 
 #[derive(Debug)]

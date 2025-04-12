@@ -1,126 +1,220 @@
+use std::cmp;
+
+use itertools::Itertools;
+
 use crate::prelude::*;
 
-pub(crate) enum ComparisonResult
+pub(crate) enum Ordering
 {
-  True,
-  False,
+  Equal,
+  Different,
+  Less,
+  Greater,
   ComparedNull,
+  Null,
 }
 
-impl Into<graph::Value> for ComparisonResult
+impl From<cmp::Ordering> for Ordering
 {
-  fn into(self) -> graph::Value
-  {
-    match self
-    {
-      ComparisonResult::True => true.into(),
-      ComparisonResult::False => false.into(),
-      ComparisonResult::ComparedNull => graph::Value::Invalid,
-    }
-  }
-}
-
-impl From<bool> for ComparisonResult
-{
-  fn from(value: bool) -> Self
+  fn from(value: cmp::Ordering) -> Self
   {
     match value
     {
-      true => Self::True,
-      false => Self::False,
+      cmp::Ordering::Equal => Ordering::Equal,
+      cmp::Ordering::Greater => Ordering::Greater,
+      cmp::Ordering::Less => Ordering::Less,
     }
   }
 }
 
-impl std::ops::Not for ComparisonResult
+fn compare_map(lhs: &graph::ValueObject, rhs: &graph::ValueObject) -> Ordering
 {
-  type Output = ComparisonResult;
-  fn not(self) -> Self::Output
+  println!("compare_map({:?}, {:?})", lhs, rhs);
+  if lhs.len() == rhs.len()
   {
-    match self
-    {
-      ComparisonResult::True => ComparisonResult::False,
-      ComparisonResult::False => ComparisonResult::True,
-      ComparisonResult::ComparedNull => ComparisonResult::ComparedNull,
-    }
+    lhs
+      .iter()
+      .sorted_by(|(lk, _), (rk, _)| lk.cmp(rk))
+      .zip(rhs.iter().sorted_by(|(lk, _), (rk, _)| lk.cmp(rk)))
+      .map(|((lhs_k, lhs_v), (rhs_k, rhs_v))| {
+        let cmp = lhs_k.cmp(rhs_k);
+        match cmp
+        {
+          std::cmp::Ordering::Equal => compare(lhs_v, rhs_v),
+          o => o.into(),
+        }
+      })
+      .find(|p| match p
+      {
+        Ordering::Equal => false,
+        _ => true,
+      })
+      .unwrap_or(Ordering::Equal)
+  }
+  else if lhs.len() < rhs.len()
+  {
+    Ordering::Less
+  }
+  else
+  {
+    Ordering::Greater
   }
 }
 
-pub(crate) fn compare(left: &graph::Value, right: &graph::Value) -> ComparisonResult
+fn compare_f64(lhs: &f64, rhs: &f64) -> Ordering
+{
+  if lhs.is_nan() || rhs.is_nan()
+  {
+    Ordering::Different
+  }
+  else
+  {
+    lhs.total_cmp(rhs).into()
+  }
+}
+
+fn compare_node(lhs: &graph::Node, rhs: &graph::Node) -> Ordering
+{
+  lhs.key.uuid.cmp(&rhs.key.uuid).into()
+  // println!("compare_node({:?}, {:?})", lhs, rhs);
+  // let labels_cmp = lhs.labels.cmp(&rhs.labels);
+  // match labels_cmp
+  // {
+  //   std::cmp::Ordering::Equal => compare_map(&lhs.properties, &rhs.properties),
+  //   o => o.into(),
+  // }
+}
+
+pub(crate) fn compare(lhs: &graph::Value, rhs: &graph::Value) -> Ordering
 {
   use graph::Value;
-  match left
+  match lhs
   {
-    Value::Invalid => ComparisonResult::ComparedNull,
-    Value::Boolean(bl) => match right
+    Value::Invalid => Ordering::ComparedNull,
+    Value::Boolean(bl) => match rhs
     {
-      Value::Boolean(br) => (bl == br).into(),
-      Value::Invalid => ComparisonResult::ComparedNull,
-      _ => ComparisonResult::False,
+      Value::Boolean(br) => bl.cmp(br).into(),
+      Value::Invalid => Ordering::ComparedNull,
+      _ => Ordering::Null,
     },
-    Value::Integer(il) => match right
+    Value::Integer(il) => match rhs
     {
-      Value::Integer(ir) => (il == ir).into(),
-      Value::Invalid => ComparisonResult::ComparedNull,
-      _ => ComparisonResult::False,
+      Value::Integer(ir) => il.cmp(ir).into(),
+      Value::Float(fr) => compare_f64(&(*il as f64), fr),
+      Value::Invalid => Ordering::ComparedNull,
+      _ => Ordering::Null,
     },
-    Value::Float(fl) => match right
+    Value::Float(fl) => match rhs
     {
-      Value::Float(fr) => (fl == fr).into(),
-      Value::Invalid => ComparisonResult::ComparedNull,
-      _ => ComparisonResult::False,
+      Value::Integer(ir) => compare_f64(fl, &(*ir as f64)),
+      Value::Float(fr) => compare_f64(fl, fr),
+      Value::Invalid => Ordering::ComparedNull,
+      _ => Ordering::Null,
     },
-    Value::String(sl) => match right
+    Value::String(sl) => match rhs
     {
-      Value::String(sr) => (sl == sr).into(),
-      Value::Invalid => ComparisonResult::ComparedNull,
-      _ => ComparisonResult::False,
+      Value::String(sr) => sl.cmp(sr).into(),
+      Value::Invalid => Ordering::ComparedNull,
+      _ => Ordering::Null,
     },
-    Value::Array(al) => match right
+    Value::Array(al) => match rhs
     {
       Value::Array(ar) =>
       {
-        if al.len() != ar.len()
+        if al.len() < ar.len()
         {
-          ComparisonResult::False
+          Ordering::Less
+        }
+        else if al.len() > ar.len()
+        {
+          Ordering::Greater
         }
         else
         {
-          let (comp, comp_to_null) =
-            al.iter()
-              .zip(ar.iter())
-              .fold((true, false), |acc, (l, r)| match compare(l, r)
+          let mut comp_to_null = false;
+          let mut compare_equal = true;
+          let comp = al
+            .iter()
+            .zip(ar.iter())
+            .find_map(|(l, r)| match compare(l, r)
+            {
+              Ordering::Equal => None,
+              Ordering::Null | Ordering::Different =>
               {
-                ComparisonResult::ComparedNull => (acc.0, true),
-                ComparisonResult::True => acc,
-                ComparisonResult::False => (false, acc.1),
-              });
-          if comp
+                compare_equal = false;
+                None
+              }
+              Ordering::Greater => Some(Ordering::Greater),
+              Ordering::Less => Some(Ordering::Less),
+              Ordering::ComparedNull =>
+              {
+                comp_to_null = true;
+                None
+              }
+            });
+
+          // Due to opencypher madness, if you compare [nil, 2] with [1, 2] this should return null because of the nil/1 comparison,
+          // however [nil, 2] with [1, "2"] should return false because 2 != "2" 🤦
+          match (comp, comp_to_null, compare_equal)
           {
-            if comp_to_null
-            {
-              // this is opencypher madness, if you compare [nil, 2] with [1, 2] this should return null because of the nil/1 comparison,
-              // however [nil, 2] with [1, "2"] should return false because 2 != "2" 🤦
-              ComparisonResult::ComparedNull
-            }
-            else
-            {
-              ComparisonResult::True
-            }
-          }
-          else
-          {
-            ComparisonResult::False
+            // Some imply either greater or lesser, in which case, return the value unless a comparison to null was made
+            (Some(o), false, _) => o,
+            (Some(_), true, _) => Ordering::ComparedNull,
+            // If equal, check if a comparison to null was made
+            (None, true, true) => Ordering::ComparedNull,
+            (None, false, true) => Ordering::Equal,
+            // If false, ignore comparison to null
+            (None, _, false) => Ordering::Null,
           }
         }
       }
-      Value::Invalid => ComparisonResult::ComparedNull,
-      _ => ComparisonResult::False,
+      Value::Invalid => Ordering::ComparedNull,
+      _ => Ordering::Null,
     },
-    // Value::Object(vol),
-    // Value::Node(Node),
-    // Value::Edge(Edge),
-    // Value::Path(Path),
-    _ => todo!("value::compare"),
+    Value::Object(lhs) => match rhs
+    {
+      Value::Object(rhs) => compare_map(lhs, rhs),
+      _ => Ordering::Null,
+    },
+    Value::Node(lhs) => match rhs
+    {
+      Value::Node(rhs) => compare_node(lhs, rhs),
+      _ => Ordering::Null,
+    },
+    Value::Edge(lhs) => match rhs
+    {
+      Value::Edge(rhs) =>
+      {
+        lhs.key.uuid.cmp(&rhs.key.uuid).into()
+        // let labels_cmp = lhs.labels.cmp(&rhs.labels);
+        // match labels_cmp
+        // {
+        //   std::cmp::Ordering::Equal => compare_map(&lhs.properties, &rhs.properties),
+        //   o => o.into(),
+        // }
+      }
+      _ => Ordering::Null,
+    },
+    Value::Path(lhs) => match rhs
+    {
+      Value::Path(rhs) =>
+      {
+        let labels_cmp = lhs.labels.cmp(&rhs.labels);
+        match labels_cmp
+        {
+          std::cmp::Ordering::Equal => match compare_map(&lhs.properties, &rhs.properties)
+          {
+            Ordering::Equal => match compare_node(&lhs.source, &rhs.source)
+            {
+              Ordering::Equal => compare_node(&lhs.destination, &rhs.destination),
+              o => o,
+            },
+            o => o,
+          },
+          o => o.into(),
+        }
+      }
+      _ => Ordering::Null,
+    },
   }
 }

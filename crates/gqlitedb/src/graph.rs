@@ -365,46 +365,9 @@ impl Value
       None => self.to_owned(),
     }
   }
-  pub(crate) fn try_compare<E: crate::error::GenericErrors>(
-    &self,
-    rhs: &Self,
-  ) -> crate::Result<std::cmp::Ordering>
+  pub(crate) fn compare(&self, rhs: &Value) -> crate::value::Ordering
   {
-    match self
-    {
-      Value::Invalid
-      | Value::Node(..)
-      | Value::Edge(..)
-      | Value::Array(..)
-      | Value::Object(..)
-      | Value::Path(..) => Err(E::not_comparable().into()),
-      Value::Boolean(lhs) => match rhs
-      {
-        Value::Boolean(rhs) => lhs.partial_cmp(rhs).ok_or(E::not_comparable().into()),
-        _ => Err(E::not_comparable().into()),
-      },
-      Value::Integer(lhs) => match rhs
-      {
-        Value::Integer(rhs) => lhs.partial_cmp(rhs).ok_or(E::not_comparable().into()),
-        Value::Float(rhs) => (*lhs as f64)
-          .partial_cmp(rhs)
-          .ok_or(E::not_comparable().into()),
-        _ => Err(E::not_comparable().into()),
-      },
-      Value::Float(lhs) => match rhs
-      {
-        Value::Integer(rhs) => lhs
-          .partial_cmp(&(*rhs as f64))
-          .ok_or(E::not_comparable().into()),
-        Value::Float(rhs) => lhs.partial_cmp(rhs).ok_or(E::not_comparable().into()),
-        _ => Err(E::not_comparable().into()),
-      },
-      Value::String(lhs) => match rhs
-      {
-        Value::String(rhs) => lhs.partial_cmp(rhs).ok_or(E::not_comparable().into()),
-        _ => Err(E::not_comparable().into()),
-      },
-    }
+    crate::value::compare(self, rhs)
   }
 
   fn orderability_map(lhs: &ValueObject, rhs: &ValueObject) -> std::cmp::Ordering
@@ -574,12 +537,12 @@ impl Add for Value
   {
     match self
     {
-      Value::Invalid
-      | Value::Boolean(..)
+      Value::Boolean(..)
       | Value::Node(..)
       | Value::Edge(..)
       | Value::Object(..)
       | Value::Path(..) => Err(RunTimeError::InvalidBinaryOperands.into()),
+      Value::Invalid => Ok(Value::Invalid),
       Self::Array(lhs) => match rhs
       {
         Self::Array(rhs) =>
@@ -625,14 +588,14 @@ macro_rules! impl_mdsr {
       {
         match self
         {
-          Value::Invalid
-          | Value::Boolean(..)
+          Value::Boolean(..)
           | Value::String(..)
           | Value::Node(..)
           | Value::Edge(..)
           | Value::Array(..)
           | Value::Object(..)
           | Value::Path(..) => Err(RunTimeError::InvalidBinaryOperands.into()),
+          Value::Invalid => Ok(Value::Invalid),
           Self::Float(lhs) => match rhs
           {
             Self::Float(rhs) => Ok(lhs.$op(rhs).into()),
@@ -665,8 +628,8 @@ impl Neg for Value
     {
       Self::Float(fl) => Ok((-fl).into()),
       Self::Integer(i) => Ok((-i).into()),
-      Value::Invalid
-      | Value::Boolean(..)
+      Value::Invalid => Ok(Value::Invalid),
+      Value::Boolean(..)
       | Value::String(..)
       | Value::Node(..)
       | Value::Edge(..)
@@ -947,3 +910,16 @@ macro_rules! labels {
 
 #[cfg(test)]
 pub(crate) use labels;
+
+#[cfg(test)]
+mod tests
+{
+  use super::Value;
+  #[test]
+  fn value_equal()
+  {
+    let v1: Value = 1.into();
+    let v2: Value = 1.0.into();
+    assert_eq!(v1, v2);
+  }
+}

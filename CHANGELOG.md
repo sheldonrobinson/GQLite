@@ -3,10 +3,12 @@
 <!-- next-header -->
 
 ## [Unreleased] - ReleaseDate
+- Improve support of comparison.
+- Add support for string as key in hash.
 
 ## [0.3.3] - 2025-03-31
 
-- Improve support for lists, float, strings and for graph patterns
+- Improve support for lists, float, strings and for graph patterns.
 - Fix support for boolean, conditional, null, integer literals.
 - Add ceil, floor, rand, toInteger functions.
 - Add collect aggregator.
