@@ -69,10 +69,12 @@ macro_rules! try_into_gv_impl {
       fn try_pop_into(&mut self) -> Result<$vn>
       {
         self.try_pop()?.try_into()
+          .map_err(|e| error::map_error!(e, Error::Internal(InternalError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))
       }
       fn try_drain_into(&mut self, n: usize) -> Result<Vec<$vn>>
       {
-        self.try_drain(n)?.map(|x| x.try_into()).collect()
+        self.try_drain(n)?.map(|x| x.try_into()).collect::<Result<_>>()
+          .map_err(|e| error::map_error!(e, Error::Internal(InternalError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))
       }
     }
   };
@@ -109,10 +111,13 @@ macro_rules! try_into_impl {
       fn try_pop_into(&mut self) -> Result<$type>
       {
         self.try_pop()?.try_into()
+        .map_err(|e| error::map_error!(e, Error::Internal(InternalError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))
+
       }
       fn try_drain_into(&mut self, n: usize) -> Result<Vec<$type>>
       {
-        self.try_drain(n)?.map(|x| x.try_into()).collect()
+        self.try_drain(n)?.map(|x| x.try_into()).collect::<Result<_>>()
+          .map_err(|e| error::map_error!(e, Error::Internal(InternalError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))
       }
     }
   };
@@ -234,10 +239,12 @@ where
   fn try_pop_into(&mut self) -> Result<T>
   {
     self.try_pop()?.try_into()
+      .map_err(|e| error::map_error!(e, Error::Internal(InternalError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))
   }
   fn try_drain_into(&mut self, n: usize) -> Result<Vec<T>>
   {
-    self.try_drain(n)?.map(|x| x.try_into()).collect()
+    self.try_drain(n)?.map(|x| x.try_into()).collect::<Result<Vec<_>>>()
+      .map_err(|e| error::map_error!(e, Error::Internal(InternalError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))
   }
 }
 
@@ -536,7 +543,7 @@ fn eval_instructions(
       {
         let idx: i64 = stack.try_pop_into()?;
         let v: graph::Value = stack.try_pop_into()?;
-        let v: Vec<graph::Value> = v.try_into()?;
+        let v: Vec<graph::Value> = v.try_into().map_err(|e| error::map_error!(e, Error::Internal(InternalError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))?;
         stack.push(
           v.get(idx as usize)
             .ok_or(RunTimeError::OutOfBound)?
