@@ -60,3 +60,27 @@ impl ToInteger
 }
 
 super::declare_function!(toInteger, ToInteger, call_impl(crate::graph::Value) -> i64);
+
+#[derive(Debug, Default)]
+pub(super) struct Properties {}
+
+impl Properties
+{
+  fn call_impl(value: &graph::Value) -> FResult<graph::ValueObject>
+  {
+    match value
+    {
+      graph::Value::Node(n) => Ok(n.properties.to_owned()),
+      graph::Value::Edge(e) => Ok(e.properties.to_owned()),
+      graph::Value::Object(m) => Ok(m.to_owned()),
+      _ => Err(RunTimeError::InvalidArgument {
+        function_name: "properties",
+        index: 0,
+        expected_type: "node or relationship",
+        value: format!("{:?}", value),
+      }),
+    }
+  }
+}
+
+super::declare_function!(properties, Properties, call_impl(crate::graph::Value) -> graph::ValueObject, validate_args(ExpressionType::Map | ExpressionType::Node | ExpressionType::Edge | ExpressionType::Null));
