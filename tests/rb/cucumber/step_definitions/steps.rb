@@ -647,3 +647,9 @@ Then(/^a SyntaxError should be raised at compile time: InvalidUnicodeLiteral$/) 
   expect(@exception).not_to be_nil
   expect(@exception.message).to match(/^CompileTime: InvalidUnicodeLiteral: .*\.$/)
 end
+
+Then(/^a TypeError should be raised at compile time: InvalidArgumentType$/) do
+  pending if @ignored_scenario
+  expect(@exception).not_to be_nil
+  expect(@exception.message).to match(/^CompileTime: InvalidArgumentType: .*\.$/)
+end
