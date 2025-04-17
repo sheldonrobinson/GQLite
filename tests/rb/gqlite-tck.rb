@@ -39,7 +39,7 @@ features = [
   # Match
   'match/Match1', 'match/Match2', 'match/Match3', 'match/Match7',
   # MatchWhere
-  'match-where/MatchWhere1', 'match-where/MatchWhere2', 'match-where/MatchWhere3', 'match-where/MatchWhere4',
+  'match-where/MatchWhere1', 'match-where/MatchWhere2', 'match-where/MatchWhere3', 'match-where/MatchWhere4', 'match-where/MatchWhere5',
   # WITH
   'with/With1', 'with/With2',  'with/With4',
   # DELETE
@@ -47,7 +47,7 @@ features = [
   # SET
   'set/Set1', 'set/Set2', 'set/Set3', 'set/Set4', 'set/Set5',
   # REMOVE
-  'remove/Remove1', 'remove/Remove2',
+  'remove/Remove1', 'remove/Remove2', 'remove/Remove3',
   # UNWIND
   'unwind/Unwind1',
   # RETURN ORDER BY
@@ -87,7 +87,7 @@ expressions = [
 # ]
 # Current dev
 # gql = []
-# features = []
+# features = [ ]
 # expressions = [
 # ]
 
@@ -115,8 +115,8 @@ expressions = [
 
 # In progress
 # gql = []
-# features = ['create/Create5', 'match/Match6', 'match-where/MatchWhere5', 'set/Set3', 'set/Set5', 'remove/Remove3', 'match/Match7' ]
-# expressions = ['comparison/Comparison1', 'aggregation/Aggregation8']
+# features = ['create/Create5', 'match/Match6', 'remove/Remove3', ]
+# expressions = [ 'aggregation/Aggregation8']
 # Current dev
 # gql = []
 # features = []
