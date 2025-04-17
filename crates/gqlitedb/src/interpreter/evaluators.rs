@@ -541,15 +541,50 @@ fn eval_instructions(
       }
       instructions::Instruction::IndexAccess =>
       {
-        let idx: i64 = stack.try_pop_into()?;
-        let v: graph::Value = stack.try_pop_into()?;
-        let v: Vec<graph::Value> = v.try_into().map_err(|e| error::map_error!(e, Error::Internal(InternalError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))?;
-        stack.push(
-          v.get(idx as usize)
-            .ok_or(RunTimeError::OutOfBound)?
-            .to_owned()
-            .into(),
-        );
+        // Implement access to array or map (edge/node properties).
+        // Get the index
+        let index: graph::Value = stack.try_pop_into()?;
+        // Get the array/map
+        let container: graph::Value = stack.try_pop_into()?;
+        match container
+        {
+          graph::Value::Array(array) =>
+          {
+            let idx: i64 = index.try_into()
+              .map_err(|e| error::map_error!(e, Error::Internal(InternalError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))?;
+            stack.push(
+              array
+                .get(idx as usize)
+                .ok_or(RunTimeError::OutOfBound)?
+                .to_owned()
+                .into(),
+            );
+          }
+          graph::Value::Object(map)
+          | graph::Value::Node(graph::Node {
+            key: _,
+            labels: _,
+            properties: map,
+          })
+          | graph::Value::Edge(graph::Edge {
+            key: _,
+            source: _,
+            destination: _,
+            labels: _,
+            properties: map,
+          }) =>
+          {
+            let idx: String = index.try_into()?;
+            stack.push(
+              map
+                .get(&idx)
+                .unwrap_or(&graph::Value::Invalid)
+                .to_owned()
+                .into(),
+            );
+          }
+          _ => Err(error::RunTimeError::InvalidArgumentType)?,
+        }
       }
       instructions::Instruction::RangeAccess { start, end } =>
       {
