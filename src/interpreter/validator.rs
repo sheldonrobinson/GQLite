@@ -1,8 +1,11 @@
 use std::collections::HashMap;
+use std::default;
 
 use crate::error::{CompileTimeError, InternalError};
 use crate::parser::ast;
-use crate::Result;
+use crate::{functions, Result};
+
+use self::ast::EdgePattern;
 
 // __     __         _       _     _     _____
 // \ \   / /_ _ _ __(_) __ _| |__ | | __|_   _|   _ _ __   ___
@@ -21,6 +24,45 @@ pub(crate) enum VariableType
   Number,
   String,
   Variant,
+}
+
+impl Into<Variable> for VariableType
+{
+  fn into(self) -> Variable
+  {
+    match self
+    {
+      Self::Boolean => Variable::Boolean,
+      Self::Edge => Variable::Edge {
+        edge: ast::EdgePattern {
+          variable: None,
+          labels: ast::LabelExpression::None,
+          properties: None,
+          source: ast::NodePattern {
+            variable: None,
+            labels: ast::LabelExpression::None,
+            properties: None,
+          },
+          destination: ast::NodePattern {
+            variable: None,
+            labels: ast::LabelExpression::None,
+            properties: None,
+          },
+          directivity: crate::graph::EdgeDirectivity::Directed,
+        },
+      },
+      Self::Node => Variable::Node {
+        node: ast::NodePattern {
+          variable: None,
+          labels: ast::LabelExpression::None,
+          properties: None,
+        },
+      },
+      Self::Number => Variable::Number,
+      Self::String => Variable::String,
+      Self::Variant => Variable::Variant,
+    }
+  }
 }
 
 // __     __         _       _     _
@@ -47,9 +89,9 @@ pub(crate) enum Variable
   Variant,
 }
 
-impl Variable
+impl Into<VariableType> for Variable
 {
-  fn as_type(&self) -> VariableType
+  fn into(self) -> VariableType
   {
     match self
     {
@@ -85,14 +127,22 @@ impl From<ast::EdgePattern> for Variable
 //   \ V / (_| | | | (_| | (_| | || (_) | |
 //    \_/ \__,_|_|_|\__,_|\__,_|\__\___/|_|
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub(crate) struct Validator
 {
   variables: HashMap<String, Variable>,
+  function_manager: functions::Manager,
 }
 
 impl Validator
 {
+  pub(crate) fn new(function_manager: functions::Manager) -> Self
+  {
+    Self {
+      variables: Default::default(),
+      function_manager,
+    }
+  }
   pub(crate) fn to_variables(&self) -> HashMap<String, Variable>
   {
     self.variables.to_owned()
@@ -106,10 +156,26 @@ impl Validator
     match expression
     {
       ast::Expression::Array(_) => Ok(Variable::Variant),
-      ast::Expression::FunctionCall(_) =>
+      ast::Expression::FunctionCall(call) =>
       {
-        todo!()
-      } // Ok(Variable::Variant),
+        let func = self
+          .function_manager
+          .get::<crate::error::CompileTimeError>(&call.name)?;
+        Ok(
+          func
+            .validate_arguments(
+              call
+                .arguments
+                .iter()
+                .map(|x| -> Result<VariableType> {
+                  let r: VariableType = self.evaluate(x)?.into();
+                  Ok(r)
+                })
+                .collect::<Result<_>>()?,
+            )?
+            .into(),
+        )
+      }
       ast::Expression::RelationalDifferent(_) => Ok(Variable::Boolean),
       ast::Expression::RelationalIn(_) => Ok(Variable::Boolean),
       ast::Expression::Map(_) => Ok(Variable::Variant),
@@ -126,7 +192,7 @@ impl Validator
               context: "Validator/evaluate",
               variable: var.identifier.to_owned(),
             })?;
-        Ok((*v).to_owned())
+        Ok(v.clone())
       }
     }
   }
@@ -156,6 +222,7 @@ impl Validator
               Ok(())
             }
           }
+          Variable::Variant => Ok(()), // Cannot be checked at compile time
           _ => Err(
             CompileTimeError::VariableTypeConflict {
               name: var_name.to_owned(),
@@ -241,6 +308,7 @@ impl Validator
               Ok(true)
             }
           }
+          Variable::Variant => Ok(true), // Cannot be checked at compile time
           _ => Err(
             CompileTimeError::VariableTypeConflict {
               name: var_name.to_owned(),
@@ -286,6 +354,7 @@ impl Validator
               Ok(true)
             }
           }
+          Variable::Variant => Ok(true), // Cannot be checked at compile time
           _ => Err(
             CompileTimeError::VariableTypeConflict {
               name: var_name.to_owned(),

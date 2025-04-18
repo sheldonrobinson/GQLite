@@ -7,6 +7,29 @@ mod value;
 
 pub(crate) type FResult<T> = std::result::Result<T, error::RunTimeError>;
 
+use crate::interpreter::validator::VariableType;
+
+trait FunctionTypeTrait
+{
+  fn result_type() -> VariableType;
+}
+
+impl FunctionTypeTrait for bool
+{
+  fn result_type() -> VariableType
+  {
+    VariableType::Boolean
+  }
+}
+
+impl FunctionTypeTrait for String
+{
+  fn result_type() -> VariableType
+  {
+    VariableType::String
+  }
+}
+
 //  _____                 _   _           _____          _ _
 // |  ___|   _ _ __   ___| |_(_) ___  _ _|_   _| __ __ _(_) |_
 // | |_ | | | | '_ \ / __| __| |/ _ \| '_ \| || '__/ _` | | __|
@@ -16,6 +39,10 @@ pub(crate) type FResult<T> = std::result::Result<T, error::RunTimeError>;
 pub(crate) trait FunctionTrait: Debug
 {
   fn call(&self, arguments: Vec<graph::Value>) -> Result<graph::Value>;
+  fn validate_arguments(
+    &self,
+    arguments: Vec<crate::interpreter::validator::VariableType>,
+  ) -> Result<crate::interpreter::validator::VariableType>;
 }
 
 //  _____                 _   _
@@ -33,9 +60,10 @@ pub(crate) type Function = std::rc::Rc<Box<dyn FunctionTrait>>;
 // |_|  |_|\__,_|_| |_|\__,_|\__, |\___|_|
 //                           |___/
 
+#[derive(Debug, Clone)]
 pub(crate) struct Manager
 {
-  functions: HashMap<String, Function>,
+  functions: std::rc::Rc<HashMap<String, Function>>,
 }
 
 impl Manager
@@ -43,7 +71,11 @@ impl Manager
   pub(crate) fn new() -> Self
   {
     Self {
-      functions: HashMap::from([edge::Type::new(), value::HasLabel::new()]),
+      functions: std::rc::Rc::new(HashMap::from([
+        edge::Type::new(),
+        value::Coalesce::new(),
+        value::HasLabel::new(),
+      ])),
     }
   }
   pub(crate) fn get<E: error::GenericErrors>(&self, name: impl Into<String>) -> Result<Function>
@@ -101,7 +133,7 @@ macro_rules! count_arguments {
 }
 
 macro_rules! declare_function {
-  ($function_name: ident, $type_name: ty, ( $( $arg_type: ty $(,)? )* ) ) => {
+  ($function_name: ident, $type_name: ty, $f_name: ident (  $( $arg_type: ty $(,)? )* ) -> $ret_type: ident ) => {
     impl $type_name
     {
       pub(super) fn new() -> (String, crate::functions::Function)
@@ -128,6 +160,25 @@ macro_rules! declare_function {
         {
           Err(RunTimeError::InvalidNumberOfArguments { function_name: stringify!($function_name), got: arguments.len(), expected: $crate::functions::count_arguments!($( $arg_type,)*) }.into())
         }
+      }
+      fn validate_arguments(
+        &self,
+        _: Vec<crate::interpreter::validator::VariableType>,
+      ) -> crate::Result<crate::interpreter::validator::VariableType>
+      {
+        Ok($ret_type::result_type())
+      }
+    }
+  };
+  ($function_name: ident, $type_name: ty, custom_trait ) => {
+    impl $type_name
+    {
+      pub(super) fn new() -> (String, crate::functions::Function)
+      {
+        (
+          stringify!($function_name).to_string(),
+          std::rc::Rc::new(Box::new(Self {})),
+        )
       }
     }
   };
