@@ -14,9 +14,9 @@ path = "src/main.rs"
 
 [dependencies]
 gqlitedb = { version = "0.1", path = "../.." }
-rustyline = "14.0.0"
+rustyline = "15"
 standard_paths = "2.1.0"
-tabled = "0.15.0"
+tabled = "0.17"
 
 # [[bin]]
 # path= "src/main.rs"
