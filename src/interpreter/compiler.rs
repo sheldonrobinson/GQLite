@@ -902,7 +902,32 @@ pub(crate) fn compile(
             instructions,
           })
         }
-        _ => Err(crate::Error::Unimplemented("compile")),
+        ast::Statement::Delete(delete_statement) => Ok(Block::Delete {
+          detach: delete_statement.detach,
+          instructions: delete_statement
+            .expressions
+            .iter()
+            .map(|expr| {
+              let mut instructions = Instructions::new();
+              let ei = expression_analyser::ExpressionInfo::analyse(
+                validator.variables_ref(),
+                function_manager,
+                expr,
+              )?;
+              match ei.expression_type
+              {
+                expression_analyser::ExpressionType::Node
+                | expression_analyser::ExpressionType::Edge
+                | expression_analyser::ExpressionType::Variant =>
+                {
+                  compile_expression(function_manager, &expr, &mut instructions, &mut None)?
+                }
+                _ => Err(CompileTimeError::InvalidDelete)?,
+              }
+              Ok(instructions)
+            })
+            .collect::<Result<_>>()?,
+        }),
       };
       inst
     })

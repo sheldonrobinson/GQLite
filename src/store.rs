@@ -66,6 +66,10 @@ impl SelectNodeQuery
   {
     self.keys.is_none() && self.labels.is_none() && self.properties.is_none() && !self.select_all
   }
+  pub(crate) fn is_select_only_keys(&self) -> bool
+  {
+    self.labels.is_none() && self.properties.is_none() && !self.select_all
+  }
   pub(crate) fn select_all() -> Self
   {
     Self {
@@ -167,6 +171,15 @@ pub(crate) struct SelectEdgeQuery
 
 impl SelectEdgeQuery
 {
+  pub(crate) fn is_select_only_keys(&self) -> bool
+  {
+    self.keys.is_some()
+      && self.labels.is_none()
+      && self.properties.is_none()
+      && self.source.select_all
+      && self.destination.select_all
+  }
+
   pub(crate) fn select_all() -> Self
   {
     Self {
@@ -195,6 +208,16 @@ impl SelectEdgeQuery
       labels: None,
       properties: None,
       source: SelectNodeQuery::select_all(),
+      destination: SelectNodeQuery::select_all(),
+    }
+  }
+  pub(crate) fn select_source_keys(source_query: SelectNodeQuery) -> Self
+  {
+    Self {
+      keys: None,
+      labels: None,
+      properties: None,
+      source: source_query,
       destination: SelectNodeQuery::select_all(),
     }
   }

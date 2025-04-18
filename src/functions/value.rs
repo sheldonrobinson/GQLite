@@ -81,9 +81,9 @@ impl super::FunctionTrait for HasLabels
         graph::Value::Edge(e) => e.labels,
         graph::Value::Node(n) => n.labels,
         _ => Err(RunTimeError::InvalidArgument {
-          function_name: "has_label",
+          function_name: "has_labels",
           index: 0,
-          expected_type: "node or edege",
+          expected_type: "node or edge",
           value: format!("{:?}", it),
         })?,
       };
@@ -117,7 +117,7 @@ impl super::FunctionTrait for HasLabels
   }
   fn validate_arguments(&self, _: Vec<ExpressionType>) -> crate::Result<ExpressionType>
   {
-    Ok(ExpressionType::Variant)
+    Ok(ExpressionType::Boolean)
   }
   fn is_deterministic(&self) -> bool
   {

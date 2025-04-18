@@ -36,7 +36,7 @@ modifiers      = { limit }
 where_modifier = { "WHERE" ~ expression }
 
 // Statements
-statement = { create_statement | optional_match_statement | match_statement | return_statement | return_all_statement | call_statement | with_statement | unwind_statement }
+statement = { create_statement | optional_match_statement | match_statement | return_statement | return_all_statement | call_statement | with_statement | unwind_statement | delete_statement | detach_delete_statement }
 
 star = { "*" }
 
@@ -48,6 +48,8 @@ return_all_statement     = { "RETURN" ~ "*" }
 call_statement           = { "CALL" ~ function_name ~ "()" }
 with_statement           = { "WITH" ~ (star | named_expression) ~ ("," ~ named_expression)* ~ modifiers? }
 unwind_statement         = { "UNWIND" ~ named_expression }
+delete_statement         = { "DELETE" ~ expression ~ ("," ~ expression)* }
+detach_delete_statement  = { "DETACH" ~ "DELETE" ~ expression ~ ("," ~ expression)* }
 
 // literals
 int            = @{ ("+" | "-")? ~ ('0'..'9')+ }
