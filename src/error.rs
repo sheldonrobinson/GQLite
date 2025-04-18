@@ -91,6 +91,8 @@ pub enum RunTimeError
   },
   #[error("InvalidBinaryOperands: operands for binary operation are not compatible.")]
   InvalidBinaryOperands,
+  #[error("InvalidNegationOperands: operands for negation operation are not compatible.")]
+  InvalidNegationOperands,
 }
 
 /// Internal errors, should be treated as bugs.

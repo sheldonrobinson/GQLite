@@ -1,6 +1,6 @@
 use std::{
   borrow::Borrow,
-  ops::{Add, Div, Mul, Rem, Sub},
+  ops::{Add, Div, Mul, Neg, Rem, Sub},
 };
 
 use serde::{Deserialize, Serialize};
@@ -244,6 +244,27 @@ impl_mdsr!(Mul, mul);
 impl_mdsr!(Sub, sub);
 impl_mdsr!(Div, div);
 impl_mdsr!(Rem, rem);
+
+impl Neg for Value
+{
+  type Output = crate::Result<Value>;
+  fn neg(self) -> Self::Output
+  {
+    match self
+    {
+      Self::Float(fl) => Ok((-fl).into()),
+      Self::Integer(i) => Ok((-i).into()),
+      Value::Invalid
+      | Value::Boolean(..)
+      | Value::String(..)
+      | Value::Node(..)
+      | Value::Edge(..)
+      | Value::Array(..)
+      | Value::Object(..)
+      | Value::Path(..) => Err(RunTimeError::InvalidNegationOperands.into()),
+    }
+  }
+}
 
 impl std::fmt::Display for Value
 {

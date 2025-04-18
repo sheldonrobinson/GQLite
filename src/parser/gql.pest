@@ -59,26 +59,42 @@ function_name  =  { ident ~ ("." ~ ident)* }
 
 // Expression
 
-expression = { or_bin_op_expression }
+expression = { prefix? ~ expression_term ~ postfix? ~ (infix ~ prefix? ~ expression_term ~ postfix?)* }
 
-or_bin_op_expression  = { and_bin_op_expression ~ ("OR" ~ expression)? }
-and_bin_op_expression = { different_bin_op_expression ~ ("OR" ~ expression)? }
+infix   = _{ addition | substraction | multiplication | division | modulo | or | and | equal | different | in_ | not_in | superior | inferior | superior_equal | inferior_equal }
+postfix = _{ is_null | is_not_null }
+prefix  = _{ negation | not }
 
-different_bin_op_expression = { equal_bin_op_expression ~ ("<>" ~ expression)? }
-equal_bin_op_expression     = { in_bin_op_expression ~ ("=" ~ expression)? }
-in_bin_op_expression        = { is_null_expression_or_term ~ ("IN" ~ expression)? }
+addition       = { "+" }
+substraction   = { "-" }
+multiplication = { "*" }
+division       = { "/" }
+modulo         = { "%" }
 
-is_null_expression         = { expression_term ~ "IS" ~ "NULL" }
-is_null_expression_or_term = { is_null_expression | expression_term }
+or             = { "OR" }
+and            = { "AND" }
+equal          = { "=" }
+different      = { "<>" }
+inferior       = { "<" }
+superior       = { ">" }
+inferior_equal = { "<=" }
+superior_equal = { ">=" }
+not_in         = { "NOT" ~ "IN" }
+in_            = { "IN" }
 
-not_expression         = { "NOT" ~ expression_term }
+negation = { "-" }
+not      = { "NOT" }
+
+is_null     = { "IS" ~ "NULL" }
+is_not_null = { "IS" ~ "NOT" ~ "NULL" }
+
 label_check_expression = { ident ~ (":" ~ ident)+ }
 
 parenthesised_expression = { "(" ~ expression ~ ")" }
 named_expression         = { (expression ~ "AS" ~ ident) | expression }
 function_call            = { function_name ~ "(" ~ expression ~ ("," ~ expression)* ~ ")" }
 count_star               = { "count" ~ "(" ~ "*" ~ ")" }
-expression_term          = { null_lit | true_lit | false_lit | num | int | string_literal | map | array | member_access | label_check_expression | parameter | parenthesised_expression | not_expression | function_call | count_star | ident }
+expression_term          = { null_lit | true_lit | false_lit | num | int | string_literal | map | array | member_access | label_check_expression | parameter | parenthesised_expression | function_call | count_star | ident }
 
 parameter     = { "$" ~ ident }
 member_access = { ident ~ ("." ~ ident)+ }

@@ -1,5 +1,8 @@
 use ast::{EdgePattern, Expression, LabelExpression, NodePattern};
-use pest::Parser;
+use pest::{
+  pratt_parser::{Assoc, Op, PrattParser},
+  Parser,
+};
 use pest_derive::Parser;
 
 use crate::{
@@ -26,106 +29,161 @@ pub(crate) mod ast;
 #[grammar = "parser/gql.pest"]
 pub(crate) struct GQLParser;
 
-fn build_pair(pair: pest::iterators::Pair<Rule>) -> Result<(String, ast::Expression)>
+fn build_pair(
+  pair: pest::iterators::Pair<Rule>,
+  pratt: &PrattParser<Rule>,
+) -> Result<(String, ast::Expression)>
 {
   let mut it = pair.into_inner();
   let k = it.try_next()?;
-  let v = build_expression(it.try_next()?)?;
+  let v = build_expression(it.try_next()?.into_inner(), pratt)?;
   return Ok((k.as_str().to_string(), v));
 }
 
-fn build_expression(pair: pest::iterators::Pair<Rule>) -> Result<ast::Expression>
+fn build_expression(
+  pairs: pest::iterators::Pairs<Rule>,
+  pratt: &PrattParser<Rule>,
+) -> Result<ast::Expression>
 {
-  match pair.as_rule()
-  {
-    Rule::expression => build_expression_relational_or_bin_op(pair.into_inner().try_next()?),
-    unknown_expression => Err(crate::Error::UnxpectedExpression(
-      "build_named_expressions",
-      format!("{unknown_expression:?}"),
-    )),
-  }
-}
-
-macro_rules! build_binop {
-  ($ast_type: tt, $rule_name: ident, $function_name: ident, $follow_fn: ident) => {
-    fn $function_name(pair: pest::iterators::Pair<Rule>) -> Result<ast::Expression>
+  pratt
+    .map_primary(|primary| build_expression_primary(primary, pratt))
+    .map_prefix(|op, rhs| match op.as_rule()
     {
-      match pair.as_rule()
-      {
-        Rule::$rule_name =>
-        {
-          let mut it = pair.into_inner();
-          let left = $follow_fn(it.try_next()?)?;
-          if let Some(right) = it.next()
-          {
-            let right = build_expression(right)?;
-            Ok(ast::$ast_type { left, right }.into())
-          }
-          else
-          {
-            Ok(left)
-          }
+      Rule::negation => Ok(ast::Negation { value: rhs? }.into()),
+      Rule::not => Ok(ast::LogicalNegation { value: rhs? }.into()),
+      unknown_expression => Err(crate::Error::UnxpectedExpression(
+        "build_expression/map_prefix",
+        format!("{unknown_expression:?}"),
+      )),
+    })
+    .map_postfix(|lhs, op| match op.as_rule()
+    {
+      Rule::is_null => Ok(ast::IsNull { value: lhs? }.into()),
+      Rule::is_not_null => Ok(ast::IsNotNull { value: lhs? }.into()),
+      unknown_expression => Err(crate::Error::UnxpectedExpression(
+        "build_expression/map_postfix",
+        format!("{unknown_expression:?}"),
+      )),
+    })
+    .map_infix(|lhs, op, rhs| match op.as_rule()
+    {
+      Rule::addition => Ok(
+        ast::Addition {
+          left: lhs?,
+          right: rhs?,
         }
-        unknown_expression => Err(crate::Error::UnxpectedExpression(
-          stringify!($function_name),
-          format!("{unknown_expression:?}"),
-        )),
-      }
-    }
-  };
+        .into(),
+      ),
+      Rule::substraction => Ok(
+        ast::Substraction {
+          left: lhs?,
+          right: rhs?,
+        }
+        .into(),
+      ),
+      Rule::multiplication => Ok(
+        ast::Multiplication {
+          left: lhs?,
+          right: rhs?,
+        }
+        .into(),
+      ),
+      Rule::division => Ok(
+        ast::Division {
+          left: lhs?,
+          right: rhs?,
+        }
+        .into(),
+      ),
+      Rule::modulo => Ok(
+        ast::Modulo {
+          left: lhs?,
+          right: rhs?,
+        }
+        .into(),
+      ),
+      Rule::or => Ok(
+        ast::LogicalOr {
+          left: lhs?,
+          right: rhs?,
+        }
+        .into(),
+      ),
+      Rule::and => Ok(
+        ast::LogicalAnd {
+          left: lhs?,
+          right: rhs?,
+        }
+        .into(),
+      ),
+      Rule::equal => Ok(
+        ast::RelationalEqual {
+          left: lhs?,
+          right: rhs?,
+        }
+        .into(),
+      ),
+      Rule::different => Ok(
+        ast::RelationalDifferent {
+          left: lhs?,
+          right: rhs?,
+        }
+        .into(),
+      ),
+      Rule::inferior => Ok(
+        ast::RelationalInferior {
+          left: lhs?,
+          right: rhs?,
+        }
+        .into(),
+      ),
+      Rule::superior => Ok(
+        ast::RelationalSuperior {
+          left: lhs?,
+          right: rhs?,
+        }
+        .into(),
+      ),
+      Rule::inferior_equal => Ok(
+        ast::RelationalInferiorEqual {
+          left: lhs?,
+          right: rhs?,
+        }
+        .into(),
+      ),
+      Rule::superior_equal => Ok(
+        ast::RelationalSuperiorEqual {
+          left: lhs?,
+          right: rhs?,
+        }
+        .into(),
+      ),
+      Rule::not_in => Ok(
+        ast::RelationalNotIn {
+          left: lhs?,
+          right: rhs?,
+        }
+        .into(),
+      ),
+      Rule::in_ => Ok(
+        ast::RelationalIn {
+          left: lhs?,
+          right: rhs?,
+        }
+        .into(),
+      ),
+      unknown_expression => Err(crate::Error::UnxpectedExpression(
+        "build_expression/map_postfix",
+        format!("{unknown_expression:?}"),
+      )),
+    })
+    .parse(pairs)
 }
 
-build_binop!(
-  LogicalOr,
-  or_bin_op_expression,
-  build_expression_relational_or_bin_op,
-  build_expression_relational_and_bin_op
-);
-
-build_binop!(
-  LogicalAnd,
-  and_bin_op_expression,
-  build_expression_relational_and_bin_op,
-  build_expression_relational_different_bin_op
-);
-
-build_binop!(
-  RelationalDifferent,
-  different_bin_op_expression,
-  build_expression_relational_different_bin_op,
-  build_expression_relational_equal_bin_op
-);
-
-build_binop!(
-  RelationalEqual,
-  equal_bin_op_expression,
-  build_expression_relational_equal_bin_op,
-  build_expression_in_bin_op
-);
-
-build_binop!(
-  RelationalIn,
-  in_bin_op_expression,
-  build_expression_in_bin_op,
-  build_is_null_expression_or_term
-);
-
-fn build_is_null_expression_or_term(pair: pest::iterators::Pair<Rule>) -> Result<ast::Expression>
-{
-  let pair = pair.into_inner().try_next()?;
-  match pair.as_rule()
-  {
-    Rule::is_null_expression => Ok(
-      ast::IsNull {
-        value: build_expression_term(pair.into_inner().try_next()?)?,
-      }
-      .into(),
-    ),
-    _ => build_expression_term(pair),
-  }
-}
-
-fn build_expression_term(pair: pest::iterators::Pair<Rule>) -> Result<ast::Expression>
+fn build_expression_primary(
+  pair: pest::iterators::Pair<Rule>,
+  pratt: &PrattParser<Rule>,
+) -> Result<ast::Expression>
 {
   match pair.as_rule()
   {
@@ -158,10 +216,10 @@ fn build_expression_term(pair: pest::iterators::Pair<Rule>) -> Result<ast::Expre
         Rule::array => Ok(ast::Expression::Array(ast::Array {
           array: pair
             .into_inner()
-            .map(|pair| build_expression(pair))
+            .map(|pair| build_expression(pair.into_inner(), pratt))
             .collect::<Result<Vec<ast::Expression>>>()?,
         })),
-        Rule::map => build_map(pair),
+        Rule::map => build_map(pair, pratt),
         Rule::member_access =>
         {
           let mut it = pair.into_inner();
@@ -186,7 +244,7 @@ fn build_expression_term(pair: pest::iterators::Pair<Rule>) -> Result<ast::Expre
           Ok(ast::Expression::FunctionCall(ast::FunctionCall {
             name: function_name.to_string(),
             arguments: it
-              .map(|pair| build_expression(pair))
+              .map(|pair| build_expression(pair.into_inner(), pratt))
               .collect::<Result<_>>()?,
           }))
         }
@@ -197,17 +255,7 @@ fn build_expression_term(pair: pest::iterators::Pair<Rule>) -> Result<ast::Expre
         Rule::parenthesised_expression =>
         {
           let mut it = pair.into_inner();
-          build_expression(it.try_next()?)
-        }
-        Rule::not_expression =>
-        {
-          let mut it = pair.into_inner();
-          Ok(
-            ast::LogicalNegation {
-              value: build_expression_term(it.try_next()?)?,
-            }
-            .into(),
-          )
+          build_expression(it.try_next()?.into_inner(), pratt)
         }
         Rule::label_check_expression =>
         {
@@ -239,18 +287,17 @@ fn build_expression_term(pair: pest::iterators::Pair<Rule>) -> Result<ast::Expre
         )),
       }
     }
-    unknown_expression =>
-    {
-      todo!();
-      Err(crate::Error::UnxpectedExpression(
-        "build_expression_term",
-        format!("{unknown_expression:?}"),
-      ))
-    }
+    unknown_expression => Err(crate::Error::UnxpectedExpression(
+      "build_expression_term",
+      format!("{unknown_expression:?}"),
+    )),
   }
 }
 
-fn build_map(pair: pest::iterators::Pair<Rule>) -> Result<ast::Expression>
+fn build_map(
+  pair: pest::iterators::Pair<Rule>,
+  pratt: &PrattParser<Rule>,
+) -> Result<ast::Expression>
 {
   match pair.as_rule()
   {
@@ -258,7 +305,7 @@ fn build_map(pair: pest::iterators::Pair<Rule>) -> Result<ast::Expression>
       let mut map = std::collections::HashMap::new();
       for k_v_pair in pair.into_inner()
       {
-        let (k, v) = build_pair(k_v_pair)?;
+        let (k, v) = build_pair(k_v_pair, pratt)?;
         map.insert(k, v);
       }
       ast::Map { map: map }
@@ -270,7 +317,10 @@ fn build_map(pair: pest::iterators::Pair<Rule>) -> Result<ast::Expression>
   }
 }
 
-fn build_modifiers(pair: pest::iterators::Pair<Rule>) -> Result<ast::Modifiers>
+fn build_modifiers(
+  pair: pest::iterators::Pair<Rule>,
+  pratt: &PrattParser<Rule>,
+) -> Result<ast::Modifiers>
 {
   let skip = None;
   let mut limit = None;
@@ -279,7 +329,13 @@ fn build_modifiers(pair: pest::iterators::Pair<Rule>) -> Result<ast::Modifiers>
   {
     match subpair.as_rule()
     {
-      Rule::limit => limit = Some(build_expression(subpair.into_inner().try_next()?)?),
+      Rule::limit =>
+      {
+        limit = Some(build_expression(
+          subpair.into_inner().try_next()?.into_inner(),
+          pratt,
+        )?)
+      }
       _ => Err::<(), crate::Error>(
         InternalError::UnexpectedPair {
           context: "build_modifiers",
@@ -296,7 +352,10 @@ fn build_modifiers(pair: pest::iterators::Pair<Rule>) -> Result<ast::Modifiers>
   })
 }
 
-fn build_named_expression(pair: pest::iterators::Pair<Rule>) -> Result<ast::NamedExpression>
+fn build_named_expression(
+  pair: pest::iterators::Pair<Rule>,
+  pratt: &PrattParser<Rule>,
+) -> Result<ast::NamedExpression>
 {
   match pair.as_rule()
   {
@@ -310,12 +369,12 @@ fn build_named_expression(pair: pest::iterators::Pair<Rule>) -> Result<ast::Name
           let expr = inner.try_next()?;
           Ok(ast::NamedExpression {
             name: expr.as_str().trim().to_string(),
-            expression: build_expression(expr)?,
+            expression: build_expression(expr.into_inner(), pratt)?,
           })
         }
         2 =>
         {
-          let expression = build_expression(inner.try_next()?)?;
+          let expression = build_expression(inner.try_next()?.into_inner(), pratt)?;
           let name = inner.try_next()?.as_str().to_string();
           Ok(ast::NamedExpression { name, expression })
         }
@@ -371,7 +430,10 @@ fn build_labels(pair: pest::iterators::Pair<Rule>) -> Result<ast::LabelExpressio
   }
 }
 
-fn build_node_pattern(pair: pest::iterators::Pair<Rule>) -> Result<ast::NodePattern>
+fn build_node_pattern(
+  pair: pest::iterators::Pair<Rule>,
+  pratt: &PrattParser<Rule>,
+) -> Result<ast::NodePattern>
 {
   let it = pair.into_inner();
   let mut variable = None;
@@ -390,7 +452,7 @@ fn build_node_pattern(pair: pest::iterators::Pair<Rule>) -> Result<ast::NodePatt
       {
         labels = build_labels(pair)?;
       }
-      Rule::map => properties = Some(build_map(pair)?),
+      Rule::map => properties = Some(build_map(pair, pratt)?),
       unknown_expression =>
       {
         return Err(crate::Error::UnxpectedExpression(
@@ -412,6 +474,7 @@ fn build_edge_pattern(
   edge_pair: pest::iterators::Pair<Rule>,
   destination_node: NodePattern,
   allow_undirected_edge: bool,
+  pratt: &PrattParser<Rule>,
 ) -> Result<EdgePattern>
 {
   let edge_rule = edge_pair.as_rule();
@@ -432,7 +495,7 @@ fn build_edge_pattern(
       {
         labels = build_labels(pair)?;
       }
-      Rule::map => properties = Some(build_map(pair)?),
+      Rule::map => properties = Some(build_map(pair, pratt)?),
       unknown_expression =>
       {
         return Err(crate::Error::UnxpectedExpression(
@@ -488,13 +551,14 @@ fn build_edge_pattern(
 fn build_patterns(
   iterator: &mut pest::iterators::Pairs<Rule>,
   allow_undirected_edge: bool,
+  pratt: &PrattParser<Rule>,
 ) -> Result<Vec<ast::Pattern>>
 {
   let mut vec = vec![];
 
   for pair in iterator
   {
-    vec.append(&mut build_pattern(pair, allow_undirected_edge)?);
+    vec.append(&mut build_pattern(pair, allow_undirected_edge, pratt)?);
   }
   Ok(vec)
 }
@@ -502,6 +566,7 @@ fn build_patterns(
 fn build_pattern(
   pair: pest::iterators::Pair<Rule>,
   allow_undirected_edge: bool,
+  pratt: &PrattParser<Rule>,
 ) -> Result<Vec<ast::Pattern>>
 {
   let mut vec = vec![];
@@ -512,22 +577,24 @@ fn build_pattern(
     {
       vec.push(ast::Pattern::Node(build_node_pattern(
         pair.into_inner().try_next()?,
+        pratt,
       )?));
     }
     Rule::edge_pattern =>
     {
       let mut it = pair.into_inner();
-      let mut source_node = build_node_pattern(it.try_next()?)?;
+      let mut source_node = build_node_pattern(it.try_next()?, pratt)?;
 
       while let Some(next) = it.next()
       {
-        let destination_node = build_node_pattern(it.try_next()?)?;
+        let destination_node = build_node_pattern(it.try_next()?, pratt)?;
 
         let edge_pattern = build_edge_pattern(
           source_node,
           next,
           destination_node.clone(),
           allow_undirected_edge,
+          pratt,
         )?;
         vec.push(ast::Pattern::Edge(edge_pattern));
         source_node = destination_node;
@@ -537,15 +604,16 @@ fn build_pattern(
     {
       let mut it = pair.into_inner();
       let variable = it.try_next()?.as_str().to_string();
-      let source_node = build_node_pattern(it.try_next()?)?;
+      let source_node = build_node_pattern(it.try_next()?, pratt)?;
       let edge_it = it.try_next()?;
-      let destination_node = build_node_pattern(it.try_next()?)?;
+      let destination_node = build_node_pattern(it.try_next()?, pratt)?;
 
       let edge_pattern = build_edge_pattern(
         source_node,
         edge_it,
         destination_node,
         allow_undirected_edge,
+        pratt,
       )?;
       vec.push(ast::Pattern::Path(ast::PathPattern {
         variable,
@@ -563,7 +631,11 @@ fn build_pattern(
   Ok(vec)
 }
 
-fn build_match(pair: pest::iterators::Pair<Rule>, optional: bool) -> Result<ast::Statement>
+fn build_match(
+  pair: pest::iterators::Pair<Rule>,
+  optional: bool,
+  pratt: &PrattParser<Rule>,
+) -> Result<ast::Statement>
 {
   let inner = pair.into_inner();
   let mut where_expression = None;
@@ -574,9 +646,12 @@ fn build_match(pair: pest::iterators::Pair<Rule>, optional: bool) -> Result<ast:
     {
       Rule::where_modifier =>
       {
-        where_expression = Some(build_expression(pair.into_inner().try_next()?)?)
+        where_expression = Some(build_expression(
+          pair.into_inner().try_next()?.into_inner(),
+          pratt,
+        )?)
       }
-      _ => patterns.append(&mut build_pattern(pair, true)?),
+      _ => patterns.append(&mut build_pattern(pair, true, pratt)?),
     }
   }
 
@@ -587,20 +662,23 @@ fn build_match(pair: pest::iterators::Pair<Rule>, optional: bool) -> Result<ast:
   }))
 }
 
-fn build_ast_from_statement(pair: pest::iterators::Pair<Rule>) -> Result<ast::Statement>
+fn build_ast_from_statement(
+  pair: pest::iterators::Pair<Rule>,
+  pratt: &PrattParser<Rule>,
+) -> Result<ast::Statement>
 {
   match pair.as_rule()
   {
     Rule::create_statement => Ok(ast::Statement::Create(ast::Create {
-      patterns: build_patterns(&mut pair.into_inner(), false)?,
+      patterns: build_patterns(&mut pair.into_inner(), false, pratt)?,
     })),
-    Rule::match_statement => build_match(pair, false),
-    Rule::optional_match_statement => build_match(pair.into_inner().try_next()?, true),
+    Rule::match_statement => build_match(pair, false, pratt),
+    Rule::optional_match_statement => build_match(pair.into_inner().try_next()?, true, pratt),
     Rule::return_statement =>
     {
       let named_expressions = pair
         .into_inner()
-        .map(|pair| build_named_expression(pair))
+        .map(|pair| build_named_expression(pair, pratt))
         .collect::<Result<Vec<ast::NamedExpression>>>()?;
       Ok(ast::Statement::Return(ast::Return {
         all: false,
@@ -619,8 +697,8 @@ fn build_ast_from_statement(pair: pest::iterators::Pair<Rule>) -> Result<ast::St
         match sub_pair.as_rule()
         {
           Rule::star => all = true,
-          Rule::named_expression => expressions.push(build_named_expression(sub_pair)?),
-          Rule::modifiers => modifiers = build_modifiers(sub_pair)?,
+          Rule::named_expression => expressions.push(build_named_expression(sub_pair, pratt)?),
+          Rule::modifiers => modifiers = build_modifiers(sub_pair, pratt)?,
           _ => Err(InternalError::UnexpectedPair {
             context: "build_ast_from_statement/with_statement",
             pair: sub_pair.as_str().to_string(),
@@ -645,7 +723,7 @@ fn build_ast_from_statement(pair: pest::iterators::Pair<Rule>) -> Result<ast::St
 
       let ne = match pair.as_rule()
       {
-        Rule::named_expression => build_named_expression(pair),
+        Rule::named_expression => build_named_expression(pair, pratt),
         _ => Err(
           InternalError::UnexpectedPair {
             context: "build_ast_from_statement/with_statement",
@@ -681,6 +759,25 @@ fn build_ast_from_statement(pair: pest::iterators::Pair<Rule>) -> Result<ast::St
 
 pub(crate) fn parse(input: &str) -> Result<ast::Statements>
 {
+  let pratt = PrattParser::new()
+    .op(Op::infix(Rule::or, Assoc::Left))
+    .op(Op::infix(Rule::and, Assoc::Left))
+    .op(Op::infix(Rule::equal, Assoc::Left) | Op::infix(Rule::different, Assoc::Left))
+    .op(
+      Op::infix(Rule::inferior, Assoc::Left)
+        | Op::infix(Rule::inferior_equal, Assoc::Left)
+        | Op::infix(Rule::superior, Assoc::Left)
+        | Op::infix(Rule::superior_equal, Assoc::Left),
+    )
+    .op(Op::infix(Rule::not_in, Assoc::Left) | Op::infix(Rule::in_, Assoc::Left))
+    .op(Op::infix(Rule::addition, Assoc::Left) | Op::infix(Rule::substraction, Assoc::Left))
+    .op(
+      Op::infix(Rule::multiplication, Assoc::Left)
+        | Op::infix(Rule::division, Assoc::Left)
+        | Op::infix(Rule::modulo, Assoc::Left),
+    )
+    .op(Op::prefix(Rule::not) | Op::prefix(Rule::negation))
+    .op(Op::postfix(Rule::is_null) | Op::postfix(Rule::is_not_null));
   let pairs = GQLParser::parse(Rule::query, input)?;
   let mut stmts = ast::Statements::new();
   if crate::consts::SHOW_PARSE_TREE
@@ -693,7 +790,10 @@ pub(crate) fn parse(input: &str) -> Result<ast::Statements>
     {
       Rule::statement =>
       {
-        stmts.push(build_ast_from_statement(pair.into_inner().try_next()?)?);
+        stmts.push(build_ast_from_statement(
+          pair.into_inner().try_next()?,
+          &pratt,
+        )?);
       }
       Rule::EOI =>
       {}
