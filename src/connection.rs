@@ -1,5 +1,3 @@
-use std::borrow::Borrow;
-
 use crate::interpreter;
 
 pub struct Connection
@@ -10,6 +8,7 @@ pub struct Connection
 
 impl Connection
 {
+  #[cfg(feature = "persy")]
   pub fn open<P: AsRef<std::path::Path>>(
     path: P,
     _options: crate::graph::ValueObject,
@@ -18,6 +17,13 @@ impl Connection
     Ok(Connection {
       store: crate::store::Store::new(path)?,
       function_manager: crate::functions::Manager::new(),
+    })
+  }
+  #[cfg(feature = "pgql")]
+  pub fn create() -> crate::Result<Connection>
+  {
+    Ok(Connection {
+      store: crate::store::Store::new()?,
     })
   }
   pub fn execute_query(
@@ -29,6 +35,6 @@ impl Connection
     let q: String = query.into();
     let q = crate::parser::parse(q.as_str())?;
     let q = interpreter::compiler::compile(&self.function_manager, q)?;
-    return interpreter::evaluators::eval_program(self.store.borrow(), q, parameters);
+    return interpreter::evaluators::eval_program(&self.store, q, parameters);
   }
 }
