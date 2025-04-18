@@ -188,6 +188,7 @@ pub(crate) enum Block
   Return
   {
     variables: Vec<RWExpression>,
+    filter: Instructions,
     modifiers: Modifiers,
   },
   Call
@@ -198,6 +199,7 @@ pub(crate) enum Block
   With
   {
     variables: Vec<RWExpression>,
+    filter: Instructions,
     modifiers: Modifiers,
   },
   Unwind

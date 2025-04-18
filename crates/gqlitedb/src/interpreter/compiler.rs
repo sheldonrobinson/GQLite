@@ -875,11 +875,13 @@ fn compile_return_with(
   validator: &mut validator::Validator,
   all: bool,
   expressions: &Vec<ast::NamedExpression>,
+  where_expression: &Option<ast::Expression>,
   modifiers: &ast::Modifiers,
-) -> Result<(Vec<RWExpression>, Modifiers)>
+) -> Result<(Vec<RWExpression>, Instructions, Modifiers)>
 {
   let mut variables = Vec::<RWExpression>::new();
   let mut val_variables = Default::default();
+  let mut filter = Default::default();
   if all
   {
     val_variables = validator.to_variables();
@@ -936,10 +938,32 @@ fn compile_return_with(
   let mut variables_tmp = validator.variables_ref().to_owned();
   variables_tmp.extend(val_variables.to_owned().into_iter());
   validator.set_variables(variables_tmp);
+
+  // Compile where expression
+  if let Some(where_expression) = where_expression
+  {
+    let ei = expression_analyser::ExpressionInfo::analyse(
+      validator.variables_ref(),
+      function_manager,
+      where_expression,
+    )?;
+    if ei.aggregation_result
+    {
+      return Err(CompileTimeError::InvalidAggregation.into());
+    }
+    compile_expression(
+      function_manager,
+      validator,
+      where_expression,
+      &mut filter,
+      &mut None,
+    )?;
+  }
+
   let modifiers = compile_modifiers(function_manager, validator, &modifiers)?;
   validator.set_variables(val_variables);
 
-  Ok((variables, modifiers))
+  Ok((variables, filter, modifiers))
 }
 
 fn compile_match_patterns(
@@ -1135,15 +1159,17 @@ pub(crate) fn compile(
         ),
         ast::Statement::Return(return_statement) =>
         {
-          let (variables, modifiers) = compile_return_with(
+          let (variables, filter, modifiers) = compile_return_with(
             function_manager,
             &mut validator,
             return_statement.all,
             &return_statement.expressions,
+            &return_statement.where_expression,
             &return_statement.modifiers,
           )?;
           Ok(Block::Return {
             variables,
+            filter,
             modifiers,
           })
         }
@@ -1167,15 +1193,17 @@ pub(crate) fn compile(
         }
         ast::Statement::With(with) =>
         {
-          let (variables, modifiers) = compile_return_with(
+          let (variables, filter, modifiers) = compile_return_with(
             function_manager,
             &mut validator,
             with.all,
             &with.expressions,
+            &with.where_expression,
             &with.modifiers,
           )?;
           Ok(Block::With {
             variables,
+            filter,
             modifiers,
           })
         }

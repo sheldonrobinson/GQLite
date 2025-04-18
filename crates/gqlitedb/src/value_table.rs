@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 pub(crate) type Row = std::collections::HashMap<String, crate::graph::Value>;
 
 #[derive(Debug)]
@@ -71,5 +73,13 @@ impl FromIterator<Row> for ValueTable
     Self {
       data: iter.into_iter().collect(),
     }
+  }
+}
+
+impl From<Vec<HashMap<String, crate::graph::Value>>> for ValueTable
+{
+  fn from(value: Vec<HashMap<String, crate::graph::Value>>) -> Self
+  {
+    Self { data: value }
   }
 }

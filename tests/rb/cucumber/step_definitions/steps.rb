@@ -235,16 +235,6 @@ IgnoredScenario = [
   "[4] Forwarding a path variable",
   # Path assignment is only supported for p = ()-[]->()
   "[8] `labels()` failing on a path",
-  # "[5] Fail for `size()` on paths",
-  # "[3] Delete relationship with bidirectional matching",
-  # "[3] Comparing across types yields null, except numbers",
-  # "[14] Direction of traversed relationship is not significant for path equality, simple",
-  # # p = ()-[]->() not supported (named path)
-  # "[16] Optionally matching named paths - null result",
-  # "[17] Optionally matching named paths - existing result",
-  # "[18] Named paths inside optional matches with node predicates",
-  # "[9] `labels()` failing on invalid arguments",
-  # "[6] `type()` failing on invalid arguments",
   # paths are not supported in where
   "[2] Join with disjunctive multi-part predicates including patterns",
   # Path assignment and variable length path are not implemented
@@ -307,8 +297,6 @@ IgnoredScenario = [
   "[6] Concatenate elements onto a list property",
   "[7] Concatenate elements in reverse onto a list property",
   "[10] Failing when setting a list of maps as a property",
-  # List comparison are not supported
-  "[4] Comparing lists",
   # Distinct is not supported
   "[4] Support sort and distinct",
   "[5] Support ordering by a property after being distinct-ified",
@@ -363,26 +351,8 @@ IgnoredScenario = [
   "[8] Get node degree via size of pattern comprehension",
   "[9] Get node degree via size of pattern comprehension that specifies a relationship type",
   "[10] Get node degree via size of pattern comprehension that specifies multiple relationship types",
-  # handling of null
-  "[4] Equality between almost equal lists with null should return null",
-  "[7] Equality between almost equal nested lists with null should return null",
-  "[6] Comparing lists to lists, Examples (#2)",
-  "[6] Comparing lists to lists, Examples (#5)",
-  "[7] Comparing maps to maps, Examples (#12)",
-  "[7] Comparing maps to maps, Examples (#13)",
-  "[7] Comparing maps to maps, Examples (#14)",
-  "[7] Comparing maps to maps, Examples (#15)",
-  "[7] Comparing maps to maps, Examples (#16)",
-  "[3] `properties()` on null",
-  # "[31] IN should return null when comparing two so-called identical lists where one element is null",
-  # "[34] IN should return null if comparison with null is required, list version 2",
   # type of value stored in array/map is lost
   "[5] `type()` handling Any type",
-  # Comparison
-  "[5] Comparing relationships to relationships",
-  "[5] Comparing NaN",
-  "[6] Comparability between numbers and strings",
-  "[8] Equality and inequality of NaN",
   # MAX aggregation on list
   "[9] `max()` over list values", # Needs a custom max/min aggregator see https://gitlab.com/GQLite/GQLite/-/issues/12
   "[11] `max()` over mixed values",

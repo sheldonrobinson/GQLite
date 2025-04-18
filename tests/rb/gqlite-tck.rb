@@ -73,6 +73,8 @@ expressions = [
   'list/List1', 'list/List2', 'list/List3', 'list/List4', 'list/List5', 'list/List6', 'list/List7',  'list/List8', 
   # literals
   'literals/Literals1', 'literals/Literals2', 'literals/Literals3', 'literals/Literals4', 'literals/Literals5', 'literals/Literals6', 'literals/Literals7', 'literals/Literals8', 
+  # comparison
+  'comparison/Comparison1', 'comparison/Comparison2',
 
 ]
 
@@ -91,6 +93,12 @@ expressions = [
 # In progress
 # features = ['create/Create4', 'create/Create6']
 
+# Regressions 1.1 -> 1.2
+
+# expressions = [
+#   # graph, those are parser problems, and will wait for the new nom parser
+#  'comparison/Comparison3' 'comparison/Comparison4',
+# ]
 
 # GQLite 1.x
 
@@ -100,8 +108,6 @@ expressions = [
 # expressions = [
 #   # Aggregations
 #   'aggregation/Aggregation1', 'aggregation/Aggregation2', 'aggregation/Aggregation3', 'aggregation/Aggregation4', 'aggregation/Aggregation7',
-#   # comparison
-#   'comparison/Comparison1', 'comparison/Comparison2', 'comparison/Comparison3', 'comparison/Comparison4',
 #   # graph
 #   'graph/Graph4', 'graph/Graph5', 'graph/Graph7', 'graph/Graph9',
 # ]
