@@ -1,4 +1,4 @@
-use ast::Expression;
+use ast::{Expression, LabelExpression};
 use pest::Parser;
 use pest_derive::Parser;
 
@@ -155,21 +155,47 @@ fn build_named_expression(pair: pest::iterators::Pair<Rule>) -> Result<ast::Name
   }
 }
 
-fn build_labels(mut iterator: pest::iterators::Pairs<Rule>) -> Result<Vec<String>>
+fn build_labels(pair: pest::iterators::Pair<Rule>) -> Result<ast::LabelExpression>
 {
-  let mut vec = vec![];
-  while let Some(pair) = iterator.next()
+  match pair.as_rule()
   {
-    vec.push(pair.as_str().to_string());
+    Rule::labels => build_labels(pair.into_inner().next().unwrap()),
+    Rule::label_alternative =>
+    {
+      let mut r = ast::LabelExpression::None;
+      let mut inner = pair.into_inner();
+      while let Some(next) = inner.next()
+      {
+        r = r.or(build_labels(next)?);
+      }
+      Ok(r)
+    }
+    Rule::label_inclusion =>
+    {
+      let mut r = ast::LabelExpression::None;
+      let mut inner = pair.into_inner();
+      while let Some(next) = inner.next()
+      {
+        r = r.and(build_labels(next)?);
+      }
+      Ok(r)
+    }
+    Rule::label_atom => Ok(ast::LabelExpression::String(pair.as_str().to_string())),
+    _ => Err(
+      InternalError::UnexpectedPair {
+        context: "build_labels",
+        pair: format!("{:#?}", pair),
+      }
+      .into(),
+    ),
   }
-  Ok(vec)
 }
 
-fn build_node_pattern(pair: pest::iterators::Pair<Rule>) -> Result<ast::GraphNode>
+fn build_node_pattern(pair: pest::iterators::Pair<Rule>) -> Result<ast::NodePattern>
 {
   let it = pair.into_inner();
   let mut variable = None;
-  let mut labels = Vec::new();
+  let mut labels = ast::LabelExpression::None;
   let mut properties = None;
 
   for pair in it
@@ -182,7 +208,7 @@ fn build_node_pattern(pair: pest::iterators::Pair<Rule>) -> Result<ast::GraphNod
       }
       Rule::labels =>
       {
-        labels = build_labels(pair.into_inner())?;
+        labels = build_labels(pair)?;
       }
       Rule::map => properties = Some(build_expression(pair)?),
       unknown_expression =>
@@ -194,7 +220,7 @@ fn build_node_pattern(pair: pest::iterators::Pair<Rule>) -> Result<ast::GraphNod
       }
     }
   }
-  Ok(ast::GraphNode {
+  Ok(ast::NodePattern {
     variable,
     labels,
     properties,
@@ -203,11 +229,11 @@ fn build_node_pattern(pair: pest::iterators::Pair<Rule>) -> Result<ast::GraphNod
 
 fn build_edge_pattern(
   pair: pest::iterators::Pair<Rule>,
-) -> Result<(Option<String>, Vec<String>, Option<Expression>)>
+) -> Result<(Option<String>, LabelExpression, Option<Expression>)>
 {
   let it = pair.into_inner();
   let mut variable = None;
-  let mut labels = vec![];
+  let mut labels = LabelExpression::None;
   let mut properties = None;
 
   for pair in it
@@ -220,7 +246,7 @@ fn build_edge_pattern(
       }
       Rule::labels =>
       {
-        labels = build_labels(pair.into_inner())?;
+        labels = build_labels(pair)?;
       }
       Rule::map => properties = Some(build_expression(pair)?),
       unknown_expression =>
@@ -248,7 +274,7 @@ fn build_pattern(
     {
       Rule::node_pattern =>
       {
-        vec.push(ast::Pattern::GraphNode(build_node_pattern(
+        vec.push(ast::Pattern::Node(build_node_pattern(
           pair.into_inner().next().unwrap(),
         )?));
       }
@@ -258,7 +284,7 @@ fn build_pattern(
         let source_node = build_node_pattern(it.next().unwrap())?;
         let edge_pattern = build_edge_pattern(it.next().unwrap())?;
         let destination_node = build_node_pattern(it.next().unwrap())?;
-        vec.push(ast::Pattern::GraphEdge(ast::GraphEdge {
+        vec.push(ast::Pattern::Edge(ast::EdgePattern {
           variable: edge_pattern.0,
           source: source_node,
           destination: destination_node,
@@ -273,7 +299,7 @@ fn build_pattern(
         let destination_node = build_node_pattern(it.next().unwrap())?;
         let edge_pattern = build_edge_pattern(it.next().unwrap())?;
         let source_node = build_node_pattern(it.next().unwrap())?;
-        vec.push(ast::Pattern::GraphEdge(ast::GraphEdge {
+        vec.push(ast::Pattern::Edge(ast::EdgePattern {
           variable: edge_pattern.0,
           source: source_node,
           destination: destination_node,
@@ -290,7 +316,7 @@ fn build_pattern(
           let source_node = build_node_pattern(it.next().unwrap())?;
           let edge_pattern = build_edge_pattern(it.next().unwrap())?;
           let destination_node = build_node_pattern(it.next().unwrap())?;
-          vec.push(ast::Pattern::GraphEdge(ast::GraphEdge {
+          vec.push(ast::Pattern::Edge(ast::EdgePattern {
             variable: edge_pattern.0,
             source: source_node,
             destination: destination_node,
@@ -314,9 +340,9 @@ fn build_pattern(
         let source_node = build_node_pattern(it.next().unwrap())?;
         let edge_pattern = build_edge_pattern(it.next().unwrap())?;
         let destination_node = build_node_pattern(it.next().unwrap())?;
-        vec.push(ast::Pattern::GraphPath(ast::GraphPath {
+        vec.push(ast::Pattern::Path(ast::PathPattern {
           variable,
-          edge: ast::GraphEdge {
+          edge: ast::EdgePattern {
             variable: edge_pattern.0,
             source: source_node,
             destination: destination_node,

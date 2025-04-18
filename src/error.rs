@@ -108,6 +108,11 @@ pub enum InternalError
   {
     context: &'static str
   },
+  #[error("Invalid create labels expression {context}.")]
+  InvalidCreateLabels
+  {
+    context: &'static str
+  },
 }
 
 /// GQLite errors

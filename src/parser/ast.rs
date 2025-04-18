@@ -165,21 +165,21 @@ pub(crate) struct OrderByExpression
   expression: Expression,
 }
 
-// Values: Patterns
+// Values: CreatePatterns
 
 #[derive(Debug)]
 pub(crate) enum Pattern
 {
-  GraphNode(GraphNode),
-  GraphEdge(GraphEdge),
-  GraphPath(GraphPath),
+  Node(NodePattern),
+  Edge(EdgePattern),
+  Path(PathPattern),
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct GraphNode
+pub(crate) struct NodePattern
 {
   pub(crate) variable: Option<String>,
-  pub(crate) labels: Vec<String>,
+  pub(crate) labels: LabelExpression,
   pub(crate) properties: Option<Expression>,
 }
 
@@ -191,21 +191,114 @@ pub(crate) enum EdgeDirectivity
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct GraphEdge
+pub(crate) struct EdgePattern
 {
   pub(crate) variable: Option<String>,
-  pub(crate) source: GraphNode,
-  pub(crate) destination: GraphNode,
+  pub(crate) source: NodePattern,
+  pub(crate) destination: NodePattern,
   pub(crate) directivity: EdgeDirectivity,
-  pub(crate) labels: Vec<String>,
+  pub(crate) labels: LabelExpression,
   pub(crate) properties: Option<Expression>,
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct GraphPath
+pub(crate) struct PathPattern
 {
   pub(crate) variable: String,
-  pub(crate) edge: GraphEdge,
+  pub(crate) edge: EdgePattern,
+}
+
+// Label Expression
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) enum LabelExpression
+{
+  Not(Box<LabelExpression>),
+  And(Vec<Box<LabelExpression>>),
+  Or(Vec<Box<LabelExpression>>),
+  String(String),
+  None,
+}
+
+impl LabelExpression
+{
+  pub(crate) fn is_none(&self) -> bool
+  {
+    match self
+    {
+      LabelExpression::None => true,
+      _ => false,
+    }
+  }
+  pub(crate) fn and(self, rhs: LabelExpression) -> LabelExpression
+  {
+    match self
+    {
+      LabelExpression::None => rhs,
+      LabelExpression::And(mut vec) => match rhs
+      {
+        LabelExpression::None => LabelExpression::And(vec),
+        LabelExpression::And(mut rhs_vec) =>
+        {
+          vec.append(&mut rhs_vec);
+          LabelExpression::And(vec)
+        }
+        other =>
+        {
+          vec.push(other.boxed());
+          LabelExpression::And(vec)
+        }
+      },
+      _ => match rhs
+      {
+        LabelExpression::None => self,
+        LabelExpression::And(mut vec) =>
+        {
+          vec.push(self.boxed());
+          LabelExpression::And(vec)
+        }
+        _ => LabelExpression::And(vec![self.boxed(), rhs.boxed()]),
+      },
+    }
+  }
+  pub(crate) fn or(self, rhs: LabelExpression) -> LabelExpression
+  {
+    match self
+    {
+      LabelExpression::None => rhs,
+      LabelExpression::Or(mut vec) => match rhs
+      {
+        LabelExpression::None => LabelExpression::And(vec),
+        LabelExpression::Or(mut rhs_vec) =>
+        {
+          vec.append(&mut rhs_vec);
+          LabelExpression::Or(vec)
+        }
+        other =>
+        {
+          vec.push(other.boxed());
+          LabelExpression::Or(vec)
+        }
+      },
+      _ => match rhs
+      {
+        LabelExpression::None => self,
+        LabelExpression::Or(mut vec) =>
+        {
+          vec.push(self.boxed());
+          LabelExpression::Or(vec)
+        }
+        _ => LabelExpression::Or(vec![self.boxed(), rhs.boxed()]),
+      },
+    }
+  }
+  fn clone_boxed(&self) -> Box<LabelExpression>
+  {
+    self.clone().boxed()
+  }
+  pub(crate) fn boxed(self) -> Box<LabelExpression>
+  {
+    Box::new(self)
+  }
 }
 
 // Values
