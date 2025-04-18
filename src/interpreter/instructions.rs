@@ -175,8 +175,7 @@ pub(crate) enum Block
   },
   With
   {
-    all: bool,
-    variables: Vec<RWExpression>,
+    variables: Vec<RWExpression>
   },
   Unwind
   {
