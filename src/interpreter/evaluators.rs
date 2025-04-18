@@ -197,7 +197,9 @@ pub(crate) fn eval_program(
             crate::store::SelectNodeQuery::select_labels(
               template
                 .to_node()
-                .ok_or_else(|| InternalError::ExpectedNode("eval_program/MatchNode"))?
+                .ok_or_else(|| InternalError::ExpectedNode {
+                  context: "eval_program/MatchNode",
+                })?
                 .labels
                 .iter(),
             ),
@@ -206,13 +208,18 @@ pub(crate) fn eval_program(
           for node in nodes.iter()
           {
             let mut new_row = row.clone();
-            new_row.insert(
-              variable
-                .as_ref()
-                .ok_or(Error::Unknown("executor/eval/match_node/variable.as_ref()"))?
-                .to_owned(),
-              crate::graph::Value::Node(node.to_owned()),
-            );
+            match &variable
+            {
+              Some(variable) =>
+              {
+                new_row.insert(
+                  variable.to_owned(),
+                  crate::graph::Value::Node(node.to_owned()),
+                );
+              }
+              None =>
+              {}
+            }
             output_table.add_row(new_row);
           }
         }
@@ -300,6 +307,31 @@ pub(crate) fn eval_program(
         }
         tx.commit()?;
         return Ok(crate::graph::Value::Array(r));
+      }
+      instructions::Block::With { all, variables } =>
+      {
+        let mut output_table = crate::value_table::ValueTable::new();
+        for row in input_table.iter()
+        {
+          let mut out_row = if all
+          {
+            row.clone()
+          }
+          else
+          {
+            crate::value_table::Row::new()
+          };
+          for (name, instructions) in variables.iter()
+          {
+            let mut stack = Vec::<crate::graph::Value>::new();
+            eval_instructions(&mut stack, row, instructions)?;
+            let value = stack.first().ok_or(Error::Unknown("eval_program/return"))?;
+            out_row.insert(name.to_owned(), value.to_owned());
+          }
+          output_table.add_row(out_row);
+        }
+        input_table = output_table;
+        println!("After with: {:?}", input_table);
       }
       instructions::Block::Call { arguments: _, name } =>
       {

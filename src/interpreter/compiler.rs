@@ -1,7 +1,7 @@
 use std::borrow::{Borrow, BorrowMut};
 
 // use crate::graph::ToValue;
-use crate::interpreter::instructions::{Block, CreateAction, Instruction, Instructions};
+use crate::interpreter::instructions::{self, Block, CreateAction, Instruction, Instructions};
 use crate::interpreter::validator;
 use crate::parser::ast;
 use crate::Result;
@@ -265,9 +265,9 @@ pub(crate) fn compile(statements: crate::parser::ast::Statements) -> Result<supe
 
           for expr in return_statement.expressions.iter()
           {
-            let mut ints = Instructions::new();
-            compile_expression(expr.expression.borrow(), ints.borrow_mut());
-            variables.insert(expr.name.to_owned(), ints);
+            let mut instructions = Instructions::new();
+            compile_expression(&expr.expression, &mut instructions);
+            variables.insert(expr.name.to_owned(), instructions);
           }
 
           Ok(
@@ -288,6 +288,23 @@ pub(crate) fn compile(statements: crate::parser::ast::Statements) -> Result<supe
             Vec::from([Block::Call {
               arguments: instructions,
               name: call.name.to_owned(),
+            }])
+            .into_iter(),
+          )
+        }
+        ast::Statement::With(with) =>
+        {
+          let mut variables = std::collections::BTreeMap::<String, Instructions>::new();
+          for e in with.expressions.iter()
+          {
+            let mut instructions = Instructions::new();
+            compile_expression(&e.expression, &mut instructions);
+            variables.insert(e.name.to_owned(), instructions);
+          }
+          Ok(
+            Vec::from([Block::With {
+              all: with.all,
+              variables,
             }])
             .into_iter(),
           )

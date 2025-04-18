@@ -20,12 +20,15 @@ undirected_edge_pattern = { ( "(" ~ pattern ~ ")-[" ~ pattern ~ "]-(" ~ pattern 
 node_or_edge_pattern = _{ edge_pattern | reverse_edge_pattern | undirected_edge_pattern | node_pattern  }
 
 // Statements
-statement = { create_statement | match_statement | return_statement | call_statement }
+statement = { create_statement | match_statement | return_statement | call_statement | with_statement }
+
+star = { "*" }
 
 create_statement = { "CREATE" ~ node_or_edge_pattern ~ ( "," ~ node_or_edge_pattern )* }
 match_statement = { "MATCH" ~ node_or_edge_pattern ~ ( "," ~ node_or_edge_pattern )* }
 return_statement = { "RETURN" ~ named_expression ~ ("," ~ named_expression )* }
 call_statement = { "CALL" ~ function_name ~ "()" }
+with_statement = { "WITH" ~ (star | named_expression) ~ ("," ~ named_expression )* }
 
 // literals
 int = { ("+" | "-")? ~ ASCII_DIGIT+ }

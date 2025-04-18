@@ -68,4 +68,9 @@ pub(crate) enum Block
     arguments: Instructions,
     name: String,
   },
+  With
+  {
+    all: bool,
+    variables: BTreeMap<String, Instructions>,
+  },
 }

@@ -36,8 +36,21 @@ pub enum RunTimeError
 #[derive(thiserror::Error, Debug)]
 pub enum InternalError
 {
-  #[error("Expected a value to be a node in {0}")]
-  ExpectedNode(&'static str),
+  #[error("Expected a value to be a node in {context}.")]
+  ExpectedNode
+  {
+    context: &'static str
+  },
+  #[error("Missing a pair from pest parsing in {context}.")]
+  MissingPair
+  {
+    context: &'static str
+  },
+  #[error("Unexpected pair {pair} from pest parsing in {context}.")]
+  UnexpectedPair
+  {
+    context: &'static str, pair: String
+  },
 }
 
 /// GQLite errors
