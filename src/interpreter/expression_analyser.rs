@@ -88,6 +88,10 @@ impl ExpressionInfo
           function_manager.is_aggregate(&call.name),
         ))
       }
+      ast::Expression::IsNull(isn) => Ok(Self::new_type(
+        ExpressionType::Boolean,
+        Self::analyses(variables, function_manager, [&isn.value].into_iter())?,
+      )),
       ast::Expression::LogicalNegation(ln) => Ok(Self::new_type(
         ExpressionType::Boolean,
         Self::analyses(variables, function_manager, [&ln.value].into_iter())?,

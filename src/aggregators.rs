@@ -8,7 +8,7 @@ use crate::{graph, value_table, Result};
 pub(crate) trait AggregatorState: Debug
 {
   fn next(&mut self, expression: graph::Value) -> Result<()>;
-  fn finalise(self) -> Result<graph::Value>;
+  fn finalise(self: Box<Self>) -> Result<graph::Value>;
 }
 
 pub(crate) trait AggregatorTrait: Debug

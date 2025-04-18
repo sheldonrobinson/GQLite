@@ -1,6 +1,6 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
-use crate::{functions, graph};
+use crate::{aggregators, functions, graph};
 
 #[derive(Debug)]
 pub(crate) enum Instruction
@@ -94,6 +94,22 @@ pub(crate) enum BlockMatch
 }
 
 #[derive(Debug)]
+pub(crate) struct RWAggregation
+{
+  pub(crate) init_instructions: Instructions,
+  pub(crate) argument_instructions: Instructions,
+  pub(crate) aggregator: aggregators::Aggregator,
+}
+
+#[derive(Debug)]
+pub(crate) struct RWExpression
+{
+  pub(crate) name: String,
+  pub(crate) instructions: Instructions,
+  pub(crate) aggregations: HashMap<String, RWAggregation>,
+}
+
+#[derive(Debug)]
 pub(crate) enum Block
 {
   Create
@@ -108,7 +124,7 @@ pub(crate) enum Block
   },
   Return
   {
-    variables: Vec<(String, Instructions)>,
+    variables: Vec<RWExpression>
   },
   Call
   {
@@ -118,7 +134,7 @@ pub(crate) enum Block
   With
   {
     all: bool,
-    variables: Vec<(String, Instructions)>,
+    variables: Vec<RWExpression>,
   },
   Unwind
   {

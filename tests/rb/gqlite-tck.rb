@@ -36,7 +36,7 @@ features = [
   # Create
   'create/Create1', 'create/Create2', 'create/Create3',
   # Match
-  'match/Match1', 'match/Match2', 'match/Match3',
+  'match/Match1', 'match/Match2', 'match/Match3', 'match/Match7',
 ]
 
 expressions = [

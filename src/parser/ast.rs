@@ -161,6 +161,7 @@ pub(crate) enum Expression
   RelationalIn(Box<RelationalIn>),
 
   LogicalNegation(Box<LogicalNegation>),
+  IsNull(Box<IsNull>),
 }
 
 // Order By Expression
@@ -457,6 +458,14 @@ impl Into<Expression> for LogicalNegation
   fn into(self) -> Expression
   {
     Expression::LogicalNegation(Box::new(self))
+  }
+}
+
+impl Into<Expression> for IsNull
+{
+  fn into(self) -> Expression
+  {
+    Expression::IsNull(Box::new(self))
   }
 }
 

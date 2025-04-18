@@ -26,6 +26,10 @@ impl ValueTable
   {
     self.data.iter()
   }
+  pub(crate) fn first_row(&self) -> Option<&Row>
+  {
+    self.data.first()
+  }
 }
 
 impl IntoIterator for ValueTable

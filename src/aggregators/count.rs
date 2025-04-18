@@ -23,7 +23,7 @@ impl AggregatorState for CountState
     self.count += 1;
     Ok(())
   }
-  fn finalise(self) -> crate::Result<crate::graph::Value>
+  fn finalise(self: Box<Self>) -> crate::Result<crate::graph::Value>
   {
     Ok(self.count.into())
   }
