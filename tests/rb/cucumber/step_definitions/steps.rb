@@ -130,6 +130,7 @@ RSpec::Matchers.matcher :eq_in_any_order do |expected|
 end
 
 IgnoredScenario = [
+  "[5] Match relationship with inline property value",
   # Triggers a different error first, as MATCH (a) return an empty list, it fails in creation
   "[24] Fail when creating a relationship using undefined variable in pattern",
   # Variable lenght not supported

@@ -1,6 +1,30 @@
-use crate::{error::InternalError, graph, Error, Result};
+use crate::{
+  error::{InternalError, RunTimeError},
+  graph, Error, Result,
+};
 
 use super::instructions;
+
+fn execute_boolean_operator(
+  stack: &mut Vec<crate::graph::Value>,
+  operand: impl FnOnce(bool, bool) -> bool,
+) -> Result<()>
+{
+  let a = stack.pop().ok_or(InternalError::EmptyStack {
+    context: "in BooleanBinaryOperator a",
+  })?;
+  let b = stack.pop().ok_or(InternalError::EmptyStack {
+    context: "in BooleanBinaryOperator b",
+  })?;
+  let a = a.to_boolean().ok_or(InternalError::ExpectedBoolean {
+    context: "in BooleanBinaryOperator a",
+  })?;
+  let b = b.to_boolean().ok_or(InternalError::ExpectedBoolean {
+    context: "in BooleanBinaryOperator b",
+  })?;
+  stack.push(operand(a, b).into());
+  Ok(())
+}
 
 fn eval_instructions(
   stack: &mut Vec<crate::graph::Value>,
@@ -158,6 +182,56 @@ fn eval_instructions(
         stack.push(c);
         stack.push(b);
       }
+      &instructions::Instruction::InverseRot3 =>
+      {
+        let a = stack
+          .pop()
+          .ok_or(Error::EmptyStack("in InverseRot3 a".to_string()))?;
+        let b = stack
+          .pop()
+          .ok_or(Error::EmptyStack("in InverseRot3 b".to_string()))?;
+        let c = stack
+          .pop()
+          .ok_or(Error::EmptyStack("in InverseRot3 c".to_string()))?;
+        stack.push(b);
+        stack.push(a);
+        stack.push(c);
+      }
+      &instructions::Instruction::Swap =>
+      {
+        let a = stack
+          .pop()
+          .ok_or(Error::EmptyStack("in Swap a".to_string()))?;
+        let b = stack
+          .pop()
+          .ok_or(Error::EmptyStack("in Swap b".to_string()))?;
+        stack.push(a);
+        stack.push(b);
+      }
+      &instructions::Instruction::Drop =>
+      {
+        stack
+          .pop()
+          .ok_or(Error::EmptyStack("in drop".to_string()))?;
+      }
+      &instructions::Instruction::AndBinaryOperator =>
+      {
+        execute_boolean_operator(stack, |a, b| a && b)?;
+      }
+      &instructions::Instruction::OrBinaryOperator =>
+      {
+        execute_boolean_operator(stack, |a, b| a || b)?;
+      }
+      &instructions::Instruction::NotUnaryOperator =>
+      {
+        let a = stack.pop().ok_or(InternalError::EmptyStack {
+          context: "in NotUnaryOperator a",
+        })?;
+        let a = a.to_boolean().ok_or(InternalError::ExpectedBoolean {
+          context: "in NotUnaryOperator a",
+        })?;
+        stack.push((!a).into());
+      }
     }
   }
   Ok(())
@@ -222,6 +296,7 @@ pub(crate) fn eval_program(
       instructions::Block::MatchNode {
         instructions,
         variable,
+        filter,
       } =>
       {
         let mut output_table = crate::value_table::ValueTable::new();
@@ -261,6 +336,14 @@ pub(crate) fn eval_program(
               None =>
               {}
             }
+            if !filter.is_empty()
+            {
+              let mut stack = Vec::<crate::graph::Value>::default();
+              stack.push(node.to_owned().into());
+              eval_instructions(&mut stack, &new_row, &filter, &parameters);
+              println!("{:#?}", stack);
+              todo!();
+            }
             output_table.add_row(new_row);
           }
         }
@@ -272,6 +355,7 @@ pub(crate) fn eval_program(
         edge_variable,
         right_variable,
         path_variable,
+        filter,
       } =>
       {
         let mut output_table = crate::value_table::ValueTable::new();
@@ -341,7 +425,25 @@ pub(crate) fn eval_program(
                 crate::graph::Value::Path(edge.to_owned().into()),
               );
             }
-            output_table.add_row(new_row);
+            let mut should_add_row = if filter.is_empty()
+            {
+              true
+            }
+            else
+            {
+              let mut stack = Vec::<crate::graph::Value>::default();
+              stack.push(edge.to_owned().into());
+              eval_instructions(&mut stack, &new_row, &filter, &parameters)?;
+              stack.pop();
+              stack
+                .pop()
+                .ok_or(Error::EmptyStack("in filtering edge".to_string()))?
+                .try_into()?
+            };
+            if should_add_row
+            {
+              output_table.add_row(new_row);
+            }
           }
         }
         input_table = output_table;

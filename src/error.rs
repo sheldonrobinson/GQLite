@@ -1,5 +1,7 @@
 //! Errors used for gqlite.
 
+use crate::graph;
+
 /// Represent compile time errors.
 #[derive(thiserror::Error, Debug)]
 pub enum CompileTimeError
@@ -57,16 +59,23 @@ pub enum RunTimeError
     name: String
   },
   /// Too few or too many arguments
-  #[error("InvalidNumberOfArguments: Invalid number of arguments for function '{name}'.")]
+  #[error("InvalidNumberOfArguments: Invalid number of arguments for function '{function_name}' got {got} expected {expected}.")]
   InvalidNumberOfArguments
   {
-    name: &'static str
+    function_name: &'static str,
+    got: usize,
+    expected: usize,
   },
   /// Parameter is not known
-  #[error("ExpectedEdge: Function '{name}' expected an edge as argument {index}.")]
-  ExpectedEdge
+  #[error(
+    "ExpectedEdge: Function '{function_name}' expected argument {index} of type {expected_type} but got {value}."
+  )]
+  InvalidArgument
   {
-    name: &'static str, index: usize
+    function_name: &'static str,
+    index: usize,
+    expected_type: &'static str,
+    value: String,
   },
   /// Edge has no label
   #[error("MissingEdgeLabel")]
@@ -113,6 +122,18 @@ pub enum InternalError
   {
     context: &'static str
   },
+  #[error("Expected boolean {context}.")]
+  ExpectedBoolean
+  {
+    context: &'static str
+  },
+  #[error("Empty stack in {context}.")]
+  EmptyStack
+  {
+    context: &'static str
+  },
+  #[error("Invalid value cast")]
+  InvalidValueCast,
 }
 
 /// GQLite errors
