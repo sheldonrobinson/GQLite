@@ -38,7 +38,7 @@ fn build_expression(pair: pest::iterators::Pair<Rule>) -> Result<ast::Expression
 {
   match pair.as_rule()
   {
-    Rule::expression => build_expression_relational_different_bin_op(pair.into_inner().try_next()?),
+    Rule::expression => build_expression_relational_or_bin_op(pair.into_inner().try_next()?),
     unknown_expression => Err(crate::Error::UnxpectedExpression(
       "build_named_expressions",
       format!("{unknown_expression:?}"),
@@ -76,9 +76,30 @@ macro_rules! build_binop {
 }
 
 build_binop!(
+  LogicalOr,
+  or_bin_op_expression,
+  build_expression_relational_or_bin_op,
+  build_expression_relational_and_bin_op
+);
+
+build_binop!(
+  LogicalAnd,
+  and_bin_op_expression,
+  build_expression_relational_and_bin_op,
+  build_expression_relational_different_bin_op
+);
+
+build_binop!(
   RelationalDifferent,
   different_bin_op_expression,
   build_expression_relational_different_bin_op,
+  build_expression_relational_equal_bin_op
+);
+
+build_binop!(
+  RelationalEqual,
+  equal_bin_op_expression,
+  build_expression_relational_equal_bin_op,
   build_expression_in_bin_op
 );
 

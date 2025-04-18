@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
   aggregators,
-  error::InternalError,
+  error::{InternalError, RunTimeError},
   graph,
   interpreter::instructions::BlockMatch,
   store::{self, SelectEdgeQuery},
@@ -19,7 +19,17 @@ enum Value
   EdgeQuery(store::SelectEdgeQuery),
 }
 
-impl Value {}
+impl Value
+{
+  fn is_null(&self) -> bool
+  {
+    match self
+    {
+      Value::GraphValue(gv) => gv.is_null(),
+      _ => false,
+    }
+  }
+}
 
 impl<T> From<T> for Value
 where
@@ -134,6 +144,18 @@ impl From<store::SelectEdgeQuery> for Value
   }
 }
 
+macro_rules! check_for_null {
+  ($a: expr) => {
+    if $a.is_null() {
+      return Ok(crate::graph::Value::Invalid)
+    }
+};
+($a: expr, $($b:expr), *) => {
+  check_for_null!($a);
+  check_for_null!($($b),*);
+}
+}
+
 #[derive(Default, Debug)]
 struct Stack
 {
@@ -204,14 +226,21 @@ fn execute_boolean_operator(
   Ok(())
 }
 
-fn execute_binary_operator(
+fn execute_binary_operator<T: Into<crate::graph::Value>>(
   stack: &mut Stack,
-  operand: impl FnOnce(crate::graph::Value, crate::graph::Value) -> Result<bool>,
+  operand: impl FnOnce(crate::graph::Value, crate::graph::Value) -> Result<T>,
 ) -> Result<()>
 {
   let a = stack.try_pop()?;
   let b = stack.try_pop()?;
-  stack.push(operand(a.try_into()?, b.try_into()?)?.into());
+  if a.is_null() || b.is_null()
+  {
+    stack.push(graph::Value::Invalid.into());
+  }
+  else
+  {
+    stack.push(operand(a.try_into()?, b.try_into()?)?.into().into());
+  }
   Ok(())
 }
 
@@ -222,6 +251,7 @@ fn eval_instructions(
   parameters: &crate::graph::ValueObject,
 ) -> Result<()>
 {
+  use std::cmp::Ordering;
   if crate::consts::SHOW_EVALUATOR_STATE
   {
     println!("----------- eval_instructions");
@@ -428,6 +458,10 @@ fn eval_instructions(
       {
         execute_boolean_operator(stack, |a, b| a || b)?;
       }
+      &instructions::Instruction::XorBinaryOperator =>
+      {
+        execute_boolean_operator(stack, |a, b| a ^ b)?;
+      }
       &instructions::Instruction::NotUnaryOperator =>
       {
         let a: bool = stack.try_pop_into()?;
@@ -441,12 +475,75 @@ fn eval_instructions(
       {
         execute_binary_operator(stack, |a, b| Ok(a != b))?;
       }
+      &instructions::Instruction::InferiorBinaryOperator =>
+      {
+        execute_binary_operator(stack, |a, b| {
+          Ok(matches!(
+            a.partial_compare::<RunTimeError>(&b)?,
+            Ordering::Less
+          ))
+        })?;
+      }
+      &instructions::Instruction::SuperiorBinaryOperator =>
+      {
+        execute_binary_operator(stack, |a, b| {
+          Ok(matches!(
+            a.partial_compare::<RunTimeError>(&b)?,
+            Ordering::Greater
+          ))
+        })?;
+      }
+      &instructions::Instruction::InferiorEqualBinaryOperator =>
+      {
+        execute_binary_operator(stack, |a, b| {
+          Ok(matches!(
+            a.partial_compare::<RunTimeError>(&b)?,
+            Ordering::Less | Ordering::Equal
+          ))
+        })?;
+      }
+      &instructions::Instruction::SuperiorEqualBinaryOperator =>
+      {
+        execute_binary_operator(stack, |a, b| {
+          Ok(matches!(
+            a.partial_compare::<RunTimeError>(&b)?,
+            Ordering::Greater | Ordering::Equal
+          ))
+        })?;
+      }
       &instructions::Instruction::InBinaryOperator =>
       {
         execute_binary_operator(stack, |a, b| {
           let b_arr: Vec<graph::Value> = b.try_into()?;
           Ok(b_arr.contains(&a))
         })?;
+      }
+      &instructions::Instruction::NotInBinaryOperator =>
+      {
+        execute_binary_operator(stack, |a, b| {
+          let b_arr: Vec<graph::Value> = b.try_into()?;
+          Ok(!b_arr.contains(&a))
+        })?;
+      }
+      &instructions::Instruction::AdditionBinaryOperator =>
+      {
+        execute_binary_operator(stack, |a, b| a + b)?;
+      }
+      &instructions::Instruction::SubstractionBinaryOperator =>
+      {
+        execute_binary_operator(stack, |a, b| a - b)?;
+      }
+      &instructions::Instruction::MultiplicationBinaryOperator =>
+      {
+        execute_binary_operator(stack, |a, b| a * b)?;
+      }
+      &instructions::Instruction::DivisionBinaryOperator =>
+      {
+        execute_binary_operator(stack, |a, b| a / b)?;
+      }
+      &instructions::Instruction::ModuloBinaryOperator =>
+      {
+        execute_binary_operator(stack, |a, b| a % b)?;
       }
     }
   }

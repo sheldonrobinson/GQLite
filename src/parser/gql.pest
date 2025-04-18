@@ -59,9 +59,13 @@ function_name  =  { ident ~ ("." ~ ident)* }
 
 // Expression
 
-expression = { different_bin_op_expression }
+expression = { or_bin_op_expression }
 
-different_bin_op_expression = { in_bin_op_expression ~ ("<>" ~ expression)? }
+or_bin_op_expression  = { and_bin_op_expression ~ ("OR" ~ expression)? }
+and_bin_op_expression = { different_bin_op_expression ~ ("OR" ~ expression)? }
+
+different_bin_op_expression = { equal_bin_op_expression ~ ("<>" ~ expression)? }
+equal_bin_op_expression     = { in_bin_op_expression ~ ("=" ~ expression)? }
 in_bin_op_expression        = { is_null_expression_or_term ~ ("IN" ~ expression)? }
 
 is_null_expression         = { expression_term ~ "IS" ~ "NULL" }

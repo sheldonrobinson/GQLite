@@ -96,7 +96,71 @@ impl ExpressionInfo
         ExpressionType::Boolean,
         Self::analyses(variables, function_manager, [&ln.value].into_iter())?,
       )),
+      ast::Expression::LogicalAnd(rd) => Ok(Self::new_type(
+        ExpressionType::Boolean,
+        Self::analyses(
+          variables,
+          function_manager,
+          [&rd.left, &rd.right].into_iter(),
+        )?,
+      )),
+      ast::Expression::LogicalOr(rd) => Ok(Self::new_type(
+        ExpressionType::Boolean,
+        Self::analyses(
+          variables,
+          function_manager,
+          [&rd.left, &rd.right].into_iter(),
+        )?,
+      )),
+      ast::Expression::LogicalXor(rd) => Ok(Self::new_type(
+        ExpressionType::Boolean,
+        Self::analyses(
+          variables,
+          function_manager,
+          [&rd.left, &rd.right].into_iter(),
+        )?,
+      )),
+      ast::Expression::RelationalEqual(rd) => Ok(Self::new_type(
+        ExpressionType::Boolean,
+        Self::analyses(
+          variables,
+          function_manager,
+          [&rd.left, &rd.right].into_iter(),
+        )?,
+      )),
       ast::Expression::RelationalDifferent(rd) => Ok(Self::new_type(
+        ExpressionType::Boolean,
+        Self::analyses(
+          variables,
+          function_manager,
+          [&rd.left, &rd.right].into_iter(),
+        )?,
+      )),
+      ast::Expression::RelationalInferior(rd) => Ok(Self::new_type(
+        ExpressionType::Boolean,
+        Self::analyses(
+          variables,
+          function_manager,
+          [&rd.left, &rd.right].into_iter(),
+        )?,
+      )),
+      ast::Expression::RelationalSuperior(rd) => Ok(Self::new_type(
+        ExpressionType::Boolean,
+        Self::analyses(
+          variables,
+          function_manager,
+          [&rd.left, &rd.right].into_iter(),
+        )?,
+      )),
+      ast::Expression::RelationalInferiorEqual(rd) => Ok(Self::new_type(
+        ExpressionType::Boolean,
+        Self::analyses(
+          variables,
+          function_manager,
+          [&rd.left, &rd.right].into_iter(),
+        )?,
+      )),
+      ast::Expression::RelationalSuperiorEqual(rd) => Ok(Self::new_type(
         ExpressionType::Boolean,
         Self::analyses(
           variables,
@@ -106,6 +170,54 @@ impl ExpressionInfo
       )),
       ast::Expression::RelationalIn(ri) => Ok(Self::new_type(
         ExpressionType::Boolean,
+        Self::analyses(
+          variables,
+          function_manager,
+          [&ri.left, &ri.right].into_iter(),
+        )?,
+      )),
+      ast::Expression::RelationalNotIn(ri) => Ok(Self::new_type(
+        ExpressionType::Boolean,
+        Self::analyses(
+          variables,
+          function_manager,
+          [&ri.left, &ri.right].into_iter(),
+        )?,
+      )),
+      ast::Expression::Addition(ri) => Ok(Self::new_type(
+        ExpressionType::Variant,
+        Self::analyses(
+          variables,
+          function_manager,
+          [&ri.left, &ri.right].into_iter(),
+        )?,
+      )),
+      ast::Expression::Multiplication(ri) => Ok(Self::new_type(
+        ExpressionType::Variant,
+        Self::analyses(
+          variables,
+          function_manager,
+          [&ri.left, &ri.right].into_iter(),
+        )?,
+      )),
+      ast::Expression::Substraction(ri) => Ok(Self::new_type(
+        ExpressionType::Variant,
+        Self::analyses(
+          variables,
+          function_manager,
+          [&ri.left, &ri.right].into_iter(),
+        )?,
+      )),
+      ast::Expression::Division(ri) => Ok(Self::new_type(
+        ExpressionType::Variant,
+        Self::analyses(
+          variables,
+          function_manager,
+          [&ri.left, &ri.right].into_iter(),
+        )?,
+      )),
+      ast::Expression::Modulo(ri) => Ok(Self::new_type(
+        ExpressionType::Variant,
         Self::analyses(
           variables,
           function_manager,
