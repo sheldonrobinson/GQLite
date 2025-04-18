@@ -1,6 +1,8 @@
+use std::collections::HashMap;
+
 use crate::{
   error::{InternalError, RunTimeError},
-  graph, Error, Result,
+  graph, Error, Result, Value,
 };
 
 use super::instructions;
@@ -267,6 +269,22 @@ fn eval_instructions(
   Ok(())
 }
 
+trait HashMapExt
+{
+  fn insert_none(&mut self, k: Option<String>);
+}
+
+impl HashMapExt for HashMap<String, Value>
+{
+  fn insert_none(&mut self, k: Option<String>)
+  {
+    if let Some(k) = k
+    {
+      self.insert(k, Value::Invalid);
+    }
+  }
+}
+
 pub(crate) fn eval_program(
   store: &crate::store::Store,
   program: super::Program,
@@ -327,6 +345,7 @@ pub(crate) fn eval_program(
         instructions,
         variable,
         filter,
+        optional,
       } =>
       {
         let mut output_table = crate::value_table::ValueTable::new();
@@ -351,32 +370,50 @@ pub(crate) fn eval_program(
             ),
           )?;
 
-          for node in nodes.iter()
+          if nodes.len() == 0 && optional
           {
             let mut new_row = row.clone();
-            match &variable
-            {
-              Some(variable) =>
-              {
-                new_row.insert(
-                  variable.to_owned(),
-                  crate::graph::Value::Node(node.to_owned()),
-                );
-              }
-              None =>
-              {}
-            }
-            if !filter.is_empty()
-            {
-              let mut stack = Vec::<crate::graph::Value>::default();
-              stack.push(node.to_owned().into());
-              eval_instructions(&mut stack, &new_row, &filter, &parameters)?;
-              println!("{:#?}", stack);
-              todo!();
-            }
+            new_row.insert_none(variable.clone());
             output_table.add_row(new_row);
           }
+          else
+          {
+            for node in nodes.iter()
+            {
+              let mut new_row = row.clone();
+              match &variable
+              {
+                Some(variable) =>
+                {
+                  new_row.insert(variable.to_owned(), node.to_owned().into());
+                }
+                None =>
+                {}
+              }
+              let should_add_row = if filter.is_empty()
+              {
+                true
+              }
+              else
+              {
+                let mut stack = Vec::<crate::graph::Value>::default();
+                stack.push(true.into());
+                stack.push(node.to_owned().into());
+                eval_instructions(&mut stack, &new_row, &filter, &parameters)?;
+                stack.pop(); // Get rid of the edge
+                stack
+                  .pop()
+                  .ok_or(Error::EmptyStack("in filtering edge".to_string()))?
+                  .try_into()?
+              };
+              if should_add_row
+              {
+                output_table.add_row(new_row);
+              }
+            }
+          }
         }
+        println!(" -- {:#?}", output_table);
         input_table = output_table;
       }
       instructions::Block::MatchEdge {
@@ -387,6 +424,7 @@ pub(crate) fn eval_program(
         path_variable,
         filter,
         directivity,
+        optional,
       } =>
       {
         let mut output_table = crate::value_table::ValueTable::new();
@@ -518,69 +556,81 @@ pub(crate) fn eval_program(
             )?
           };
 
-          for edge in edges.iter()
+          if edges.len() == 0 && optional
           {
             let mut new_row = row.clone();
-            if let Some(left_variable) = left_variable.to_owned()
+            new_row.insert_none(left_variable.clone());
+            new_row.insert_none(right_variable.clone());
+            new_row.insert_none(edge_variable.clone());
+            new_row.insert_none(path_variable.clone());
+            output_table.add_row(new_row);
+          }
+          else
+          {
+            for edge in edges.iter()
             {
-              new_row.insert(
-                left_variable,
-                if edge.reversed
-                {
-                  edge.edge.destination.to_owned()
-                }
-                else
-                {
-                  edge.edge.source.to_owned()
-                }
-                .into(),
-              );
-            }
-            if let Some(right_variable) = right_variable.to_owned()
-            {
-              new_row.insert(
-                right_variable,
-                if edge.reversed
-                {
-                  edge.edge.source.to_owned()
-                }
-                else
-                {
-                  edge.edge.destination.to_owned()
-                }
-                .into(),
-              );
-            }
-            if let Some(edge_variable) = edge_variable.to_owned()
-            {
-              new_row.insert(edge_variable, edge.edge.to_owned().into());
-            }
-            if let Some(path_variable) = path_variable.to_owned()
-            {
-              new_row.insert(
-                path_variable,
-                crate::graph::Value::Path(edge.edge.to_owned().into()),
-              );
-            }
-            let should_add_row = if filter.is_empty()
-            {
-              true
-            }
-            else
-            {
-              let mut stack = Vec::<crate::graph::Value>::default();
-              stack.push(true.into());
-              stack.push(edge.edge.to_owned().into());
-              eval_instructions(&mut stack, &new_row, &filter, &parameters)?;
-              stack.pop(); // Get rid of the edge
-              stack
-                .pop()
-                .ok_or(Error::EmptyStack("in filtering edge".to_string()))?
-                .try_into()?
-            };
-            if should_add_row
-            {
-              output_table.add_row(new_row);
+              let mut new_row = row.clone();
+              if let Some(left_variable) = left_variable.to_owned()
+              {
+                new_row.insert(
+                  left_variable,
+                  if edge.reversed
+                  {
+                    edge.edge.destination.to_owned()
+                  }
+                  else
+                  {
+                    edge.edge.source.to_owned()
+                  }
+                  .into(),
+                );
+              }
+              if let Some(right_variable) = right_variable.to_owned()
+              {
+                new_row.insert(
+                  right_variable,
+                  if edge.reversed
+                  {
+                    edge.edge.source.to_owned()
+                  }
+                  else
+                  {
+                    edge.edge.destination.to_owned()
+                  }
+                  .into(),
+                );
+              }
+              if let Some(edge_variable) = edge_variable.to_owned()
+              {
+                new_row.insert(edge_variable, edge.edge.to_owned().into());
+              }
+              if let Some(path_variable) = path_variable.to_owned()
+              {
+                new_row.insert(
+                  path_variable,
+                  crate::graph::Value::Path(edge.edge.to_owned().into()),
+                );
+              }
+              let should_add_row = if filter.is_empty()
+              {
+                true
+              }
+              else
+              {
+                let mut stack = Vec::<crate::graph::Value>::default();
+                stack.push(true.into());
+                stack.push(edge.edge.to_owned().into());
+                eval_instructions(&mut stack, &new_row, &filter, &parameters)?;
+                stack.pop(); // Get rid of the edge
+                stack
+                  .pop()
+                  .ok_or(Error::EmptyStack("in filtering edge".to_string()))?
+                  .try_into()?
+              };
+              if should_add_row
+              {
+                output_table.add_row(new_row);
+              }
             }
           }
         }

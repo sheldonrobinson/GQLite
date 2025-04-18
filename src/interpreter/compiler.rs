@@ -360,6 +360,7 @@ fn compile_match_edge(
   edge: &crate::parser::ast::EdgePattern,
   single_match: bool,
   previous_edges: &mut Vec<String>,
+  optional: bool,
 ) -> Result<Block>
 {
   let mut instructions = Instructions::new();
@@ -453,6 +454,7 @@ fn compile_match_edge(
     path_variable,
     filter,
     directivity: edge.directivity,
+    optional,
   })
 }
 
@@ -460,6 +462,7 @@ fn compile_match_patterns(
   function_manager: &functions::Manager,
   validator: &mut validator::Validator,
   patterns: &Vec<crate::parser::ast::Pattern>,
+  optional: bool,
 ) -> Result<Vec<Block>>
 {
   let is_single_match = patterns.len() == 1;
@@ -478,6 +481,7 @@ fn compile_match_patterns(
           instructions: instructions,
           variable: node.variable.to_owned(),
           filter,
+          optional,
         })
       }
       crate::parser::ast::Pattern::Edge(edge) => compile_match_edge(
@@ -487,6 +491,7 @@ fn compile_match_patterns(
         &edge,
         is_single_match,
         &mut edge_variables,
+        optional,
       ),
       crate::parser::ast::Pattern::Path(path) => compile_match_edge(
         function_manager,
@@ -495,6 +500,7 @@ fn compile_match_patterns(
         &path.edge,
         is_single_match,
         &mut edge_variables,
+        optional,
       ),
     })
     .collect::<Result<Vec<Block>>>()?;
@@ -524,8 +530,12 @@ pub(crate) fn compile(
         }
         ast::Statement::Match(match_statement) =>
         {
-          let cm =
-            compile_match_patterns(function_manager, &mut validator, &match_statement.patterns);
+          let cm = compile_match_patterns(
+            function_manager,
+            &mut validator,
+            &match_statement.patterns,
+            match_statement.optional,
+          );
           match cm
           {
             Ok(cm) => Ok(cm.into_iter()),

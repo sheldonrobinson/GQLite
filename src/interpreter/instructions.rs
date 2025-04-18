@@ -75,6 +75,7 @@ pub(crate) enum Block
     instructions: Instructions,
     variable: Option<String>,
     filter: Instructions,
+    optional: bool,
   },
   MatchEdge
   {
@@ -85,6 +86,7 @@ pub(crate) enum Block
     path_variable: Option<String>,
     filter: Instructions,
     directivity: graph::EdgeDirectivity,
+    optional: bool,
   },
   Return
   {
