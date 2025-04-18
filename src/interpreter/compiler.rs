@@ -14,6 +14,9 @@ fn compile_expression(expression: &crate::parser::ast::Expression, instructions:
     ast::Expression::Variable(variable) => Instruction::GetVariable {
       name: variable.identifier.clone(),
     },
+    ast::Expression::Parameter(parameter) => Instruction::GetParameter {
+      name: parameter.name.clone(),
+    },
     ast::Expression::Array(array) =>
     {
       for v in array.array.iter()

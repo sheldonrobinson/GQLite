@@ -34,7 +34,9 @@ end
 gql = []
 features = [
   # Create
-  'create/Create1', 'create/Create2', 'create/Create3'
+  'create/Create1', 'create/Create2', 'create/Create3',
+  # Match
+  'match/Match1',
 ]
 
 expressions = [
@@ -43,12 +45,15 @@ expressions = [
 
 # In progress
 # gql = []
-# features = []
+# features = [ ]
 # expressions = []
 # Current dev
 # gql = []
 # features = []
 # expressions = []
+
+# In progress
+# features = ['create/Create4', 'create/Create6']
 
 
 # GQLite 1.x
@@ -57,7 +62,7 @@ expressions = [
 # gql = ['Graph1']
 # features = [
 #   # Match
-#   'match/Match1', 'match/Match2', 'match/Match3', 'match/Match7',
+#   'match/Match2', 'match/Match3', 'match/Match7',
 #   # MatchWhere
 #   'match-where/MatchWhere1', 'match-where/MatchWhere2', 'match-where/MatchWhere3', 'match-where/MatchWhere4',
 #   # WITH

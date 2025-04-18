@@ -2,9 +2,20 @@
 #[derive(thiserror::Error, Debug)]
 pub enum CompileTimeError
 {
-  /// This error happens
+  /// Parse error
+  #[error("ParseError: '{0}'")]
+  ParseError(#[from] pest::error::Error<crate::parser::Rule>),
+  /// This error happens if the variable is already defined
   #[error("VariableAlreadyBound: Variable '{name}' is already bound.")]
   VariableAlreadyBound
+  {
+    name: String
+  },
+  /// This error happens if the variable is already bound to a different type
+  #[error(
+    "VariableTypeConflict: Variable '{name}' is redefined as a variable of a different type."
+  )]
+  VariableTypeConflict
   {
     name: String
   },
@@ -28,6 +39,12 @@ pub enum RunTimeError
   /// Variable is not defined
   #[error("UndefinedVariable: Unknown variable '{name}'.")]
   UndefinedVariable
+  {
+    name: String
+  },
+  /// Parameter is not known
+  #[error("UnknownParameter: Unknown parameter '{name}'.")]
+  UnknownParameter
   {
     name: String
   },
@@ -83,8 +100,6 @@ pub enum Error
   CborSerialisationError(#[from] ciborium::ser::Error<std::io::Error>),
   #[error("An error occured while deserialization from Cbor: {0}")]
   CborDeserialisationError(#[from] ciborium::de::Error<std::io::Error>),
-  #[error("Parse error: {0}")]
-  ParseError(#[from] pest::error::Error<crate::parser::Rule>),
   #[error("Parse int error: {0}")]
   ParseFloatError(#[from] std::num::ParseFloatError),
   #[error("Parse int error: {0}")]
@@ -105,4 +120,12 @@ pub enum Error
   InternalError(&'static str),
   #[error("Unimplemented error at {0}")]
   Unimplemented(&'static str),
+}
+
+impl From<pest::error::Error<crate::parser::Rule>> for Error
+{
+  fn from(value: pest::error::Error<crate::parser::Rule>) -> Self
+  {
+    CompileTimeError::from(value).into()
+  }
 }

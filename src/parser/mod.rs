@@ -34,6 +34,9 @@ fn build_expression(pair: pest::iterators::Pair<Rule>) -> Result<ast::Expression
     Rule::ident => Ok(ast::Expression::Variable(ast::Variable {
       identifier: pair.as_str().to_string(),
     })),
+    Rule::parameter => Ok(ast::Expression::Parameter(ast::Parameter {
+      name: pair.as_str().to_string(),
+    })),
     Rule::array => Ok(ast::Expression::Array(ast::Array {
       array: pair
         .into_inner()
@@ -217,7 +220,10 @@ fn build_edge_pattern(
   Ok((variable, label, properties))
 }
 
-fn build_pattern(mut iterator: pest::iterators::Pairs<Rule>) -> Result<Vec<ast::Pattern>>
+fn build_pattern(
+  mut iterator: pest::iterators::Pairs<Rule>,
+  allow_undirected_edge: bool,
+) -> Result<Vec<ast::Pattern>>
 {
   let mut vec = vec![];
 
@@ -233,11 +239,6 @@ fn build_pattern(mut iterator: pest::iterators::Pairs<Rule>) -> Result<Vec<ast::
       }
       Rule::edge_pattern =>
       {
-        println!("()-[]->() ->->->->->->-> pair: {:?}", pair);
-        pair
-          .clone()
-          .into_inner()
-          .for_each(|p| println!("     {:?}", p));
         let mut it = pair.into_inner();
         let source_node = build_node_pattern(it.next().unwrap())?;
         let edge_pattern = build_edge_pattern(it.next().unwrap())?;
@@ -253,11 +254,6 @@ fn build_pattern(mut iterator: pest::iterators::Pairs<Rule>) -> Result<Vec<ast::
       }
       Rule::reverse_edge_pattern =>
       {
-        println!("()-[]->() ->->->->->->-> pair: {:?}", pair);
-        pair
-          .clone()
-          .into_inner()
-          .for_each(|p| println!("     {:?}", p));
         let mut it = pair.into_inner();
         let destination_node = build_node_pattern(it.next().unwrap())?;
         let edge_pattern = build_edge_pattern(it.next().unwrap())?;
@@ -273,9 +269,27 @@ fn build_pattern(mut iterator: pest::iterators::Pairs<Rule>) -> Result<Vec<ast::
       }
       Rule::undirected_edge_pattern =>
       {
-        Err(CompileTimeError::RequiresDirectedRelationship {
-          context: "creation",
-        })?;
+        if allow_undirected_edge
+        {
+          let mut it = pair.into_inner();
+          let source_node = build_node_pattern(it.next().unwrap())?;
+          let edge_pattern = build_edge_pattern(it.next().unwrap())?;
+          let destination_node = build_node_pattern(it.next().unwrap())?;
+          vec.push(ast::Pattern::GraphEdge(ast::GraphEdge {
+            variable: edge_pattern.0,
+            source: source_node,
+            destination: destination_node,
+            directivity: ast::EdgeDirectivity::Undirected,
+            label: edge_pattern.1,
+            properties: edge_pattern.2,
+          }));
+        }
+        else
+        {
+          Err(CompileTimeError::RequiresDirectedRelationship {
+            context: "creation",
+          })?;
+        }
       }
       unknown_expression =>
       {
@@ -295,11 +309,11 @@ fn build_ast_from_statement(pair: pest::iterators::Pair<Rule>) -> Result<ast::St
   match pair.as_rule()
   {
     Rule::create_statement => Ok(ast::Statement::Create(ast::Create {
-      patterns: build_pattern(pair.into_inner())?,
+      patterns: build_pattern(pair.into_inner(), false)?,
     })),
     Rule::match_statement => Ok(ast::Statement::Match(ast::Match {
       where_expression: None,
-      patterns: build_pattern(pair.into_inner())?,
+      patterns: build_pattern(pair.into_inner(), true)?,
       optional: false,
     })),
     Rule::return_statement =>

@@ -44,8 +44,9 @@ function_name = { ident ~ ("." ~ ident)* }
 // Expression
 
 named_expression = { expression ~ "AS" ~ ident | expression }
-expression = _{ null_lit | true_lit | false_lit | num | string_literal | map | array | member_access | ident }
+expression = _{ null_lit | true_lit | false_lit | num | string_literal | map | array | member_access | ident | parameter }
 
+parameter = { "$" ~ ident }
 member_access = { ident ~ ("." ~ ident)+}
 
 pair = { ident ~ ":" ~ expression }
