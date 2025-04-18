@@ -39,6 +39,14 @@ impl FunctionTypeTrait for i64
   }
 }
 
+impl<T> FunctionTypeTrait for Vec<T>
+{
+  fn result_type() -> ExpressionType
+  {
+    ExpressionType::Array
+  }
+}
+
 //  _____                 _   _           _____          _ _
 // |  ___|   _ _ __   ___| |_(_) ___  _ _|_   _| __ __ _(_) |_
 // | |_ | | | | '_ \ / __| __| |/ _ \| '_ \| || '__/ _` | | __|
@@ -88,6 +96,7 @@ impl Manager
       inner: std::rc::Rc::new(ManagerInner {
         functions: HashMap::from([
           containers::Length::new(),
+          containers::Range::new(),
           edge::Type::new(),
           value::Coalesce::new(),
           value::HasLabel::new(),
@@ -209,7 +218,7 @@ macro_rules! count_arguments {
 }
 
 macro_rules! declare_function {
-  ($function_name: ident, $type_name: ty, $f_name: ident (  $( $arg_type: ty $(,)? )* ) -> $ret_type: ident ) => {
+  ($function_name: ident, $type_name: ty, $f_name: ident (  $( $arg_type: ty $(,)? )* ) -> $ret_type: ty ) => {
     impl $type_name
     {
       pub(super) fn new() -> (String, crate::functions::Function)
@@ -243,7 +252,7 @@ macro_rules! declare_function {
       ) -> crate::Result<crate::interpreter::expression_analyser::ExpressionType>
       {
         // TODO
-        Ok($ret_type::result_type())
+        Ok(<$ret_type>::result_type())
       }
       fn is_deterministic(&self) -> bool
       {

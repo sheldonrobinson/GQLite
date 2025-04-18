@@ -46,3 +46,16 @@ impl super::FunctionTrait for Length
 }
 
 super::declare_function!(length, Length, custom_trait);
+
+#[derive(Debug, Default)]
+pub(super) struct Range {}
+
+impl Range
+{
+  fn call_impl(min: &i64, max: &i64) -> FResult<Vec<i64>>
+  {
+    Ok((*min..=*max).step_by(1).collect())
+  }
+}
+
+super::declare_function!(range, Range, call_impl(i64, i64) -> Vec<i64>);
