@@ -1,9 +1,13 @@
+use std::sync::atomic::{AtomicU64, Ordering};
+
 use crate::error::{CompileTimeError, InternalError};
 // use crate::graph::ToValue;
 use crate::interpreter::instructions::{Block, CreateAction, Instruction, Instructions};
 use crate::interpreter::validator;
 use crate::parser::ast;
 use crate::{functions, Result};
+
+static fake_variable_counter: AtomicU64 = AtomicU64::new(0);
 
 fn compile_expression(
   function_manager: &functions::Manager,
@@ -115,7 +119,7 @@ fn compile_create_node(
 {
   validator.declare_node_variable(&node)?;
   variables.push(node.variable.to_owned());
-  compile_optional_expression(function_manager, &node.properties, instructions);
+  compile_optional_expression(function_manager, &node.properties, instructions)?;
   let mut labels = Default::default();
   compile_labels_expression(&mut labels, &node.labels)?;
   instructions.push(Instruction::CreateNodeLiteral { labels });
@@ -153,7 +157,7 @@ fn compile_labels_expression(
 }
 
 // Assume top of the stack contains an edge or node
-fn compile_filter_layers(
+fn compile_filter_labels(
   instructions: &mut Instructions,
   label_expressions: &ast::LabelExpression,
   has_label_function: &functions::Function,
@@ -167,7 +171,7 @@ fn compile_filter_layers(
       instructions.push(Instruction::Swap);
       for expr in expressions.iter()
       {
-        compile_filter_layers(instructions, expr, has_label_function)?;
+        compile_filter_labels(instructions, expr, has_label_function)?;
         // stack contains (a: bool) (b: labels) (c: bool)
         instructions.push(Instruction::InverseRot3);
         // stack contains (c: bool) (a: bool) (b: labels)
@@ -186,7 +190,7 @@ fn compile_filter_layers(
       instructions.push(Instruction::Swap);
       for expr in expressions.iter()
       {
-        compile_filter_layers(instructions, expr, has_label_function)?;
+        compile_filter_labels(instructions, expr, has_label_function)?;
         // stack contains (a: bool) (b: labels) (c: bool)
         instructions.push(Instruction::InverseRot3);
         // stack contains (c: bool) (a: bool) (b: labels)
@@ -199,7 +203,7 @@ fn compile_filter_layers(
     }
     &ast::LabelExpression::Not(expr) =>
     {
-      compile_filter_layers(instructions, expr, has_label_function)?;
+      compile_filter_labels(instructions, expr, has_label_function)?;
       instructions.push(Instruction::NotUnaryOperator);
       Ok(())
     }
@@ -331,7 +335,6 @@ fn compile_match_node(
   }
   else
   {
-    let empty_filter = filter.is_empty();
     if let Some(get_node_function_name) = get_node_function_name
     {
       filter.push(Instruction::Duplicate);
@@ -341,12 +344,10 @@ fn compile_match_node(
       });
     }
     let has_label_function = function_manager.get::<CompileTimeError>("has_label")?;
-    compile_filter_layers(filter, &node.labels, &has_label_function);
+    compile_filter_labels(filter, &node.labels, &has_label_function)?;
+    filter.push(Instruction::Rot3);
+    filter.push(Instruction::AndBinaryOperator);
     filter.push(Instruction::Swap);
-    if !empty_filter
-    {
-      filter.push(Instruction::AndBinaryOperator);
-    }
   }
   instructions.push(Instruction::CreateNodeLiteral { labels });
   Ok(())
@@ -357,6 +358,8 @@ fn compile_match_edge(
   validator: &mut validator::Validator,
   path_variable: Option<String>,
   edge: &crate::parser::ast::EdgePattern,
+  single_match: bool,
+  previous_edges: &mut Vec<String>,
 ) -> Result<Block>
 {
   let mut instructions = Instructions::new();
@@ -399,6 +402,7 @@ fn compile_match_edge(
     )?;
   }
   compile_optional_expression(function_manager, &edge.properties, &mut instructions)?;
+  // Handle labels
   let mut labels = Default::default();
   if edge.labels.is_all_inclusive()
   {
@@ -406,19 +410,45 @@ fn compile_match_edge(
   }
   else
   {
-    let empty_filter = filter.is_empty();
     let has_label_function = function_manager.get::<CompileTimeError>("has_label")?;
-    compile_filter_layers(&mut filter, &edge.labels, &has_label_function);
-    if !empty_filter
-    {
-      filter.push(Instruction::AndBinaryOperator);
-    }
+    compile_filter_labels(&mut filter, &edge.labels, &has_label_function)?;
+    filter.push(Instruction::Rot3);
+    filter.push(Instruction::AndBinaryOperator);
+    filter.push(Instruction::Swap);
   }
   instructions.push(Instruction::CreateEdgeLiteral { labels });
+  // Make sure that this edge isn't equal to an already matched edge
+  let edge_variable = if single_match
+  {
+    edge.variable.to_owned()
+  }
+  else
+  {
+    let edge_variable = edge.variable.to_owned().unwrap_or_else(|| {
+      format!(
+        "__gqlite_edge_{}",
+        fake_variable_counter.fetch_add(1, Ordering::Relaxed)
+      )
+    });
+    for other in previous_edges.iter()
+    {
+      filter.push(Instruction::Duplicate);
+      filter.push(Instruction::GetVariable {
+        name: other.clone(),
+      });
+      filter.push(Instruction::NotEqualBinaryOperator);
+      filter.push(Instruction::InverseRot3);
+      filter.push(Instruction::AndBinaryOperator);
+      filter.push(Instruction::Swap);
+    }
+    previous_edges.push(edge_variable.clone());
+    Some(edge_variable)
+  };
+  // Create block
   Ok(Block::MatchEdge {
     instructions: instructions,
     left_variable: source_variable,
-    edge_variable: edge.variable.to_owned(),
+    edge_variable,
     right_variable: destination_variable,
     path_variable,
     filter,
@@ -432,6 +462,8 @@ fn compile_match_patterns(
   patterns: &Vec<crate::parser::ast::Pattern>,
 ) -> Result<Vec<Block>>
 {
+  let is_single_match = patterns.len() == 1;
+  let mut edge_variables = vec![];
   let blocks = patterns
     .iter()
     .map(|c| match c
@@ -448,15 +480,21 @@ fn compile_match_patterns(
           filter,
         })
       }
-      crate::parser::ast::Pattern::Edge(edge) =>
-      {
-        compile_match_edge(function_manager, validator, None, &edge)
-      }
+      crate::parser::ast::Pattern::Edge(edge) => compile_match_edge(
+        function_manager,
+        validator,
+        None,
+        &edge,
+        is_single_match,
+        &mut edge_variables,
+      ),
       crate::parser::ast::Pattern::Path(path) => compile_match_edge(
         function_manager,
         validator,
         Some(path.variable.to_owned()),
         &path.edge,
+        is_single_match,
+        &mut edge_variables,
       ),
     })
     .collect::<Result<Vec<Block>>>()?;
