@@ -14,6 +14,23 @@ To execute a query, write the query and end it with a ';'"
 fn main_loop(rl: &mut rustyline::DefaultEditor) -> rustyline::Result<()>
 {
   let mut connection: Option<gqlitedb::Connection> = None;
+  let mut args = std::env::args();
+  args.next(); // remove program name
+  if let Some(filename) = args.next()
+  {
+    let connection_res = gqlitedb::Connection::open(filename, gqlitedb::ValueObject::new());
+    match connection_res
+    {
+      Ok(c) =>
+      {
+        connection = Some(c);
+      }
+      Err(msg) =>
+      {
+        println!("{:?}", msg);
+      }
+    }
+  }
   loop
   {
     let line = rl.readline("gqlite> ")?;
