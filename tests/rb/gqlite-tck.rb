@@ -47,6 +47,8 @@ features = [
   'set/Set1', 'set/Set2', 'set/Set3', 'set/Set4', 'set/Set5',
   # REMOVE
   'remove/Remove1', 'remove/Remove2',
+  # UNWIND
+  'unwind/Unwind1',
 ]
 
 expressions = [
@@ -81,8 +83,6 @@ expressions = [
 #   'with/With3', 
 #   # WITH SKIP LIMIT
 #   'with-skip-limit/WithSkipLimit1', 'with-skip-limit/WithSkipLimit2', 'with-skip-limit/WithSkipLimit3',
-#   # UNWIND
-#   'unwind/Unwind1',
 # ]
 
 # expressions = [

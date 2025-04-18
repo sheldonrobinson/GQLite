@@ -6,6 +6,7 @@
 
 - Fix order of arrays.
 - Support for array concatenation.
+- Improve support of UNWIND.
 
 ## [0.3.1] - 2025-02-16
 
