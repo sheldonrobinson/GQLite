@@ -23,6 +23,7 @@ if File.directory?('openCypher')
     File.write("openCypher_update", Time.now.to_i)
     `cd openCypher; git pull`
   end
+  `cd openCypher; git checkout main`
 else
   puts "Cloning openCypher"
   `git clone https://github.com/opencypher/openCypher.git`
