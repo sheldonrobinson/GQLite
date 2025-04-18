@@ -33,6 +33,11 @@ pub enum CompileTimeError
   {
     context: &'static str
   },
+  #[error("UnknownFunction: {name}")]
+  UnknownFunction
+  {
+    name: String
+  },
 }
 
 /// Runtime errors.
@@ -51,6 +56,21 @@ pub enum RunTimeError
   {
     name: String
   },
+  /// Too few or too many arguments
+  #[error("InvalidNumberOfArguments: Invalid number of arguments for function '{name}'.")]
+  InvalidNumberOfArguments
+  {
+    name: &'static str
+  },
+  /// Parameter is not known
+  #[error("ExpectedEdge: Function '{name}' expected an edge as argument {index}.")]
+  ExpectedEdge
+  {
+    name: &'static str, index: usize
+  },
+  /// Edge has no label
+  #[error("MissingEdgeLabel")]
+  MissingEdgeLabel,
 }
 
 /// Internal errors, should be treated as bugs.
@@ -136,5 +156,24 @@ impl From<pest::error::Error<crate::parser::Rule>> for Error
   fn from(value: pest::error::Error<crate::parser::Rule>) -> Self
   {
     CompileTimeError::from(value).into()
+  }
+}
+
+//   ____                      _      _____
+//  / ___| ___ _ __   ___ _ __(_) ___| ____|_ __ _ __ ___  _ __ ___
+// | |  _ / _ \ '_ \ / _ \ '__| |/ __|  _| | '__| '__/ _ \| '__/ __|
+// | |_| |  __/ | | |  __/ |  | | (__| |___| |  | | | (_) | |  \__ \
+//  \____|\___|_| |_|\___|_|  |_|\___|_____|_|  |_|  \___/|_|  |___/
+
+pub(crate) trait GenericErrors: Into<Error>
+{
+  fn unknown_function(name: impl Into<String>) -> Self;
+}
+
+impl GenericErrors for CompileTimeError
+{
+  fn unknown_function(name: impl Into<String>) -> Self
+  {
+    Self::UnknownFunction { name: name.into() }
   }
 }

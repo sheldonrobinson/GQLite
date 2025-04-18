@@ -1,5 +1,7 @@
 use std::collections::BTreeMap;
 
+use crate::functions;
+
 #[derive(Debug)]
 pub(crate) enum Instruction
 {
@@ -10,6 +12,11 @@ pub(crate) enum Instruction
   CreateEdgeLiteral
   {
     labels: Vec<String>,
+  },
+  FunctionCall
+  {
+    function: functions::Function,
+    arguments_count: usize,
   },
   Push
   {
