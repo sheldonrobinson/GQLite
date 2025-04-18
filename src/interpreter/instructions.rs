@@ -1,28 +1,55 @@
 use std::collections::HashMap;
 
 #[derive(Debug)]
-pub(crate) enum Instruction {
-  CreateNode { labels: Vec<String> },
-  CreateEdge { label: Option<String> },
-  Push { value: crate::graph::Value },
-  GetVariable { name: String },
-  CreateMap { keys: Vec<String> },
+pub(crate) enum Instruction
+{
+  CreateNodeLiteral
+  {
+    labels: Vec<String>
+  },
+  CreateEdgeLiteral
+  {
+    label: Option<String>
+  },
+  Push
+  {
+    value: crate::graph::Value
+  },
+  GetVariable
+  {
+    name: String
+  },
+  CreateMap
+  {
+    keys: Vec<String>
+  },
   // Duplicate,
 }
 
 pub(crate) type Instructions = Vec<Instruction>;
 
 #[derive(Debug)]
-pub(crate) enum Block {
-  Create {
+pub(crate) enum Block
+{
+  Create
+  {
     instructions: Instructions,
     variables: Vec<Option<String>>,
   },
-  Match {
+  MatchNode
+  {
     instructions: Instructions,
-    variables: Vec<Option<String>>,
+    variable: Option<String>,
   },
-  Return {
+  MatchEdge
+  {
+    instructions: Instructions,
+    left_variable: Option<String>,
+    edge_variable: Option<String>,
+    right_variable: Option<String>,
+  },
+  Return
+  {
     variables: HashMap<String, Instructions>,
   },
 }

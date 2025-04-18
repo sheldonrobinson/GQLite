@@ -11,10 +11,14 @@ fn eval_instructions(
   stack: &mut Vec<crate::graph::Value>,
   row: &crate::value_table::Row,
   instructions: &instructions::Instructions,
-) -> Result<()> {
-  for instruction in instructions {
-    match instruction {
-      instructions::Instruction::CreateEdge { label } => {
+) -> Result<()>
+{
+  for instruction in instructions
+  {
+    match instruction
+    {
+      instructions::Instruction::CreateEdgeLiteral { label } =>
+      {
         let props = stack.pop().unwrap();
         let dst: graph::Node = stack
           .pop()
@@ -37,7 +41,8 @@ fn eval_instructions(
           .into(),
         );
       }
-      instructions::Instruction::CreateNode { labels } => {
+      instructions::Instruction::CreateNodeLiteral { labels } =>
+      {
         let props = stack.pop().unwrap();
         stack.push(
           crate::graph::Node {
@@ -48,22 +53,32 @@ fn eval_instructions(
           .into(),
         );
       }
-      instructions::Instruction::Push { value } => {
+      instructions::Instruction::Push { value } =>
+      {
         stack.push(value.clone());
       }
-      instructions::Instruction::GetVariable { name } => {
-        if let Some(value) = row.get(name) {
+      instructions::Instruction::GetVariable { name } =>
+      {
+        if let Some(value) = row.get(name)
+        {
           stack.push(value.to_owned());
-        } else {
+        }
+        else
+        {
           return Err(Error::UnknownVariable(name.to_owned()));
         }
       }
-      instructions::Instruction::CreateMap { keys } => {
+      instructions::Instruction::CreateMap { keys } =>
+      {
         let mut m = crate::graph::ValueObject::new();
-        for k in keys.iter().rev() {
-          if let Some(value) = stack.pop() {
+        for k in keys.iter().rev()
+        {
+          if let Some(value) = stack.pop()
+          {
             m.insert(k.to_owned(), value);
-          } else {
+          }
+          else
+          {
             return Err(Error::EmptyStack(format!("Missing value for key {:?}", k)));
           }
         }
@@ -77,27 +92,34 @@ fn eval_instructions(
 pub(crate) fn eval_program(
   store: &crate::store::Store,
   program: super::Program,
-) -> crate::Result<crate::graph::Value> {
+) -> crate::Result<crate::graph::Value>
+{
   let mut input_table = crate::value_table::ValueTable::new();
   input_table.add_row(crate::value_table::Row::new());
   let mut tx = store.begin()?;
   let mut stack = Vec::<crate::graph::Value>::new();
-  for block in program {
-    match block {
+  for block in program
+  {
+    match block
+    {
       instructions::Block::Create {
         instructions,
         variables,
-      } => {
+      } =>
+      {
         let mut output_table = crate::value_table::ValueTable::new();
-        for row in input_table.iter() {
+        for row in input_table.iter()
+        {
           eval_instructions(stack.borrow_mut(), row, instructions.borrow())?;
           let mut new_row = row.clone();
           for (v, var) in stack
             .drain(stack.len() - variables.len()..)
             .zip(variables.iter())
           {
-            match v {
-              crate::graph::Value::Node(n) => {
+            match v
+            {
+              crate::graph::Value::Node(n) =>
+              {
                 store.add_nodes(tx.borrow_mut(), "default", vec![n.to_owned()].iter())?;
                 new_row.insert(
                   var
@@ -107,7 +129,8 @@ pub(crate) fn eval_program(
                   crate::graph::Value::Node(n),
                 );
               }
-              crate::graph::Value::Edge(e) => {
+              crate::graph::Value::Edge(e) =>
+              {
                 store.add_edges(tx.borrow_mut(), "default", vec![e.to_owned()].iter())?;
                 new_row.insert(
                   var
@@ -117,7 +140,8 @@ pub(crate) fn eval_program(
                   crate::graph::Value::Edge(e),
                 );
               }
-              _ => {
+              _ =>
+              {
                 return Err(Error::Unimplemented("executor/eval/create"));
               }
             }
@@ -126,28 +150,29 @@ pub(crate) fn eval_program(
         }
         input_table = output_table;
       }
-      instructions::Block::Match {
+      instructions::Block::MatchNode {
         instructions,
-        variables,
-      } => {
+        variable,
+      } =>
+      {
         let mut output_table = crate::value_table::ValueTable::new();
-        for row in input_table.iter() {
+        for row in input_table.iter()
+        {
           eval_instructions(stack.borrow_mut(), row, instructions.borrow())?;
-          for _ in variables.iter().rev() {
-            let _ = stack.pop().unwrap();
-          }
+          let _template = stack.pop().unwrap();
           let nodes = store.select_nodes(
             tx.borrow_mut(),
             "default",
             crate::store::SelectNodeQuery::select_all(),
           )?;
 
-          for node in nodes.iter() {
+          for node in nodes.iter()
+          {
             let mut new_row = row.clone();
             new_row.insert(
-              variables[0]
+              variable
                 .as_ref()
-                .ok_or(Error::Unknown("executor/eval/variables[0].as_ref()"))?
+                .ok_or(Error::Unknown("executor/eval/match_node/variable.as_ref()"))?
                 .to_owned(),
               crate::graph::Value::Node(node.to_owned()),
             );
@@ -156,11 +181,58 @@ pub(crate) fn eval_program(
         }
         input_table = output_table;
       }
-      instructions::Block::Return { variables } => {
+      instructions::Block::MatchEdge {
+        instructions,
+        left_variable,
+        edge_variable,
+        right_variable,
+      } =>
+      {
         let mut output_table = crate::value_table::ValueTable::new();
-        for row in input_table.iter() {
+        for row in input_table.iter()
+        {
+          eval_instructions(stack.borrow_mut(), row, instructions.borrow())?;
+          let _template = stack.pop().unwrap();
+          let edges = store.select_edges(
+            tx.borrow_mut(),
+            "default",
+            crate::store::SelectEdgeQuery::select_all(),
+          )?;
+
+          for edge in edges.iter()
+          {
+            let mut new_row = row.clone();
+            if let Some(left_variable) = left_variable.to_owned()
+            {
+              new_row.insert(
+                left_variable,
+                crate::graph::Value::Node(edge.source.to_owned()),
+              );
+            }
+            if let Some(right_variable) = right_variable.to_owned()
+            {
+              new_row.insert(
+                right_variable,
+                crate::graph::Value::Node(edge.destination.to_owned()),
+              );
+            }
+            if let Some(edge_variable) = edge_variable.to_owned()
+            {
+              new_row.insert(edge_variable, crate::graph::Value::Edge(edge.to_owned()));
+            }
+            output_table.add_row(new_row);
+          }
+        }
+        input_table = output_table;
+      }
+      instructions::Block::Return { variables } =>
+      {
+        let mut output_table = crate::value_table::ValueTable::new();
+        for row in input_table.iter()
+        {
           let mut out_row = crate::value_table::Row::new();
-          for (name, instructions) in variables.iter() {
+          for (name, instructions) in variables.iter()
+          {
             let mut stack = Vec::<crate::graph::Value>::new();
             eval_instructions(&mut stack, row, instructions)?;
             let value = stack.first().ok_or(Error::Unknown("eval_program/return"))?;
@@ -175,11 +247,13 @@ pub(crate) fn eval_program(
             .map(|(name, _)| crate::graph::Value::String(name.to_owned()))
             .collect(),
         ));
-        for row in output_table.iter() {
+        for row in output_table.iter()
+        {
           r.push(crate::graph::Value::Array(
             variables
               .iter()
-              .map(|(name, _)| match row.get(name) {
+              .map(|(name, _)| match row.get(name)
+              {
                 Some(v) => v.to_owned(),
                 None => crate::graph::Value::Invalid,
               })
