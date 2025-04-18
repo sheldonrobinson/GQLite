@@ -202,18 +202,21 @@ pub(crate) fn eval_program(
         for row in input_table.iter()
         {
           eval_instructions(stack.borrow_mut(), row, instructions.borrow())?;
-          let template = stack.pop().unwrap();
+          let template = stack
+            .pop()
+            .ok_or_else(|| InternalError::MissingStackValue {
+              context: "eval_program/match_node",
+            })?
+            .to_node()
+            .ok_or_else(|| InternalError::ExpectedNode {
+              context: "eval_program/MatchNode",
+            })?;
           let nodes = store.select_nodes(
             tx.borrow_mut(),
             "default",
-            crate::store::SelectNodeQuery::select_labels(
-              template
-                .to_node()
-                .ok_or_else(|| InternalError::ExpectedNode {
-                  context: "eval_program/MatchNode",
-                })?
-                .labels
-                .iter(),
+            crate::store::SelectNodeQuery::select_labels_properties(
+              template.labels.iter(),
+              template.properties.iter(),
             ),
           )?;
 
