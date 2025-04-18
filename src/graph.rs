@@ -64,6 +64,14 @@ impl Value
       _ => None,
     }
   }
+  pub fn to_edge(&self) -> Option<Edge>
+  {
+    match self
+    {
+      Value::Edge(e) => Some(e.clone()),
+      _ => None,
+    }
+  }
   pub(crate) fn access<'a>(&self, mut path: impl Iterator<Item = &'a String>) -> Value
   {
     match path.next()
@@ -207,9 +215,11 @@ impl std::fmt::Display for Node
 pub struct Edge
 {
   pub key: Key,
+  #[serde(skip_serializing)]
   pub source: Node,
+  #[serde(skip_serializing)]
   pub destination: Node,
-  pub label: String,
+  pub labels: Vec<String>,
   pub properties: ValueObject,
 }
 
@@ -217,9 +227,9 @@ impl std::fmt::Display for Edge
 {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
   {
-    write!(f, "{}-[:{} ", self.source, self.label)?;
+    write!(f, "[:{} ", self.labels.join(":"))?;
     value_object_display(self.properties.borrow(), f)?;
-    write!(f, "]->{})", self.destination)
+    write!(f, "])")
   }
 }
 

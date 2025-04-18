@@ -84,7 +84,7 @@ struct PersistentEdge
     deserialize_with = "persy_id_deserialize"
   )]
   pub destination: persy::PersyId,
-  pub label: String,
+  pub labels: Vec<String>,
   pub properties: graph::ValueObject,
 }
 
@@ -105,6 +105,18 @@ where
   keys: Option<TKeys>,
   labels: Option<TLabels>,
   properties: Option<TProperties>,
+}
+
+impl<'a, TKeys, TLabels, TProperties> SelectNodeQuery<'a, TKeys, TLabels, TProperties>
+where
+  TKeys: Iterator<Item = &'a crate::graph::Key>,
+  TLabels: Iterator<Item = &'a String>,
+  TProperties: Iterator<Item = (&'a String, &'a graph::Value)>,
+{
+  fn is_select_all(&self) -> bool
+  {
+    self.keys.is_none() && self.labels.is_none() && self.properties.is_none()
+  }
 }
 
 pub(crate) struct NullIterator<'a, T: 'a>
@@ -153,43 +165,13 @@ impl<'a, TKeys: Iterator<Item = &'a crate::graph::Key>>
     NullIterator<'a, (&'a String, &'a graph::Value)>,
   >
 {
+  #[allow(unused)]
   pub(crate) fn select_keys(keys: TKeys) -> Self
   {
     Self {
       keys: Some(keys),
       labels: None,
       properties: None,
-    }
-  }
-}
-
-impl<'a, TLabels: Iterator<Item = &'a String>>
-  SelectNodeQuery<
-    'a,
-    NullIterator<'a, &'a crate::graph::Key>,
-    TLabels,
-    NullIterator<'a, (&'a String, &'a graph::Value)>,
-  >
-{
-  pub(crate) fn select_labels(labels: TLabels) -> Self
-  {
-    Self {
-      keys: None,
-      labels: Some(labels),
-      properties: None,
-    }
-  }
-}
-
-impl<'a, TProperties: Iterator<Item = (&'a String, &'a graph::Value)>>
-  SelectNodeQuery<'a, NullIterator<'a, &'a graph::Key>, NullIterator<'a, &'a String>, TProperties>
-{
-  pub(crate) fn select_properties(properties: TProperties) -> Self
-  {
-    Self {
-      keys: None,
-      labels: None,
-      properties: Some(properties),
     }
   }
 }
@@ -218,12 +200,48 @@ impl<
 //                                        |___/                            |___/
 
 #[derive(Default)]
-pub(crate) struct SelectEdgeQuery<'a, T: Iterator<Item = &'a crate::graph::Key>>
+pub(crate) struct SelectEdgeQuery<
+  'a,
+  TSourceKeys,
+  TSourceLabels,
+  TSourceProperties,
+  TKeys,
+  TLabels,
+  TProperties,
+  TDestinationKeys,
+  TDestinationLabels,
+  TDestinationProperties,
+> where
+  TSourceKeys: Iterator<Item = &'a crate::graph::Key>,
+  TSourceLabels: Iterator<Item = &'a String>,
+  TSourceProperties: Iterator<Item = (&'a String, &'a graph::Value)>,
+  TKeys: Iterator<Item = &'a crate::graph::Key>,
+  TLabels: Iterator<Item = &'a String>,
+  TProperties: Iterator<Item = (&'a String, &'a graph::Value)>,
+  TDestinationKeys: Iterator<Item = &'a crate::graph::Key>,
+  TDestinationLabels: Iterator<Item = &'a String>,
+  TDestinationProperties: Iterator<Item = (&'a String, &'a graph::Value)>,
 {
-  keys: Option<T>,
+  keys: Option<TKeys>,
+  labels: Option<TLabels>,
+  properties: Option<TProperties>,
+  source: SelectNodeQuery<'a, TSourceKeys, TSourceLabels, TSourceProperties>,
+  destination: SelectNodeQuery<'a, TDestinationKeys, TDestinationLabels, TDestinationProperties>,
 }
 
-impl SelectEdgeQuery<'static, core::slice::Iter<'static, crate::graph::Key>>
+impl
+  SelectEdgeQuery<
+    'static,
+    NullIterator<'static, &crate::graph::Key>,
+    NullIterator<'static, &String>,
+    NullIterator<'static, (&'static String, &'static graph::Value)>,
+    NullIterator<'static, &crate::graph::Key>,
+    NullIterator<'static, &String>,
+    NullIterator<'static, (&'static String, &'static graph::Value)>,
+    NullIterator<'static, &crate::graph::Key>,
+    NullIterator<'static, &String>,
+    NullIterator<'static, (&'static String, &'static graph::Value)>,
+  >
 {
   pub(crate) fn select_all() -> Self
   {
@@ -231,11 +249,86 @@ impl SelectEdgeQuery<'static, core::slice::Iter<'static, crate::graph::Key>>
   }
 }
 
-impl<'a, T: Iterator<Item = &'a crate::graph::Key>> SelectEdgeQuery<'a, T>
+impl<'a, T: Iterator<Item = &'a crate::graph::Key>>
+  SelectEdgeQuery<
+    'a,
+    NullIterator<'a, &'a crate::graph::Key>,
+    NullIterator<'a, &'a String>,
+    NullIterator<'a, (&'a String, &'a graph::Value)>,
+    T,
+    NullIterator<'a, &'a String>,
+    NullIterator<'a, (&'a String, &'a graph::Value)>,
+    NullIterator<'a, &'a crate::graph::Key>,
+    NullIterator<'a, &'a String>,
+    NullIterator<'a, (&'a String, &'a graph::Value)>,
+  >
 {
+  #[allow(unused)]
   pub(crate) fn select_keys(keys: T) -> Self
   {
-    Self { keys: Some(keys) }
+    Self {
+      keys: Some(keys),
+      labels: None,
+      properties: None,
+      source: SelectNodeQuery::select_all(),
+      destination: SelectNodeQuery::select_all(),
+    }
+  }
+}
+
+impl<
+    'a,
+    TSourceKeys,
+    TSourceLabels,
+    TSourceProperties,
+    TLabels,
+    TProperties,
+    TDestinationKeys,
+    TDestinationLabels,
+    TDestinationProperties,
+  >
+  SelectEdgeQuery<
+    'a,
+    TSourceKeys,
+    TSourceLabels,
+    TSourceProperties,
+    NullIterator<'a, &'a crate::graph::Key>,
+    TLabels,
+    TProperties,
+    TDestinationKeys,
+    TDestinationLabels,
+    TDestinationProperties,
+  >
+where
+  TSourceKeys: Iterator<Item = &'a crate::graph::Key>,
+  TSourceLabels: Iterator<Item = &'a String>,
+  TSourceProperties: Iterator<Item = (&'a String, &'a graph::Value)>,
+  TLabels: Iterator<Item = &'a String>,
+  TProperties: Iterator<Item = (&'a String, &'a graph::Value)>,
+  TDestinationKeys: Iterator<Item = &'a crate::graph::Key>,
+  TDestinationLabels: Iterator<Item = &'a String>,
+  TDestinationProperties: Iterator<Item = (&'a String, &'a graph::Value)>,
+{
+  #[allow(unused)]
+  pub(crate) fn select_source_destination_labels_properties(
+    source_query: SelectNodeQuery<'a, TSourceKeys, TSourceLabels, TSourceProperties>,
+    labels: TLabels,
+    properties: TProperties,
+    destination_query: SelectNodeQuery<
+      'a,
+      TDestinationKeys,
+      TDestinationLabels,
+      TDestinationProperties,
+    >,
+  ) -> Self
+  {
+    Self {
+      keys: None,
+      labels: Some(labels),
+      properties: Some(properties),
+      source: source_query,
+      destination: destination_query,
+    }
   }
 }
 
@@ -291,16 +384,18 @@ impl Store
     let graph_name = name.into();
     tx.create_segment(format!("{}_nodes", graph_name).as_str())?;
     tx.create_segment(format!("{}_edges", graph_name).as_str())?;
-    for index_name in [
-      "_nodes_uuid_index",
-      "_edges_uuid_index",
-      "_edges_source_uuid_index",
-      "_edges_destination_uuid_index",
-    ]
+    for index_name in ["_nodes_uuid_index", "_edges_uuid_index"]
     {
       tx.create_index::<u128, persy::PersyId>(
         (graph_name.clone() + index_name).as_str(),
         persy::ValueMode::Exclusive,
+      )?;
+    }
+    for index_name in ["_edges_source_uuid_index", "_edges_destination_uuid_index"]
+    {
+      tx.create_index::<u128, persy::PersyId>(
+        (graph_name.clone() + index_name).as_str(),
+        persy::ValueMode::Cluster,
       )?;
     }
     tx.commit()?;
@@ -377,11 +472,7 @@ impl Store
       ) as Box<dyn Iterator<Item = Result<Vec<u8>>>>,
     };
     let r = nodes_raw.map(|v| {
-      // Ok::<graph::Node, crate::Error>(ciborium::from_reader::<graph::Node, &[u8]>(
-      //   &mut v?.as_ref(),
-      // )?)
       let c = ciborium::from_reader::<graph::Node, &[u8]>(&mut v?.as_ref())?;
-      println!("Retrieved: {:?}", c);
       Ok::<graph::Node, crate::Error>(c)
     });
     let r = match query.labels
@@ -439,9 +530,8 @@ impl Store
         })) as Box<dyn Iterator<Item = Result<crate::graph::Node>>>
       }
       None => Box::new(r) as Box<dyn Iterator<Item = Result<crate::graph::Node>>>,
-    }
-    .collect::<Result<Vec<crate::graph::Node>>>()?;
-    Ok(r)
+    };
+    r.collect()
   }
   fn get_node_id(
     &self,
@@ -483,7 +573,7 @@ impl Store
           key: x.key,
           source: source_pid,
           destination: destination_pid,
-          label: x.label.clone(),
+          labels: x.labels.clone(),
           properties: x.properties.clone(),
         },
         &mut data,
@@ -494,17 +584,16 @@ impl Store
         x.key.borrow().into(),
         pid,
       )?;
-      // TODO support for proper index, but the following is buggy as it only allow a node to belong to one edge
-      // transaction.put::<u128, persy::PersyId>(
-      //   &graph_info.edges_source_uuid_index.as_str(),
-      //   x.source.key.borrow().into(),
-      //   pid,
-      // )?;
-      // transaction.put::<u128, persy::PersyId>(
-      //   graph_info.edges_destination_uuid_index.as_str(),
-      //   x.destination.key.borrow().into(),
-      //   pid,
-      // )?;
+      transaction.put::<u128, persy::PersyId>(
+        &graph_info.edges_source_uuid_index.as_str(),
+        x.source.key.borrow().into(),
+        pid,
+      )?;
+      transaction.put::<u128, persy::PersyId>(
+        graph_info.edges_destination_uuid_index.as_str(),
+        x.destination.key.borrow().into(),
+        pid,
+      )?;
     }
     Ok(())
   }
@@ -527,64 +616,251 @@ impl Store
     }
   }
   /// Select edges
-  pub(crate) fn select_edges<'a, T: Iterator<Item = &'a crate::graph::Key>>(
+  pub(crate) fn select_edges<
+    'a,
+    TSourceKeys,
+    TSourceLabels,
+    TSourceProperties,
+    TKeys,
+    TLabels,
+    TProperties,
+    TDestinationKeys,
+    TDestinationLabels,
+    TDestinationProperties,
+  >(
     &self,
     transaction: &mut persy::Transaction,
     graph_name: impl Into<String>,
-    query: SelectEdgeQuery<'a, T>,
+    query: SelectEdgeQuery<
+      'a,
+      TSourceKeys,
+      TSourceLabels,
+      TSourceProperties,
+      TKeys,
+      TLabels,
+      TProperties,
+      TDestinationKeys,
+      TDestinationLabels,
+      TDestinationProperties,
+    >,
   ) -> Result<Vec<crate::graph::Edge>>
+  where
+    TSourceKeys: Iterator<Item = &'a crate::graph::Key>,
+    TSourceLabels: Iterator<Item = &'a String>,
+    TSourceProperties: Iterator<Item = (&'a String, &'a graph::Value)>,
+    TKeys: Iterator<Item = &'a crate::graph::Key>,
+    TLabels: Iterator<Item = &'a String>,
+    TProperties: Iterator<Item = (&'a String, &'a graph::Value)>,
+    TDestinationKeys: Iterator<Item = &'a crate::graph::Key>,
+    TDestinationLabels: Iterator<Item = &'a String>,
+    TDestinationProperties: Iterator<Item = (&'a String, &'a graph::Value)>,
   {
     let graph_name = graph_name.into();
     let graph_info = self.graphs.get(&graph_name).unwrap();
     let transaction = RefCell::new(transaction);
+
     let edges_raw = {
       let mut transaction = transaction.borrow_mut();
       match query.keys
       {
-        Some(keys_iter) => Box::new(keys_iter.map(|key| {
-          let key: u128 = key.into();
-          if let Some(key) =
-            transaction.one::<u128, persy::PersyId>(graph_info.edges_uuid_index.as_str(), &key)?
-          {
-            if let Some(v) = transaction.read(graph_info.edges_segment, key.borrow())?
+        Some(keys_iter) => keys_iter
+          .map(|key| {
+            let key: u128 = key.into();
+            if let Some(key) =
+              transaction.one::<u128, persy::PersyId>(graph_info.edges_uuid_index.as_str(), &key)?
             {
-              Ok(v)
+              if let Some(v) = transaction.read(graph_info.edges_segment, key.borrow())?
+              {
+                Ok(v)
+              }
+              else
+              {
+                Err(Error::UnknownNode)
+              }
             }
             else
             {
               Err(Error::UnknownNode)
             }
+          })
+          .collect::<Result<Vec<Vec<u8>>>>()?,
+        None =>
+        {
+          if query.source.is_select_all() && query.destination.is_select_all()
+          {
+            transaction
+              .scan(graph_info.edges_segment)?
+              .map(|(_, content)| Ok::<Vec<u8>, crate::Error>(content))
+              .collect::<Result<Vec<Vec<u8>>>>()?
           }
           else
           {
-            Err(Error::UnknownNode)
+            let edges_ids = if !query.destination.is_select_all() && !query.source.is_select_all()
+            {
+              let dest_it: Vec<persy::PersyId> = self
+                .select_nodes(&mut transaction, graph_name.to_owned(), query.destination)?
+                .into_iter()
+                .map(|n| {
+                  transaction.get(
+                    graph_info.edges_destination_uuid_index.as_str(),
+                    &(<&graph::Key as Into<u128>>::into(&n.key) as u128),
+                  )
+                })
+                .collect::<std::result::Result<
+                  Vec<persy::ValueIter<persy::PersyId>>,
+                  persy::PE<persy::IndexChangeError>,
+                >>()?
+                .into_iter()
+                .flatten()
+                .collect();
+              Box::new(
+                self
+                  .select_nodes(&mut transaction, graph_name, query.source)?
+                  .into_iter()
+                  .map(|n| {
+                    transaction.get(
+                      graph_info.edges_source_uuid_index.as_str(),
+                      &(<&graph::Key as Into<u128>>::into(&n.key) as u128),
+                    )
+                  })
+                  .map(|id_iter| {
+                    Ok({
+                      let dest_it = dest_it.clone();
+                      id_iter?.filter(move |id| dest_it.contains(id))
+                    })
+                  })
+                  .collect::<Vec<std::result::Result<_, persy::PE<persy::IndexChangeError>>>>()
+                  .into_iter()
+                  .flatten()
+                  .flatten(),
+              ) as Box<dyn Iterator<Item = persy::PersyId>>
+            }
+            else if !query.source.is_select_all()
+            {
+              Box::new(
+                self
+                  .select_nodes(&mut transaction, graph_name, query.source)?
+                  .into_iter()
+                  .map(|n| {
+                    transaction.get(
+                      graph_info.edges_source_uuid_index.as_str(),
+                      &(<&graph::Key as Into<u128>>::into(&n.key) as u128),
+                    )
+                  })
+                  .collect::<std::result::Result<
+                    Vec<persy::ValueIter<persy::PersyId>>,
+                    persy::PE<persy::IndexChangeError>,
+                  >>()?
+                  .into_iter()
+                  .flatten(),
+              ) as Box<dyn Iterator<Item = persy::PersyId>>
+            }
+            else
+            {
+              Box::new(
+                self
+                  .select_nodes(&mut transaction, graph_name, query.destination)?
+                  .into_iter()
+                  .map(|n| {
+                    transaction.get(
+                      graph_info.edges_destination_uuid_index.as_str(),
+                      &(<&graph::Key as Into<u128>>::into(&n.key) as u128),
+                    )
+                  })
+                  .collect::<std::result::Result<
+                    Vec<persy::ValueIter<persy::PersyId>>,
+                    persy::PE<persy::IndexChangeError>,
+                  >>()?
+                  .into_iter()
+                  .flatten(),
+              ) as Box<dyn Iterator<Item = persy::PersyId>>
+            };
+            edges_ids
+              .map(|key| {
+                if let Some(v) = transaction.read(graph_info.edges_segment, &key)?
+                {
+                  Ok(v)
+                }
+                else
+                {
+                  Err(Error::UnknownNode)
+                }
+              })
+              .collect::<Result<Vec<Vec<u8>>>>()?
           }
-        })) as Box<dyn Iterator<Item = Result<Vec<u8>>>>,
-        None => Box::new({
-          transaction
-            .scan(graph_info.edges_segment)?
-            .map(|(_, content)| Ok::<Vec<u8>, crate::Error>(content))
-        }) as Box<dyn Iterator<Item = Result<Vec<u8>>>>,
+        }
       }
-      .collect::<Result<Vec<Vec<u8>>>>()?
     };
-    let r = edges_raw
-      .into_iter()
-      .map(|v| {
-        Ok::<graph::Edge, crate::Error>({
-          let edge = ciborium::from_reader::<PersistentEdge, &[u8]>(&mut v.as_ref())?;
-          let mut transaction = transaction.borrow_mut();
-          graph::Edge {
-            key: edge.key,
-            source: self.fetch_node(&mut transaction, graph_info, edge.source)?,
-            destination: self.fetch_node(&mut transaction, graph_info, edge.destination)?,
-            label: edge.label,
-            properties: edge.properties,
-          }
-        })
+    let r = edges_raw.into_iter().map(|v| {
+      Ok::<graph::Edge, crate::Error>({
+        let edge = ciborium::from_reader::<PersistentEdge, &[u8]>(&mut v.as_ref())?;
+        let mut transaction = transaction.borrow_mut();
+        graph::Edge {
+          key: edge.key,
+          source: self.fetch_node(&mut transaction, graph_info, edge.source)?,
+          destination: self.fetch_node(&mut transaction, graph_info, edge.destination)?,
+          labels: edge.labels,
+          properties: edge.properties,
+        }
       })
-      .collect::<Result<Vec<crate::graph::Edge>>>()?;
-    Ok(r)
+    });
+    let r = match query.labels
+    {
+      Some(labels) =>
+      {
+        let labels = labels.collect::<Vec<&'a String>>();
+        Box::new(r.filter(move |e| match e
+        {
+          Ok(e) =>
+          {
+            for l in labels.iter()
+            {
+              if !e.labels.contains(l)
+              {
+                return false;
+              }
+            }
+            true
+          }
+          Err(_) => true,
+        })) as Box<dyn Iterator<Item = Result<crate::graph::Edge>>>
+      }
+      None => Box::new(r) as Box<dyn Iterator<Item = Result<crate::graph::Edge>>>,
+    };
+    let r = match query.properties
+    {
+      Some(properties) =>
+      {
+        let properties = properties.collect::<Vec<(&'a String, &'a graph::Value)>>();
+        Box::new(r.filter(move |e| match e
+        {
+          Ok(e) =>
+          {
+            for (k, v) in properties.iter()
+            {
+              match e.properties.get(*k)
+              {
+                Some(val) =>
+                {
+                  if val != *v
+                  {
+                    return false;
+                  }
+                }
+                None =>
+                {
+                  return false;
+                }
+              }
+            }
+            true
+          }
+          Err(_) => true,
+        })) as Box<dyn Iterator<Item = Result<crate::graph::Edge>>>
+      }
+      None => Box::new(r) as Box<dyn Iterator<Item = Result<crate::graph::Edge>>>,
+    };
+    r.collect()
   }
   pub(crate) fn compute_statistics(
     &self,

@@ -13,9 +13,8 @@ fn eval_instructions(
   {
     match instruction
     {
-      instructions::Instruction::CreateEdgeLiteral { label } =>
+      instructions::Instruction::CreateEdgeLiteral { labels } =>
       {
-        println!("{:?}", stack);
         let props = stack.pop().unwrap();
         let dst: graph::Node = stack
           .pop()
@@ -27,18 +26,16 @@ fn eval_instructions(
           .unwrap()
           .to_node()
           .ok_or(Error::Unknown("Expected node on stack."))?;
-        println!("Create edge between {:?} {:?} ", src, dst);
         stack.push(
           crate::graph::Edge {
             key: graph::Key::default(),
             source: src,
             destination: dst,
-            label: label.to_owned().unwrap_or(String::default()),
+            labels: labels.to_owned(),
             properties: props.to_object_safe(),
           }
           .into(),
         );
-        println!("{:?}", stack);
       }
       instructions::Instruction::CreateNodeLiteral { labels } =>
       {
@@ -168,7 +165,6 @@ pub(crate) fn eval_program(
     {
       instructions::Block::Create { actions } =>
       {
-        println!("instructions::Block::Create input {:?}", input_table);
         let mut output_table = crate::value_table::ValueTable::new();
         for row in input_table.iter()
         {
@@ -254,7 +250,6 @@ pub(crate) fn eval_program(
             output_table.add_row(new_row);
           }
         }
-        println!("match output {:?}", output_table);
         input_table = output_table;
       }
       instructions::Block::MatchEdge {
@@ -268,11 +263,39 @@ pub(crate) fn eval_program(
         for row in input_table.iter()
         {
           eval_instructions(&mut stack, row, &instructions, &parameters)?;
-          let _template = stack.pop().unwrap();
+          let template = stack
+            .pop()
+            .ok_or_else(|| InternalError::MissingStackValue {
+              context: "eval_program/MatchEdge",
+            })?
+            .to_edge()
+            .ok_or_else(|| InternalError::ExpectedNode {
+              context: "eval_program/MatchEdge",
+            })?;
+          let nodes = store.select_nodes(
+            &mut tx,
+            "default",
+            crate::store::SelectNodeQuery::select_labels_properties(
+              template.labels.iter(),
+              template.properties.iter(),
+            ),
+          )?;
+
           let edges = store.select_edges(
             &mut tx,
             "default",
-            crate::store::SelectEdgeQuery::select_all(),
+            crate::store::SelectEdgeQuery::select_source_destination_labels_properties(
+              crate::store::SelectNodeQuery::select_labels_properties(
+                template.source.labels.iter(),
+                template.source.properties.iter(),
+              ),
+              template.labels.iter(),
+              template.properties.iter(),
+              crate::store::SelectNodeQuery::select_labels_properties(
+                template.destination.labels.iter(),
+                template.destination.properties.iter(),
+              ),
+            ),
           )?;
 
           for edge in edges.iter()
@@ -370,7 +393,6 @@ pub(crate) fn eval_program(
           output_table.add_row(out_row);
         }
         input_table = output_table;
-        println!("After with: {:?}", input_table);
       }
       instructions::Block::Unwind { name, instructions } =>
       {

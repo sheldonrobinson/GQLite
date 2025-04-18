@@ -195,7 +195,7 @@ pub(crate) struct GraphEdge
   pub(crate) source: GraphNode,
   pub(crate) destination: GraphNode,
   pub(crate) directivity: EdgeDirectivity,
-  pub(crate) label: Option<String>,
+  pub(crate) labels: Vec<String>,
   pub(crate) properties: Option<Expression>,
 }
 

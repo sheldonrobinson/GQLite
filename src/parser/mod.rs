@@ -188,11 +188,11 @@ fn build_node_pattern(pair: pest::iterators::Pair<Rule>) -> Result<ast::GraphNod
 
 fn build_edge_pattern(
   pair: pest::iterators::Pair<Rule>,
-) -> Result<(Option<String>, Option<String>, Option<Expression>)>
+) -> Result<(Option<String>, Vec<String>, Option<Expression>)>
 {
   let it = pair.into_inner();
   let mut variable = None;
-  let mut label = None;
+  let mut labels = vec![];
   let mut properties = None;
 
   for pair in it
@@ -205,7 +205,7 @@ fn build_edge_pattern(
       }
       Rule::labels =>
       {
-        label = Some(pair.into_inner().as_str().to_string());
+        labels = build_labels(pair.into_inner())?;
       }
       Rule::map => properties = Some(build_expression(pair)?),
       unknown_expression =>
@@ -217,7 +217,7 @@ fn build_edge_pattern(
       }
     }
   }
-  Ok((variable, label, properties))
+  Ok((variable, labels, properties))
 }
 
 fn build_pattern(
@@ -248,7 +248,7 @@ fn build_pattern(
           source: source_node,
           destination: destination_node,
           directivity: ast::EdgeDirectivity::Directed,
-          label: edge_pattern.1,
+          labels: edge_pattern.1,
           properties: edge_pattern.2,
         }));
       }
@@ -263,7 +263,7 @@ fn build_pattern(
           source: source_node,
           destination: destination_node,
           directivity: ast::EdgeDirectivity::Directed,
-          label: edge_pattern.1,
+          labels: edge_pattern.1,
           properties: edge_pattern.2,
         }));
       }
@@ -280,7 +280,7 @@ fn build_pattern(
             source: source_node,
             destination: destination_node,
             directivity: ast::EdgeDirectivity::Undirected,
-            label: edge_pattern.1,
+            labels: edge_pattern.1,
             properties: edge_pattern.2,
           }));
         }
