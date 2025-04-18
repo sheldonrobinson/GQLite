@@ -5,7 +5,7 @@
 ## [Unreleased] - ReleaseDate
 - Improve support of comparison.
 - Add support for string as key in map, and allow to use operator [] for map.
-- Add properties function.
+- Add properties, toString functions.
 
 ## [0.3.3] - 2025-03-31
 
