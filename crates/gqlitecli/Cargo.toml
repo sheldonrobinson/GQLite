@@ -1,19 +1,19 @@
 [package]
 name = "gqlitecli"
-version = "0.3.0"
-edition = "2021"
-license = "MIT"
 description = "Command Line Interface tool for GQLite"
 readme = "README.md"
-homepage = "https://gqlite.org"
-repository = "https://gitlab.com/gqlite/gqlite"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
 
 [[bin]]
 name = "gqlite"
 path = "src/main.rs"
 
 [dependencies]
-gqlitedb = { version = "0.3.0", path = "../.." }
+gqlitedb = { workspace = true }
 rustyline = "15"
 standard_paths = "2.1.0"
 tabled = "0.17"

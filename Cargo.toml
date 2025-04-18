@@ -1,37 +1,14 @@
-[package]
-name = "gqlitedb"
+[workspace]
+resolver = "2"
+members = ["crates/*"]
+
+[workspace.package]
 version = "0.3.2"
 edition = "2021"
 license = "MIT"
-description = "GQLite is a Rust-language library, with a C interface, that implements a small, fast, self-contained, high-reliability, full-featured, Graph Query database engine."
-readme = "README.md"
 homepage = "https://gqlite.org"
 repository = "https://gitlab.com/gqlite/gqlite"
 
-[lib]
-crate-type = ["cdylib", "lib"]
-
-[features]
-default = ["redb", "capi"]
-capi = []
-redb = ["dep:redb"]
-pgql = ["dep:pgrx"]
-pg12 = ["pgrx/pg12"]
-pg13 = ["pgrx/pg13"]
-pg14 = ["pgrx/pg14"]
-pg15 = ["pgrx/pg15"]
-pg16 = ["pgrx/pg16"]
-pg17 = ["pgrx/pg17"]
-
-[dependencies]
-ciborium = "0.2"
-itertools = "0.14"
-pgrx = { version = "0.12", optional = true }
-pest = "2"
-pest_derive = "2"
-rand = "0.9"
-redb = { version = "2", optional = true }
-serde = "1"
-serde_json = "1"
-thiserror = "2"
-uuid = { version = "1", features = ["v4"] }
+[workspace.dependencies]
+# versions have to be specified with path: https://github.com/rust-lang/cargo/issues/11133
+gqlitedb= { version = "0.3.2", path = "crates/gqlitedb" }
