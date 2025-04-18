@@ -4,6 +4,7 @@ use crate::{aggregators, error, graph, Result};
 
 mod containers;
 mod edge;
+mod math;
 mod node;
 mod path;
 mod scalar;
@@ -39,6 +40,14 @@ impl FunctionTypeTrait for i64
   fn result_type() -> ExpressionType
   {
     ExpressionType::Integer
+  }
+}
+
+impl FunctionTypeTrait for f64
+{
+  fn result_type() -> ExpressionType
+  {
+    ExpressionType::Float
   }
 }
 
@@ -102,6 +111,9 @@ impl Manager
           containers::Range::new(),
           containers::Size::new(),
           edge::Type::new(),
+          math::Ceil::new(),
+          math::Floor::new(),
+          math::Rand::new(),
           node::Labels::new(),
           path::Length::new(),
           scalar::Coalesce::new(),
@@ -242,6 +254,7 @@ macro_rules! declare_function {
       {
         if arguments.len() == $crate::functions::count_arguments!($( $arg_type,)*)
         {
+          #[allow(unused_imports)]
           use crate::graph::ValueTryIntoRef;
           Ok(
             $crate::functions::make_function_call!(Self::$f_name, arguments, $( $arg_type,)*)

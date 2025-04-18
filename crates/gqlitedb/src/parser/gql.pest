@@ -140,7 +140,7 @@ label_check_expression = { ident ~ (":" ~ ident)+ }
 
 parenthesised_expression = { "(" ~ expression ~ ")" }
 named_expression         = { (expression ~ "AS" ~ ident) | expression }
-function_call            = { function_name ~ "(" ~ expression ~ ("," ~ expression)* ~ ")" }
+function_call            = { function_name ~ "(" ~ (expression ~ ("," ~ expression)*)? ~ ")" }
 count_star               = { "count" ~ "(" ~ "*" ~ ")" }
 expression_term          = { null_lit | true_lit | false_lit | num | int | string_literal | map | array | label_check_expression | parameter | parenthesised_expression | function_call | count_star | ident }
 
