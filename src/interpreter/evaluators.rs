@@ -1,6 +1,9 @@
 use std::borrow::{Borrow, BorrowMut};
 
-use crate::{error::InternalError, graph, Error, Result};
+use crate::{
+  error::{self, InternalError},
+  graph, Error, Result,
+};
 
 use super::instructions;
 
@@ -62,7 +65,12 @@ fn eval_instructions(
         }
         else
         {
-          return Err(Error::UnknownVariable(name.to_owned()));
+          return Err(
+            crate::error::RunTimeError::UndefinedVariable {
+              name: name.to_owned(),
+            }
+            .into(),
+          );
         }
       }
       instructions::Instruction::CreateMap { keys } =>
@@ -127,41 +135,41 @@ pub(crate) fn eval_program(
   {
     match block
     {
-      instructions::Block::Create {
-        instructions,
-        variables,
-      } =>
+      instructions::Block::Create { actions } =>
       {
         let mut output_table = crate::value_table::ValueTable::new();
         for row in input_table.iter()
         {
-          eval_instructions(stack.borrow_mut(), row, instructions.borrow())?;
           let mut new_row = row.clone();
-          for (v, var) in stack
-            .drain(stack.len() - variables.len()..)
-            .zip(variables.iter())
+          for action in actions.iter()
           {
-            match v
+            eval_instructions(stack.borrow_mut(), &new_row, &action.instructions)?;
+            for (v, var) in stack
+              .drain(stack.len() - action.variables.len()..)
+              .zip(action.variables.iter())
             {
-              crate::graph::Value::Node(n) =>
+              match v
               {
-                store.add_nodes(&mut tx, "default", vec![n.to_owned()].iter())?;
-                if let Some(var) = var
+                crate::graph::Value::Node(n) =>
                 {
-                  new_row.insert(var.to_owned(), crate::graph::Value::Node(n));
+                  store.add_nodes(&mut tx, "default", vec![n.to_owned()].iter())?;
+                  if let Some(var) = var
+                  {
+                    new_row.insert(var.to_owned(), crate::graph::Value::Node(n));
+                  }
                 }
-              }
-              crate::graph::Value::Edge(e) =>
-              {
-                store.add_edges(&mut tx, "default", vec![e.to_owned()].iter())?;
-                if let Some(var) = var
+                crate::graph::Value::Edge(e) =>
                 {
-                  new_row.insert(var.to_owned(), crate::graph::Value::Edge(e));
+                  store.add_edges(&mut tx, "default", vec![e.to_owned()].iter())?;
+                  if let Some(var) = var
+                  {
+                    new_row.insert(var.to_owned(), crate::graph::Value::Edge(e));
+                  }
                 }
-              }
-              _ =>
-              {
-                return Err(Error::Unimplemented("executor/eval/create"));
+                _ =>
+                {
+                  return Err(Error::Unimplemented("executor/eval/create"));
+                }
               }
             }
           }

@@ -245,6 +245,26 @@ fn build_pattern(mut iterator: pest::iterators::Pairs<Rule>) -> Result<Vec<ast::
           properties: edge_pattern.2,
         }));
       }
+      Rule::reverse_edge_pattern =>
+      {
+        println!("()-[]->() ->->->->->->-> pair: {:?}", pair);
+        pair
+          .clone()
+          .into_inner()
+          .for_each(|p| println!("     {:?}", p));
+        let mut it = pair.into_inner();
+        let destination_node = build_node_pattern(it.next().unwrap())?;
+        let edge_pattern = build_edge_pattern(it.next().unwrap())?;
+        let source_node = build_node_pattern(it.next().unwrap())?;
+        vec.push(ast::Pattern::GraphEdge(ast::GraphEdge {
+          variable: edge_pattern.0,
+          source: source_node,
+          destination: destination_node,
+          directivity: ast::EdgeDirectivity::Directed,
+          label: edge_pattern.1,
+          properties: edge_pattern.2,
+        }));
+      }
       unknown_expression =>
       {
         return Err(crate::Error::UnxpectedExpression(

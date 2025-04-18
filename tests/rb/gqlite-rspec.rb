@@ -209,6 +209,11 @@ RSpec.describe "compare" do
     expect(compare({"type" => "node", "labels" => ["a", "b"], "properties" => {}}, {"type" => "node", "labels" => ["a", "b"], "properties" => {"k" => 1}})).to be false
     expect(compare({"type" => "node", "labels" => ["a", "b"], "properties" => {"k" => 1}}, {"type" => "node", "labels" => ["b", "a"], "properties" => {"k" => 1}})).to be true
   end
+  it "can compare nodes with keys" do
+    expect(compare({"key"=>71399689742590698717330075576608269690, "type" => "node", "labels" => ["a", "b"], "properties" => {}}, {"type" => "node", "labels" => ["b", "a"], "properties" => {}})).to be true
+  end
+  
+
 end
 
 RSpec.describe "compare tables" do

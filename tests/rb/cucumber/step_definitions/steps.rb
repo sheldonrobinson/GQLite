@@ -422,7 +422,7 @@ Then(/^a SyntaxError should be raised at compile time: VariableAlreadyBound$/) d
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
   # TODO: should not match for RunTime
-  expect(@exception.message).to match(/^(RunTime)|(CompileTime): (VariableAlreadyBound: Variable .* is already bound( at \(\d+, \d+\))?\.)|(UnexpectedSyntax: Expected token .* got .* at \(\d+, \d+\)\.)$/)
+  expect(@exception.message).to match(/^(RunTime)|(CompileTime): (VariableAlreadyBound: Variable '.*' is already bound( at \(\d+, \d+\))?\.)|(UnexpectedSyntax: Expected token .* got .* at \(\d+, \d+\)\.)$/)
 end
 
 Then(/^a SyntaxError should be raised at compile time: UndefinedVariable$/) do

@@ -1,7 +1,7 @@
 use std::borrow::{Borrow, BorrowMut};
 
 // use crate::graph::ToValue;
-use crate::interpreter::instructions::{Block, Instruction, Instructions};
+use crate::interpreter::instructions::{Block, CreateAction, Instruction, Instructions};
 use crate::interpreter::validator;
 use crate::parser::ast;
 use crate::Result;
@@ -97,11 +97,9 @@ fn compile_create_patterns(
   patterns: &Vec<crate::parser::ast::Pattern>,
 ) -> Result<Block>
 {
-  let mut instructions = Instructions::new();
-  let mut variables = Vec::<Option<String>>::new();
-
-  for c in patterns.iter()
-  {
+  let actions = patterns.iter().map(|c| {
+    let mut instructions = Instructions::new();
+    let mut variables = Vec::<Option<String>>::new();
     match c
     {
       crate::parser::ast::Pattern::GraphNode(node) =>
@@ -130,7 +128,13 @@ fn compile_create_patterns(
           )?;
           instructions.push(Instruction::Duplicate);
         }
-        if validator.check_existing_node(&edge.destination)?
+        if edge.source.variable.is_some()
+          && edge.destination.variable.is_some()
+          && edge.source.variable == edge.destination.variable
+        {
+          instructions.push(Instruction::Duplicate);
+        }
+        else if validator.check_existing_node(&edge.destination)?
         {
           instructions.push(Instruction::GetVariable {
             name: edge.destination.variable.as_ref().unwrap().to_owned(),
@@ -158,10 +162,13 @@ fn compile_create_patterns(
         });
       }
     }
-  }
+    Ok(CreateAction {
+      instructions,
+      variables,
+    })
+  });
   Ok(Block::Create {
-    instructions: instructions,
-    variables: variables,
+    actions: actions.collect::<Result<Vec<CreateAction>>>()?,
   })
 }
 

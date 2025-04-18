@@ -12,10 +12,10 @@ def compare(a,b)
       end
       return true
     when Hash
-      return false unless a.keys.sort == b.keys.sort
-      if a.keys.sort == ["labels", "properties", "type"] && a["type"] == "node"
-          return a["labels"].sort == b["labels"].sort && compare(a["properties"], b["properties"])
+      if (a.keys.sort == ["labels", "properties", "type"] || a.keys.sort == ["key", "labels", "properties", "type"]) && a["type"] == "node"
+        return a["labels"].sort == b["labels"].sort && compare(a["properties"], b["properties"])
       else
+        return false unless a.keys.sort == b.keys.sort
         a.keys.each do |k|
           return false unless compare(a[k], b[k])
         end
