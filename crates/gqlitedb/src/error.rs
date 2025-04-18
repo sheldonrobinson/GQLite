@@ -95,7 +95,7 @@ pub enum RunTimeError
   },
   /// Parameter is not known
   #[error(
-    "ExpectedEdge: Function '{function_name}' expected argument {index} of type {expected_type} but got {value}."
+    "InvalidArgument: Function '{function_name}' expected argument {index} of type {expected_type} but got {value}."
   )]
   InvalidArgument
   {

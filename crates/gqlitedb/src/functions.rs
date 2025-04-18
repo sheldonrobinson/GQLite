@@ -193,7 +193,7 @@ impl Manager
 }
 
 macro_rules! make_function_argument {
-  ($arguments: ident, $index: expr, $arg_type: ty) => {
+  ($function_name: ident, $arguments: ident, $index: expr, $arg_type: ty) => {
     $arguments[$index]
       .try_into_ref()
       .map_err(|_| RunTimeError::InvalidArgument {
@@ -206,20 +206,21 @@ macro_rules! make_function_argument {
 }
 
 macro_rules! make_function_call {
-  ($function: expr, $arguments: ident, $arg_type_0: ty, ) => {
+  ($function_name: ident, $function: expr, $arguments: ident, $arg_type_0: ty, ) => {
     $function($crate::functions::make_function_argument!(
+      $function_name,
       $arguments,
       0,
       $arg_type_0
     ))
   };
-  ($function: expr, $arguments: ident, $arg_type_0: ty, $arg_type_1: ty, ) => {
+  ($function_name: ident, $function: expr, $arguments: ident, $arg_type_0: ty, $arg_type_1: ty, ) => {
     $function(
-      $crate::functions::make_function_argument!($arguments, 0, $arg_type_0),
-      $crate::functions::make_function_argument!($arguments, 1, $arg_type_1),
+      $crate::functions::make_function_argument!($function_name, $arguments, 0, $arg_type_0),
+      $crate::functions::make_function_argument!($function_name, $arguments, 1, $arg_type_1),
     )
   };
-  ($function: expr, $arguments: ident, ) => {
+  ($function_name: ident, $function: expr, $arguments: ident, ) => {
     $function()
   };
 }
@@ -236,8 +237,8 @@ macro_rules! count_arguments {
   };
 }
 
-macro_rules! declare_function {
-  ($function_name: ident, $type_name: ty, $f_name: ident (  $( $arg_type: ty $(,)? )* ) -> $ret_type: ty ) => {
+macro_rules! declare_function_ {
+  ($function_name: ident, $type_name: ty, $f_name: ident (  $( $arg_type: ty $(,)? )* ) -> $ret_type: ty, $allow_null: expr ) => {
     impl $type_name
     {
       pub(super) fn new() -> (String, crate::functions::Function)
@@ -254,10 +255,14 @@ macro_rules! declare_function {
       {
         if arguments.len() == $crate::functions::count_arguments!($( $arg_type,)*)
         {
+          if !$allow_null && $crate::functions::count_arguments!($( $arg_type,)*) > 0 && arguments.iter().all(|x| x.is_null())
+          {
+            return Ok(crate::graph::Value::Invalid)
+          }
           #[allow(unused_imports)]
           use crate::graph::ValueTryIntoRef;
           Ok(
-            $crate::functions::make_function_call!(Self::$f_name, arguments, $( $arg_type,)*)
+            $crate::functions::make_function_call!($function_name, Self::$f_name, arguments, $( $arg_type,)*)
             .map(|r| -> graph::Value { r.into() })?,
           )
         }
@@ -280,6 +285,15 @@ macro_rules! declare_function {
       }
     }
   };
+}
+
+macro_rules! declare_function {
+  ($function_name: ident, $type_name: ty, $f_name: ident (  $( $arg_type: ty $(,)? )* ) -> $ret_type: ty ) => {
+    $crate::functions::declare_function_!($function_name, $type_name, $f_name (  $( $arg_type, )* ) -> $ret_type, false );
+  };
+  ($function_name: ident, $type_name: ty, $f_name: ident (  $( $arg_type: ty $(,)? )* ) -> $ret_type: ty, accept_null ) => {
+    $crate::functions::declare_function_!($function_name, $type_name, $f_name (  $( $arg_type, )* ) -> $ret_type, true );
+  };
   ($function_name: ident, $type_name: ty, custom_trait ) => {
     impl $type_name
     {
@@ -296,5 +310,6 @@ macro_rules! declare_function {
 
 pub(crate) use count_arguments;
 pub(crate) use declare_function;
+pub(crate) use declare_function_;
 pub(crate) use make_function_argument;
 pub(crate) use make_function_call;
