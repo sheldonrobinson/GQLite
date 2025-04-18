@@ -713,12 +713,14 @@ pub(crate) fn eval_program(
                   left_variable,
                   edge_variable,
                   right_variable,
+                  path_variable,
                   ..
                 } =>
                 {
                   new_row.insert_none(left_variable);
                   new_row.insert_none(edge_variable);
                   new_row.insert_none(right_variable);
+                  new_row.insert_none(path_variable);
                 }
               }
             }

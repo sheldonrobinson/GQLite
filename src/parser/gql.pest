@@ -23,7 +23,7 @@ reversed_edge_pattern   = { (")<-[" ~ pattern ~ "]-(") | (nothing ~ ")<--(") }
 undirected_edge_pattern = { (")-[" ~ pattern ~ "]-(") | (")<-[" ~ pattern ~ "]->(") | (nothing ~ ")--(") }
 edge_pattern            = { "(" ~ pattern ~ ((directed_edge_pattern | reversed_edge_pattern | undirected_edge_pattern) ~ pattern)+ ~ ")" }
 
-path_pattern = { ident ~ "=" ~ edge_pattern }
+path_pattern = { ident ~ "=" ~ "(" ~ pattern ~ (directed_edge_pattern | reversed_edge_pattern | undirected_edge_pattern) ~ pattern ~ ")" }
 
 node_or_edge_pattern         = _{ edge_pattern | node_pattern }
 node_or_edge_or_path_pattern = _{ edge_pattern | node_pattern | path_pattern }
