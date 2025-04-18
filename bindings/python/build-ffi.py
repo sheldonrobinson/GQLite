@@ -2,12 +2,19 @@ from cffi import FFI
 
 import sys
 
+
 def build(include_dirs, library_dirs, libraries):
 
-  ffibuilder = FFI()
-  ffibuilder.set_source("__c_gqlite", "#include <gqlite-c.h>", include_dirs = include_dirs, libraries=libraries, library_dirs=library_dirs)
-  ffibuilder.cdef(
-  """
+    ffibuilder = FFI()
+    ffibuilder.set_source(
+        "__c_gqlite",
+        "#include <gqlite-c.h>",
+        include_dirs=include_dirs,
+        libraries=libraries,
+        library_dirs=library_dirs,
+    )
+    ffibuilder.cdef(
+        """
 
   typedef struct gqlite_api_context* gqlite_api_context_t;
   typedef struct gqlite_connection* gqlite_connection_t;
@@ -27,12 +34,15 @@ def build(include_dirs, library_dirs, libraries):
   const char* gqlite_value_to_json(gqlite_api_context_t, gqlite_value_t);
   bool gqlite_value_is_valid(gqlite_api_context_t, gqlite_value_t);
 
-  """)
+  """
+    )
 
-  return ffibuilder
+    return ffibuilder
+
 
 def build_for_pip():
-  return build(["src/"], ["build"], ["gqlite"])
+    return build(["src/"], ["build"], ["gqlite"])
+
 
 if __name__ == "__main__":
-  build([sys.argv[1] + "/include"], ["."], ["gqlite"]).compile(verbose=True)
+    build([sys.argv[1] + "/include"], ["."], ["gqlitedb"]).compile(verbose=True)

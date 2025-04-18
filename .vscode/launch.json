@@ -33,7 +33,7 @@
             "name": "gqlite cmd (gdb)",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${env:LRS_PKG_ROOT}/host-build-debug/gqlite/cargo/build/x86_64-unknown-linux-gnu/debug/gqlite-cmd",
+            "program": "${env:LRS_PKG_ROOT}/host-build-debug/gqlite/cargo/build/x86_64-unknown-linux-gnu/debug/gqlitecli",
             "args": [],
             "stopAtEntry": false,
             "cwd": "/tmp",
