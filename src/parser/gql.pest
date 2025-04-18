@@ -3,9 +3,18 @@ ident = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* ~ "'"* }
 int = { ("+" | "-")? ~ ASCII_DIGIT+ }
 num = @{ int ~ ("." ~ ASCII_DIGIT*)? ~ (^"e" ~ int)? }
 
+// Query
+query = _{ SOI ~ statement* ~ EOI }
+
+// Statements
+statement = { create_node | create_edge | match_node | return_statement }
+
 create_node = { "CREATE" ~ "(" ~ ident ~ ")" }
 create_edge = { "CREATE" ~ "(" ~ ident ~ ")" ~ "-[" ~ ident ~ "]>" ~ "(" ~ ident ~ ")" }
+match_node = { "MATCH" ~ "(" ~ ident ~ ")" }
+return_statement = { "RETURN" ~ named_expression+ }
 
-statement = { create_node | create_edge }
+// Expression
 
-query = _{ SOI ~ statement* ~ EOI }
+named_expression = { expression | ident ~ expression }
+expression = _{ ident }

@@ -9,6 +9,12 @@ pub(crate) struct Store
   persy_store: persy::Persy,
 }
 
+#[derive(Default)]
+pub(crate) struct SelectQuery<'a, T: Iterator<Item = &'a crate::graph::Key>>
+{
+  keys: Option<T>,
+}
+
 impl Store
 {
   pub(crate) fn new<P: AsRef<std::path::Path>>(path: P) -> crate::Result<Store>
@@ -61,27 +67,47 @@ impl Store
     }
     Ok(())
   }
-  pub(crate) fn select_node<'a, T: Iterator<Item = &'a crate::graph::Key>>
-    (&self, transaction: &mut persy::Transaction, graph_name: impl Into<String>, keys_iter: T) -> crate::Result<Vec<crate::graph::Node>>
+  pub(crate) fn select_nodes<'a, T: Iterator<Item = &'a crate::graph::Key>>
+    (&self, transaction: &mut persy::Transaction, graph_name: impl Into<String>, query: SelectQuery<'a, T>) -> crate::Result<Vec<crate::graph::Node>>
   {
     let graph_name = graph_name.into();
     let graph_name_index = Self::graph_main_index_name(graph_name.clone());
-    let r = keys_iter.map(|key| {
-      let key: u128 = key.into();
-      if let Some(key) = transaction.one::<u128, persy::PersyId>(
-        graph_name_index.as_str(), &key)?
+
+    let nodes_raw = match query.keys {
+      Some(keys_iter) =>
       {
-        if let Some(v) = transaction.read(graph_name.clone(), key.borrow())?
-        {
-          Ok::<graph::Node, crate::Error>(ciborium::from_reader::<graph::Node, &[u8]>(&mut v.as_ref())?)
-        } else {
-          Err(crate::Error::UnknownNode)
-        }
-      } else {
-        Err(crate::Error::UnknownNode)
+        Box::new(
+          keys_iter.map(|key| {
+            let key: u128 = key.into();
+            if let Some(key) = transaction.one::<u128, persy::PersyId>(
+              graph_name_index.as_str(), &key)?
+            {
+              if let Some(v) = transaction.read(graph_name.clone(), key.borrow())?
+              {
+                Ok(v)
+                // Ok::<graph::Node, crate::Error>(ciborium::from_reader::<graph::Node, &[u8]>(&mut v.as_ref())?)
+              } else {
+                Err(crate::Error::UnknownNode)
+              }
+            } else {
+              Err(crate::Error::UnknownNode)
+            }
+          })
+        ) as Box<dyn Iterator<Item = crate::Result<Vec<u8>>>>
       }
-    });
-    let r = r.collect::<crate::Result<Vec<crate::graph::Node>>>()?;
+      None => {
+        Box::new(
+          transaction.scan(graph_name)?.map(|(_, content)| {
+            Ok::<Vec<u8>, crate::Error>(content)
+          })
+        ) as Box<dyn Iterator<Item = crate::Result<Vec<u8>>>>
+      }
+    };
+    let r =
+      nodes_raw.map(|v| {
+        Ok::<graph::Node, crate::Error>(ciborium::from_reader::<graph::Node, &[u8]>(&mut v?.as_ref())?)
+      }) 
+      .collect::<crate::Result<Vec<crate::graph::Node>>>()?;
     Ok(r)
   }
 }
@@ -100,7 +126,9 @@ impl<T> From<persy::PE<T>> for crate::Error
 
 #[cfg(test)]
 mod tests {
-  use crate::graph::ToValue;
+  use std::borrow::BorrowMut;
+
+use crate::graph::ToValue;
   #[test]
   fn test_add_nodes() {
     let nodes = [
@@ -112,9 +140,15 @@ mod tests {
     ];
     let store = super::Store::new(crate::tests::get_tmp_file().unwrap()).unwrap();
 
-    store.add_nodes("default", nodes.iter()).unwrap();
+    let tx = store.begin().unwrap();
+    store.add_nodes(tx.borrow_mut(), "default", nodes.iter()).unwrap();
+    tx.commit();
 
-    let selected_nodes = store.select_node("default", [nodes[0].key].iter()).unwrap();
+    let selected_nodes = store.select_nodes("default",
+    
+    crate::store::SelectQuery::<core::slice::Iter<'_, crate::graph::Key>>::default()
+
+     [nodes[0].key].iter()).unwrap();
 
     assert_eq!(nodes.len(), selected_nodes.len());
     assert_eq!(nodes[0], selected_nodes[0]);

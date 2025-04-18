@@ -20,6 +20,6 @@ impl Connection
     let q: String = query.into();
     let q = crate::parser::parse(q.as_str())?;
     let q = interpreter::compiler::compile(q)?;
-    return interpreter::executer::eval(self.store.borrow(), q)
+    return interpreter::evaluators::eval_program(self.store.borrow(), q)
   }
 }
