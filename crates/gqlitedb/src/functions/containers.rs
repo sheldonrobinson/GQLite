@@ -4,45 +4,22 @@ use crate::{error::RunTimeError, graph};
 #[derive(Debug, Default)]
 pub(super) struct Keys {}
 
-impl super::FunctionTrait for Keys
+impl Keys
 {
-  fn call(&self, arguments: Vec<graph::Value>) -> crate::Result<graph::Value>
+  fn call_impl(container: &graph::Value) -> crate::Result<Vec<crate::graph::Value>>
   {
-    let container = arguments
-      .first()
-      .ok_or_else(|| RunTimeError::InvalidNumberOfArguments {
-        function_name: "keys",
-        got: arguments.len(),
-        expected: 1,
-      })?;
-
     match container
     {
-      graph::Value::Object(obj) =>
-      {
-        Ok((obj.keys().map(|x| x.to_owned()).collect::<Vec<_>>()).into())
-      }
-      graph::Value::Node(n) => Ok(
-        (n.properties
-          .keys()
-          .map(|x| x.to_owned())
-          .collect::<Vec<_>>())
-        .into(),
-      ),
-      graph::Value::Edge(e) => Ok(
-        (e.properties
-          .keys()
-          .map(|x| x.to_owned())
-          .collect::<Vec<_>>())
-        .into(),
-      ),
+      graph::Value::Object(obj) => Ok(obj.keys().map(|x| x.to_owned().into()).collect()),
+      graph::Value::Node(n) => Ok(n.properties.keys().map(|x| x.to_owned().into()).collect()),
+      graph::Value::Edge(e) => Ok(e.properties.keys().map(|x| x.to_owned().into()).collect()),
       _ =>
       {
         return Err(
           RunTimeError::InvalidArgument {
-            function_name: "length",
+            function_name: "keys",
             index: 0,
-            expected_type: "array or map",
+            expected_type: "map, node or relationship",
             value: format!("{:?}", container),
           }
           .into(),
@@ -50,17 +27,9 @@ impl super::FunctionTrait for Keys
       }
     }
   }
-  fn validate_arguments(&self, _: Vec<ExpressionType>) -> crate::Result<ExpressionType>
-  {
-    Ok(ExpressionType::Variant)
-  }
-  fn is_deterministic(&self) -> bool
-  {
-    true
-  }
 }
 
-super::declare_function!(keys, Keys, custom_trait);
+super::declare_function!(keys, Keys, call_impl(crate::graph::Value) -> Vec<crate::graph::Value>, validate_args(ExpressionType::Map | ExpressionType::Node | ExpressionType::Edge | ExpressionType::Null));
 
 #[derive(Debug, Default)]
 pub(super) struct Range {}
