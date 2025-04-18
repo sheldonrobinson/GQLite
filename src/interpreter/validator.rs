@@ -221,7 +221,7 @@ impl Validator
             }
           }
           _ => Err(
-            CompileTimeError::VariableAlreadyBound {
+            CompileTimeError::VariableTypeConflict {
               name: var_name.to_owned(),
             }
             .into(),
