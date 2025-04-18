@@ -7,6 +7,12 @@ pub enum CompileTimeError
   /// Parse error
   #[error("ParseError: '{0}'")]
   ParseError(#[from] pest::error::Error<crate::parser::Rule>),
+  /// Variable is not defined
+  #[error("UndefinedVariable: Unknown variable '{name}'.")]
+  UndefinedVariable
+  {
+    name: String
+  },
   /// This error happens if the variable is already defined
   #[error("VariableAlreadyBound: Variable '{name}' is already bound.")]
   VariableAlreadyBound
@@ -18,12 +24,6 @@ pub enum CompileTimeError
     "VariableTypeConflict: Variable '{name}' is redefined as a variable of a different type."
   )]
   VariableTypeConflict
-  {
-    name: String
-  },
-  /// Variable is not defined
-  #[error("UndefinedVariable: Unknown variable '{name}'.")]
-  UndefinedVariable
   {
     name: String
   },
@@ -148,12 +148,6 @@ pub enum InternalError
   {
     context: &'static str, pair: String
   },
-  #[error("Unknown variable {variable} in {context}.")]
-  UnknownVariable
-  {
-    context: &'static str,
-    variable: String,
-  },
   #[error("Missing value from stack in {context}.")]
   MissingStackValue
   {
@@ -273,8 +267,6 @@ pub enum Error
   UnknownNode,
   #[error("Unknown edge")]
   UnknownEdge,
-  #[error("Unknown variable {0}")]
-  UnknownVariable(String),
   #[error("Empty stack {0}")]
   EmptyStack(String),
   #[error("Unknown error at {0}")]

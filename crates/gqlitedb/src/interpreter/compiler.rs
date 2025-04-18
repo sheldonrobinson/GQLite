@@ -19,19 +19,38 @@ use crate::{
 static FAKE_VARIABLE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 macro_rules! compile_binary_op {
-  ( $x:tt, $function_manager:tt, $instructions:tt, $aggregations:tt ) => {
-    compile_expression($function_manager, &$x.right, $instructions, $aggregations)?;
-    compile_expression($function_manager, &$x.left, $instructions, $aggregations)?;
+  ( $x:tt, $function_manager:tt, $validator:tt, $instructions:tt, $aggregations:tt ) => {
+    compile_expression(
+      $function_manager,
+      $validator,
+      &$x.right,
+      $instructions,
+      $aggregations,
+    )?;
+    compile_expression(
+      $function_manager,
+      $validator,
+      &$x.left,
+      $instructions,
+      $aggregations,
+    )?;
   };
 }
 
 fn compile_expression(
   function_manager: &functions::Manager,
+  validator: &mut validator::Validator,
   expression: &crate::parser::ast::Expression,
   instructions: &mut Instructions,
   aggregations: &mut Option<&mut HashMap<String, RWAggregation>>,
 ) -> Result<()>
 {
+  expression_analyser::ExpressionInfo::analyse(
+    validator.variables_ref(),
+    &function_manager,
+    &expression,
+  )?;
+
   let expr = match expression
   {
     ast::Expression::Value(value) => Instruction::Push {
@@ -59,6 +78,7 @@ fn compile_expression(
 
           compile_expression(
             function_manager,
+            validator,
             function_call
               .arguments
               .get(0)
@@ -70,6 +90,7 @@ fn compile_expression(
           {
             compile_expression(
               function_manager,
+              validator,
               init_arg,
               &mut init_instructions,
               aggregations,
@@ -93,7 +114,7 @@ fn compile_expression(
         {
           for v in function_call.arguments.iter()
           {
-            compile_expression(function_manager, v, instructions, aggregations)?;
+            compile_expression(function_manager, validator, v, instructions, aggregations)?;
           }
 
           let function = function_manager.get_function::<CompileTimeError>(&function_call.name)?;
@@ -108,7 +129,7 @@ fn compile_expression(
     {
       for v in array.array.iter()
       {
-        compile_expression(function_manager, v, instructions, aggregations)?;
+        compile_expression(function_manager, validator, v, instructions, aggregations)?;
       }
       Instruction::CreateArray {
         length: array.array.len(),
@@ -119,7 +140,7 @@ fn compile_expression(
       let mut keys = Vec::new();
       for (k, v) in map.map.iter()
       {
-        compile_expression(function_manager, v, instructions, aggregations)?;
+        compile_expression(function_manager, validator, v, instructions, aggregations)?;
         keys.push(k.to_owned());
       }
       Instruction::CreateMap { keys: keys }
@@ -128,6 +149,7 @@ fn compile_expression(
     {
       compile_expression(
         function_manager,
+        validator,
         &member_access.left,
         instructions,
         aggregations,
@@ -140,12 +162,14 @@ fn compile_expression(
     {
       compile_expression(
         function_manager,
+        validator,
         &index_access.left,
         instructions,
         aggregations,
       )?;
       compile_expression(
         function_manager,
+        validator,
         &index_access.index,
         instructions,
         aggregations,
@@ -156,13 +180,20 @@ fn compile_expression(
     {
       compile_expression(
         function_manager,
+        validator,
         &index_access.left,
         instructions,
         aggregations,
       )?;
       let start = if let Some(start) = &index_access.start
       {
-        compile_expression(function_manager, start, instructions, aggregations)?;
+        compile_expression(
+          function_manager,
+          validator,
+          start,
+          instructions,
+          aggregations,
+        )?;
         true
       }
       else
@@ -171,7 +202,7 @@ fn compile_expression(
       };
       let end = if let Some(end) = &index_access.end
       {
-        compile_expression(function_manager, end, instructions, aggregations)?;
+        compile_expression(function_manager, validator, end, instructions, aggregations)?;
         true
       }
       else
@@ -183,17 +214,35 @@ fn compile_expression(
     }
     ast::Expression::LogicalAnd(logical_and) =>
     {
-      compile_binary_op!(logical_and, function_manager, instructions, aggregations);
+      compile_binary_op!(
+        logical_and,
+        function_manager,
+        validator,
+        instructions,
+        aggregations
+      );
       Instruction::AndBinaryOperator
     }
     ast::Expression::LogicalOr(logical_or) =>
     {
-      compile_binary_op!(logical_or, function_manager, instructions, aggregations);
+      compile_binary_op!(
+        logical_or,
+        function_manager,
+        validator,
+        instructions,
+        aggregations
+      );
       Instruction::OrBinaryOperator
     }
     ast::Expression::LogicalXor(logical_xor) =>
     {
-      compile_binary_op!(logical_xor, function_manager, instructions, aggregations);
+      compile_binary_op!(
+        logical_xor,
+        function_manager,
+        validator,
+        instructions,
+        aggregations
+      );
       Instruction::XorBinaryOperator
     }
     ast::Expression::RelationalEqual(relational_equal) =>
@@ -201,6 +250,7 @@ fn compile_expression(
       compile_binary_op!(
         relational_equal,
         function_manager,
+        validator,
         instructions,
         aggregations
       );
@@ -211,6 +261,7 @@ fn compile_expression(
       compile_binary_op!(
         relational_different,
         function_manager,
+        validator,
         instructions,
         aggregations
       );
@@ -221,6 +272,7 @@ fn compile_expression(
       compile_binary_op!(
         relational_inferior,
         function_manager,
+        validator,
         instructions,
         aggregations
       );
@@ -231,6 +283,7 @@ fn compile_expression(
       compile_binary_op!(
         relational_superior,
         function_manager,
+        validator,
         instructions,
         aggregations
       );
@@ -241,6 +294,7 @@ fn compile_expression(
       compile_binary_op!(
         relational_inferior_equal,
         function_manager,
+        validator,
         instructions,
         aggregations
       );
@@ -251,6 +305,7 @@ fn compile_expression(
       compile_binary_op!(
         relational_superior_equal,
         function_manager,
+        validator,
         instructions,
         aggregations
       );
@@ -258,7 +313,13 @@ fn compile_expression(
     }
     ast::Expression::RelationalIn(relational_in) =>
     {
-      compile_binary_op!(relational_in, function_manager, instructions, aggregations);
+      compile_binary_op!(
+        relational_in,
+        function_manager,
+        validator,
+        instructions,
+        aggregations
+      );
       Instruction::InBinaryOperator
     }
     ast::Expression::RelationalNotIn(relational_not_in) =>
@@ -266,6 +327,7 @@ fn compile_expression(
       compile_binary_op!(
         relational_not_in,
         function_manager,
+        validator,
         instructions,
         aggregations
       );
@@ -274,33 +336,64 @@ fn compile_expression(
 
     ast::Expression::Addition(addition) =>
     {
-      compile_binary_op!(addition, function_manager, instructions, aggregations);
+      compile_binary_op!(
+        addition,
+        function_manager,
+        validator,
+        instructions,
+        aggregations
+      );
       Instruction::AdditionBinaryOperator
     }
     ast::Expression::Substraction(substraction) =>
     {
-      compile_binary_op!(substraction, function_manager, instructions, aggregations);
+      compile_binary_op!(
+        substraction,
+        function_manager,
+        validator,
+        instructions,
+        aggregations
+      );
       Instruction::SubstractionBinaryOperator
     }
     ast::Expression::Multiplication(multiplication) =>
     {
-      compile_binary_op!(multiplication, function_manager, instructions, aggregations);
+      compile_binary_op!(
+        multiplication,
+        function_manager,
+        validator,
+        instructions,
+        aggregations
+      );
       Instruction::MultiplicationBinaryOperator
     }
     ast::Expression::Division(division) =>
     {
-      compile_binary_op!(division, function_manager, instructions, aggregations);
+      compile_binary_op!(
+        division,
+        function_manager,
+        validator,
+        instructions,
+        aggregations
+      );
       Instruction::DivisionBinaryOperator
     }
     ast::Expression::Modulo(modulo) =>
     {
-      compile_binary_op!(modulo, function_manager, instructions, aggregations);
+      compile_binary_op!(
+        modulo,
+        function_manager,
+        validator,
+        instructions,
+        aggregations
+      );
       Instruction::ModuloBinaryOperator
     }
     ast::Expression::Negation(logical_negation) =>
     {
       compile_expression(
         function_manager,
+        validator,
         &logical_negation.value,
         instructions,
         aggregations,
@@ -311,6 +404,7 @@ fn compile_expression(
     {
       compile_expression(
         function_manager,
+        validator,
         &logical_negation.value,
         instructions,
         aggregations,
@@ -319,12 +413,24 @@ fn compile_expression(
     }
     ast::Expression::IsNull(is_null) =>
     {
-      compile_expression(function_manager, &is_null.value, instructions, aggregations)?;
+      compile_expression(
+        function_manager,
+        validator,
+        &is_null.value,
+        instructions,
+        aggregations,
+      )?;
       Instruction::IsNullUnaryOperator
     }
     ast::Expression::IsNotNull(is_null) =>
     {
-      compile_expression(function_manager, &is_null.value, instructions, aggregations)?;
+      compile_expression(
+        function_manager,
+        validator,
+        &is_null.value,
+        instructions,
+        aggregations,
+      )?;
       instructions.push(Instruction::IsNullUnaryOperator);
       Instruction::NotUnaryOperator
     }
@@ -335,13 +441,14 @@ fn compile_expression(
 
 fn compile_optional_expression(
   function_manager: &functions::Manager,
+  validator: &mut validator::Validator,
   properties: &Option<ast::Expression>,
   instructions: &mut Instructions,
 ) -> Result<()>
 {
   if let Some(expr) = properties
   {
-    compile_expression(function_manager, expr, instructions, &mut None)?;
+    compile_expression(function_manager, validator, expr, instructions, &mut None)?;
   }
   else
   {
@@ -384,7 +491,7 @@ fn compile_create_node(
   validator.check_unexisting_variable(&node.variable)?;
   validator.validate_node(&node)?;
   variables.push(node.variable.to_owned());
-  compile_optional_expression(function_manager, &node.properties, instructions)?;
+  compile_optional_expression(function_manager, validator, &node.properties, instructions)?;
   let mut labels = Default::default();
   compile_labels_expression(&mut labels, &node.labels)?;
   instructions.push(Instruction::CreateNodeLiteral { labels });
@@ -559,7 +666,12 @@ fn compile_create_patterns(
         }
         validator.validate_edge(edge)?;
         variables.push(edge.variable.to_owned());
-        compile_optional_expression(function_manager, &edge.properties, &mut instructions)?;
+        compile_optional_expression(
+          function_manager,
+          validator,
+          &edge.properties,
+          &mut instructions,
+        )?;
         if !edge.labels.is_string()
         {
           Err(CompileTimeError::NoSingleRelationshipType)?;
@@ -587,13 +699,14 @@ fn compile_create_patterns(
 
 fn compile_match_node(
   function_manager: &functions::Manager,
+  validator: &mut validator::Validator,
   node: &crate::parser::ast::NodePattern,
   instructions: &mut Instructions,
   filter: &mut Instructions,
   get_node_function_name: Option<&'static str>,
 ) -> Result<()>
 {
-  compile_optional_expression(function_manager, &node.properties, instructions)?;
+  compile_optional_expression(function_manager, validator, &node.properties, instructions)?;
   let mut labels = Default::default();
   if node.labels.is_all_inclusive()
   {
@@ -651,6 +764,7 @@ fn compile_match_edge(
     source_variable = edge.source.variable.to_owned();
     compile_match_node(
       function_manager,
+      validator,
       &edge.source,
       &mut instructions,
       &mut filter,
@@ -670,6 +784,7 @@ fn compile_match_edge(
     destination_variable = edge.destination.variable.to_owned();
     compile_match_node(
       function_manager,
+      validator,
       &edge.destination,
       &mut instructions,
       &mut filter,
@@ -694,7 +809,12 @@ fn compile_match_edge(
   else
   {
     validator.validate_edge(edge)?;
-    compile_optional_expression(function_manager, &edge.properties, &mut instructions)?;
+    compile_optional_expression(
+      function_manager,
+      validator,
+      &edge.properties,
+      &mut instructions,
+    )?;
     // Handle labels
     let mut labels = Default::default();
     if edge.labels.is_all_inclusive()
@@ -781,6 +901,7 @@ fn compile_return_with(
     let mut aggregations = HashMap::<String, RWAggregation>::new();
     compile_expression(
       function_manager,
+      validator,
       &e.expression,
       &mut instructions,
       &mut Some(&mut aggregations),
@@ -811,8 +932,12 @@ fn compile_return_with(
       .into(),
     );
   }
-  validator.set_variables(val_variables);
+  // TODO this is ugly, there need to be a better way to have two sets of variables for validation
+  let mut variables_tmp = validator.variables_ref().to_owned();
+  variables_tmp.extend(val_variables.to_owned().into_iter());
+  validator.set_variables(variables_tmp);
   let modifiers = compile_modifiers(function_manager, validator, &modifiers)?;
+  validator.set_variables(val_variables);
 
   Ok((variables, modifiers))
 }
@@ -834,7 +959,14 @@ fn compile_match_patterns(
       let mut instructions = Instructions::new();
       validator.validate_node(node)?;
       let mut filter = Instructions::new();
-      compile_match_node(function_manager, node, &mut instructions, &mut filter, None)?;
+      compile_match_node(
+        function_manager,
+        validator,
+        node,
+        &mut instructions,
+        &mut filter,
+        None,
+      )?;
       Ok(BlockMatch::MatchNode {
         instructions: instructions,
         variable: node.variable.to_owned(),
@@ -871,7 +1003,13 @@ fn compile_match_patterns(
     {
       return Err(CompileTimeError::InvalidAggregation.into());
     }
-    compile_expression(function_manager, where_expression, &mut filter, &mut None)?;
+    compile_expression(
+      function_manager,
+      validator,
+      where_expression,
+      &mut filter,
+      &mut None,
+    )?;
   }
   Ok(Block::BlockMatch {
     blocks,
@@ -915,7 +1053,13 @@ pub(crate) fn compile_modifiers(
     .map(|x| {
       check_for_constant_integer_expression(function_manager, validator, x)?;
       let mut instructions = Instructions::new();
-      compile_expression(function_manager, &x, &mut instructions, &mut None)?;
+      compile_expression(
+        function_manager,
+        validator,
+        &x,
+        &mut instructions,
+        &mut None,
+      )?;
       Ok::<_, error::Error>(instructions)
     })
     .transpose()?;
@@ -925,7 +1069,13 @@ pub(crate) fn compile_modifiers(
     .map(|x| {
       check_for_constant_integer_expression(function_manager, validator, x)?;
       let mut instructions = Instructions::new();
-      compile_expression(function_manager, &x, &mut instructions, &mut None)?;
+      compile_expression(
+        function_manager,
+        validator,
+        &x,
+        &mut instructions,
+        &mut None,
+      )?;
       Ok::<_, error::Error>(instructions)
     })
     .transpose()?;
@@ -939,6 +1089,7 @@ pub(crate) fn compile_modifiers(
 
           compile_expression(
             function_manager,
+            validator,
             &x.expression,
             &mut instructions,
             &mut None,
@@ -1001,7 +1152,13 @@ pub(crate) fn compile(
           let mut instructions = Instructions::new();
           for e in call.arguments.iter().rev()
           {
-            compile_expression(function_manager, e, &mut instructions, &mut None)?;
+            compile_expression(
+              function_manager,
+              &mut validator,
+              e,
+              &mut instructions,
+              &mut None,
+            )?;
           }
           Ok(Block::Call {
             arguments: instructions,
@@ -1027,6 +1184,7 @@ pub(crate) fn compile(
           let mut instructions = Instructions::new();
           compile_expression(
             function_manager,
+            &mut validator,
             &unwind.expression,
             &mut instructions,
             &mut None,
@@ -1056,10 +1214,13 @@ pub(crate) fn compile(
               {
                 expression_analyser::ExpressionType::Node
                 | expression_analyser::ExpressionType::Edge
-                | expression_analyser::ExpressionType::Variant =>
-                {
-                  compile_expression(function_manager, &expr, &mut instructions, &mut None)?
-                }
+                | expression_analyser::ExpressionType::Variant => compile_expression(
+                  function_manager,
+                  &mut validator,
+                  &expr,
+                  &mut instructions,
+                  &mut None,
+                )?,
                 _ => Err(CompileTimeError::InvalidDelete)?,
               }
               Ok(instructions)
@@ -1078,6 +1239,7 @@ pub(crate) fn compile(
                 let mut instructions = Instructions::new();
                 compile_expression(
                   function_manager,
+                  &mut validator,
                   &update_property.expression,
                   &mut instructions,
                   &mut None,
