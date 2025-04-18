@@ -1,8 +1,10 @@
+use std::error;
+
 use ast::Expression;
 use pest::Parser;
 use pest_derive::Parser;
 
-use crate::{graph, Result};
+use crate::{error::CompileTimeError, graph, Result};
 
 pub(crate) mod ast;
 
@@ -264,6 +266,12 @@ fn build_pattern(mut iterator: pest::iterators::Pairs<Rule>) -> Result<Vec<ast::
           label: edge_pattern.1,
           properties: edge_pattern.2,
         }));
+      }
+      Rule::undirected_edge_pattern =>
+      {
+        Err(CompileTimeError::RequiresDirectedRelationship {
+          context: "creation",
+        })?;
       }
       unknown_expression =>
       {
