@@ -159,6 +159,8 @@ pub(crate) enum Expression
 
   RelationalDifferent(Box<RelationalDifferent>),
   RelationalIn(Box<RelationalIn>),
+
+  LogicalNegation(Box<LogicalNegation>),
 }
 
 // Order By Expression
@@ -442,12 +444,20 @@ create_binary_op! {Modulo}
 #[macro_export]
 macro_rules! create_unary_op {
   ( $x:tt ) => {
-    #[derive(Debug)]
+    #[derive(Debug, Clone, PartialEq)]
     pub(crate) struct $x
     {
-      value: Expression,
+      pub(crate) value: Expression,
     }
   };
+}
+
+impl Into<Expression> for LogicalNegation
+{
+  fn into(self) -> Expression
+  {
+    Expression::LogicalNegation(Box::new(self))
+  }
 }
 
 create_unary_op! {LogicalNegation}

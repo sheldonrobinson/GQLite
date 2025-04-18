@@ -75,6 +75,7 @@ impl Manager
         edge::Type::new(),
         value::Coalesce::new(),
         value::HasLabel::new(),
+        value::HasLabels::new(),
       ])),
     }
   }

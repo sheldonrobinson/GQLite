@@ -78,6 +78,11 @@ fn compile_expression(
       compile_expression(function_manager, &relational_in.left, instructions)?;
       Instruction::InBinaryOperator
     }
+    ast::Expression::LogicalNegation(logical_negation) =>
+    {
+      compile_expression(function_manager, &logical_negation.value, instructions)?;
+      Instruction::NotUnaryOperator
+    }
   };
   instructions.push(expr);
   Ok(())
