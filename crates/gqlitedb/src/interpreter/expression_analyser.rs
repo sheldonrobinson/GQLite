@@ -70,6 +70,19 @@ mod validators
       _ => Err(error::CompileTimeError::InvalidArgumentType.into()),
     }
   }
+  pub(super) fn map_or_edge_or_node_or_null(x: ExpressionInfo) -> Result<ExpressionInfo>
+  {
+    match x.expression_type
+    {
+      ExpressionType::Map
+      | ExpressionType::Edge
+      | ExpressionType::Node
+      | ExpressionType::Variant
+      | ExpressionType::Null => Ok(x),
+      _ => Err(error::CompileTimeError::InvalidArgumentType.into()),
+    }
+  }
+
   pub(super) fn integer_or_null(x: ExpressionInfo) -> Result<ExpressionInfo>
   {
     match x.expression_type
@@ -434,7 +447,11 @@ impl ExpressionInfo
       )),
       ast::Expression::MemberAccess(ma) => Ok(Self::new_type(
         ExpressionType::Variant,
-        [Self::analyse(variables, function_manager, &ma.left)?],
+        [validators::map_or_edge_or_node_or_null(Self::analyse(
+          variables,
+          function_manager,
+          &ma.left,
+        )?)?],
       )),
       ast::Expression::IndexAccess(ia) => Ok({
         let left = Self::analyse(variables, function_manager, &ia.left)?;
