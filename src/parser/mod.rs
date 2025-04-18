@@ -291,6 +291,26 @@ fn build_pattern(
           })?;
         }
       }
+      Rule::path_pattern =>
+      {
+        let mut it = pair.into_inner();
+        let variable = it.next().unwrap().as_str().to_string();
+        let mut it = it.next().unwrap().into_inner();
+        let source_node = build_node_pattern(it.next().unwrap())?;
+        let edge_pattern = build_edge_pattern(it.next().unwrap())?;
+        let destination_node = build_node_pattern(it.next().unwrap())?;
+        vec.push(ast::Pattern::GraphPath(ast::GraphPath {
+          variable,
+          edge: ast::GraphEdge {
+            variable: edge_pattern.0,
+            source: source_node,
+            destination: destination_node,
+            directivity: ast::EdgeDirectivity::Directed,
+            labels: edge_pattern.1,
+            properties: edge_pattern.2,
+          },
+        }));
+      }
       unknown_expression =>
       {
         return Err(crate::Error::UnxpectedExpression(
@@ -411,7 +431,7 @@ pub(crate) fn parse(input: &str) -> Result<ast::Statements>
   println!("\n\n\n{:?}\n\n\n", input);
   let pairs = GQLParser::parse(Rule::query, input)?;
   let mut stmts = ast::Statements::new();
-  println!("{:?}", pairs);
+  println!("pairs = {:#?}", pairs);
   for pair in pairs
   {
     match pair.as_rule()
@@ -431,6 +451,6 @@ pub(crate) fn parse(input: &str) -> Result<ast::Statements>
       }
     }
   }
-  println!("{:?}", &stmts);
+  println!("statements = {:#?}", &stmts);
   Ok(stmts)
 }

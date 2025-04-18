@@ -257,6 +257,7 @@ pub(crate) fn eval_program(
         left_variable,
         edge_variable,
         right_variable,
+        path_variable,
       } =>
       {
         let mut output_table = crate::value_table::ValueTable::new();
@@ -318,6 +319,13 @@ pub(crate) fn eval_program(
             if let Some(edge_variable) = edge_variable.to_owned()
             {
               new_row.insert(edge_variable, crate::graph::Value::Edge(edge.to_owned()));
+            }
+            if let Some(path_variable) = path_variable.to_owned()
+            {
+              new_row.insert(
+                path_variable,
+                crate::graph::Value::Path(edge.to_owned().into()),
+              );
             }
             output_table.add_row(new_row);
           }

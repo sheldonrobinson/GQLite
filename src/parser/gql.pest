@@ -17,7 +17,10 @@ node_pattern = { "(" ~ pattern ~ ")" }
 edge_pattern = { "(" ~ pattern ~ ")-[" ~ pattern ~ "]->(" ~ pattern ~ ")" }
 reverse_edge_pattern = { "(" ~ pattern ~ ")<-[" ~ pattern ~ "]-(" ~ pattern ~ ")" }
 undirected_edge_pattern = { ( "(" ~ pattern ~ ")-[" ~ pattern ~ "]-(" ~ pattern ~ ")" ) | ( "(" ~ pattern ~ ")<-[" ~ pattern ~ "]->(" ~ pattern ~ ")" ) }
+edge_patterns = _{ edge_pattern | reverse_edge_pattern | undirected_edge_pattern }
+path_pattern = { ident ~ "=" ~ edge_patterns }
 node_or_edge_pattern = _{ edge_pattern | reverse_edge_pattern | undirected_edge_pattern | node_pattern  }
+node_or_edge_or_path_pattern = _{ edge_pattern | reverse_edge_pattern | undirected_edge_pattern | node_pattern | path_pattern }
 
 // Statements
 statement = { create_statement | match_statement | return_statement | call_statement | with_statement | unwind_statement }
@@ -25,7 +28,7 @@ statement = { create_statement | match_statement | return_statement | call_state
 star = { "*" }
 
 create_statement = { "CREATE" ~ node_or_edge_pattern ~ ( "," ~ node_or_edge_pattern )* }
-match_statement = { "MATCH" ~ node_or_edge_pattern ~ ( "," ~ node_or_edge_pattern )* }
+match_statement = { "MATCH" ~ node_or_edge_or_path_pattern ~ ( "," ~ node_or_edge_or_path_pattern )* }
 return_statement = { "RETURN" ~ named_expression ~ ("," ~ named_expression )* }
 call_statement = { "CALL" ~ function_name ~ "()" }
 with_statement = { "WITH" ~ (star | named_expression) ~ ("," ~ named_expression )* }

@@ -17,6 +17,7 @@ pub enum Value
   Object(ValueObject),
   Node(Node),
   Edge(Edge),
+  Path(Path),
 }
 
 pub type ValueObject = std::collections::HashMap<String, Value>;
@@ -122,6 +123,7 @@ impl std::fmt::Display for Value
       Value::Object(o) => value_object_display(o, f),
       Value::Node(n) => write!(f, "{}", n),
       Value::Edge(e) => write!(f, "{}", e),
+      Value::Path(p) => write!(f, "{}", p),
     }
   }
 }
@@ -204,7 +206,14 @@ impl std::fmt::Display for Node
 {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
   {
-    write!(f, "({} ", self.labels.join(":"))?;
+    if self.labels.is_empty()
+    {
+      write!(f, "(");
+    }
+    else
+    {
+      write!(f, "(:{} ", self.labels.join(":"))?;
+    }
     value_object_display(self.properties.borrow(), f)?;
     write!(f, ")")
   }
@@ -230,6 +239,41 @@ impl std::fmt::Display for Edge
     write!(f, "[:{} ", self.labels.join(":"))?;
     value_object_display(self.properties.borrow(), f)?;
     write!(f, "])")
+  }
+}
+
+impl Into<Path> for Edge
+{
+  fn into(self) -> Path
+  {
+    Path {
+      key: self.key,
+      source: self.source,
+      destination: self.destination,
+      labels: self.labels,
+      properties: self.properties,
+    }
+  }
+}
+
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq, Clone)]
+#[serde(tag = "type", rename = "path")]
+pub struct Path
+{
+  pub key: Key,
+  pub source: Node,
+  pub destination: Node,
+  pub labels: Vec<String>,
+  pub properties: ValueObject,
+}
+
+impl std::fmt::Display for Path
+{
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
+  {
+    write!(f, "{}-[:{} ", self.source, self.labels.join(":"))?;
+    value_object_display(self.properties.borrow(), f)?;
+    write!(f, "])->{}", self.destination)
   }
 }
 

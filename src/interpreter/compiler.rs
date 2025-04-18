@@ -1,3 +1,4 @@
+use crate::error::InternalError;
 // use crate::graph::ToValue;
 use crate::interpreter::instructions::{Block, CreateAction, Instruction, Instructions};
 use crate::interpreter::validator;
@@ -118,7 +119,6 @@ fn compile_create_patterns(
       }
       crate::parser::ast::Pattern::GraphEdge(edge) =>
       {
-        println!("{:?}", validator);
         if validator.check_existing_node(&edge.source)?
         {
           instructions.push(Instruction::GetVariable {
@@ -160,6 +160,15 @@ fn compile_create_patterns(
           labels: edge.labels.to_owned(),
         });
       }
+      crate::parser::ast::Pattern::GraphPath(_) =>
+      {
+        return Err(
+          InternalError::PathPatternInCreateExpression {
+            context: "compiler/compile_create_patterns",
+          }
+          .into(),
+        );
+      }
     }
     Ok(CreateAction {
       instructions,
@@ -177,6 +186,51 @@ fn compile_match_node(node: &crate::parser::ast::GraphNode, instructions: &mut I
   instructions.push(Instruction::CreateNodeLiteral {
     labels: node.labels.to_owned(),
   });
+}
+
+fn compile_match_edge(
+  validator: &mut validator::Validator,
+  path_variable: Option<String>,
+  edge: &crate::parser::ast::GraphEdge,
+) -> Result<Block>
+{
+  let mut instructions = Instructions::new();
+  validator.declare_edge_variable(edge)?;
+  let mut source_variable = None;
+  if validator.check_existing_node(&edge.source)?
+  {
+    instructions.push(Instruction::GetVariable {
+      name: edge.source.variable.as_ref().unwrap().to_owned(),
+    });
+  }
+  else
+  {
+    source_variable = edge.source.variable.to_owned();
+    compile_match_node(&edge.source, &mut instructions);
+  }
+  let mut destination_variable = None;
+  if validator.check_existing_node(&edge.destination)?
+  {
+    instructions.push(Instruction::GetVariable {
+      name: edge.destination.variable.as_ref().unwrap().to_owned(),
+    });
+  }
+  else
+  {
+    destination_variable = edge.destination.variable.to_owned();
+    compile_match_node(&edge.destination, &mut instructions);
+  }
+  compile_optional_expression(&edge.properties, &mut instructions);
+  instructions.push(Instruction::CreateEdgeLiteral {
+    labels: edge.labels.to_owned(),
+  });
+  Ok(Block::MatchEdge {
+    instructions: instructions,
+    left_variable: source_variable,
+    edge_variable: edge.variable.to_owned(),
+    right_variable: destination_variable,
+    path_variable: path_variable,
+  })
 }
 
 fn compile_match_patterns(
@@ -198,44 +252,10 @@ fn compile_match_patterns(
           variable: node.variable.to_owned(),
         })
       }
-      crate::parser::ast::Pattern::GraphEdge(edge) =>
+      crate::parser::ast::Pattern::GraphEdge(edge) => compile_match_edge(validator, None, &edge),
+      crate::parser::ast::Pattern::GraphPath(path) =>
       {
-        let mut instructions = Instructions::new();
-        validator.declare_edge_variable(edge)?;
-        let mut source_variable = None;
-        if validator.check_existing_node(&edge.source)?
-        {
-          instructions.push(Instruction::GetVariable {
-            name: edge.source.variable.as_ref().unwrap().to_owned(),
-          });
-        }
-        else
-        {
-          source_variable = edge.source.variable.to_owned();
-          compile_match_node(&edge.source, &mut instructions);
-        }
-        let mut destination_variable = None;
-        if validator.check_existing_node(&edge.destination)?
-        {
-          instructions.push(Instruction::GetVariable {
-            name: edge.destination.variable.as_ref().unwrap().to_owned(),
-          });
-        }
-        else
-        {
-          destination_variable = edge.destination.variable.to_owned();
-          compile_match_node(&edge.destination, &mut instructions);
-        }
-        compile_optional_expression(&edge.properties, &mut instructions);
-        instructions.push(Instruction::CreateEdgeLiteral {
-          labels: edge.labels.to_owned(),
-        });
-        Ok(Block::MatchEdge {
-          instructions: instructions,
-          left_variable: source_variable,
-          edge_variable: edge.variable.to_owned(),
-          right_variable: destination_variable,
-        })
+        compile_match_edge(validator, Some(path.variable.to_owned()), &path.edge)
       }
     })
     .collect::<Result<Vec<Block>>>()?;
@@ -348,6 +368,6 @@ pub(crate) fn compile(statements: crate::parser::ast::Statements) -> Result<supe
     .flatten();
   let program = program.collect::<super::Program>();
   statements_err?;
-  println!("program = {:?}", program);
+  println!("program = {:#?}", program);
   Ok(program)
 }

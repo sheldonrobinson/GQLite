@@ -134,15 +134,26 @@ IgnoredScenario = [
   "[24] Fail when creating a relationship using undefined variable in pattern",
   # Variable lenght not supported
   "[22] Fail when creating a variable-length relationship",
-  # Path assignment is not implemented yet
-  "[4] Forwarding a path variable",
-  "[14] Fail when filtering path with property predicate",
-  "[8] `labels()` failing on a path",
-  "[5] Fail for `size()` on paths",
-  "[3] Delete relationship with bidirectional matching",
-  "[3] Comparing across types yields null, except numbers",
-  "[14] Direction of traversed relationship is not significant for path equality, simple",
-  "[12] Aggregation of named paths",
+  # # Path assignment is not implemented yet
+  # "[4] Forwarding a path variable",
+  # "[14] Fail when filtering path with property predicate",
+  # "[8] `labels()` failing on a path",
+  # "[5] Fail for `size()` on paths",
+  # "[3] Delete relationship with bidirectional matching",
+  # "[3] Comparing across types yields null, except numbers",
+  # "[14] Direction of traversed relationship is not significant for path equality, simple",
+  # "[12] Aggregation of named paths",
+  # # p = ()-[]->() not supported (named path)
+  # "[12] Filter path with path length predicate on multi variables with one binding",
+  # "[13] Filter path with false path length predicate on multi variables with one binding",
+  # "[16] Optionally matching named paths - null result",
+  # "[17] Optionally matching named paths - existing result",
+  # "[18] Named paths inside optional matches with node predicates",
+  # "[19] Optionally matching named paths with single and variable length patterns",
+  # "[9] `labels()` failing on invalid arguments",
+  # "[6] `type()` failing on invalid arguments",
+  # # paths are not supported in where
+  # "[2] Join with disjunctive multi-part predicates including patterns",
   # Path assignment and variable length path are not implemented
   "[8] Fail when a path has the same variable in a preceding MATCH",
   "[9] Fail when a relationship has the same variable in the same pattern",
@@ -156,15 +167,6 @@ IgnoredScenario = [
   "[14] Variable length optional relationships with length predicates",
   "[15] Variable length patterns and nulls",
   "[20] Variable length optional relationships with bound nodes, no matches",
-  # p = ()-[]->() not supported (named path)
-  "[12] Filter path with path length predicate on multi variables with one binding",
-  "[13] Filter path with false path length predicate on multi variables with one binding",
-  "[16] Optionally matching named paths - null result",
-  "[17] Optionally matching named paths - existing result",
-  "[18] Named paths inside optional matches with node predicates",
-  "[19] Optionally matching named paths with single and variable length patterns",
-  "[9] `labels()` failing on invalid arguments",
-  "[6] `type()` failing on invalid arguments",
   # WITH not eliminating conflicts
   "[7] Matching twice with conflicting relationship types on same relationship",
   "[24] Matching twice with duplicate relationship types on same relationship",
@@ -182,8 +184,6 @@ IgnoredScenario = [
   "[29] Fail when re-using a relationship in the same pattern",
   # WITH allow to reuse variable even with considering edge isomorphism, need a better way to handle that, might have to be tracked by the parser
   "[3] Forwarding a relationship variable",
-  # paths are not supported in where
-  "[2] Join with disjunctive multi-part predicates including patterns",
   # Unreported error
   "[5] Fail when not aliasing expressions in WITH",
   # aggregation (or function call) fail to access a variable when used in a WITH statement (such as ´count(you.age)´) https://gitlab.com/GQLite/GQLite/-/issues/16

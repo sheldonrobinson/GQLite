@@ -171,6 +171,7 @@ pub(crate) enum Pattern
 {
   GraphNode(GraphNode),
   GraphEdge(GraphEdge),
+  GraphPath(GraphPath),
 }
 
 #[derive(Debug, Clone)]
@@ -197,6 +198,13 @@ pub(crate) struct GraphEdge
   pub(crate) directivity: EdgeDirectivity,
   pub(crate) labels: Vec<String>,
   pub(crate) properties: Option<Expression>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct GraphPath
+{
+  pub(crate) variable: String,
+  pub(crate) edge: GraphEdge,
 }
 
 // Values
