@@ -1,3 +1,6 @@
+use std::env::var;
+
+use ast::Expression;
 use pest::{error::Error, Parser};
 use pest_derive::Parser;
 
@@ -78,30 +81,73 @@ fn build_labels(mut iterator: pest::iterators::Pairs<Rule>) -> Result<Vec<String
   Ok(vec)
 }
 
+fn build_node_pattern(pair: pest::iterators::Pair<Rule>) -> Result<ast::GraphNode> {
+  let mut it = pair.into_inner();
+  let variable = it.next().map(|x| x.as_str().to_string());
+  let labels = if let Some(labels_it) = it.next() {
+    println!("labels: {:?}", labels_it);
+    build_labels(labels_it.into_inner())?
+  } else {
+    vec![]
+  };
+  let properties = if let Some(properties_it) = it.next() {
+    Some(build_expression(properties_it)?)
+  } else {
+    None
+  };
+  Ok(ast::GraphNode {
+    variable: variable,
+    labels: labels,
+    properties: properties,
+  })
+}
+
+fn build_edge_pattern(
+  pair: pest::iterators::Pair<Rule>,
+) -> Result<(Option<String>, Option<String>, Option<Expression>)> {
+  let mut it = pair.into_inner();
+  let variable = it.next().map(|x| x.as_str().to_string());
+  let label = if let Some(label) = it.next() {
+    Some(label.as_str().to_string())
+  } else {
+    None
+  };
+  let properties = if let Some(properties_it) = it.next() {
+    Some(build_expression(properties_it)?)
+  } else {
+    None
+  };
+
+  Ok((variable, label, properties))
+}
+
 fn build_pattern(mut iterator: pest::iterators::Pairs<Rule>) -> Result<Vec<ast::Pattern>> {
   let mut vec = vec![];
 
   while let Some(pair) = iterator.next() {
     match pair.as_rule() {
       Rule::node_pattern => {
-        println!("pair: {:?}", pair);
-        let mut it = pair.into_inner().next().unwrap().into_inner();
-        let variable = it.next().map(|x| x.as_str().to_string());
-        let labels = if let Some(labels_it) = it.next() {
-          println!("labels: {:?}", labels_it);
-          build_labels(labels_it.into_inner())?
-        } else {
-          vec![]
-        };
-        let properties = if let Some(properties_it) = it.next() {
-          Some(build_expression(properties_it)?)
-        } else {
-          None
-        };
-        vec.push(ast::Pattern::GraphNode(ast::GraphNode {
-          variable: variable,
-          labels: labels,
-          properties: properties,
+        vec.push(ast::Pattern::GraphNode(build_node_pattern(
+          pair.into_inner().next().unwrap(),
+        )?));
+      }
+      Rule::edge_pattern => {
+        println!("()-[]->() ->->->->->->-> pair: {:?}", pair);
+        pair
+          .clone()
+          .into_inner()
+          .for_each(|p| println!("     {:?}", p));
+        let mut it = pair.into_inner();
+        let source_node = build_node_pattern(it.next().unwrap())?;
+        let edge_pattern = build_edge_pattern(it.next().unwrap())?;
+        let destination_node = build_node_pattern(it.next().unwrap())?;
+        vec.push(ast::Pattern::GraphEdge(ast::GraphEdge {
+          variable: edge_pattern.0,
+          source: source_node,
+          destination: destination_node,
+          directivity: ast::EdgeDirectivity::Directed,
+          label: edge_pattern.1,
+          properties: edge_pattern.2,
         }));
       }
       unknown_expression => {

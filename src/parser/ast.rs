@@ -152,7 +152,7 @@ pub(crate) struct GraphNode {
 }
 
 #[derive(Debug)]
-enum EdgeDirectivity {
+pub(crate) enum EdgeDirectivity {
   Undirected,
   Directed,
 }
@@ -163,7 +163,7 @@ pub(crate) struct GraphEdge {
   pub(crate) source: GraphNode,
   pub(crate) destination: GraphNode,
   pub(crate) directivity: EdgeDirectivity,
-  pub(crate) label: String,
+  pub(crate) label: Option<String>,
   pub(crate) properties: Option<Expression>,
 }
 

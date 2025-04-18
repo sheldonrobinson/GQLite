@@ -1,6 +1,6 @@
 use std::borrow::Borrow;
 
-use serde::{ Serialize, Deserialize };
+use serde::{Deserialize, Serialize};
 
 /// Represent a value in a properties for a Node or an Edge.
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, Clone)]
@@ -8,6 +8,7 @@ use serde::{ Serialize, Deserialize };
 pub enum Value {
   #[default]
   Invalid,
+  Boolean(bool),
   Integer(i64),
   Float(f64),
   String(String),
@@ -21,7 +22,7 @@ pub type ValueObject = std::collections::HashMap<String, Value>;
 
 fn value_object_display(obj: &ValueObject, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
   write!(f, "{{")?;
-  obj.iter().for_each(|(k,v)| {
+  obj.iter().for_each(|(k, v)| {
     write!(f, "{}: {}", k, v).unwrap();
   });
   write!(f, "}}")
@@ -41,17 +42,30 @@ impl Value {
       _ => None,
     }
   }
+  pub fn to_node(&self) -> Option<Node> {
+    match self {
+      Value::Node(n) => Some(n.clone()),
+      _ => None,
+    }
+  }
 }
 
-impl std::fmt::Display for Value
-{
+impl std::fmt::Display for Value {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
       Value::Invalid => write!(f, "invalid"),
+      Value::Boolean(b) => write!(f, "{}", b),
       Value::Integer(i) => write!(f, "{}", i),
       Value::Float(fl) => write!(f, "{}", fl),
       Value::String(s) => write!(f, "{}", s),
-      Value::Array(v) => write!(f, "[{}]", v.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(", ")),
+      Value::Array(v) => write!(
+        f,
+        "[{}]",
+        v.iter()
+          .map(|x| x.to_string())
+          .collect::<Vec<String>>()
+          .join(", ")
+      ),
       Value::Object(o) => value_object_display(o, f),
       Value::Node(n) => write!(f, "{}", n),
       Value::Edge(e) => write!(f, "{}", e),
@@ -60,15 +74,16 @@ impl std::fmt::Display for Value
 }
 
 macro_rules! impl_to_value {
-  ($type:tt, $vn:tt) => (
+  ($type:tt, $vn:tt) => {
     impl Into<Value> for $type {
       fn into(self) -> Value {
         Value::$vn(self.clone())
       }
     }
-  );
+  };
 }
 
+impl_to_value!(bool, Boolean);
 impl_to_value!(i64, Integer);
 impl_to_value!(f64, Float);
 impl_to_value!(String, String);
@@ -81,14 +96,22 @@ pub struct Key {
 }
 
 impl Serialize for Key {
-  fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: serde::Serializer {
+  fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+  where
+    S: serde::Serializer,
+  {
     serializer.serialize_u128(self.uuid)
   }
 }
 
 impl<'de> Deserialize<'de> for Key {
-  fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: serde::Deserializer<'de> {
-    Ok(Self { uuid: u128::deserialize(deserializer)? })
+  fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+  where
+    D: serde::Deserializer<'de>,
+  {
+    Ok(Self {
+      uuid: u128::deserialize(deserializer)?,
+    })
   }
 }
 
@@ -107,15 +130,14 @@ impl From<&Key> for u128 {
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, Clone)]
-#[serde(tag = "type", rename="node")]
+#[serde(tag = "type", rename = "node")]
 pub struct Node {
   pub key: Key,
   pub labels: Vec<String>,
   pub properties: ValueObject,
 }
 
-impl std::fmt::Display for Node
-{
+impl std::fmt::Display for Node {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(f, "({} ", self.labels.join(":"))?;
     value_object_display(self.properties.borrow(), f)?;
@@ -124,16 +146,16 @@ impl std::fmt::Display for Node
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, Clone)]
-#[serde(tag = "type", rename="edge")]
+#[serde(tag = "type", rename = "edge")]
 pub struct Edge {
+  pub key: Key,
   pub source: Node,
   pub destination: Node,
   pub label: String,
   pub properties: ValueObject,
 }
 
-impl std::fmt::Display for Edge
-{
+impl std::fmt::Display for Edge {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(f, "{}-[:{} ", self.source, self.label)?;
     value_object_display(self.properties.borrow(), f)?;

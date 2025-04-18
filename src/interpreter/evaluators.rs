@@ -1,6 +1,9 @@
 use std::borrow::{Borrow, BorrowMut};
 
-use crate::{graph, Result};
+use crate::{
+  graph::{self, Key},
+  Error, Result,
+};
 
 use super::instructions;
 
@@ -11,13 +14,28 @@ fn eval_instructions(
 ) -> Result<()> {
   for instruction in instructions {
     match instruction {
-      instructions::Instruction::CreateEdge { label: _ } => {
-        // let props = stack.pop();
-        // stack.push(crate::graph::Edge {
-        //   label: label,
-        //   properties: props,
-        // })
-        return Err(crate::Error::Unimplemented("eval_instructions/CreateEdge"));
+      instructions::Instruction::CreateEdge { label } => {
+        let props = stack.pop().unwrap();
+        let dst: graph::Node = stack
+          .pop()
+          .unwrap()
+          .to_node()
+          .ok_or(Error::Unknown("Expected node on stack."))?;
+        let src: graph::Node = stack
+          .pop()
+          .unwrap()
+          .to_node()
+          .ok_or(Error::Unknown("Expected node on stack."))?;
+        stack.push(
+          crate::graph::Edge {
+            key: graph::Key::default(),
+            source: src,
+            destination: dst,
+            label: label.to_owned().unwrap_or(String::default()),
+            properties: props.to_object_safe(),
+          }
+          .into(),
+        );
       }
       instructions::Instruction::CreateNode { labels } => {
         let props = stack.pop().unwrap();
@@ -28,7 +46,7 @@ fn eval_instructions(
             properties: props.to_object_safe(),
           }
           .into(),
-        )
+        );
       }
       instructions::Instruction::Push { value } => {
         stack.push(value.clone());
@@ -37,7 +55,7 @@ fn eval_instructions(
         if let Some(value) = row.get(name) {
           stack.push(value.to_owned());
         } else {
-          return Err(crate::Error::UnknownVariable(name.to_owned()));
+          return Err(Error::UnknownVariable(name.to_owned()));
         }
       }
       instructions::Instruction::CreateMap { keys } => {
@@ -46,10 +64,7 @@ fn eval_instructions(
           if let Some(value) = stack.pop() {
             m.insert(k.to_owned(), value);
           } else {
-            return Err(crate::Error::EmptyStack(format!(
-              "Missing value for key {:?}",
-              k
-            )));
+            return Err(Error::EmptyStack(format!("Missing value for key {:?}", k)));
           }
         }
         stack.push(graph::Value::Object(m));
@@ -87,13 +102,23 @@ pub(crate) fn eval_program(
                 new_row.insert(
                   var
                     .as_ref()
-                    .ok_or(crate::Error::Unknown("executor/eval/variables[0].as_ref()"))?
+                    .ok_or(Error::Unknown("executor/eval/variables[0].as_ref()"))?
                     .to_owned(),
                   crate::graph::Value::Node(n),
                 );
               }
+              crate::graph::Value::Edge(e) => {
+                store.add_edges(tx.borrow_mut(), "default", vec![e.to_owned()].iter())?;
+                new_row.insert(
+                  var
+                    .as_ref()
+                    .ok_or(Error::Unknown("executor/eval/variables[0].as_ref()"))?
+                    .to_owned(),
+                  crate::graph::Value::Edge(e),
+                );
+              }
               _ => {
-                return Err(crate::Error::Unimplemented("executor/eval/create"));
+                return Err(Error::Unimplemented("executor/eval/create"));
               }
             }
           }
@@ -114,7 +139,7 @@ pub(crate) fn eval_program(
           let nodes = store.select_nodes(
             tx.borrow_mut(),
             "default",
-            crate::store::SelectQuery::select_all(),
+            crate::store::SelectNodeQuery::select_all(),
           )?;
 
           for node in nodes.iter() {
@@ -122,7 +147,7 @@ pub(crate) fn eval_program(
             new_row.insert(
               variables[0]
                 .as_ref()
-                .ok_or(crate::Error::Unknown("executor/eval/variables[0].as_ref()"))?
+                .ok_or(Error::Unknown("executor/eval/variables[0].as_ref()"))?
                 .to_owned(),
               crate::graph::Value::Node(node.to_owned()),
             );
@@ -138,9 +163,7 @@ pub(crate) fn eval_program(
           for (name, instructions) in variables.iter() {
             let mut stack = Vec::<crate::graph::Value>::new();
             eval_instructions(&mut stack, row, instructions)?;
-            let value = stack
-              .first()
-              .ok_or(crate::Error::Unknown("eval_program/return"))?;
+            let value = stack.first().ok_or(Error::Unknown("eval_program/return"))?;
             out_row.insert(name.to_owned(), value.to_owned());
           }
           output_table.add_row(out_row);
