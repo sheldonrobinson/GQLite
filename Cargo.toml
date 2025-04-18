@@ -3,7 +3,7 @@ resolver = "2"
 members = ["crates/*"]
 
 [workspace.package]
-version = "0.3.3"
+version = "0.3.4"
 edition = "2021"
 license = "MIT"
 homepage = "https://gqlite.org"
@@ -11,4 +11,4 @@ repository = "https://gitlab.com/gqlite/gqlite"
 
 [workspace.dependencies]
 # versions have to be specified with path: https://github.com/rust-lang/cargo/issues/11133
-gqlitedb= { version = "0.3.3", path = "crates/gqlitedb" }
+gqlitedb= { version = "0.3.4", path = "crates/gqlitedb" }

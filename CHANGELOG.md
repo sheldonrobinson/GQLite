@@ -3,6 +3,8 @@
 <!-- next-header -->
 
 ## [Unreleased] - ReleaseDate
+
+## [0.3.4] - 2025-04-18
 - Improve support of comparison and maps.
 - Add support for string as key in map, and allow to use operator [] for map.
 - Add properties, toString functions.
@@ -48,7 +50,8 @@
 - `persy` backend.
 
 <!-- next-url -->
-[Unreleased]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.3.3...dev/2
+[Unreleased]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.3.4...dev/2
+[0.3.4]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.3.3...gqlitedb-v0.3.4
 [0.3.3]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.3.2...gqlitedb-v0.3.3
 [0.3.2]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.3.1...gqlitedb-v0.3.2
 [0.3.1]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.3.0...gqlitedb-v0.3.1
