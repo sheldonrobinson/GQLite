@@ -44,7 +44,7 @@ features = [
   # DELETE
   'delete/Delete1', 'delete/Delete2',
   # SET
-  'set/Set1', 'set/Set2',
+  'set/Set1', 'set/Set2', 'set/Set3', 
 
 ]
 
@@ -56,7 +56,7 @@ expressions = [
 # gql = []
 # features = [
 #   # SET
-#   'set/Set3', 'set/Set4', 'set/Set5',
+#  'set/Set4', 'set/Set5',
 # ]
 # expressions = []
 # Current dev
