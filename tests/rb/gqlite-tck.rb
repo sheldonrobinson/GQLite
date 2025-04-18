@@ -62,7 +62,7 @@ features = [
 
 expressions = [
   # boolean
-  'boolean/Boolean1', 'boolean/Boolean2', 'boolean/Boolean3', 'boolean/Boolean5',
+  'boolean/Boolean1', 'boolean/Boolean2', 'boolean/Boolean3', 'boolean/Boolean4', 'boolean/Boolean5',
   # conditonal
   'conditional/Conditional1', 'conditional/Conditional2',
   # null
@@ -85,7 +85,8 @@ expressions = [
 # Current dev
 # gql = []
 # features = []
-# expressions = []
+# expressions = [
+# ]
 
 # In progress
 # features = ['create/Create4', 'create/Create6']
@@ -97,8 +98,6 @@ expressions = [
 # gql = ['Graph1']
 
 # expressions = [
-#   # Boolean
-#   'boolean/Boolean4', 
 #   # Aggregations
 #   'aggregation/Aggregation1', 'aggregation/Aggregation2', 'aggregation/Aggregation3', 'aggregation/Aggregation4', 'aggregation/Aggregation7',
 #   # comparison
