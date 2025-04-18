@@ -1,6 +1,6 @@
 [package]
 name = "gqlitedb"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2021"
 license = "MIT"
 description = "GQLite is a Rust-language library, with a C interface, that implements a small, fast, self-contained, high-reliability, full-featured, Graph Query database engine."
@@ -12,9 +12,9 @@ repository = "https://gitlab.com/gqlite/gqlite"
 crate-type = ["cdylib", "lib"]
 
 [features]
-default = ["persy", "capi"]
+default = ["redb", "capi"]
 capi = []
-persy = ["dep:persy"]
+redb = ["dep:redb"]
 pgql = ["dep:pgrx"]
 pg12 = ["pgrx/pg12"]
 pg13 = ["pgrx/pg13"]
@@ -26,11 +26,11 @@ pg17 = ["pgrx/pg17"]
 [dependencies]
 ciborium = "0.2"
 itertools = "0.14"
-persy = { version = "1", optional = true }
 pgrx = { version = "0.12", optional = true }
 pest = "2"
 pest_derive = "2"
 rand = "0.9"
+redb = { version = "2", optional = true }
 serde = "1"
 serde_json = "1"
 thiserror = "2"

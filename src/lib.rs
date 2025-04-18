@@ -39,10 +39,10 @@ pub(crate) mod tests
   use rand::Rng;
   pub(crate) fn get_tmp_file() -> Result<std::path::PathBuf, std::io::Error>
   {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     loop
     {
-      let rand: u32 = rng.gen();
+      let rand: u32 = rng.random();
       let path = std::path::PathBuf::from(format!(
         "{}/tmp_gqlite_{}",
         std::env::temp_dir().to_str().unwrap(),

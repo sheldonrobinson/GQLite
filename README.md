@@ -33,7 +33,7 @@ Documentation
 Storage Backends
 ----------------
 
-* [persy](https://persy.rs) store. This is the current default store for `gqlite 2.x`.
+* [redb](https://redb.rs) store. This is the current default store for `gqlite 2.x`.
 * [sqlite](https://sqlite.org) store. Pre-planning for a sqlite store, which the fasted and most used SQL database. This enable to achieve high performance and for application to combine Graph queries with traditional SQL queries. This is required for `gqlite 2.0`.
 * [postgresql](https://postgresql.org) work-in-progress.
 

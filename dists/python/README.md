@@ -1,4 +1,4 @@
-GQLite is a C++-language library, with a C interface, that implements a small, fast, self-contained, high-reliability, full-featured, Graph Query database engine. The data is stored in a Persy database, which the fasted and most used SQL database. This enable to achieve high performance and for application to combine Graph queries with traditional SQL queries.
+GQLite is a C++-language library, with a C interface, that implements a small, fast, self-contained, high-reliability, full-featured, Graph Query database engine. The data is stored in a redb or sqlite database, which the fasted and most used SQL database. This enable to achieve high performance and for application to combine Graph queries with traditional SQL queries.
 
 GQLite source code is license under the [MIT License](LICENSE) and is free to everyone to use for any purpose. 
 

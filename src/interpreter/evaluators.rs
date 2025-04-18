@@ -621,7 +621,7 @@ pub(crate) fn eval_program(
               {
                 crate::graph::Value::Node(n) =>
                 {
-                  store.add_nodes(&mut tx, "default", vec![n.to_owned()].iter())?;
+                  store.create_nodes(&mut tx, "default", vec![n.to_owned()].iter())?;
                   if let Some(var) = var
                   {
                     let _ = new_row.noreplace_insert(&var, crate::graph::Value::Node(n));
@@ -629,7 +629,7 @@ pub(crate) fn eval_program(
                 }
                 crate::graph::Value::Edge(e) =>
                 {
-                  store.add_edges(&mut tx, "default", vec![e.to_owned()].iter())?;
+                  store.create_edges(&mut tx, "default", vec![e.to_owned()].iter())?;
                   if let Some(var) = var
                   {
                     new_row.insert(var.to_owned(), crate::graph::Value::Edge(e));

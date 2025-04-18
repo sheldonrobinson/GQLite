@@ -8,7 +8,7 @@ pub struct Connection
 
 impl Connection
 {
-  #[cfg(feature = "persy")]
+  #[cfg(feature = "redb")]
   pub fn open<P: AsRef<std::path::Path>>(
     path: P,
     _options: crate::graph::ValueObject,

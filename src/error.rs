@@ -188,6 +188,26 @@ pub enum Error
   #[error("Internal: {0}")]
   Internal(#[from] InternalError),
 
+  // Errors from dependencies
+  #[cfg(feature = "redb")]
+  #[error("ReDB: {0}")]
+  ReDBError(#[from] redb::Error),
+  #[cfg(feature = "redb")]
+  #[error("ReDB:Storage: {0}")]
+  ReDBStorageError(#[from] redb::StorageError),
+  #[cfg(feature = "redb")]
+  #[error("ReDB:DatabaseError: {0}")]
+  ReDBDatabaseError(#[from] redb::DatabaseError),
+  #[cfg(feature = "redb")]
+  #[error("ReDB:TransactionError: {0}")]
+  ReDBTransactionError(#[from] redb::TransactionError),
+  #[cfg(feature = "redb")]
+  #[error("ReDB:TableError: {0}")]
+  ReDBTableError(#[from] redb::TableError),
+  #[cfg(feature = "redb")]
+  #[error("ReDB:CommitError: {0}")]
+  ReDBCommitError(#[from] redb::CommitError),
+
   // Following errors need reviews, and most would fall in the internal error category
   #[error("An error occured while serialization to Cbor: {0}")]
   CborSerialisationError(#[from] ciborium::ser::Error<std::io::Error>),
@@ -203,6 +223,8 @@ pub enum Error
   UnxpectedExpression(&'static str, String),
   #[error("Unknown node")]
   UnknownNode,
+  #[error("Unknown edge")]
+  UnknownEdge,
   #[error("Unknown variable {0}")]
   UnknownVariable(String),
   #[error("Empty stack {0}")]
@@ -213,6 +235,13 @@ pub enum Error
   InternalError(&'static str),
   #[error("Unimplemented error at {0}")]
   Unimplemented(&'static str),
+}
+
+#[allow(dead_code)]
+pub(crate) fn show_backtrace<T>(t: T) -> T
+{
+  println!("{:#?}", std::backtrace::Backtrace::capture());
+  t
 }
 
 impl From<pest::error::Error<crate::parser::Rule>> for Error

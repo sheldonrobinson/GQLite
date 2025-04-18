@@ -37,7 +37,12 @@
             "args": [],
             "stopAtEntry": false,
             "cwd": "/tmp",
-            "environment": [],
+            "environment": [
+                {
+                    "name": "RUST_BACKTRACE",
+                    "value": "1"
+                }
+            ],
             "externalConsole": false,
             "MIMode": "gdb",
             "setupCommands": [
