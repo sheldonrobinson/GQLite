@@ -53,6 +53,11 @@ fn value_object_display(obj: &ValueObject, f: &mut std::fmt::Formatter<'_>) -> s
 pub(crate) trait ValueObjectExtension
 {
   fn remove_null(self) -> Self;
+  fn remove_value<'a>(
+    &mut self,
+    field: Option<&'a String>,
+    path: impl Iterator<Item = &'a String>,
+  ) -> crate::Result<()>;
   fn add_values<'a>(
     &mut self,
     field: Option<&'a String>,
@@ -77,7 +82,43 @@ impl ValueObjectExtension for ValueObject
       .map(|(k, v)| (k, v.remove_null()))
       .collect()
   }
-
+  fn remove_value<'a>(
+    &mut self,
+    field: Option<&'a String>,
+    mut path: impl Iterator<Item = &'a String>,
+  ) -> crate::Result<()>
+  {
+    if let Some(field) = field
+    {
+      if let Some(next_field) = path.next()
+      {
+        let v = self.get_mut(field);
+        match v
+        {
+          Some(Value::Object(o)) =>
+          {
+            o.remove_value(Some(next_field), path)?;
+          }
+          None =>
+          {}
+          _ => Err(crate::error::Error::Unimplemented(
+            "remove_value should get a better error",
+          ))?, // TODO
+        }
+      }
+      else
+      {
+        self.remove(field);
+      }
+    }
+    else
+    {
+      Err(crate::error::Error::Unimplemented(
+        "remove_value should get a better error",
+      ))? // TODO
+    }
+    Ok(())
+  }
   fn add_values<'a>(
     &mut self,
     field: Option<&'a String>,
