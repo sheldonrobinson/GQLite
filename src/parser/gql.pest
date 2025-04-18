@@ -4,17 +4,26 @@ int = { ("+" | "-")? ~ ASCII_DIGIT+ }
 num = @{ int ~ ("." ~ ASCII_DIGIT*)? ~ (^"e" ~ int)? }
 
 // Query
-query = _{ SOI ~ statement* ~ EOI }
+query = _{ SOI ~ statement* ~ ";"? ~ EOI }
+
+// fragments
+
+labels = { (":" ~ ident)* }
+pattern = { ident? ~ labels ~ map? }
+node_pattern = { "(" ~ pattern ~ ")" }
+edge_pattern = { "[" ~ pattern ~ "]" }
+node_or_edge_pattern = _{ node_pattern | edge_pattern }
 
 // Statements
-statement = { create_node | create_edge | match_node | return_statement }
+statement = { create_statement | match_statement | return_statement }
 
-create_node = { "CREATE" ~ "(" ~ ident ~ ")" }
-create_edge = { "CREATE" ~ "(" ~ ident ~ ")" ~ "-[" ~ ident ~ "]>" ~ "(" ~ ident ~ ")" }
-match_node = { "MATCH" ~ "(" ~ ident ~ ")" }
+create_statement = { "CREATE" ~ node_or_edge_pattern ~ ( "," ~ node_or_edge_pattern )* }
+match_statement = { "MATCH" ~ node_or_edge_pattern ~ ( "," ~ node_or_edge_pattern )* }
 return_statement = { "RETURN" ~ named_expression+ }
 
 // Expression
 
 named_expression = { expression | ident ~ expression }
-expression = _{ ident }
+expression = _{ ident | map }
+
+map = { "{" ~ (ident ~ ":" ~ expression)  ~ "}" }

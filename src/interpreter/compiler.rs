@@ -1,27 +1,8 @@
 use std::borrow::{ Borrow, BorrowMut };
 
-use crate::graph::ToValue;
+// use crate::graph::ToValue;
 use crate::parser::ast;
 use crate::interpreter::instructions::{ Instruction, Instructions, Block };
-
-fn compile_patterns(
-  patterns: &Vec<crate::parser::ast::GraphNodeOrEdge>,
-  instructions: &mut Instructions,
-  variables: &mut Vec<Option<String>>
-) {
-  for c in patterns.iter() {
-    match c {
-      crate::parser::ast::GraphNodeOrEdge::GraphNode(node) => {
-        variables.push(node.variable.to_owned());
-        instructions.push(Instruction::Push { value: crate::graph::Node::default().to_value() });
-      }
-      crate::parser::ast::GraphNodeOrEdge::GraphEdge(edge) => {
-        variables.push(edge.variable.to_owned());
-        instructions.push(Instruction::Push { value: crate::graph::Edge::default().to_value() });
-      }
-    }
-  }
-}
 
 fn compile_expression(
   expression: &crate::parser::ast::Expression,
@@ -37,6 +18,37 @@ fn compile_expression(
       }
     }
   );
+}
+
+fn compile_optional_expression(properties: &Option<ast::Expression>, instructions: &mut Instructions)
+{
+  if let Some(expr) = properties {
+    compile_expression(expr, instructions);
+  }
+  else {
+    instructions.push(Instruction::Push { value: crate::graph::Value::Invalid });  
+  } 
+}
+
+fn compile_patterns(
+  patterns: &Vec<crate::parser::ast::Pattern>,
+  instructions: &mut Instructions,
+  variables: &mut Vec<Option<String>>
+) {
+  for c in patterns.iter() {
+    match c {
+      crate::parser::ast::Pattern::GraphNode(node) => {
+        variables.push(node.variable.to_owned());
+        compile_optional_expression(node.properties.borrow(), instructions);
+        instructions.push(Instruction::CreateNode { labels: node.labels.to_owned() });
+      }
+      crate::parser::ast::Pattern::GraphEdge(edge) => {
+        variables.push(edge.variable.to_owned());
+        compile_optional_expression(edge.properties.borrow(), instructions);
+        instructions.push(Instruction::CreateEdge { label: edge.label.to_owned() });
+      }
+    }
+  }
 }
 
 pub(crate) fn compile(statements: crate::parser::ast::Statements) -> crate::Result<super::Program> {

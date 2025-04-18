@@ -2,6 +2,8 @@ use std::collections::HashMap;
 
 pub(crate) enum Instruction
 {
+  CreateNode { labels: Vec<String> },
+  CreateEdge { label: String },
   Push { value: crate::graph::Value },
   GetVariable { name: String },
 }

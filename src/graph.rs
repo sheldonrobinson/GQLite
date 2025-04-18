@@ -1,3 +1,5 @@
+use std::borrow::Borrow;
+
 use serde::{ Serialize, Deserialize };
 
 /// Represent a value in a properties for a Node or an Edge.
@@ -17,6 +19,14 @@ pub enum Value {
 
 pub type ValueObject = std::collections::HashMap<String, Value>;
 
+fn value_object_display(obj: &ValueObject, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+  write!(f, "{{")?;
+  obj.iter().for_each(|(k,v)| {
+    write!(f, "{}: {}", k, v).unwrap();
+  });
+  write!(f, "}}")
+}
+
 impl Value {
   /// Return an object from the value, or an empty object
   pub fn to_object_safe(&self) -> ValueObject {
@@ -25,18 +35,34 @@ impl Value {
       _ => ValueObject::new(),
     }
   }
+  pub fn to_object(&self) -> Option<ValueObject> {
+    match self {
+      Value::Object(o) => Some(o.clone()),
+      _ => None,
+    }
+  }
 }
 
-pub trait ToValue {
-  fn to_value(&self) -> Value;
+impl std::fmt::Display for Value
+{
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      Value::Invalid => write!(f, "invalid"),
+      Value::Integer(i) => write!(f, "{}", i),
+      Value::Float(fl) => write!(f, "{}", fl),
+      Value::String(s) => write!(f, "{}", s),
+      Value::Array(v) => write!(f, "[{}]", v.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(", ")),
+      Value::Object(o) => value_object_display(o, f),
+      Value::Node(n) => write!(f, "{}", n),
+      Value::Edge(e) => write!(f, "{}", e),
+    }
+  }
 }
 
 macro_rules! impl_to_value {
   ($type:tt, $vn:tt) => (
-    impl ToValue for $type
-    {
-      fn to_value(&self) -> Value
-      {
+    impl Into<Value> for $type {
+      fn into(self) -> Value {
         Value::$vn(self.clone())
       }
     }
@@ -88,13 +114,31 @@ pub struct Node {
   pub properties: ValueObject,
 }
 
+impl std::fmt::Display for Node
+{
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "({} ", self.labels.join(":"))?;
+    value_object_display(self.properties.borrow(), f)?;
+    write!(f, ")")
+  }
+}
+
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, Clone)]
 #[serde(tag = "type", rename="edge")]
 pub struct Edge {
-  pub source: Key,
-  pub destination: Key,
+  pub source: Node,
+  pub destination: Node,
   pub label: String,
   pub properties: ValueObject,
+}
+
+impl std::fmt::Display for Edge
+{
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "{}-[:{} ", self.source, self.label)?;
+    value_object_display(self.properties.borrow(), f)?;
+    write!(f, "]->{})", self.destination)
+  }
 }
 
 #[macro_export]
@@ -102,7 +146,7 @@ macro_rules! properties {
   // map-like
   ($($k:expr => $v:expr),* $(,)?) => {
     {
-    core::convert::From::from([$(($k.to_string(), $v.to_value()),)*])
+    core::convert::From::from([$(($k.to_string(), $v.into()),)*])
     }
   };
 }
