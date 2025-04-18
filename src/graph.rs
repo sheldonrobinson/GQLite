@@ -619,7 +619,7 @@ impl std::fmt::Display for Node
   {
     if self.labels.is_empty()
     {
-      write!(f, "(");
+      write!(f, "(")?;
     }
     else
     {
@@ -688,7 +688,7 @@ impl std::fmt::Display for Path
   }
 }
 
-#[macro_export]
+#[cfg(test)]
 macro_rules! properties {
   // map-like
   ($($k:expr => $v:expr),* $(,)?) => {
@@ -698,7 +698,10 @@ macro_rules! properties {
   };
 }
 
-#[macro_export]
+#[cfg(test)]
+pub(crate) use properties;
+
+#[cfg(test)]
 macro_rules! labels {
   // match a list of expressions separated by comma:
   ($($str:expr),*) => (
@@ -709,3 +712,6 @@ macro_rules! labels {
     }
   );
 }
+
+#[cfg(test)]
+pub(crate) use labels;

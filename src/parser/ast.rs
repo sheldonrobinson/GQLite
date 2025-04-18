@@ -453,7 +453,6 @@ create_binary_op! {Multiplication}
 create_binary_op! {Division}
 create_binary_op! {Modulo}
 
-#[macro_export]
 macro_rules! create_unary_op {
   ( $x:tt ) => {
     #[derive(Debug, Clone, PartialEq)]

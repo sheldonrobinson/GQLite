@@ -3,7 +3,7 @@ mod count;
 use std::fmt::Debug;
 
 use crate::interpreter::expression_analyser::ExpressionType;
-use crate::{graph, value_table, Result};
+use crate::{graph, Result};
 
 pub(crate) trait AggregatorState: Debug
 {
@@ -35,10 +35,12 @@ macro_rules! declare_aggregator {
     }
     impl crate::aggregators::AggregatorTrait for $type_name
     {
+      #[allow(unused_variables)]
       fn create(&self, arguments: Vec<crate::graph::Value>) -> Result<Box<dyn AggregatorState>>
       {
         Ok(Box::new($crate::functions::make_function_call!($state_type_name::new, arguments, $( $arg_type,)*)?))
       }
+      #[allow(unused_variables)]
       fn validate_arguments(
         &self,
         arguments: Vec<crate::interpreter::expression_analyser::ExpressionType>,

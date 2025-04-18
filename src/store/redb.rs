@@ -1,8 +1,6 @@
-use itertools::Itertools;
-use pest::pratt_parser::Op;
 use redb::{ReadableTable, ReadableTableMetadata};
 use serde::{Deserialize, Serialize};
-use std::{cell::RefCell, collections::HashMap, rc::Rc, str::FromStr};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{error, graph, Result};
 
@@ -632,11 +630,11 @@ impl Store
       table_source.insert(sk, v)?;
 
       let mut v = table_destination
-        .remove(sk)?
+        .remove(dk)?
         .ok_or_else(|| error::show_backtrace(error::Error::UnknownNode))?
         .value();
       v.retain(|x| *x != e.edge.key);
-      table_destination.insert(sk, v)?;
+      table_destination.insert(dk, v)?;
     }
     Ok(())
   }
@@ -968,7 +966,7 @@ impl Store
 #[cfg(test)]
 mod tests
 {
-  use std::{borrow::BorrowMut, default};
+  use std::borrow::BorrowMut;
 
   use crate::graph;
 
@@ -978,12 +976,12 @@ mod tests
     // Add a single empty node
     let nodes = [
       crate::graph::Node {
-        labels: crate::labels!("hello", "world"),
-        properties: crate::properties!("key" => 42i64),
+        labels: graph::labels!("hello", "world"),
+        properties: graph::properties!("key" => 42i64),
         key: crate::graph::Key::default(),
       },
       crate::graph::Node {
-        labels: crate::labels!("not"),
+        labels: graph::labels!("not"),
         properties: Default::default(),
         key: crate::graph::Key::default(),
       },
@@ -1022,13 +1020,13 @@ mod tests
   fn test_add_edges()
   {
     let source_node = crate::graph::Node {
-      labels: crate::labels!("hello"),
-      properties: crate::properties!("key" => 42i64),
+      labels: graph::labels!("hello"),
+      properties: graph::properties!("key" => 42i64),
       key: crate::graph::Key::default(),
     };
     let destination_node = crate::graph::Node {
-      labels: crate::labels!("world"),
-      properties: crate::properties!("key" => 12i64),
+      labels: graph::labels!("world"),
+      properties: graph::properties!("key" => 12i64),
       key: crate::graph::Key::default(),
     };
     let edge = crate::graph::Edge {
@@ -1036,7 +1034,7 @@ mod tests
       destination: destination_node.clone(),
       key: crate::graph::Key::default(),
       labels: vec!["!".into()],
-      properties: crate::properties!("existence" => true),
+      properties: graph::properties!("existence" => true),
     };
     let store = super::Store::new(crate::tests::get_tmp_file().unwrap()).unwrap();
 

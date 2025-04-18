@@ -1,19 +1,21 @@
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use crate::error::{self, CompileTimeError, InternalError, RunTimeError};
-// use crate::graph::ToValue;
-use crate::interpreter::instructions::{
-  self, Block, CreateAction, Instruction, Instructions, RWAggregation, RWExpression,
+use crate::{
+  error::{self, CompileTimeError, InternalError},
+  functions,
+  interpreter::{
+    expression_analyser,
+    instructions::{
+      self, Block, BlockMatch, CreateAction, Instruction, Instructions, RWAggregation, RWExpression,
+    },
+    validator,
+  },
+  parser::ast,
+  Result,
 };
-use crate::interpreter::validator;
-use crate::parser::ast::{self, OneUpdate, UpdateProperty};
-use crate::{functions, graph, Result};
 
-use super::expression_analyser;
-use super::instructions::BlockMatch;
-
-static fake_variable_counter: AtomicU64 = AtomicU64::new(0);
+static FAKE_VARIABLE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 macro_rules! compile_binary_op {
   ( $x:tt, $function_manager:tt, $instructions:tt, $aggregations:tt ) => {
@@ -49,7 +51,7 @@ fn compile_expression(
         {
           let var_name = format!(
             "__gqlite_aggregator_{}",
-            fake_variable_counter.fetch_add(1, Ordering::Relaxed)
+            FAKE_VARIABLE_COUNTER.fetch_add(1, Ordering::Relaxed)
           );
           let mut init_instructions = Instructions::new();
           let mut argument_instructions = Instructions::new();
@@ -673,7 +675,7 @@ fn compile_match_edge(
     let edge_variable = edge.variable.to_owned().unwrap_or_else(|| {
       format!(
         "__gqlite_edge_{}",
-        fake_variable_counter.fetch_add(1, Ordering::Relaxed)
+        FAKE_VARIABLE_COUNTER.fetch_add(1, Ordering::Relaxed)
       )
     });
     for other in previous_edges.iter()
