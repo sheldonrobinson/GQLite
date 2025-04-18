@@ -1,5 +1,6 @@
 #[derive(thiserror::Error, Debug)]
-pub enum Error {
+pub enum Error
+{
   #[error("An error occured while serialization to Cbor: {0}")]
   CborSerialisationError(#[from] ciborium::ser::Error<std::io::Error>),
   #[error("An error occured while deserialization from Cbor: {0}")]
