@@ -91,7 +91,14 @@ fn build_expression(
         let it = op.into_inner();
         Ok(ast::Expression::MemberAccess(Box::new(ast::MemberAccess {
           left: lhs?,
-          path: it.map(|el| el.as_str().to_string()).collect(),
+          path: it
+            .map(|el| match el.as_rule()
+            {
+              Rule::ident => el.as_str().to_string(),
+              Rule::string_literal => el.into_inner().as_str().to_string(),
+              _ => todo!(),
+            })
+            .collect(),
         })))
       }
       Rule::index_access =>

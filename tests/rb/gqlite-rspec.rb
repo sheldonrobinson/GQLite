@@ -151,90 +151,97 @@ end
 
 RSpec.describe "compare" do
   it "can compare basic types" do
-    expect(compare(1, 2)).to be false
-    expect(compare(2, 2)).to be true
-    expect(compare(2.001, 2.001)).to be true
-    expect(compare(2.0000001, 2.0000002)).to be false
-    expect(compare(2.0000000000001, 2.0000000000002)).to be true
-    expect(compare("abc", "abc")).to be true
-    expect(compare("abc", "abcd")).to be false
-    expect(compare("abcd", "abc")).to be false
-    expect(compare("abd", "abc")).to be false
+    expect(compare(1, 2, false)).to be false
+    expect(compare(2, 2, false)).to be true
+    expect(compare(2.001, 2.001, false)).to be true
+    expect(compare(2.0000001, 2.0000002, false)).to be false
+    expect(compare(2.0000000000001, 2.0000000000002, false)).to be true
+    expect(compare("abc", "abc", false)).to be true
+    expect(compare("abc", "abcd", false)).to be false
+    expect(compare("abcd", "abc", false)).to be false
+    expect(compare("abd", "abc", false)).to be false
   end
   it "can compare integers to float" do
-    expect(compare(1, 2.0)).to be false
-    expect(compare(2, 2.0)).to be true
-    expect(compare(2.0, 1)).to be false
-    expect(compare(2.0, 2)).to be true
+    expect(compare(1, 2.0, false)).to be false
+    expect(compare(2, 2.0, false)).to be true
+    expect(compare(2.0, 1, false)).to be false
+    expect(compare(2.0, 2, false)).to be true
   end
   it "can't compare values of different types" do
-    expect(compare("1", 1)).to be false
-    expect(compare("1.0", 1.0)).to be false
-    expect(compare(1.0, "1.0")).to be false
-    expect(compare(1, "1")).to be false
-    expect(compare(1, [1])).to be false
-    expect(compare(1.0, [1.0])).to be false
-    expect(compare("a", ["a"])).to be false
-    expect(compare([1], 1)).to be false
-    expect(compare([1.0], 1.0)).to be false
-    expect(compare(["a"], "a")).to be false
-    expect(compare(1, {"k" => 1})).to be false
-    expect(compare(1.0, {"k" => 1.0})).to be false
-    expect(compare("a", {"k" => "a"})).to be false
-    expect(compare([1, 1.0, "a"], {"k" => [1, 1.0, "a"]})).to be false
-    expect(compare({"k" => 1}, 1)).to be false
-    expect(compare({"k" => 1.0}, 1.0)).to be false
-    expect(compare({"k" => "a"}, "a")).to be false
-    expect(compare({"k" => [1, 1.0, "a"]}, [1, 1.0, "a"])).to be false
+    expect(compare("1", 1, false)).to be false
+    expect(compare("1.0", 1.0, false)).to be false
+    expect(compare(1.0, "1.0", false)).to be false
+    expect(compare(1, "1", false)).to be false
+    expect(compare(1, [1], false)).to be false
+    expect(compare(1.0, [1.0], false)).to be false
+    expect(compare("a", ["a"], false)).to be false
+    expect(compare([1], 1, false)).to be false
+    expect(compare([1.0], 1.0, false)).to be false
+    expect(compare(["a"], "a", false)).to be false
+    expect(compare(1, {"k" => 1}, false)).to be false
+    expect(compare(1.0, {"k" => 1.0}, false)).to be false
+    expect(compare("a", {"k" => "a"}, false)).to be false
+    expect(compare([1, 1.0, "a"], {"k" => [1, 1.0, "a"]}, false)).to be false
+    expect(compare({"k" => 1}, 1, false)).to be false
+    expect(compare({"k" => 1.0}, 1.0, false)).to be false
+    expect(compare({"k" => "a"}, "a", false)).to be false
+    expect(compare({"k" => [1, 1.0, "a"]}, [1, 1.0, "a"], false)).to be false
   end
   it "can compare arrays" do
-    expect(compare([1], [2])).to be false
-    expect(compare([1, 1.0], [1, 1.0])).to be true
-    expect(compare([1, 1.0], [1, 2.0])).to be false
-    expect(compare([1, 1.0, "a"], [1, 1.0, "a"])).to be true
-    expect(compare([1, 1.0, "a"], [1, 1.0, "b"])).to be false
-    expect(compare([1, 1.0, ["a"]], [1, 1.0, ["b"]])).to be false
-    expect(compare([1, 1.0, ["a"]], [1, 1.0, ["a"]])).to be true
-    expect(compare([1, 1.0, ["a"]], [1, 1.0, ["a", 1]])).to be false
-    expect(compare([1, 1.0, ["a"]], [1, 1.0])).to be false
+    expect(compare([1], [2], false)).to be false
+    expect(compare([1, 1.0], [1, 1.0], false)).to be true
+    expect(compare([1, 1.0], [1, 2.0], false)).to be false
+    expect(compare([1, 1.0, "a"], [1, 1.0, "a"], false)).to be true
+    expect(compare([1, 1.0, "a"], [1, 1.0, "b"], false)).to be false
+    expect(compare([1, 1.0, ["a"]], [1, 1.0, ["b"]], false)).to be false
+    expect(compare([1, 1.0, ["a"]], [1, 1.0, ["a"]], false)).to be true
+    expect(compare([1, 1.0, ["a"]], [1, 1.0, ["a", 1]], false)).to be false
+    expect(compare([1, 1.0, ["a"]], [1, 1.0], false)).to be false
+  end
+  it "can compare arrays ignoring order" do
+    expect(compare([1], [2], true)).to be false
+    expect(compare([1, 1.0], [1.0, 1], true)).to be true
+    expect(compare([1, 1.0], [2.0, 1], true)).to be false
+    expect(compare(["b", "c", "a"], ["a", "b", "c"], true)).to be true
+    expect(compare(["b", "c", "a"], ["a", "b", "d"], true)).to be false
   end
   it "can compare hashes" do
-    expect(compare({"k" => 1}, {"k" => 2})).to be false
-    expect(compare({"k" => 1}, {"k" => 1})).to be true
-    expect(compare({"k" => [1]}, {"k" => [1]})).to be true
-    expect(compare({"k" => {"k" => [1]}}, {"k" => {"k" => [1]}})).to be true
-    expect(compare({"k" => {"k" => [1]}}, {"k" => {"k" => [2]}})).to be false
-    expect(compare({"k" => {"k" => [1]}}, {"k" => {"k2" => [1]}})).to be false
-    expect(compare({"k" => {"k" => [1]}}, {"k2" => {"k" => [1]}})).to be false
+    expect(compare({"k" => 1}, {"k" => 2}, false)).to be false
+    expect(compare({"k" => 1}, {"k" => 1}, false)).to be true
+    expect(compare({"k" => [1]}, {"k" => [1]}, false)).to be true
+    expect(compare({"k" => {"k" => [1]}}, {"k" => {"k" => [1]}}, false)).to be true
+    expect(compare({"k" => {"k" => [1]}}, {"k" => {"k" => [2]}}, false)).to be false
+    expect(compare({"k" => {"k" => [1]}}, {"k" => {"k2" => [1]}}, false)).to be false
+    expect(compare({"k" => {"k" => [1]}}, {"k2" => {"k" => [1]}}, false)).to be false
   end
   it "can compare nodes with labels in different order" do
-    expect(compare({"type" => "node", "labels" => ["a", "b"], "properties" => {}}, {"type" => "node", "labels" => ["b", "a"], "properties" => {}})).to be true
-    expect(compare({"type" => "node", "labels" => ["a", "b"], "properties" => {}}, {"type" => "node", "labels" => ["b", "c"], "properties" => {}})).to be false
-    expect(compare({"type" => "node", "labels" => ["a", "b"], "properties" => {}}, {"type" => "node", "labels" => ["a", "b"], "properties" => {"k" => 1}})).to be false
-    expect(compare({"type" => "node", "labels" => ["a", "b"], "properties" => {"k" => 1}}, {"type" => "node", "labels" => ["b", "a"], "properties" => {"k" => 1}})).to be true
+    expect(compare({"type" => "node", "labels" => ["a", "b"], "properties" => {}}, {"type" => "node", "labels" => ["b", "a"], "properties" => {}}, false)).to be true
+    expect(compare({"type" => "node", "labels" => ["a", "b"], "properties" => {}}, {"type" => "node", "labels" => ["b", "c"], "properties" => {}}, false)).to be false
+    expect(compare({"type" => "node", "labels" => ["a", "b"], "properties" => {}}, {"type" => "node", "labels" => ["a", "b"], "properties" => {"k" => 1}}, false)).to be false
+    expect(compare({"type" => "node", "labels" => ["a", "b"], "properties" => {"k" => 1}}, {"type" => "node", "labels" => ["b", "a"], "properties" => {"k" => 1}}, false)).to be true
   end
   it "can compare nodes with keys" do
-    expect(compare({"key"=>71399689742590698717330075576608269690, "type" => "node", "labels" => ["a", "b"], "properties" => {}}, {"type" => "node", "labels" => ["b", "a"], "properties" => {}})).to be true
+    expect(compare({"key"=>71399689742590698717330075576608269690, "type" => "node", "labels" => ["a", "b"], "properties" => {}}, {"type" => "node", "labels" => ["b", "a"], "properties" => {}}, false)).to be true
   end
   
   it "can compare nodes with edges" do
-    expect(compare({"type"=>"edge", "key"=>248450202975772154401016793053495639615, "labels"=>["T1"], "properties"=>{}}, {"type"=>"edge", "properties"=>{}, "labels"=>["T1"]})).to be true
+    expect(compare({"type"=>"edge", "key"=>248450202975772154401016793053495639615, "labels"=>["T1"], "properties"=>{}}, {"type"=>"edge", "properties"=>{}, "labels"=>["T1"]}, false)).to be true
   end
 end
 
 RSpec.describe "compare tables" do
   it "works" do
-    expect(compare_table_in_any_order([["p"], ["foo"]], [["p"], ["foo"]])).to be true
-    expect(compare_table_in_any_order([["p"], ["foo"]], [["p"], ["fo0"]])).to be false
-    expect(compare_table_in_any_order([["p"], ["foo"]], [["p"]])).to be false
-    expect(compare_table_in_any_order([["p"]], [["p"], ["foo"]])).to be false
+    expect(compare_table_in_any_order([["p"], ["foo"]], [["p"], ["foo"]], false)).to be true
+    expect(compare_table_in_any_order([["p"], ["foo"]], [["p"], ["fo0"]], false)).to be false
+    expect(compare_table_in_any_order([["p"], ["foo"]], [["p"]], false)).to be false
+    expect(compare_table_in_any_order([["p"]], [["p"], ["foo"]], false)).to be false
     expect(compare_table_in_any_order([["a", "b", "result"], [1, 1, true], [1, 0, true], [0, 1, true], [0, 0, true]],
-                                      [["a", "b", "result"], [true, true, true], [true, false, true], [false, true, true], [false, false, true]])).to be true
+                                      [["a", "b", "result"], [true, true, true], [true, false, true], [false, true, true], [false, false, true]], false)).to be true
   end
   it "in any column order" do
-    expect(compare_table_in_any_order([["p", "a"], ["foo", 1]], [["a", "p"], [1, "foo"]])).to be true
-    expect(compare_table_in_any_order([["a", "p"], [1, "foo"]], [["p", "a"], ["foo", 1]])).to be true
-    expect(compare_table_in_any_order([["b", "p"], [1, "foo"]], [["p", "a"], ["foo", 1]])).to be false
+    expect(compare_table_in_any_order([["p", "a"], ["foo", 1]], [["a", "p"], [1, "foo"]], false)).to be true
+    expect(compare_table_in_any_order([["a", "p"], [1, "foo"]], [["p", "a"], ["foo", 1]], false)).to be true
+    expect(compare_table_in_any_order([["b", "p"], [1, "foo"]], [["p", "a"], ["foo", 1]], false)).to be false
   end
 end
 

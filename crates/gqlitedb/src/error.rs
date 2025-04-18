@@ -112,6 +112,10 @@ pub enum RunTimeError
     expected_type: &'static str,
     value: String,
   },
+  #[error(
+    "MapElementAccessByNonString: attempt to accessing a map value using a non-string value."
+  )]
+  MapElementAccessByNonString,
   #[error("NotComparable: values are not comparable.")]
   NotComparable,
   /// Edge has no label
