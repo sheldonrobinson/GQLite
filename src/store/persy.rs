@@ -568,16 +568,22 @@ impl Store
     let graph_name = graph_name.into();
     let graph_info = self.graphs.get(&graph_name).unwrap();
     let transaction = Rc::new(RefCell::new(transaction));
-    let (edges_source_uuid_index, edges_destination_uuid_index) = match directivity
+    let edges_uuid_indices = match directivity
     {
-      graph::EdgeDirectivity::Directed => (
-        graph_info.edges_source_uuid_index.to_index_ref(),
-        graph_info.edges_destination_uuid_index.to_index_ref(),
-      ),
-      graph::EdgeDirectivity::Undirected => (
-        graph_info.edges_nodes_uuid_index.to_index_ref(),
-        graph_info.edges_nodes_uuid_index.to_index_ref(),
-      ),
+      graph::EdgeDirectivity::Directed => vec![(
+        &graph_info.edges_source_uuid_index,
+        &graph_info.edges_destination_uuid_index,
+      )],
+      graph::EdgeDirectivity::Undirected => vec![
+        (
+          &graph_info.edges_source_uuid_index,
+          &graph_info.edges_destination_uuid_index,
+        ),
+        (
+          &graph_info.edges_destination_uuid_index,
+          &graph_info.edges_source_uuid_index,
+        ),
+      ],
     };
 
     // Get the UUID of the edges
@@ -626,104 +632,106 @@ impl Store
           }
           else
           {
-            let edges_ids = if !query.destination.is_select_all() && !query.source.is_select_all()
-            {
-              let dest_it = self.select_nodes(
-                &mut transaction.borrow_mut(),
-                graph_name.to_owned(),
-                query.destination.clone(),
-              )?;
-              let dest_it: Vec<persy::PersyId> = dest_it
-                .into_iter()
-                .map(|n| edges_destination_uuid_index.get(transaction.clone(), n.key))
-                .collect::<Result<Vec<_>>>()?
-                .into_iter()
-                .flatten()
-                .collect();
-              let nodes = self.select_nodes(
-                &mut transaction.borrow_mut(),
-                graph_name,
-                query.source.clone(),
-              )?;
-              Box::new(
-                nodes
-                  .into_iter()
-                  .map(|n| {
-                    let nkey = n.key;
-                    Ok::<_, crate::Error>(
-                      edges_source_uuid_index
-                        .get(transaction.clone(), nkey)?
-                        .map(move |k| (k, Some(nkey), None)),
-                    )
-                  })
-                  .map(|id_iter| {
-                    Ok({
-                      let dest_it = dest_it.clone();
-                      id_iter?.filter(move |(id, _, _)| dest_it.contains(id))
-                    })
-                  })
-                  .collect::<Vec<Result<_>>>()
-                  .into_iter()
-                  .flatten()
-                  .flatten(),
-              )
-                as Box<
-                  dyn Iterator<Item = (persy::PersyId, Option<graph::Key>, Option<graph::Key>)>,
-                >
-            }
-            else if !query.source.is_select_all()
-            {
-              let nodes = self.select_nodes(
-                &mut transaction.borrow_mut(),
-                graph_name,
-                query.source.clone(),
-              )?;
-              Box::new(
-                nodes
-                  .into_iter()
-                  .map(|n| {
-                    let nkey = n.key;
-                    Ok(
-                      edges_source_uuid_index
-                        .get(transaction.clone(), nkey)?
-                        .map(move |k| (k, Some(nkey), None)),
-                    )
-                  })
-                  .collect::<Result<Vec<_>>>()?
-                  .into_iter()
-                  .flatten(),
-              )
-                as Box<
-                  dyn Iterator<Item = (persy::PersyId, Option<graph::Key>, Option<graph::Key>)>,
-                >
-            }
-            else
-            {
-              let nodes = self.select_nodes(
-                &mut transaction.borrow_mut(),
-                graph_name,
-                query.destination.clone(),
-              )?;
-              Box::new(
-                nodes
-                  .into_iter()
-                  .map(|n| {
-                    let nkey = n.key;
-                    Ok(
-                      edges_destination_uuid_index
-                        .get(transaction.clone(), nkey)?
-                        .map(move |k| (k, None, Some(nkey))),
-                    )
-                  })
-                  .collect::<Result<Vec<_>>>()?
-                  .into_iter()
-                  .flatten(),
-              )
-                as Box<
-                  dyn Iterator<Item = (persy::PersyId, Option<graph::Key>, Option<graph::Key>)>,
-                >
-            };
+            let edges_ids = edges_uuid_indices
+              .into_iter()
+              .map(|(edges_source_uuid_index, edges_destination_uuid_index)| {
+                if !query.destination.is_select_all() && !query.source.is_select_all()
+                {
+                  let dest_it = self.select_nodes(
+                    &mut transaction.borrow_mut(),
+                    graph_name.to_owned(),
+                    query.destination.clone(),
+                  )?;
+                  let dest_it: Vec<persy::PersyId> = dest_it
+                    .into_iter()
+                    .map(|n| edges_destination_uuid_index.get(transaction.clone(), n.key))
+                    .collect::<Result<Vec<_>>>()?
+                    .into_iter()
+                    .flatten()
+                    .collect();
+                  let nodes = self.select_nodes(
+                    &mut transaction.borrow_mut(),
+                    &graph_name,
+                    query.source.clone(),
+                  )?;
+                  Ok::<_, crate::Error>(Box::new(
+                    nodes
+                      .into_iter()
+                      .map(|n| {
+                        let nkey = n.key;
+                        Ok::<_, crate::Error>(
+                          edges_source_uuid_index
+                            .get(transaction.clone(), nkey)?
+                            .map(move |k| (k, Some(nkey), None)),
+                        )
+                      })
+                      .map(move |id_iter| {
+                        let dest_it = dest_it.clone();
+                        id_iter
+                          .unwrap()
+                          .filter(move |(id, _, _)| dest_it.contains(id))
+                      })
+                      .flatten(),
+                  )
+                    as Box<
+                      dyn Iterator<Item = (persy::PersyId, Option<graph::Key>, Option<graph::Key>)>,
+                    >)
+                }
+                else if !query.source.is_select_all()
+                {
+                  let nodes = self.select_nodes(
+                    &mut transaction.borrow_mut(),
+                    &graph_name,
+                    query.source.clone(),
+                  )?;
+                  Ok(Box::new(
+                    nodes
+                      .into_iter()
+                      .map(|n| {
+                        let nkey = n.key;
+                        Ok::<_, crate::Error>(
+                          edges_source_uuid_index
+                            .get(transaction.clone(), nkey)?
+                            .map(move |k| (k, Some(nkey), None)),
+                        )
+                      })
+                      .flatten()
+                      .flatten(),
+                  )
+                    as Box<
+                      dyn Iterator<Item = (persy::PersyId, Option<graph::Key>, Option<graph::Key>)>,
+                    >)
+                }
+                else
+                {
+                  let nodes = self.select_nodes(
+                    &mut transaction.borrow_mut(),
+                    &graph_name,
+                    query.destination.clone(),
+                  )?;
+                  Ok(Box::new(
+                    nodes
+                      .into_iter()
+                      .map(|n| {
+                        let nkey = n.key;
+                        Ok::<_, crate::Error>(
+                          edges_destination_uuid_index
+                            .get(transaction.clone(), nkey)?
+                            .map(move |k| (k, None, Some(nkey))),
+                        )
+                      })
+                      .flatten()
+                      .flatten(),
+                  )
+                    as Box<
+                      dyn Iterator<Item = (persy::PersyId, Option<graph::Key>, Option<graph::Key>)>,
+                    >)
+                }
+              })
+              .flatten()
+              .flatten();
             edges_ids
+              .unique()
               .map(|(edge_key, ks, kd)| {
                 if let Some(v) = transaction
                   .borrow_mut()

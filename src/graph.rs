@@ -202,7 +202,7 @@ impl_to_value!(Node, Node);
 impl_to_value!(Edge, Edge);
 impl_to_value!(Vec<Value>, Array);
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy, Hash)]
 pub struct Key
 {
   uuid: u128,
