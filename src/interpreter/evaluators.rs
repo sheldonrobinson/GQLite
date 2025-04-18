@@ -1,5 +1,7 @@
 use std::{collections::HashMap, default, hash::Hash};
 
+use itertools::Itertools;
+
 use crate::{
   error::{InternalError, RunTimeError},
   graph,
@@ -528,7 +530,11 @@ pub(crate) fn eval_program(
         }
         input_table = output_table;
       }
-      instructions::Block::BlockMatch { blocks, optional } =>
+      instructions::Block::BlockMatch {
+        blocks,
+        filter,
+        optional,
+      } =>
       {
         let mut output_table = crate::value_table::ValueTable::new();
         for row in input_table.into_iter()
@@ -664,6 +670,34 @@ pub(crate) fn eval_program(
             }
             current_rows = new_rows;
           }
+          if !filter.is_empty()
+          {
+            current_rows = current_rows
+              .into_iter()
+              .filter_map(|row| {
+                let res: Result<bool> = (|| {
+                  let mut stack = Stack::default();
+                  eval_instructions(&mut stack, &row, &filter, &parameters)?;
+                  stack.try_pop_into()
+                })();
+                match res
+                {
+                  Err(x) => Some(Err(x)),
+                  Ok(v) =>
+                  {
+                    if v
+                    {
+                      Some(Ok(row))
+                    }
+                    else
+                    {
+                      None
+                    }
+                  }
+                }
+              })
+              .collect::<Result<_>>()?
+          };
           if current_rows.is_empty() && optional
           {
             let mut new_row = row;

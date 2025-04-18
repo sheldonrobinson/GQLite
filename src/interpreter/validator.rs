@@ -17,6 +17,7 @@ pub(crate) enum VariableType
 {
   Node,
   Edge,
+  Boolean,
   Number,
   String,
   Variant,
@@ -40,6 +41,7 @@ pub(crate) enum Variable
   {
     edge: ast::EdgePattern,
   },
+  Boolean,
   Number,
   String,
   Variant,
@@ -53,6 +55,7 @@ impl Variable
     {
       Variable::Node { node: _ } => VariableType::Node,
       Variable::Edge { edge: _ } => VariableType::Edge,
+      Variable::Boolean => VariableType::Boolean,
       Variable::Number => VariableType::Number,
       Variable::String => VariableType::String,
       Variable::Variant => VariableType::Variant,
@@ -107,6 +110,7 @@ impl Validator
       {
         todo!()
       } // Ok(Variable::Variant),
+      ast::Expression::RelationalDifferent(_) => Ok(Variable::Boolean),
       ast::Expression::Map(_) => Ok(Variable::Variant),
       ast::Expression::MemberAccess(_) => Ok(Variable::Variant),
       ast::Expression::Parameter(_) => Ok(Variable::Variant),

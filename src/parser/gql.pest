@@ -30,8 +30,9 @@ node_or_edge_or_path_pattern = _{ edge_pattern | node_pattern | path_pattern }
 
 // Modifiers
 
-limit     = { "LIMIT" ~ expression }
-modifiers = { limit }
+limit          = { "LIMIT" ~ expression }
+modifiers      = { limit }
+where_modifier = { "WHERE" ~ expression }
 
 // Statements
 statement = { create_statement | optional_match_statement | match_statement | return_statement | call_statement | with_statement | unwind_statement }
@@ -39,7 +40,7 @@ statement = { create_statement | optional_match_statement | match_statement | re
 star = { "*" }
 
 create_statement         = { "CREATE" ~ node_or_edge_pattern ~ ("," ~ node_or_edge_pattern)* }
-match_statement          = { "MATCH" ~ node_or_edge_or_path_pattern ~ ("," ~ node_or_edge_or_path_pattern)* }
+match_statement          = { "MATCH" ~ node_or_edge_or_path_pattern ~ ("," ~ node_or_edge_or_path_pattern)* ~ where_modifier? }
 optional_match_statement = { "OPTIONAL" ~ match_statement }
 return_statement         = { "RETURN" ~ named_expression ~ ("," ~ named_expression)* }
 call_statement           = { "CALL" ~ function_name ~ "()" }
@@ -58,9 +59,13 @@ function_name  =  { ident ~ ("." ~ ident)* }
 
 // Expression
 
-named_expression =  { expression ~ "AS" ~ ident | expression }
+expression = { different_bin_op_expression }
+
+different_bin_op_expression = { expression_term ~ ("<>" ~ expression_term)? }
+
+named_expression =  { (expression ~ "AS" ~ ident) | expression }
 function_call    =  { function_name ~ "(" ~ expression ~ ("," ~ expression)* ~ ")" }
-expression       = _{ null_lit | true_lit | false_lit | num | int | string_literal | map | array | function_call | member_access | ident | parameter }
+expression_term  = _{ null_lit | true_lit | false_lit | num | int | string_literal | map | array | function_call | member_access | ident | parameter }
 
 parameter     = { "$" ~ ident }
 member_access = { ident ~ ("." ~ ident)+ }
