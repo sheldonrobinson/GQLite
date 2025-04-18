@@ -1,32 +1,40 @@
 use std::{collections::HashMap, fmt::Debug};
 
-use crate::{error, graph, Result};
+use crate::{aggregators, error, graph, Result};
 
 mod edge;
 mod value;
 
 pub(crate) type FResult<T> = std::result::Result<T, error::RunTimeError>;
 
-use crate::interpreter::validator::VariableType;
+use crate::interpreter::expression_analyser::ExpressionType;
 
-trait FunctionTypeTrait
+pub(crate) trait FunctionTypeTrait
 {
-  fn result_type() -> VariableType;
+  fn result_type() -> ExpressionType;
 }
 
 impl FunctionTypeTrait for bool
 {
-  fn result_type() -> VariableType
+  fn result_type() -> ExpressionType
   {
-    VariableType::Boolean
+    ExpressionType::Boolean
   }
 }
 
 impl FunctionTypeTrait for String
 {
-  fn result_type() -> VariableType
+  fn result_type() -> ExpressionType
   {
-    VariableType::String
+    ExpressionType::String
+  }
+}
+
+impl FunctionTypeTrait for i64
+{
+  fn result_type() -> ExpressionType
+  {
+    ExpressionType::Number
   }
 }
 
@@ -39,10 +47,8 @@ impl FunctionTypeTrait for String
 pub(crate) trait FunctionTrait: Debug
 {
   fn call(&self, arguments: Vec<graph::Value>) -> Result<graph::Value>;
-  fn validate_arguments(
-    &self,
-    arguments: Vec<crate::interpreter::validator::VariableType>,
-  ) -> Result<crate::interpreter::validator::VariableType>;
+  fn validate_arguments(&self, arguments: Vec<ExpressionType>) -> Result<ExpressionType>;
+  fn is_deterministic(&self) -> bool;
 }
 
 //  _____                 _   _
@@ -60,10 +66,17 @@ pub(crate) type Function = std::rc::Rc<Box<dyn FunctionTrait>>;
 // |_|  |_|\__,_|_| |_|\__,_|\__, |\___|_|
 //                           |___/
 
+#[derive(Debug)]
+struct ManagerInner
+{
+  functions: HashMap<String, Function>,
+  aggregators: HashMap<String, aggregators::Aggregator>,
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct Manager
 {
-  functions: std::rc::Rc<HashMap<String, Function>>,
+  inner: std::rc::Rc<ManagerInner>,
 }
 
 impl Manager
@@ -71,24 +84,81 @@ impl Manager
   pub(crate) fn new() -> Self
   {
     Self {
-      functions: std::rc::Rc::new(HashMap::from([
-        edge::Type::new(),
-        value::Coalesce::new(),
-        value::HasLabel::new(),
-        value::HasLabels::new(),
-      ])),
+      inner: std::rc::Rc::new(ManagerInner {
+        functions: HashMap::from([
+          edge::Type::new(),
+          value::Coalesce::new(),
+          value::HasLabel::new(),
+          value::HasLabels::new(),
+        ]),
+        aggregators: aggregators::init_aggregators(),
+      }),
     }
   }
-  pub(crate) fn get<E: error::GenericErrors>(&self, name: impl Into<String>) -> Result<Function>
+  pub(crate) fn get_function<E: error::GenericErrors>(
+    &self,
+    name: impl Into<String>,
+  ) -> Result<Function>
   {
     let name = name.into();
     Ok(
       self
+        .inner
         .functions
         .get(&name)
         .ok_or_else(|| E::unknown_function(name).into())?
         .clone(),
     )
+  }
+  pub(crate) fn get_aggregator<E: error::GenericErrors>(
+    &self,
+    name: impl Into<String>,
+  ) -> Result<aggregators::Aggregator>
+  {
+    let name = name.into();
+    Ok(
+      self
+        .inner
+        .aggregators
+        .get(&name)
+        .ok_or_else(|| E::unknown_function(name).into())?
+        .clone(),
+    )
+  }
+  pub(crate) fn is_deterministic(&self, name: impl Into<String>) -> Result<bool>
+  {
+    let name = name.into();
+    let fun = self.get_function::<crate::error::CompileTimeError>(name.clone());
+    match fun
+    {
+      Ok(fun) => Ok(fun.is_deterministic()),
+      Err(_) =>
+      {
+        self.get_aggregator::<crate::error::CompileTimeError>(name)?;
+        Ok(false)
+      }
+    }
+  }
+  pub(crate) fn is_aggregate(&self, name: &String) -> bool
+  {
+    self.inner.aggregators.contains_key(name)
+  }
+
+  pub(crate) fn validate_arguments(
+    &self,
+    name: impl Into<String>,
+    arguments: Vec<ExpressionType>,
+  ) -> Result<ExpressionType>
+  {
+    let name = name.into();
+    let fun = self.get_function::<crate::error::CompileTimeError>(name.clone());
+    match fun
+    {
+      Ok(fun) => fun.validate_arguments(arguments),
+      Err(_) => self
+        .get_aggregator::<crate::error::CompileTimeError>(name)?
+        .validate_arguments(arguments),
+    }
   }
 }
 
@@ -118,6 +188,9 @@ macro_rules! make_function_call {
       $crate::functions::make_function_argument!($arguments, 0, $arg_type_0),
       $crate::functions::make_function_argument!($arguments, 1, $arg_type_1),
     )
+  };
+  ($function: expr, $arguments: ident, ) => {
+    $function()
   };
 }
 
@@ -153,7 +226,7 @@ macro_rules! declare_function {
         {
           use crate::graph::ValueTryIntoRef;
           Ok(
-            $crate::functions::make_function_call!(Self::call_impl, arguments, $( $arg_type,)*)
+            $crate::functions::make_function_call!(Self::$f_name, arguments, $( $arg_type,)*)
             .map(|r| -> graph::Value { r.into() })?,
           )
         }
@@ -164,10 +237,15 @@ macro_rules! declare_function {
       }
       fn validate_arguments(
         &self,
-        _: Vec<crate::interpreter::validator::VariableType>,
-      ) -> crate::Result<crate::interpreter::validator::VariableType>
+        _: Vec<crate::interpreter::expression_analyser::ExpressionType>,
+      ) -> crate::Result<crate::interpreter::expression_analyser::ExpressionType>
       {
+        // TODO
         Ok($ret_type::result_type())
+      }
+      fn is_deterministic(&self) -> bool
+      {
+        true
       }
     }
   };

@@ -5,6 +5,7 @@
 #![warn(missing_docs)]
 // #![deny(warnings)]
 
+mod aggregators;
 #[cfg(feature = "capi")]
 mod capi;
 mod connection;

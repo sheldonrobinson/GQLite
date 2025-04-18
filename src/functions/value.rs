@@ -1,6 +1,6 @@
 use crate::{error::RunTimeError, graph};
 
-use super::{FResult, FunctionTypeTrait};
+use super::{ExpressionType, FResult, FunctionTypeTrait};
 
 #[derive(Debug, Default)]
 pub(super) struct Coalesce {}
@@ -20,12 +20,13 @@ impl super::FunctionTrait for Coalesce
     }
     Ok(graph::Value::Invalid)
   }
-  fn validate_arguments(
-    &self,
-    _: Vec<crate::interpreter::validator::VariableType>,
-  ) -> crate::Result<crate::interpreter::validator::VariableType>
+  fn validate_arguments(&self, _: Vec<ExpressionType>) -> crate::Result<ExpressionType>
   {
-    Ok(crate::interpreter::validator::VariableType::Variant)
+    Ok(ExpressionType::Variant)
+  }
+  fn is_deterministic(&self) -> bool
+  {
+    true
   }
 }
 
@@ -114,12 +115,13 @@ impl super::FunctionTrait for HasLabels
       Ok(true.into())
     }
   }
-  fn validate_arguments(
-    &self,
-    _: Vec<crate::interpreter::validator::VariableType>,
-  ) -> crate::Result<crate::interpreter::validator::VariableType>
+  fn validate_arguments(&self, _: Vec<ExpressionType>) -> crate::Result<ExpressionType>
   {
-    Ok(crate::interpreter::validator::VariableType::Variant)
+    Ok(ExpressionType::Variant)
+  }
+  fn is_deterministic(&self) -> bool
+  {
+    true
   }
 }
 
