@@ -1,17 +1,14 @@
 use std::collections::HashMap;
 
 #[cfg(feature = "pgql")]
-mod pgql;
+pub(crate) mod pgql;
 #[cfg(feature = "redb")]
-mod redb;
-
-#[cfg(feature = "redb")]
-pub(crate) use redb::{Store, Transaction};
+pub(crate) mod redb;
 
 #[cfg(feature = "pgql")]
 pub(crate) use pgql::Store;
 
-use crate::graph;
+use crate::{graph, Result};
 
 //  ____  _        _   _     _   _
 // / ___|| |_ __ _| |_(_)___| |_(_) ___ ___
@@ -25,6 +22,80 @@ pub(crate) struct Statistics
   pub edges_count: usize,
   pub labels_nodes_count: usize,
   pub properties_count: usize,
+}
+
+//  ____  _
+// / ___|| |_ ___  _ __ ___
+// \___ \| __/ _ \| '__/ _ \
+//  ___) | || (_) | | |  __/
+// |____/ \__\___/|_|  \___|
+
+pub(crate) trait Store
+{
+  type Transaction;
+  fn create_graph(&mut self, name: impl Into<String>, _ignore_if_exists: bool) -> Result<()>;
+  fn begin(&self) -> Result<Self::Transaction>;
+  fn commit(&self, transaction: Self::Transaction) -> Result<()>;
+  /// Create nodes and add them to a graph
+  fn create_nodes<'a, T: Iterator<Item = &'a crate::graph::Node>>(
+    &self,
+    transaction: &mut Self::Transaction,
+    graph_name: &String,
+    nodes_iter: T,
+  ) -> Result<()>;
+  /// Create nodes and add them to a graph
+  fn update_node(
+    &self,
+    transaction: &mut Self::Transaction,
+    graph_name: &String,
+    node: &graph::Node,
+  ) -> Result<()>;
+  /// Delete nodes according to a given query
+  fn delete_nodes(
+    &self,
+    transaction: &mut Self::Transaction,
+    graph_name: &String,
+    query: SelectNodeQuery,
+    detach: bool,
+  ) -> Result<()>;
+  /// Select nodes according to a given query
+  fn select_nodes(
+    &self,
+    transaction: &mut Self::Transaction,
+    graph_name: &String,
+    query: SelectNodeQuery,
+  ) -> Result<Vec<crate::graph::Node>>;
+  /// Add edge
+  fn create_edges<'a, T: Iterator<Item = &'a crate::graph::Edge>>(
+    &self,
+    transaction: &mut Self::Transaction,
+    graph_name: &String,
+    edges_iter: T,
+  ) -> Result<()>;
+  fn update_edge(
+    &self,
+    transaction: &mut Self::Transaction,
+    graph_name: &String,
+    edge: &graph::Edge,
+  ) -> Result<()>;
+  /// Delete nodes according to a given query
+  fn delete_edges(
+    &self,
+    transaction: &mut Self::Transaction,
+    graph_name: &String,
+    query: SelectEdgeQuery,
+    directivity: graph::EdgeDirectivity,
+  ) -> Result<()>;
+  /// Select edges
+  fn select_edges(
+    &self,
+    transaction: &mut Self::Transaction,
+    graph_name: &String,
+    query: SelectEdgeQuery,
+    directivity: graph::EdgeDirectivity,
+  ) -> Result<Vec<EdgeResult>>;
+  /// Compute store statistics
+  fn compute_statistics(&self, transaction: &mut Self::Transaction) -> Result<Statistics>;
 }
 
 //  _____    _            ____                 _ _

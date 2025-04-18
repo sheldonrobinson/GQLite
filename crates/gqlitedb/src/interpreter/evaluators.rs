@@ -334,17 +334,15 @@ fn eval_instructions(
         {
           graph::Value::Node(no) =>
           {
-            stack.push(crate::store::SelectNodeQuery::select_keys([no.key]).into());
+            stack.push(store::SelectNodeQuery::select_keys([no.key]).into());
           }
           graph::Value::Object(ob) =>
           {
-            stack.push(
-              crate::store::SelectNodeQuery::select_labels_properties(labels.clone(), ob).into(),
-            );
+            stack.push(store::SelectNodeQuery::select_labels_properties(labels.clone(), ob).into());
           }
           graph::Value::Invalid =>
           {
-            stack.push(crate::store::SelectNodeQuery::select_none().into());
+            stack.push(store::SelectNodeQuery::select_none().into());
           }
           _ => Err(InternalError::InvalidValueCast)?,
         }
@@ -584,9 +582,9 @@ impl HashMapExt for HashMap<String, graph::Value>
   }
 }
 
-pub(crate) fn eval_update_property(
-  store: &crate::store::Store,
-  mut tx: &mut crate::store::Transaction,
+pub(crate) fn eval_update_property<TStore: store::Store>(
+  store: &TStore,
+  mut tx: &mut TStore::Transaction,
   graph_name: &String,
   row: &mut value_table::Row,
   target: &String,
@@ -858,8 +856,8 @@ fn compute_return_with_table(
   )
 }
 
-pub(crate) fn eval_program(
-  store: &crate::store::Store,
+pub(crate) fn eval_program<TStore: store::Store>(
+  store: &TStore,
   program: super::Program,
   parameters: crate::graph::ValueObject,
 ) -> crate::Result<crate::graph::Value>
@@ -945,7 +943,7 @@ pub(crate) fn eval_program(
                 } =>
                 {
                   eval_instructions(&mut stack, &row, &instructions, &parameters)?;
-                  let query: crate::store::SelectNodeQuery = stack.try_pop_into()?;
+                  let query: store::SelectNodeQuery = stack.try_pop_into()?;
                   let nodes = store.select_nodes(&mut tx, &graph_name, query)?;
 
                   for node in nodes.iter()
@@ -1151,7 +1149,7 @@ pub(crate) fn eval_program(
               .collect(),
           ));
         }
-        tx.commit()?;
+        store.commit(tx)?;
         return Ok(crate::graph::Value::Array(r));
       }
       instructions::Block::With {
@@ -1401,6 +1399,6 @@ pub(crate) fn eval_program(
       }
     }
   }
-  tx.commit()?;
+  store.commit(tx)?;
   Ok(crate::graph::Value::Invalid)
 }

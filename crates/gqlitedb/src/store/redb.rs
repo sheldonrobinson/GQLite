@@ -2,7 +2,7 @@ use redb::{ReadableTable, ReadableTableMetadata};
 use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::{error, graph, Result};
+use crate::{error, graph, store, Result};
 
 //  ____               _     _             _   _____    _
 // |  _ \ ___ _ __ ___(_)___| |_ ___ _ __ | |_| ____|__| | __ _  ___
@@ -282,18 +282,92 @@ impl Store
   pub(crate) fn new<P: AsRef<std::path::Path>>(path: P) -> Result<Store>
   {
     let path = path.as_ref();
-    let mut s = Store {
+    let mut s = Self {
       redb_store: redb::Database::create(path)?,
       graphs: Default::default(),
     };
+    use crate::store::Store;
     s.create_graph("default", true)?;
     Ok(s)
   }
-  pub(crate) fn create_graph(
-    &mut self,
-    name: impl Into<String>,
-    _ignore_if_exists: bool,
-  ) -> Result<()>
+  fn select_nodes_from_table<'txn>(
+    &self,
+    nodes_table: &redb::Table<'txn, graph::Key, graph::Node>,
+    query: super::SelectNodeQuery,
+  ) -> Result<Vec<crate::graph::Node>>
+  {
+    let r = match query.keys
+    {
+      Some(keys) => Box::new(keys.into_iter().map(|key| {
+        Ok(
+          nodes_table
+            .get_required(key, error::Error::UnknownNode)?
+            .value(),
+        )
+      })) as Box<dyn Iterator<Item = Result<graph::Node>>>,
+      None => Box::new({
+        nodes_table.range::<graph::Key>(..)?.into_iter().map(|r| {
+          let (_, v) = r?;
+          Ok(v.value())
+        })
+      }) as Box<dyn Iterator<Item = Result<graph::Node>>>,
+    };
+    let r = match query.labels
+    {
+      Some(labels) => Box::new(r.filter(move |n| match n
+      {
+        Ok(n) =>
+        {
+          for l in labels.iter()
+          {
+            if !n.labels.contains(l)
+            {
+              return false;
+            }
+          }
+          true
+        }
+        Err(_) => true,
+      })) as Box<dyn Iterator<Item = Result<crate::graph::Node>>>,
+      None => Box::new(r) as Box<dyn Iterator<Item = Result<crate::graph::Node>>>,
+    };
+    let r = match query.properties
+    {
+      Some(properties) => Box::new(r.filter(move |n| match n
+      {
+        Ok(n) =>
+        {
+          for (k, v) in properties.iter()
+          {
+            match n.properties.get(k)
+            {
+              Some(val) =>
+              {
+                if val != v
+                {
+                  return false;
+                }
+              }
+              None =>
+              {
+                return false;
+              }
+            }
+          }
+          true
+        }
+        Err(_) => true,
+      })) as Box<dyn Iterator<Item = Result<crate::graph::Node>>>,
+      None => Box::new(r) as Box<dyn Iterator<Item = Result<crate::graph::Node>>>,
+    };
+    r.collect()
+  }
+}
+
+impl store::Store for Store
+{
+  type Transaction = redb::WriteTransaction;
+  fn create_graph(&mut self, name: impl Into<String>, _ignore_if_exists: bool) -> Result<()>
   {
     let gi = GraphInfo::new(name);
 
@@ -308,13 +382,18 @@ impl Store
 
     Ok(())
   }
-  pub(crate) fn begin(&self) -> Result<redb::WriteTransaction>
+  fn begin(&self) -> Result<redb::WriteTransaction>
   {
     let s = self.redb_store.begin_write()?;
     Ok(s)
   }
+  fn commit(&self, transaction: Self::Transaction) -> Result<()>
+  {
+    transaction.commit()?;
+    Ok(())
+  }
   /// Create nodes and add them to a graph
-  pub(crate) fn create_nodes<'a, T: Iterator<Item = &'a crate::graph::Node>>(
+  fn create_nodes<'a, T: Iterator<Item = &'a crate::graph::Node>>(
     &self,
     transaction: &mut redb::WriteTransaction,
     graph_name: &String,
@@ -335,7 +414,7 @@ impl Store
     Ok(())
   }
   /// Create nodes and add them to a graph
-  pub(crate) fn update_node(
+  fn update_node(
     &self,
     transaction: &mut redb::WriteTransaction,
     graph_name: &String,
@@ -348,7 +427,7 @@ impl Store
     Ok(())
   }
   /// Delete nodes according to a given query
-  pub(crate) fn delete_nodes(
+  fn delete_nodes(
     &self,
     transaction: &mut redb::WriteTransaction,
     graph_name: &String,
@@ -448,7 +527,7 @@ impl Store
     Ok(())
   }
   /// Select nodes according to a given query
-  pub(crate) fn select_nodes(
+  fn select_nodes(
     &self,
     transaction: &mut redb::WriteTransaction,
     graph_name: &String,
@@ -459,80 +538,8 @@ impl Store
     let nodes_table = transaction.open_table(graph_info.nodes_table_definition())?;
     self.select_nodes_from_table(&nodes_table, query)
   }
-  fn select_nodes_from_table<'txn>(
-    &self,
-    nodes_table: &redb::Table<'txn, graph::Key, graph::Node>,
-    query: super::SelectNodeQuery,
-  ) -> Result<Vec<crate::graph::Node>>
-  {
-    let r = match query.keys
-    {
-      Some(keys) => Box::new(keys.into_iter().map(|key| {
-        Ok(
-          nodes_table
-            .get_required(key, error::Error::UnknownNode)?
-            .value(),
-        )
-      })) as Box<dyn Iterator<Item = Result<graph::Node>>>,
-      None => Box::new({
-        nodes_table.range::<graph::Key>(..)?.into_iter().map(|r| {
-          let (_, v) = r?;
-          Ok(v.value())
-        })
-      }) as Box<dyn Iterator<Item = Result<graph::Node>>>,
-    };
-    let r = match query.labels
-    {
-      Some(labels) => Box::new(r.filter(move |n| match n
-      {
-        Ok(n) =>
-        {
-          for l in labels.iter()
-          {
-            if !n.labels.contains(l)
-            {
-              return false;
-            }
-          }
-          true
-        }
-        Err(_) => true,
-      })) as Box<dyn Iterator<Item = Result<crate::graph::Node>>>,
-      None => Box::new(r) as Box<dyn Iterator<Item = Result<crate::graph::Node>>>,
-    };
-    let r = match query.properties
-    {
-      Some(properties) => Box::new(r.filter(move |n| match n
-      {
-        Ok(n) =>
-        {
-          for (k, v) in properties.iter()
-          {
-            match n.properties.get(k)
-            {
-              Some(val) =>
-              {
-                if val != v
-                {
-                  return false;
-                }
-              }
-              None =>
-              {
-                return false;
-              }
-            }
-          }
-          true
-        }
-        Err(_) => true,
-      })) as Box<dyn Iterator<Item = Result<crate::graph::Node>>>,
-      None => Box::new(r) as Box<dyn Iterator<Item = Result<crate::graph::Node>>>,
-    };
-    r.collect()
-  }
   /// Add edge
-  pub(crate) fn create_edges<'a, T: Iterator<Item = &'a crate::graph::Edge>>(
+  fn create_edges<'a, T: Iterator<Item = &'a crate::graph::Edge>>(
     &self,
     transaction: &mut redb::WriteTransaction,
     graph_name: &String,
@@ -572,7 +579,7 @@ impl Store
     }
     Ok(())
   }
-  pub(crate) fn update_edge(
+  fn update_edge(
     &self,
     transaction: &mut redb::WriteTransaction,
     graph_name: &String,
@@ -594,7 +601,7 @@ impl Store
     Ok(())
   }
   /// Delete nodes according to a given query
-  pub(crate) fn delete_edges(
+  fn delete_edges(
     &self,
     transaction: &mut redb::WriteTransaction,
     graph_name: &String,
@@ -639,7 +646,7 @@ impl Store
     Ok(())
   }
   /// Select edges
-  pub(crate) fn select_edges(
+  fn select_edges(
     &self,
     transaction: &mut redb::WriteTransaction,
     graph_name: &String,
@@ -907,7 +914,7 @@ impl Store
       r.collect()
     }
   }
-  pub(crate) fn compute_statistics(
+  fn compute_statistics(
     &self,
     transaction: &mut redb::WriteTransaction,
   ) -> Result<super::Statistics>
@@ -968,7 +975,10 @@ mod tests
 {
   use std::borrow::BorrowMut;
 
-  use crate::graph;
+  use crate::{
+    graph,
+    store::{self, Store},
+  };
 
   #[test]
   fn test_add_nodes()
@@ -998,7 +1008,7 @@ mod tests
       .select_nodes(
         store.begin().unwrap().borrow_mut(),
         &"default".into(),
-        crate::store::SelectNodeQuery::select_keys([nodes[0].key]),
+        store::SelectNodeQuery::select_keys([nodes[0].key]),
       )
       .unwrap();
 
@@ -1009,7 +1019,7 @@ mod tests
       .select_nodes(
         store.begin().unwrap().borrow_mut(),
         &"default".into(),
-        crate::store::SelectNodeQuery::select_labels(["not".to_string()]),
+        store::SelectNodeQuery::select_labels(["not".to_string()]),
       )
       .unwrap();
 
@@ -1058,7 +1068,7 @@ mod tests
       .select_edges(
         store.begin().unwrap().borrow_mut(),
         &"default".into(),
-        crate::store::SelectEdgeQuery::select_keys([edge.key]),
+        store::SelectEdgeQuery::select_keys([edge.key]),
         graph::EdgeDirectivity::Directed,
       )
       .unwrap();
@@ -1071,11 +1081,11 @@ mod tests
       .select_edges(
         store.begin().unwrap().borrow_mut(),
         &"default".into(),
-        crate::store::SelectEdgeQuery::select_source_destination_labels_properties(
-          crate::store::SelectNodeQuery::select_all(),
+        store::SelectEdgeQuery::select_source_destination_labels_properties(
+          store::SelectNodeQuery::select_all(),
           vec![],
           Default::default(),
-          crate::store::SelectNodeQuery::select_all(),
+          store::SelectNodeQuery::select_all(),
         ),
         graph::EdgeDirectivity::Directed,
       )
@@ -1089,11 +1099,11 @@ mod tests
       .select_edges(
         store.begin().unwrap().borrow_mut(),
         &"default".into(),
-        crate::store::SelectEdgeQuery::select_source_destination_labels_properties(
-          crate::store::SelectNodeQuery::select_labels_properties(vec![], Default::default()),
+        store::SelectEdgeQuery::select_source_destination_labels_properties(
+          store::SelectNodeQuery::select_labels_properties(vec![], Default::default()),
           vec![],
           Default::default(),
-          crate::store::SelectNodeQuery::select_labels_properties(vec![], Default::default()),
+          store::SelectNodeQuery::select_labels_properties(vec![], Default::default()),
         ),
         graph::EdgeDirectivity::Directed,
       )
