@@ -2,6 +2,7 @@ use std::{collections::HashMap, fmt::Debug};
 
 use crate::{aggregators, error, graph, Result};
 
+mod containers;
 mod edge;
 mod value;
 
@@ -86,6 +87,7 @@ impl Manager
     Self {
       inner: std::rc::Rc::new(ManagerInner {
         functions: HashMap::from([
+          containers::Length::new(),
           edge::Type::new(),
           value::Coalesce::new(),
           value::HasLabel::new(),
