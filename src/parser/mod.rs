@@ -1,7 +1,7 @@
-use pest::Parser;
+use pest::{error::Error, Parser};
 use pest_derive::Parser;
 
-use crate::Result;
+use crate::{graph, Result};
 
 pub(crate) mod ast;
 
@@ -9,17 +9,33 @@ pub(crate) mod ast;
 #[grammar = "parser/gql.pest"]
 pub(crate) struct GQLParser;
 
+fn build_pair(pair: pest::iterators::Pair<Rule>) -> Result<(String, ast::Expression)> {
+  let mut it = pair.into_inner();
+  let k = it.next().unwrap();
+  let v = build_expression(it.next().unwrap())?;
+  return Ok((k.as_str().to_string(), v));
+}
+
 fn build_expression(pair: pest::iterators::Pair<Rule>) -> Result<ast::Expression> {
   match pair.as_rule() {
-    Rule::ident => {
-      Ok(
-        ast::Expression::Variable(ast::Variable {
-          identifier: pair.as_str().to_string(),
-        })
-      )
-    }
-    unknown_expression =>
-      Err(crate::Error::UnxpectedExpression("build_expression", format!("{unknown_expression:?}"))),
+    Rule::ident => Ok(ast::Expression::Variable(ast::Variable {
+      identifier: pair.as_str().to_string(),
+    })),
+    Rule::map => Ok(ast::Expression::Map({
+      let mut map = std::collections::HashMap::new();
+      for k_v_pair in pair.into_inner() {
+        let (k, v) = build_pair(k_v_pair)?;
+        map.insert(k, v);
+      }
+      ast::Map { map: map }
+    })),
+    Rule::string_literal => Ok(ast::Expression::Value(ast::Value {
+      value: graph::Value::String(pair.into_inner().next().unwrap().as_str().to_string()),
+    })),
+    unknown_expression => Err(crate::Error::UnxpectedExpression(
+      "build_expression",
+      format!("{unknown_expression:?}"),
+    )),
   }
 }
 
@@ -35,32 +51,28 @@ fn build_named_expression(pair: pest::iterators::Pair<Rule>) -> Result<ast::Name
             expression: build_expression(expr)?,
           })
         }
-        2 => {
-          Ok(ast::NamedExpression {
-            name: inner.next().unwrap().as_str().to_string(),
-            expression: build_expression(inner.next().unwrap())?,
-          })
-        }
+        2 => Ok(ast::NamedExpression {
+          name: inner.next().unwrap().as_str().to_string(),
+          expression: build_expression(inner.next().unwrap())?,
+        }),
         _ => {
-          panic!("Invalid number of terms in named expressions {}", inner.len());
+          panic!(
+            "Invalid number of terms in named expressions {}",
+            inner.len()
+          );
         }
       }
     }
-    unknown_expression =>
-      Err(
-        crate::Error::UnxpectedExpression(
-          "build_named_expressions",
-          format!("{unknown_expression:?}")
-        )
-      ),
+    unknown_expression => Err(crate::Error::UnxpectedExpression(
+      "build_named_expressions",
+      format!("{unknown_expression:?}"),
+    )),
   }
 }
 
 fn build_labels(mut iterator: pest::iterators::Pairs<Rule>) -> Result<Vec<String>> {
-  println!("!!!!!!!!! {:?}", iterator);
   let mut vec = vec![];
   while let Some(pair) = iterator.next() {
-    println!("------------------ {:?}", pair);
     vec.push(pair.as_str().to_string());
   }
   Ok(vec)
@@ -81,21 +93,22 @@ fn build_pattern(mut iterator: pest::iterators::Pairs<Rule>) -> Result<Vec<ast::
         } else {
           vec![]
         };
-        vec.push(
-          ast::Pattern::GraphNode(ast::GraphNode {
-            variable: variable,
-            labels: labels,
-            properties: None,
-          })
-        );
+        let properties = if let Some(properties_it) = it.next() {
+          Some(build_expression(properties_it)?)
+        } else {
+          None
+        };
+        vec.push(ast::Pattern::GraphNode(ast::GraphNode {
+          variable: variable,
+          labels: labels,
+          properties: properties,
+        }));
       }
       unknown_expression => {
-        return Err(
-          crate::Error::UnxpectedExpression(
-            "build_node_or_edge_vec",
-            format!("{unknown_expression:?}")
-          )
-        );
+        return Err(crate::Error::UnxpectedExpression(
+          "build_node_or_edge_vec",
+          format!("{unknown_expression:?}"),
+        ));
       }
     }
   }
@@ -105,42 +118,29 @@ fn build_pattern(mut iterator: pest::iterators::Pairs<Rule>) -> Result<Vec<ast::
 
 fn build_ast_from_statement(pair: pest::iterators::Pair<Rule>) -> Result<ast::Statement> {
   match pair.as_rule() {
-    Rule::create_statement => {
-      Ok(
-        ast::Statement::Create(ast::Create {
-          patterns: build_pattern(pair.into_inner())?,
-        })
-      )
-    }
-    Rule::match_statement => {
-      Ok(
-        ast::Statement::Match(ast::Match {
-          where_expression: None,
-          patterns: build_pattern(pair.into_inner())?,
-          optional: false,
-        })
-      )
-    }
+    Rule::create_statement => Ok(ast::Statement::Create(ast::Create {
+      patterns: build_pattern(pair.into_inner())?,
+    })),
+    Rule::match_statement => Ok(ast::Statement::Match(ast::Match {
+      where_expression: None,
+      patterns: build_pattern(pair.into_inner())?,
+      optional: false,
+    })),
     Rule::return_statement => {
       let named_expressions = pair
         .into_inner()
         .map(|pair| build_named_expression(pair))
         .collect::<Result<Vec<ast::NamedExpression>>>()?;
-      Ok(
-        ast::Statement::Return(ast::Return {
-          all: false,
-          expressions: named_expressions,
-          modifiers: ast::Modifiers::default(),
-        })
-      )
+      Ok(ast::Statement::Return(ast::Return {
+        all: false,
+        expressions: named_expressions,
+        modifiers: ast::Modifiers::default(),
+      }))
     }
-    unknown_expression =>
-      Err(
-        crate::Error::UnxpectedExpression(
-          "build_ast_from_statement",
-          format!("{unknown_expression:?}")
-        )
-      ),
+    unknown_expression => Err(crate::Error::UnxpectedExpression(
+      "build_ast_from_statement",
+      format!("{unknown_expression:?}"),
+    )),
   }
 }
 
@@ -156,7 +156,10 @@ pub(crate) fn parse(input: &str) -> Result<ast::Statements> {
       }
       Rule::EOI => {}
       unknown_expression => {
-        Err(crate::Error::UnxpectedExpression("parse", format!("{unknown_expression:?}")))?;
+        Err(crate::Error::UnxpectedExpression(
+          "parse",
+          format!("{unknown_expression:?}"),
+        ))?;
       }
     }
   }
