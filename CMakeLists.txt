@@ -190,7 +190,7 @@ if(Python3_FOUND AND PYTHON3_CFFI_FOUND)
   add_custom_target(python3_ffi_lib ALL
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/bindings/python/build-ffi.py ${CMAKE_CURRENT_SOURCE_DIR}
       WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-      DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/bindings/python/build-ffi.py gqlite
+      DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/bindings/python/build-ffi.py cargo-build_gqlite
   )
   install(FILES ${CMAKE_CURRENT_BINARY_DIR}/__c_gqlite.cpython-${Python3_VERSION_MAJOR}${Python3_VERSION_MINOR}-x86_64-linux-gnu.so DESTINATION ${PYTHON_SITE_PACKAGES_INSTALL_DIR}/)
   install(DIRECTORY bindings/python/gqlite DESTINATION ${PYTHON_SITE_PACKAGES_INSTALL_DIR})
