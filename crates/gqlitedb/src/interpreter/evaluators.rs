@@ -187,9 +187,9 @@ struct Stack
 
 impl Stack
 {
-  fn push(&mut self, value: Value)
+  fn push(&mut self, value: impl Into<Value>)
   {
-    self.stack.push(value);
+    self.stack.push(value.into());
   }
   fn try_pop(&mut self) -> Result<Value>
   {
@@ -265,11 +265,11 @@ fn execute_boolean_operator(
       {
         if b.is_null() || <graph::Value as TryInto<bool>>::try_into(b)? == true
         {
-          stack.push(graph::Value::Invalid.into());
+          stack.push(graph::Value::Invalid);
         }
         else
         {
-          stack.push(false.into());
+          stack.push(false);
         }
       }
       else
@@ -279,16 +279,16 @@ fn execute_boolean_operator(
         {
           if b.is_null()
           {
-            stack.push(graph::Value::Invalid.into());
+            stack.push(graph::Value::Invalid);
           }
           else
           {
-            stack.push(b.into());
+            stack.push(b);
           }
         }
         else
         {
-          stack.push(false.into());
+          stack.push(false);
         }
       }
     }
@@ -298,11 +298,11 @@ fn execute_boolean_operator(
       {
         if b.is_null() || <graph::Value as TryInto<bool>>::try_into(b)? == false
         {
-          stack.push(graph::Value::Invalid.into());
+          stack.push(graph::Value::Invalid);
         }
         else
         {
-          stack.push(true.into());
+          stack.push(true);
         }
       }
       else
@@ -310,17 +310,17 @@ fn execute_boolean_operator(
         let a: bool = a.try_into()?;
         if a
         {
-          stack.push(true.into());
+          stack.push(true);
         }
         else
         {
           if b.is_null()
           {
-            stack.push(graph::Value::Invalid.into());
+            stack.push(graph::Value::Invalid);
           }
           else
           {
-            stack.push(b.into());
+            stack.push(b);
           }
         }
       }
@@ -329,13 +329,13 @@ fn execute_boolean_operator(
     {
       if a.is_null() || b.is_null()
       {
-        stack.push(graph::Value::Invalid.into());
+        stack.push(graph::Value::Invalid);
       }
       else
       {
         let a: bool = a.try_into()?;
         let b: bool = b.try_into()?;
-        stack.push((a ^ b).into());
+        stack.push(a ^ b);
       }
     }
     _ => Err(InternalError::Unreachable {
@@ -353,7 +353,7 @@ fn execute_binary_operator<T: Into<crate::graph::Value>>(
 {
   let a = stack.try_pop()?;
   let b = stack.try_pop()?;
-  stack.push(operand(a.try_into()?, b.try_into()?)?.into().into());
+  stack.push(operand(a.try_into()?, b.try_into()?)?.into());
   Ok(())
 }
 
@@ -384,28 +384,22 @@ fn eval_instructions(
         let props: graph::Value = stack.try_pop_into()?;
         let dst: graph::Node = stack.try_pop_into()?;
         let src: graph::Node = stack.try_pop_into()?;
-        stack.push(
-          crate::graph::Edge {
-            key: graph::Key::default(),
-            source: src,
-            destination: dst,
-            labels: labels.to_owned(),
-            properties: props.to_object_safe(),
-          }
-          .into(),
-        );
+        stack.push(crate::graph::Edge {
+          key: graph::Key::default(),
+          source: src,
+          destination: dst,
+          labels: labels.to_owned(),
+          properties: props.to_object_safe(),
+        });
       }
       instructions::Instruction::CreateNodeLiteral { labels } =>
       {
         let props: graph::Value = stack.try_pop_into()?;
-        stack.push(
-          crate::graph::Node {
-            key: crate::graph::Key::default(),
-            labels: labels.clone(),
-            properties: props.to_object_safe(),
-          }
-          .into(),
-        );
+        stack.push(crate::graph::Node {
+          key: crate::graph::Key::default(),
+          labels: labels.clone(),
+          properties: props.to_object_safe(),
+        });
       }
       instructions::Instruction::CreateEdgeQuery { labels } =>
       {
@@ -416,9 +410,11 @@ fn eval_instructions(
         {
           graph::Value::Edge(ed) =>
           {
-            stack.push(
-              store::SelectEdgeQuery::select_source_destination_keys(src, [ed.key], dst).into(),
-            );
+            stack.push(store::SelectEdgeQuery::select_source_destination_keys(
+              src,
+              [ed.key],
+              dst,
+            ));
           }
           graph::Value::Object(ob) =>
           {
@@ -428,13 +424,12 @@ fn eval_instructions(
                 labels.clone(),
                 ob,
                 dst,
-              )
-              .into(),
+              ),
             );
           }
           graph::Value::Invalid =>
           {
-            stack.push(store::SelectEdgeQuery::select_none().into());
+            stack.push(store::SelectEdgeQuery::select_none());
           }
           _ => Err(InternalError::InvalidValueCast {
             value: props,
@@ -449,15 +444,18 @@ fn eval_instructions(
         {
           graph::Value::Node(no) =>
           {
-            stack.push(store::SelectNodeQuery::select_keys([no.key]).into());
+            stack.push(store::SelectNodeQuery::select_keys([no.key]));
           }
           graph::Value::Object(ob) =>
           {
-            stack.push(store::SelectNodeQuery::select_labels_properties(labels.clone(), ob).into());
+            stack.push(store::SelectNodeQuery::select_labels_properties(
+              labels.clone(),
+              ob,
+            ));
           }
           graph::Value::Invalid =>
           {
-            stack.push(store::SelectNodeQuery::select_none().into());
+            stack.push(store::SelectNodeQuery::select_none());
           }
           _ => Err(InternalError::InvalidValueCast {
             value: props,
@@ -477,17 +475,17 @@ fn eval_instructions(
             context: "eval_instructions/FunctionCall",
           })?;
         }
-        stack.push(function.call(args)?.into());
+        stack.push(function.call(args)?);
       }
       instructions::Instruction::Push { value } =>
       {
-        stack.push(value.clone().into());
+        stack.push(value.clone());
       }
       instructions::Instruction::GetVariable { name } =>
       {
         if let Some(value) = row.get(name)
         {
-          stack.push(value.to_owned().into());
+          stack.push(value.to_owned());
         }
         else
         {
@@ -503,7 +501,7 @@ fn eval_instructions(
       {
         if let Some(value) = parameters.get(name)
         {
-          stack.push(value.to_owned().into());
+          stack.push(value.to_owned());
         }
         else
         {
@@ -523,7 +521,7 @@ fn eval_instructions(
           m.push(stack.try_pop_into()?);
         }
         m.reverse();
-        stack.push(graph::Value::Array(m).into());
+        stack.push(graph::Value::Array(m));
       }
       instructions::Instruction::CreateMap { keys } =>
       {
@@ -532,58 +530,61 @@ fn eval_instructions(
         {
           m.insert(k.to_owned(), stack.try_pop_into()?);
         }
-        stack.push(graph::Value::Object(m).into());
+        stack.push(graph::Value::Object(m));
       }
       instructions::Instruction::MemberAccess { path } =>
       {
         let v: graph::Value = stack.try_pop_into()?;
-        stack.push(v.access(path.iter()).into());
+        stack.push(v.access(path.iter()));
       }
       instructions::Instruction::IndexAccess =>
       {
         // Implement access to array or map (edge/node properties).
         // Get the index
         let index: graph::Value = stack.try_pop_into()?;
-        // Get the array/map
-        let container: graph::Value = stack.try_pop_into()?;
-        match container
+        if index.is_null()
         {
-          graph::Value::Array(array) =>
+          stack.try_drain(1)?;
+          stack.push(graph::Value::Invalid);
+        }
+        else
+        {
+          // Get the array/map
+          let container: graph::Value = stack.try_pop_into()?;
+          match container
           {
-            let idx: i64 = index.try_into()
+            graph::Value::Array(array) =>
+            {
+              let idx: i64 = index.try_into()
               .map_err(|e| error::map_error!(e, Error::Internal(InternalError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))?;
-            stack.push(
-              array
-                .get(idx as usize)
-                .ok_or(RunTimeError::OutOfBound)?
-                .to_owned()
-                .into(),
-            );
+              stack.push(
+                array
+                  .get(idx as usize)
+                  .ok_or(RunTimeError::OutOfBound)?
+                  .to_owned(),
+              );
+            }
+            graph::Value::Object(map)
+            | graph::Value::Node(graph::Node {
+              key: _,
+              labels: _,
+              properties: map,
+            })
+            | graph::Value::Edge(graph::Edge {
+              key: _,
+              source: _,
+              destination: _,
+              labels: _,
+              properties: map,
+            }) =>
+            {
+              let idx: String = index.try_into()
+                .map_err(|e| error::map_error!(e, Error::Internal(InternalError::InvalidValueCast{..}) => RunTimeError::MapElementAccessByNonString ))?;
+              stack.push(map.get(&idx).unwrap_or(&graph::Value::Invalid).to_owned());
+            }
+            graph::Value::Invalid => stack.push(graph::Value::Invalid),
+            _ => Err(error::RunTimeError::InvalidArgumentType)?,
           }
-          graph::Value::Object(map)
-          | graph::Value::Node(graph::Node {
-            key: _,
-            labels: _,
-            properties: map,
-          })
-          | graph::Value::Edge(graph::Edge {
-            key: _,
-            source: _,
-            destination: _,
-            labels: _,
-            properties: map,
-          }) =>
-          {
-            let idx: String = index.try_into()?;
-            stack.push(
-              map
-                .get(&idx)
-                .unwrap_or(&graph::Value::Invalid)
-                .to_owned()
-                .into(),
-            );
-          }
-          _ => Err(error::RunTimeError::InvalidArgumentType)?,
         }
       }
       instructions::Instruction::RangeAccess { start, end } =>
@@ -610,7 +611,7 @@ fn eval_instructions(
         if end.as_ref().map_or(false, |e| e.is_null())
           || start.as_ref().map_or(false, |s| s.is_null())
         {
-          stack.push(graph::Value::Invalid.into());
+          stack.push(graph::Value::Invalid);
         }
         else
         {
@@ -625,7 +626,7 @@ fn eval_instructions(
           };
           if length.map_or(false, |l| l >= v.len() as i64)
           {
-            stack.push(v.into());
+            stack.push(v);
           }
           else
           {
@@ -642,16 +643,16 @@ fn eval_instructions(
               {
                 if end < start
                 {
-                  Vec::<graph::Value>::default().into()
+                  Vec::<graph::Value>::default()
                 }
                 else
                 {
-                  v[start as usize..end as usize].to_owned().into()
+                  v[start as usize..end as usize].to_owned()
                 }
               }
-              (Some(start), None) => v[start as usize..].to_owned().into(),
-              (None, Some(end)) => v[..end as usize].to_owned().into(),
-              (None, None) => v.to_owned().into(),
+              (Some(start), None) => v[start as usize..].to_owned(),
+              (None, Some(end)) => v[..end as usize].to_owned(),
+              (None, None) => v.to_owned(),
             };
             stack.push(v);
           }
@@ -698,20 +699,20 @@ fn eval_instructions(
         let a: graph::Value = stack.try_pop_into()?;
         match a
         {
-          graph::Value::Invalid => stack.push(graph::Value::Invalid.into()),
-          graph::Value::Boolean(b) => stack.push((!b).into()),
+          graph::Value::Invalid => stack.push(graph::Value::Invalid),
+          graph::Value::Boolean(b) => stack.push(!b),
           _ => Err(RunTimeError::InvalidArgumentType)?,
         }
       }
       &instructions::Instruction::NegationUnaryOperator =>
       {
         let a: crate::graph::Value = stack.try_pop_into()?;
-        stack.push((-a)?.into());
+        stack.push((-a)?);
       }
       &instructions::Instruction::IsNullUnaryOperator =>
       {
         let a: crate::graph::Value = stack.try_pop_into()?;
-        stack.push((a.is_null()).into());
+        stack.push(a.is_null());
       }
       &instructions::Instruction::EqualBinaryOperator =>
       {
@@ -1279,8 +1280,8 @@ pub(crate) fn eval_program<TStore: store::Store>(
                     else
                     {
                       let mut stack = Stack::default();
-                      stack.push(true.into());
-                      stack.push(node.to_owned().into());
+                      stack.push(true);
+                      stack.push(node.to_owned());
                       eval_instructions(&mut stack, &new_row, &filter, &parameters)?;
                       stack.try_pop()?; // Get rid of the edge
                       stack.try_pop_into()?
@@ -1357,8 +1358,8 @@ pub(crate) fn eval_program<TStore: store::Store>(
                     else
                     {
                       let mut stack = Stack::default();
-                      stack.push(true.into());
-                      stack.push(edge.edge.to_owned().into());
+                      stack.push(true);
+                      stack.push(edge.edge.to_owned());
                       eval_instructions(&mut stack, &new_row, &filter, &parameters)?;
                       stack.try_pop()?; // Get rid of the edge
                       stack.try_pop_into()?

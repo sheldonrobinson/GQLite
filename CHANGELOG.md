@@ -3,7 +3,7 @@
 <!-- next-header -->
 
 ## [Unreleased] - ReleaseDate
-- Improve support of comparison.
+- Improve support of comparison and maps.
 - Add support for string as key in map, and allow to use operator [] for map.
 - Add properties, toString functions.
 

@@ -441,14 +441,14 @@ Then(/^the result should be \(ignoring element order for lists\):$/) do |table|
   pending if @ignored_scenario
   expect(@exception).to be_nil
   expect(@query_result).not_to be_nil
-  expect(@query_result).to eq_in_any_order(GQLiteTest.parse_results_table table)
+  expect(@query_result).to eq_in_any_order_ignoring_lists_order(GQLiteTest.parse_results_table table)
 end
 
 Then(/^the result should be, in order \(ignoring element order for lists\):$/) do |table|
   pending if @ignored_scenario
   expect(@exception).to be_nil
   expect(@query_result).not_to be_nil
-  expect(@query_result).to eq_in_order(GQLiteTest.parse_results_table table)
+  expect(@query_result).to eq_in_order_ignoring_lists_order(GQLiteTest.parse_results_table table)
 end
 
 Then(/^a SyntaxError should be raised at compile time: VariableAlreadyBound$/) do
@@ -652,4 +652,16 @@ Then(/^a TypeError should be raised at compile time: InvalidArgumentType$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
   expect(@exception.message).to match(/^CompileTime: InvalidArgumentType: .*\.$/)
+end
+
+Then(/^a TypeError should be raised at runtime: MapElementAccessByNonString$/) do
+  pending if @ignored_scenario
+  expect(@exception).not_to be_nil
+  expect(@exception.message).to match(/^RunTime: MapElementAccessByNonString: .*\.$/)
+end
+
+Then(/^a TypeError should be raised at runtime: InvalidArgumentType$/) do
+  pending if @ignored_scenario
+  expect(@exception).not_to be_nil
+  expect(@exception.message).to match(/^RunTime: InvalidArgumentType: .*\.$/)
 end
