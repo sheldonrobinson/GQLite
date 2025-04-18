@@ -1,13 +1,12 @@
+use std::str::FromStr;
+
 use pest::{
   pratt_parser::{Assoc, Op, PrattParser},
   Parser,
 };
 use pest_derive::Parser;
 
-use crate::{
-  error::{CompileTimeError, InternalError},
-  graph, Result,
-};
+use crate::prelude::*;
 
 trait TryNext: Iterator
 {
@@ -16,6 +15,18 @@ trait TryNext: Iterator
     self
       .next()
       .ok_or_else(|| crate::Error::InternalError("Missing element in iterator."))
+  }
+}
+
+fn remove_hex_prefix<'a>(string: &'a str) -> String
+{
+  if &string[0..1] == "-"
+  {
+    format!("-{}", &string[3..])
+  }
+  else
+  {
+    string[2..].into()
   }
 }
 
@@ -261,7 +272,28 @@ fn build_expression_primary(
           value: graph::Value::Boolean(false),
         })),
         Rule::int => Ok(ast::Expression::Value(ast::Value {
-          value: graph::Value::Integer(pair.as_str().parse()?),
+          value: {
+            graph::Value::Integer(
+              i64::from_str(pair.as_str())
+                .map_err(|e| error::parse_int_error_to_compile_error(pair.as_str(), e))?,
+            )
+          },
+        })),
+        Rule::octa_int => Ok(ast::Expression::Value(ast::Value {
+          value: {
+            graph::Value::Integer(
+              i64::from_str_radix(&remove_hex_prefix(pair.as_str()), 8)
+                .map_err(|e| error::parse_int_error_to_compile_error(pair.as_str(), e))?,
+            )
+          },
+        })),
+        Rule::hexa_int => Ok(ast::Expression::Value(ast::Value {
+          value: {
+            graph::Value::Integer(
+              i64::from_str_radix(&remove_hex_prefix(pair.as_str()), 16)
+                .map_err(|e| error::parse_int_error_to_compile_error(pair.as_str(), e))?,
+            )
+          },
         })),
         Rule::num => Ok(ast::Expression::Value(ast::Value {
           value: graph::Value::Float(pair.as_str().parse()?),

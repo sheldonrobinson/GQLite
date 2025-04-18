@@ -4,6 +4,12 @@
 #[derive(thiserror::Error, Debug)]
 pub enum CompileTimeError
 {
+  /// Integer overflow
+  #[error("IntegerOverflow: '{text}' is too large.")]
+  IntegerOverflow
+  {
+    text: String
+  },
   /// Parse error
   #[error("ParseError: '{0}'")]
   ParseError(#[from] pest::error::Error<crate::parser::Rule>),
@@ -333,4 +339,20 @@ pub(crate) fn vec_to_error<E: std::fmt::Display>(errs: &Vec<Error>) -> String
 {
   let errs: Vec<String> = errs.iter().map(|x| format!("'{}'", x)).collect();
   errs.join(", ")
+}
+
+pub(crate) fn parse_int_error_to_compile_error<'a>(
+  text: &'a str,
+  e: std::num::ParseIntError,
+) -> crate::Error
+{
+  use std::num::IntErrorKind;
+  match e.kind()
+  {
+    IntErrorKind::PosOverflow | IntErrorKind::NegOverflow => CompileTimeError::IntegerOverflow {
+      text: text.to_owned(),
+    }
+    .into(),
+    _ => e.into(),
+  }
 }
