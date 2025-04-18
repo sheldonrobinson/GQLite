@@ -1,10 +1,11 @@
 [package]
-name = "gqlite"
+name = "gqlitedb"
 version = "2.0.0"
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
+name = "gqlite"
 
 [dependencies]
 ciborium = "0.2.2"
@@ -16,4 +17,3 @@ serde = "1.0.204"
 serde_json = "1.0.120"
 thiserror = "1.0.61"
 uuid = { version = "1.9.1", features = ["v4"] }
-wasmtime = "22.0.0"
