@@ -85,32 +85,32 @@ impl SelectNodeQuery
     }
   }
   #[allow(unused)]
-  pub(crate) fn select_keys(keys: Vec<graph::Key>) -> Self
+  pub(crate) fn select_keys(keys: impl Into<Vec<graph::Key>>) -> Self
   {
     Self {
-      keys: Some(keys),
+      keys: Some(keys.into()),
       labels: None,
       properties: None,
       select_all: false,
     }
   }
-  pub(crate) fn select_labels(labels: Vec<String>) -> Self
+  pub(crate) fn select_labels(labels: impl Into<Vec<String>>) -> Self
   {
     Self {
       keys: None,
-      labels: Some(labels),
+      labels: Some(labels.into()),
       properties: None,
       select_all: false,
     }
   }
   pub(crate) fn select_labels_properties(
-    labels: Vec<String>,
+    labels: impl Into<Vec<String>>,
     properties: HashMap<String, graph::Value>,
   ) -> Self
   {
     Self {
       keys: None,
-      labels: Some(labels),
+      labels: Some(labels.into()),
       properties: Some(properties),
       select_all: false,
     }
@@ -188,10 +188,10 @@ impl SelectEdgeQuery
     }
   }
   #[allow(unused)]
-  pub(crate) fn select_keys(keys: Vec<graph::Key>) -> Self
+  pub(crate) fn select_keys(keys: impl Into<Vec<graph::Key>>) -> Self
   {
     Self {
-      keys: Some(keys),
+      keys: Some(keys.into()),
       labels: None,
       properties: None,
       source: SelectNodeQuery::select_all(),
@@ -200,12 +200,12 @@ impl SelectEdgeQuery
   }
   pub(crate) fn select_source_destination_keys(
     source_query: SelectNodeQuery,
-    keys: Vec<graph::Key>,
+    keys: impl Into<Vec<graph::Key>>,
     destination_query: SelectNodeQuery,
   ) -> Self
   {
     Self {
-      keys: Some(keys),
+      keys: Some(keys.into()),
       labels: None,
       properties: None,
       source: source_query,
@@ -214,14 +214,14 @@ impl SelectEdgeQuery
   }
   pub(crate) fn select_source_destination_labels_properties(
     source_query: SelectNodeQuery,
-    labels: Vec<String>,
+    labels: impl Into<Vec<String>>,
     properties: HashMap<String, graph::Value>,
     destination_query: SelectNodeQuery,
   ) -> Self
   {
     Self {
       keys: None,
-      labels: Some(labels),
+      labels: Some(labels.into()),
       properties: Some(properties),
       source: source_query,
       destination: destination_query,

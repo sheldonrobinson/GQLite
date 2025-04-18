@@ -269,9 +269,7 @@ fn eval_instructions(
         {
           graph::Value::Edge(ed) =>
           {
-            stack.push(
-              SelectEdgeQuery::select_source_destination_keys(src, [ed.key].into(), dst).into(),
-            );
+            stack.push(SelectEdgeQuery::select_source_destination_keys(src, [ed.key], dst).into());
           }
           graph::Value::Object(ob) =>
           {
@@ -299,7 +297,7 @@ fn eval_instructions(
         {
           graph::Value::Node(no) =>
           {
-            stack.push(crate::store::SelectNodeQuery::select_keys([no.key].into()).into());
+            stack.push(crate::store::SelectNodeQuery::select_keys([no.key]).into());
           }
           graph::Value::Object(ob) =>
           {
