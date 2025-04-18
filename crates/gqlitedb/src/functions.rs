@@ -9,6 +9,7 @@ mod node;
 mod path;
 mod scalar;
 mod value;
+mod string;
 
 pub(crate) type FResult<T> = std::result::Result<T, error::RunTimeError>;
 
@@ -127,6 +128,7 @@ impl Manager
           scalar::Coalesce::new(),
           scalar::Properties::new(),
           scalar::ToInteger::new(),
+          string::ToString::new(),
           value::HasLabel::new(),
           value::HasLabels::new(),
         ]),
