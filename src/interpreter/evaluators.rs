@@ -413,7 +413,6 @@ pub(crate) fn eval_program(
             }
           }
         }
-        println!(" -- {:#?}", output_table);
         input_table = output_table;
       }
       instructions::Block::MatchEdge {
@@ -430,9 +429,7 @@ pub(crate) fn eval_program(
         let mut output_table = crate::value_table::ValueTable::new();
         for row in input_table.iter()
         {
-          println!("{:#?} {:#?}", stack, instructions);
           eval_instructions(&mut stack, row, &instructions, &parameters)?;
-          println!("{:#?}", stack);
           let template = stack
             .pop()
             .ok_or_else(|| InternalError::MissingStackValue {

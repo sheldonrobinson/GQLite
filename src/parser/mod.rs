@@ -96,7 +96,6 @@ fn build_expression(pair: pest::iterators::Pair<Rule>) -> Result<ast::Expression
     }
     Rule::function_call =>
     {
-      println!("{:#?}", pair);
       let mut it = pair.into_inner();
       let function_name = it
         .next()
@@ -488,7 +487,6 @@ fn build_ast_from_statement(pair: pest::iterators::Pair<Rule>) -> Result<ast::St
 
 pub(crate) fn parse(input: &str) -> Result<ast::Statements>
 {
-  println!("\n\n\n{:?}\n\n\n", input);
   let pairs = GQLParser::parse(Rule::query, input)?;
   let mut stmts = ast::Statements::new();
   if crate::consts::SHOW_PARSE_TREE
