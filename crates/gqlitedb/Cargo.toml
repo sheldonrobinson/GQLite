@@ -1,7 +1,7 @@
 [package]
 name = "gqlitedb"
 description = "GQLite is a Rust-language library, with a C interface, that implements a small, fast, self-contained, high-reliability, full-featured, Graph Query database engine."
-readme = "README.md"
+readme = "../../README.md"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
