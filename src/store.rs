@@ -308,9 +308,12 @@ impl Store
       ) as Box<dyn Iterator<Item = Result<Vec<u8>>>>,
     };
     let r = nodes_raw.map(|v| {
-      Ok::<graph::Node, crate::Error>(ciborium::from_reader::<graph::Node, &[u8]>(
-        &mut v?.as_ref(),
-      )?)
+      // Ok::<graph::Node, crate::Error>(ciborium::from_reader::<graph::Node, &[u8]>(
+      //   &mut v?.as_ref(),
+      // )?)
+      let c = ciborium::from_reader::<graph::Node, &[u8]>(&mut v?.as_ref())?;
+      println!("Retrieved: {:?}", c);
+      Ok::<graph::Node, crate::Error>(c)
     });
     let r = match query.labels
     {
@@ -354,6 +357,7 @@ impl Store
     }
     else
     {
+      println!("UnknownNode {:?}", key);
       Err(Error::UnknownNode)
     }
   }

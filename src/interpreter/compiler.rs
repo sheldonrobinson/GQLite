@@ -80,7 +80,6 @@ fn compile_create_node(
   node: &crate::parser::ast::GraphNode,
   instructions: &mut Instructions,
   variables: &mut Vec<Option<String>>,
-  allow_existing: bool,
 ) -> Result<()>
 {
   validator.declare_node_variable(node)?;
@@ -104,7 +103,7 @@ fn compile_create_patterns(
     {
       crate::parser::ast::Pattern::GraphNode(node) =>
       {
-        compile_create_node(validator, node, &mut instructions, &mut variables, false)?;
+        compile_create_node(validator, node, &mut instructions, &mut variables)?;
       }
       crate::parser::ast::Pattern::GraphEdge(edge) =>
       {
@@ -118,14 +117,7 @@ fn compile_create_patterns(
         }
         else
         {
-          second_should_swap = true;
-          compile_create_node(
-            validator,
-            &edge.source,
-            &mut instructions,
-            &mut variables,
-            false,
-          )?;
+          compile_create_node(validator, &edge.source, &mut instructions, &mut variables)?;
           instructions.push(Instruction::Duplicate);
         }
         if edge.source.variable.is_some()
@@ -147,13 +139,9 @@ fn compile_create_patterns(
             &edge.destination,
             &mut instructions,
             &mut variables,
-            false,
           )?;
           instructions.push(Instruction::Duplicate);
-          if second_should_swap
-          {
-            instructions.push(Instruction::Rot3);
-          }
+          instructions.push(Instruction::Rot3);
         }
         variables.push(edge.variable.to_owned());
         compile_optional_expression(edge.properties.borrow(), &mut instructions);
