@@ -80,6 +80,7 @@ module GQLiteTest
     r_node = /^\(((\:\w*)*)(\s*{.*})?\)$/
     r_edge = /^\[((\:\w*)*)(\s*{.*})?\]$/
     r_path = /^\<\(((\:\w*)*)(\s*{.*})?\)\-\[((\:\w*)*)(\s*{.*})?\]\-\>\(((\:\w*)*)(\s*{.*})?\)\>$/
+    r_float = /^(\+|\-)?[0-9]+(\.[0-9]+)?(E|e)(\-)?[0-9]+$/
     first_row = true
     return table.map do |c|
       if first_row
@@ -87,8 +88,11 @@ module GQLiteTest
         c
       else
         c.map do |v|
-          arr = v.scan r_node
-          if arr.size > 0
+          if v == "[{}]"
+            YAML.load v
+          elsif (v.scan r_float).size > 0
+            v.to_f
+          elsif (arr = v.scan r_node).size > 0
             labels = arr[0][0]
             if labels.nil?
               labels = []
@@ -166,6 +170,8 @@ module GQLiteTest
               "properties" => edge_properties, "labels" => edge_labels,
               "destination" => { "type"=>"node", "properties" => destination_properties, "labels" => destination_labels }
             }
+          elsif v[0] == "'" and v[-1] == "'"
+            v[1...-1]
           else
             YAML.load v
           end
@@ -389,7 +395,9 @@ IgnoredScenario = [
   "[7] Fail when a relationship has the same variable in a preceding MATCH",
   # [x IN values] not supported
   "[45] Sort order should be consistent with comparisons where comparisons are defined #Example: <exampleName>",
-
+  # String Unicode literal not supported
+  "[10] Accept valid Unicode literal",
+  "[13] Failing on incorrect unicode literal",
 ]
 
 Before do |scenario|
@@ -475,8 +483,8 @@ Then(/^the result should be, in any order:$/) do |table|
   pending if @ignored_scenario
   expect(@exception).to be_nil
   expect(@query_result).not_to be_nil
-  puts @query_result
-  puts GQLiteTest.parse_results_table table
+  puts "Query result: #{@query_result}"
+  puts "Expected result: #{GQLiteTest.parse_results_table table}"
   expect(@query_result).to eq_in_any_order(GQLiteTest.parse_results_table table)
 end
 
@@ -623,6 +631,12 @@ Then(/^a SyntaxError should be raised at compile time: IntegerOverflow$/) do
   expect(@exception.message).to match(/^CompileTime: IntegerOverflow: .*\.$/)
 end
 
+Then(/^a SyntaxError should be raised at compile time: FloatingPointOverflow$/) do
+  pending if @ignored_scenario
+  expect(@exception).not_to be_nil
+  expect(@exception.message).to match(/^CompileTime: FloatingPointOverflow: .*\.$/)
+end
+
 Then(/^a SyntaxError should be raised at compile time: InvalidNumberLiteral$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
@@ -690,4 +704,10 @@ end
 Then(/^an Error should be raised at run time: InexistingGraph$/) do
   expect(@exception).not_to be_nil
   expect(@exception.message).to match(/^RunTime: InexistingGraph: .*\.$/)
+end
+
+Then(/^a SyntaxError should be raised at compile time: InvalidUnicodeLiteral$/) do
+  pending if @ignored_scenario
+  expect(@exception).not_to be_nil
+  expect(@exception.message).to match(/^CompileTime: InvalidUnicodeLiteral: .*\.$/)
 end

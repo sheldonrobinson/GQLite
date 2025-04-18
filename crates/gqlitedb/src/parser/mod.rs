@@ -30,6 +30,23 @@ fn remove_hex_prefix<'a>(string: &'a str) -> String
   }
 }
 
+fn validate_float<'a>(value: f64, text: &'a str) -> Result<f64>
+{
+  if value.is_finite()
+  {
+    Ok(value)
+  }
+  else
+  {
+    Err(
+      CompileTimeError::FloatingPointOverflow {
+        text: text.to_owned(),
+      }
+      .into(),
+    )
+  }
+}
+
 impl<T: Iterator> TryNext for T {}
 
 pub(crate) mod ast;
@@ -296,7 +313,7 @@ fn build_expression_primary(
           },
         })),
         Rule::num => Ok(ast::Expression::Value(ast::Value {
-          value: graph::Value::Float(pair.as_str().parse()?),
+          value: graph::Value::Float(validate_float(pair.as_str().parse()?, pair.as_str())?),
         })),
         Rule::ident => Ok(ast::Expression::Variable(ast::Variable {
           identifier: pair.as_str().to_string(),
