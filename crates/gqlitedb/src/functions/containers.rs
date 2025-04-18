@@ -85,13 +85,14 @@ impl super::FunctionTrait for Size
     let container = arguments
       .first()
       .ok_or_else(|| RunTimeError::InvalidNumberOfArguments {
-        function_name: "length",
+        function_name: "size",
         got: arguments.len(),
         expected: 1,
       })?;
 
     match container
     {
+      graph::Value::Invalid => Ok(graph::Value::Invalid),
       graph::Value::Array(arr) => Ok((arr.len() as i64).into()),
       graph::Value::Object(obj) => Ok((obj.len() as i64).into()),
       graph::Value::Path(..) => Ok(1.into()),
@@ -99,7 +100,7 @@ impl super::FunctionTrait for Size
       {
         return Err(
           RunTimeError::InvalidArgument {
-            function_name: "length",
+            function_name: "size",
             index: 0,
             expected_type: "array or map",
             value: format!("{:?}", container),

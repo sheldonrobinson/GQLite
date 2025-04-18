@@ -83,7 +83,7 @@ int            = @{ ("+" | "-")? ~ ('0'..'9')+ }
 null_lit       =  { "null" }
 true_lit       =  { "true" }
 false_lit      =  { "false" }
-num            = @{ int ~ "." ~ ASCII_DIGIT* ~ (^"e" ~ int)? }
+num            = @{ int ~ "." ~ ASCII_DIGIT+ ~ (^"e" ~ int)? }
 string_literal = ${ "'" ~ inner ~ "'" }
 inner          = @{ char* }
 function_name  =  { ident ~ ("." ~ ident)* }
@@ -98,10 +98,10 @@ set_label_expression =  { ident ~ (":" ~ ident)+ }
 set_eq_member_access =  { (("(" ~ ident ~ ")") | ident) ~ ("." ~ ident)* }
 remove_member_access =  { (("(" ~ ident ~ ")") | ident) ~ ("." ~ ident)+ }
 
-expression = { prefix* ~ expression_term ~ postfix? ~ (infix ~ prefix? ~ expression_term ~ postfix?)* }
+expression = { prefix* ~ expression_term ~ postfix* ~ (infix ~ prefix? ~ expression_term ~ postfix*)* }
 
 infix   = _{ addition | substraction | multiplication | division | modulo | or | and | xor | equal | different | in_ | not_in | superior | inferior | superior_equal | inferior_equal }
-postfix = _{ is_null | is_not_null }
+postfix = _{ is_null | is_not_null | member_access | range_access | range_access_to | index_access }
 prefix  = _{ negation | not }
 
 addition       = { "+" }
@@ -129,8 +129,12 @@ negation =  { "-" }
 not_kw   = @{ "NOT" ~ !ASCII_ALPHA }
 not      =  { not_kw }
 
-is_null     = { "IS" ~ "NULL" }
-is_not_null = { "IS" ~ "NOT" ~ "NULL" }
+is_null         = { "IS" ~ "NULL" }
+is_not_null     = { "IS" ~ "NOT" ~ "NULL" }
+member_access   = { ("." ~ ident)+ }
+index_access    = { "[" ~ expression ~ "]" }
+range_access    = { "[" ~ expression ~ ".." ~ expression? ~ "]" }
+range_access_to = { "[" ~ ".." ~ expression ~ "]" }
 
 label_check_expression = { ident ~ (":" ~ ident)+ }
 
@@ -138,10 +142,9 @@ parenthesised_expression = { "(" ~ expression ~ ")" }
 named_expression         = { (expression ~ "AS" ~ ident) | expression }
 function_call            = { function_name ~ "(" ~ expression ~ ("," ~ expression)* ~ ")" }
 count_star               = { "count" ~ "(" ~ "*" ~ ")" }
-expression_term          = { null_lit | true_lit | false_lit | num | int | string_literal | map | array | member_access | label_check_expression | parameter | parenthesised_expression | function_call | count_star | ident }
+expression_term          = { null_lit | true_lit | false_lit | num | int | string_literal | map | array | label_check_expression | parameter | parenthesised_expression | function_call | count_star | ident }
 
-parameter     = { "$" ~ parameter_name }
-member_access = { ident ~ ("." ~ ident)+ }
+parameter = { "$" ~ parameter_name }
 
 pair = { ident ~ ":" ~ expression }
 

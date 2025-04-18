@@ -54,6 +54,109 @@ mod validators
       _ => Err(error::CompileTimeError::InvalidArgumentType.into()),
     }
   }
+  pub(super) fn array(x: ExpressionInfo) -> Result<ExpressionInfo>
+  {
+    match x.expression_type
+    {
+      ExpressionType::Array | ExpressionType::Variant => Ok(x),
+      _ => Err(error::CompileTimeError::InvalidArgumentType.into()),
+    }
+  }
+  pub(super) fn array_or_map(x: ExpressionInfo) -> Result<ExpressionInfo>
+  {
+    match x.expression_type
+    {
+      ExpressionType::Array | ExpressionType::Map | ExpressionType::Variant => Ok(x),
+      _ => Err(error::CompileTimeError::InvalidArgumentType.into()),
+    }
+  }
+  pub(super) fn integer_or_null(x: ExpressionInfo) -> Result<ExpressionInfo>
+  {
+    match x.expression_type
+    {
+      ExpressionType::Integer | ExpressionType::Null | ExpressionType::Variant => Ok(x),
+      _ => Err(error::CompileTimeError::InvalidArgumentType.into()),
+    }
+  }
+  pub(super) fn string_or_null(x: ExpressionInfo) -> Result<ExpressionInfo>
+  {
+    match x.expression_type
+    {
+      ExpressionType::String | ExpressionType::Null | ExpressionType::Variant => Ok(x),
+      _ => Err(error::CompileTimeError::InvalidArgumentType.into()),
+    }
+  }
+}
+
+trait ExpressionAnalyser
+{
+  fn analyse(
+    self,
+    variables: &impl Variables,
+    function_manager: &functions::Manager,
+  ) -> Result<Vec<ExpressionInfo>>;
+}
+
+impl<'a, T, VT> ExpressionAnalyser for (T, VT)
+where
+  T: Iterator<Item = &'a ast::Expression>,
+  VT: Fn(ExpressionInfo) -> Result<ExpressionInfo>,
+{
+  fn analyse(
+    self,
+    variables: &impl Variables,
+    function_manager: &functions::Manager,
+  ) -> Result<Vec<ExpressionInfo>>
+  {
+    self
+      .0
+      .map(|x| self.1(ExpressionInfo::analyse(variables, function_manager, x)?))
+      .collect::<Result<_>>()
+  }
+}
+
+impl<'a, VT> ExpressionAnalyser for (&'a ast::Expression, VT)
+where
+  VT: Fn(ExpressionInfo) -> Result<ExpressionInfo>,
+{
+  fn analyse(
+    self,
+    variables: &impl Variables,
+    function_manager: &functions::Manager,
+  ) -> Result<Vec<ExpressionInfo>>
+  {
+    Ok(vec![self.1(ExpressionInfo::analyse(
+      variables,
+      function_manager,
+      self.0,
+    )?)?])
+  }
+}
+
+impl<'a, VT0, VT1> ExpressionAnalyser for ((&'a ast::Expression, &'a ast::Expression), (VT0, VT1))
+where
+  VT0: Fn(ExpressionInfo) -> Result<ExpressionInfo>,
+  VT1: Fn(ExpressionInfo) -> Result<ExpressionInfo>,
+{
+  fn analyse(
+    self,
+    variables: &impl Variables,
+    function_manager: &functions::Manager,
+  ) -> Result<Vec<ExpressionInfo>>
+  {
+    Ok(vec![
+      self.1 .0(ExpressionInfo::analyse(
+        variables,
+        function_manager,
+        self.0 .0,
+      )?)?,
+      self.1 .1(ExpressionInfo::analyse(
+        variables,
+        function_manager,
+        self.0 .1,
+      )?)?,
+    ])
+  }
 }
 
 impl ExpressionInfo
@@ -75,18 +178,35 @@ impl ExpressionInfo
       aggregation_result: dependents.into_iter().any(|x| x.aggregation_result == true),
     }
   }
-  fn analyses<'a>(
+  fn analyses<'a, TExpressions, TValidatorType>(
     variables: &impl Variables,
     function_manager: &functions::Manager,
-    expressions: impl Iterator<Item = &'a ast::Expression>,
-    validator: impl Fn(ExpressionInfo) -> Result<ExpressionInfo>,
+    expressions: TExpressions,
+    validator: TValidatorType,
+  ) -> Result<Vec<ExpressionInfo>>
+  where
+    (TExpressions, TValidatorType): ExpressionAnalyser,
+  {
+    (expressions, validator).analyse(variables, function_manager)
+  }
+  fn analyses_in<'a>(
+    variables: &impl Variables,
+    function_manager: &functions::Manager,
+    left_expr: &'a ast::Expression,
+    right_expr: &'a ast::Expression,
   ) -> Result<Vec<ExpressionInfo>>
   {
-    expressions
-      .map(|x| validator(Self::analyse(variables, function_manager, x)?))
-      .collect::<Result<_>>()
-  }
+    let mut left_expr = ExpressionInfo::analyse(variables, function_manager, left_expr)?;
+    let right_expr = ExpressionInfo::analyse(variables, function_manager, right_expr)?;
+    let right_expr = validators::array_or_map(right_expr)?;
 
+    if right_expr.expression_type == ExpressionType::Map
+    {
+      left_expr = validators::string_or_null(left_expr)?;
+    }
+
+    Ok(vec![left_expr, right_expr])
+  }
   pub(crate) fn analyse(
     variables: &impl Variables,
     function_manager: &functions::Manager,
@@ -241,21 +361,11 @@ impl ExpressionInfo
       )),
       ast::Expression::RelationalIn(ri) => Ok(Self::new_type(
         ExpressionType::Boolean,
-        Self::analyses(
-          variables,
-          function_manager,
-          [&ri.left, &ri.right].into_iter(),
-          validators::any,
-        )?,
+        Self::analyses_in(variables, function_manager, &ri.left, &ri.right)?,
       )),
       ast::Expression::RelationalNotIn(ri) => Ok(Self::new_type(
         ExpressionType::Boolean,
-        Self::analyses(
-          variables,
-          function_manager,
-          [&ri.left, &ri.right].into_iter(),
-          validators::any,
-        )?,
+        Self::analyses_in(variables, function_manager, &ri.left, &ri.right)?,
       )),
       ast::Expression::Addition(ri) => Ok(Self::new_type(
         ExpressionType::Variant,
@@ -315,6 +425,37 @@ impl ExpressionInfo
         ExpressionType::Variant,
         [Self::analyse(variables, function_manager, &ma.left)?],
       )),
+      ast::Expression::IndexAccess(ia) => Ok(Self::new_type(
+        ExpressionType::Variant,
+        [
+          validators::array(Self::analyse(variables, function_manager, &ia.left)?)?,
+          validators::integer_or_null(Self::analyse(variables, function_manager, &ia.index)?)?,
+        ],
+      )),
+      ast::Expression::RangeAccess(ia) => Ok({
+        let mut dependents = vec![validators::array(Self::analyse(
+          variables,
+          function_manager,
+          &ia.left,
+        )?)?];
+        if let Some(start) = &ia.start
+        {
+          dependents.push(validators::integer_or_null(Self::analyse(
+            variables,
+            function_manager,
+            start,
+          )?)?);
+        }
+        if let Some(end) = &ia.end
+        {
+          dependents.push(validators::integer_or_null(Self::analyse(
+            variables,
+            function_manager,
+            end,
+          )?)?);
+        }
+        Self::new_type(ExpressionType::Variant, dependents)
+      }),
       ast::Expression::Parameter(_) => Ok(Self::new(ExpressionType::Variant, true, false)),
       ast::Expression::Value(val) => Ok(Self::new(
         match val.value

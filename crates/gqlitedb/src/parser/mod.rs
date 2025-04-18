@@ -58,6 +58,60 @@ fn build_expression(
     {
       Rule::is_null => Ok(ast::IsNull { value: lhs? }.into()),
       Rule::is_not_null => Ok(ast::IsNotNull { value: lhs? }.into()),
+      Rule::member_access =>
+      {
+        let it = op.into_inner();
+        Ok(ast::Expression::MemberAccess(Box::new(ast::MemberAccess {
+          left: lhs?,
+          path: it.map(|el| el.as_str().to_string()).collect(),
+        })))
+      }
+      Rule::index_access =>
+      {
+        let mut it = op.into_inner();
+
+        Ok(ast::Expression::IndexAccess(Box::new(ast::IndexAccess {
+          left: lhs?,
+          index: it
+            .next()
+            .map(|el| build_expression(el.into_inner(), pratt))
+            .unwrap()?,
+        })))
+      }
+      Rule::range_access =>
+      {
+        let mut it = op.into_inner();
+        let start = Some(
+          it.next()
+            .map(|el| build_expression(el.into_inner(), pratt))
+            .unwrap()?,
+        );
+        let end = it
+          .next()
+          .map(|el| build_expression(el.into_inner(), pratt))
+          .transpose()?;
+
+        Ok(ast::Expression::RangeAccess(Box::new(ast::RangeAccess {
+          left: lhs?,
+          start,
+          end,
+        })))
+      }
+      Rule::range_access_to =>
+      {
+        let mut it = op.into_inner();
+        let end = Some(
+          it.next()
+            .map(|el| build_expression(el.into_inner(), pratt))
+            .unwrap()?,
+        );
+
+        Ok(ast::Expression::RangeAccess(Box::new(ast::RangeAccess {
+          left: lhs?,
+          start: None,
+          end,
+        })))
+      }
       unknown_expression => Err(crate::Error::UnxpectedExpression(
         "build_expression/map_postfix",
         format!("{unknown_expression:?}"),
@@ -225,17 +279,6 @@ fn build_expression_primary(
             .collect::<Result<Vec<ast::Expression>>>()?,
         })),
         Rule::map => build_map(pair, pratt),
-        Rule::member_access =>
-        {
-          let mut it = pair.into_inner();
-          let left = ast::Expression::Variable(ast::Variable {
-            identifier: it.try_next()?.as_str().to_string(),
-          });
-          Ok(ast::Expression::MemberAccess(Box::new(ast::MemberAccess {
-            left,
-            path: it.map(|el| el.as_str().to_string()).collect(),
-          })))
-        }
         Rule::string_literal => Ok(ast::Expression::Value(ast::Value {
           value: graph::Value::String(pair.into_inner().try_next()?.as_str().to_string()),
         })),
@@ -935,7 +978,14 @@ pub(crate) fn parse(input: &str) -> Result<ast::Statements>
         | Op::infix(Rule::modulo, Assoc::Left),
     )
     .op(Op::prefix(Rule::not) | Op::prefix(Rule::negation))
-    .op(Op::postfix(Rule::is_null) | Op::postfix(Rule::is_not_null));
+    .op(
+      Op::postfix(Rule::is_null)
+        | Op::postfix(Rule::is_not_null)
+        | Op::postfix(Rule::member_access)
+        | Op::postfix(Rule::index_access)
+        | Op::postfix(Rule::range_access)
+        | Op::postfix(Rule::range_access_to),
+    );
   let pairs = GQLParser::parse(Rule::query, input)?;
   let mut stmts = ast::Statements::new();
   if crate::consts::SHOW_PARSE_TREE

@@ -4,6 +4,7 @@
 
 ## [Unreleased] - ReleaseDate
 
+- Improve support for lists.
 - Fix support for boolean, conditional, null.
 - Add toInteger function.
 

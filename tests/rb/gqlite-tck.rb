@@ -67,6 +67,8 @@ expressions = [
   'conditional/Conditional1', 'conditional/Conditional2',
   # null
   'null/Null1', 'null/Null2',
+  # list
+  'list/List1', 'list/List2', 'list/List3', 'list/List4', 'list/List5', 'list/List6', 'list/List7',  'list/List8', 
 ]
 
 # In progress
