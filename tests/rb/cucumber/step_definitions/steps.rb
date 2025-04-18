@@ -181,18 +181,6 @@ module GQLiteTest
   end
 end
 
-RSpec::Matchers.matcher :eq_in_any_order do |expected|
-  match do |actual|
-    compare_table_in_any_order(actual, expected)
-  end
-end
-
-RSpec::Matchers.matcher :eq_in_order do |expected|
-  match do |actual|
-    compare_table_in_order(actual, expected)
-  end
-end
-
 IgnoredScenario = [
   # Regressions for gqlite 1.2:
   # aggregation not supported in ORDER BY

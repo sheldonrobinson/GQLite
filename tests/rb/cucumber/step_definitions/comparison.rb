@@ -1,3 +1,4 @@
+require 'rspec'
 
 def compare(a,b)
   # return a == b
@@ -115,4 +116,16 @@ def compare_table_in_order(actual, expected)
     end
   end
   return true
+end
+
+RSpec::Matchers.matcher :eq_in_any_order do |expected|
+  match do |actual|
+    compare_table_in_any_order(actual, expected)
+  end
+end
+
+RSpec::Matchers.matcher :eq_in_order do |expected|
+  match do |actual|
+    compare_table_in_order(actual, expected)
+  end
 end

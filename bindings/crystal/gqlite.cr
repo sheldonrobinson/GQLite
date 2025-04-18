@@ -50,7 +50,9 @@ module GQLite
       ret = GQLite.handle_api_context(LibGQLite.gqlite_connection_query ApiContext, @dbhandle, query, nil)
       if GQLite.handle_api_context(LibGQLite.gqlite_value_is_valid ApiContext, ret)
         val = GQLite.handle_api_context(LibGQLite.gqlite_value_to_json ApiContext, ret)
-        val = JSON.parse(String.new(val))
+        val = String.new(val)
+        val = val.gsub(/"key"\:\d+,/, "")
+        val = JSON.parse(val)
       else
         val = nil
       end
