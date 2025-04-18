@@ -17,14 +17,16 @@ nothing = { nothing_ident? }
 labels                       =  { ":" ~ label_expression }
 pattern                      =  { ident? ~ labels? ~ map? }
 node_pattern                 =  { "(" ~ pattern ~ ")" }
-edge_pattern                 =  { "(" ~ pattern ~ ((")-[" ~ pattern ~ "]->(") | (nothing ~ ")-->(")) ~ pattern ~ (((")-[" ~ pattern ~ "]->(") | (nothing ~ ")-->(")) ~ pattern)* ~ ")" }
-reverse_edge_pattern         =  { "(" ~ pattern ~ ")<-[" ~ pattern ~ "]-(" ~ pattern ~ ")" }
-bidirection_edge_pattern     =  { "(" ~ pattern ~ ")<-[" ~ pattern ~ "]-(" ~ pattern ~ ")-[" ~ pattern ~ "]->(" ~ pattern ~ ")" }
-undirected_edge_pattern      =  { ("(" ~ pattern ~ ")-[" ~ pattern ~ "]-(" ~ pattern ~ ")") | ("(" ~ pattern ~ ")<-[" ~ pattern ~ "]->(" ~ pattern ~ ")") }
-edge_patterns                = _{ edge_pattern | bidirection_edge_pattern | reverse_edge_pattern | undirected_edge_pattern }
-path_pattern                 =  { ident ~ "=" ~ edge_patterns }
-node_or_edge_pattern         = _{ edge_patterns | node_pattern }
-node_or_edge_or_path_pattern = _{ edge_patterns | node_pattern | path_pattern }
+
+directed_edge_pattern        =  { (")-[" ~ pattern ~ "]->(" ) | (nothing ~ ")-->(") }
+reversed_edge_pattern        =  { (")<-[" ~ pattern ~ "]-(" ) | (nothing ~ ")<--(") }
+undirected_edge_pattern      =  { (")-[" ~ pattern ~ "]-(" ) | (")<-[" ~ pattern ~ "]->(" ) | (nothing ~ ")--(") }
+edge_pattern                 =  { "(" ~ pattern ~ ( (directed_edge_pattern | reversed_edge_pattern | undirected_edge_pattern) ~ pattern )+ ~")" }
+
+path_pattern                 =  { ident ~ "=" ~ edge_pattern }
+
+node_or_edge_pattern         = _{ edge_pattern | node_pattern }
+node_or_edge_or_path_pattern = _{ edge_pattern | node_pattern | path_pattern }
 
 // Statements
 statement = { create_statement | match_statement | return_statement | call_statement | with_statement | unwind_statement }
