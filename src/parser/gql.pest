@@ -1,5 +1,5 @@
 WHITESPACE     = _{ " " | "\t" | "\n" }
-ONESPACE       = _{ " " | "\t" | "\n" }
+COMMENT        = _{ ("//" ~ (!"\n" ~ ANY)*) | ("/*" ~ (!"*/" ~ ANY)* ~ "*/") }
 ident          = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
 parameter_name = @{ (ASCII_ALPHANUMERIC | "_")* }
 char           =  {
@@ -38,11 +38,15 @@ skip_kw     = @{ "SKIP" ~ !ASCII_ALPHA }
 
 limit                    = { limit_kw ~ expression }
 order_by                 = { order_by_kw ~ (order_by_desc_expression | order_by_asc_expression) ~ ("," ~ (order_by_desc_expression | order_by_asc_expression))* }
-order_by_asc_expression  = { expression ~ "ASC"? }
-order_by_desc_expression = { expression ~ "DESC" }
+order_by_asc_expression  = { expression ~ ("ASCENDING" | "ASC")? }
+order_by_desc_expression = { expression ~ ("DESCENDING" | "DESC") }
 skip                     = { skip_kw ~ expression }
-modifiers                = { limit? ~ order_by? ~ skip? }
-// modifiers      = { (limit ~ order_by? ~ skip?) | (order_by ~ (limit? ~ skip?) | (skip ~ limit?)) | (skip ~ (limit? ~ order_by?) | (order_by | limit?)) }
+modifiers                = {
+    (limit ~ ((order_by ~ skip?) | (skip? ~ order_by?)))
+  | (order_by ~ ((limit ~ skip?) | (skip? ~ limit?)))
+  | (skip ~ ((order_by ~ limit?) | (limit? ~ order_by?)))
+}
+
 where_modifier = { "WHERE" ~ expression }
 
 // Statements

@@ -4,9 +4,8 @@ use crate::{
   aggregators,
   error::{InternalError, RunTimeError},
   graph,
-  interpreter::instructions::{self, BlockMatch},
-  store::{self, SelectEdgeQuery},
-  Error, Result,
+  interpreter::instructions,
+  store, value_table, Error, Result,
 };
 
 #[derive(Debug, Clone)]
@@ -85,6 +84,8 @@ macro_rules! try_into_gv_impl {
 }
 
 try_into_gv_impl! {bool}
+try_into_gv_impl! {i64}
+try_into_gv_impl! {f64}
 try_into_gv_impl! {String}
 try_into_gv_impl! {graph::Node}
 try_into_gv_impl! {graph::Edge}
@@ -245,7 +246,7 @@ fn execute_binary_operator<T: Into<crate::graph::Value>>(
 
 fn eval_instructions(
   stack: &mut Stack,
-  row: &crate::value_table::Row,
+  row: &value_table::Row,
   instructions: &instructions::Instructions,
   parameters: &crate::graph::ValueObject,
 ) -> Result<()>
@@ -303,12 +304,14 @@ fn eval_instructions(
         {
           graph::Value::Edge(ed) =>
           {
-            stack.push(SelectEdgeQuery::select_source_destination_keys(src, [ed.key], dst).into());
+            stack.push(
+              store::SelectEdgeQuery::select_source_destination_keys(src, [ed.key], dst).into(),
+            );
           }
           graph::Value::Object(ob) =>
           {
             stack.push(
-              SelectEdgeQuery::select_source_destination_labels_properties(
+              store::SelectEdgeQuery::select_source_destination_labels_properties(
                 src,
                 labels.clone(),
                 ob,
@@ -319,7 +322,7 @@ fn eval_instructions(
           }
           graph::Value::Invalid =>
           {
-            stack.push(SelectEdgeQuery::select_none().into());
+            stack.push(store::SelectEdgeQuery::select_none().into());
           }
           _ => Err(InternalError::InvalidValueCast)?,
         }
@@ -488,17 +491,14 @@ fn eval_instructions(
       &instructions::Instruction::InferiorBinaryOperator =>
       {
         execute_binary_operator(stack, |a, b| {
-          Ok(matches!(
-            a.partial_compare::<RunTimeError>(&b)?,
-            Ordering::Less
-          ))
+          Ok(matches!(a.try_compare::<RunTimeError>(&b)?, Ordering::Less))
         })?;
       }
       &instructions::Instruction::SuperiorBinaryOperator =>
       {
         execute_binary_operator(stack, |a, b| {
           Ok(matches!(
-            a.partial_compare::<RunTimeError>(&b)?,
+            a.try_compare::<RunTimeError>(&b)?,
             Ordering::Greater
           ))
         })?;
@@ -507,7 +507,7 @@ fn eval_instructions(
       {
         execute_binary_operator(stack, |a, b| {
           Ok(matches!(
-            a.partial_compare::<RunTimeError>(&b)?,
+            a.try_compare::<RunTimeError>(&b)?,
             Ordering::Less | Ordering::Equal
           ))
         })?;
@@ -516,7 +516,7 @@ fn eval_instructions(
       {
         execute_binary_operator(stack, |a, b| {
           Ok(matches!(
-            a.partial_compare::<RunTimeError>(&b)?,
+            a.try_compare::<RunTimeError>(&b)?,
             Ordering::Greater | Ordering::Equal
           ))
         })?;
@@ -588,7 +588,7 @@ pub(crate) fn eval_update_property(
   store: &crate::store::Store,
   mut tx: &mut crate::store::Transaction,
   graph_name: &String,
-  row: &mut crate::value_table::Row,
+  row: &mut value_table::Row,
   target: &String,
   path: &Vec<String>,
   instructions: &instructions::Instructions,
@@ -655,13 +655,46 @@ pub(crate) fn eval_update_property(
   Ok(())
 }
 
+struct OrderByKey(Vec<(graph::Value, bool)>);
+
+fn handle_asc(o: std::cmp::Ordering, asc: bool) -> std::cmp::Ordering
+{
+  if asc
+  {
+    o
+  }
+  else
+  {
+    match o
+    {
+      std::cmp::Ordering::Equal => std::cmp::Ordering::Equal,
+      std::cmp::Ordering::Less => std::cmp::Ordering::Greater,
+      std::cmp::Ordering::Greater => std::cmp::Ordering::Less,
+    }
+  }
+}
+
+fn compute_order_by(
+  a: &Vec<(graph::Value, bool)>,
+  b: &Vec<(graph::Value, bool)>,
+) -> std::cmp::Ordering
+{
+  a.iter()
+    .zip(b.iter())
+    .map(|(a, b)| handle_asc(a.0.orderability(&b.0), a.1))
+    .find(|p| *p != std::cmp::Ordering::Equal)
+    .unwrap_or(std::cmp::Ordering::Equal)
+}
+
 fn compute_return_with_table(
   variables: &Vec<instructions::RWExpression>,
-  input_table: crate::value_table::ValueTable,
+  modifiers: &instructions::Modifiers,
+  input_table: value_table::ValueTable,
   parameters: &crate::graph::ValueObject,
-) -> Result<crate::value_table::ValueTable>
+) -> Result<value_table::ValueTable>
 {
-  let mut output_table = crate::value_table::ValueTable::new();
+  let mut output_table = value_table::ValueTable::new();
+  // Compute table
   if variables.iter().any(|v| v.aggregations.len() > 0)
   {
     // Initialise aggregation states
@@ -713,7 +746,7 @@ fn compute_return_with_table(
       }
     }
     // Export the end result
-    let mut out_row = crate::value_table::Row::new();
+    let mut out_row = value_table::Row::new();
     for (rw_expr, aggregation_states) in variables.iter().zip(aggregations_states.into_iter())
     {
       let mut in_row = input_table
@@ -732,21 +765,97 @@ fn compute_return_with_table(
   }
   else
   {
-    for row in input_table.iter()
+    output_table = input_table
+      .into_iter()
+      .map(|mut row| {
+        for rw_expr in variables.iter()
+        {
+          assert_eq!(rw_expr.aggregations.len(), 0);
+          let mut stack = Stack::default();
+          eval_instructions(&mut stack, &row, &rw_expr.instructions, &parameters)?;
+          let value: graph::Value = stack.try_pop_into()?;
+          row.insert(rw_expr.name.to_owned(), value.to_owned());
+        }
+        Ok(row)
+      })
+      .collect::<Result<_>>()?;
+  }
+  // Apply modifiers
+  // Sort the table according to order_by
+  if !modifiers.order_by.is_empty()
+  {
+    let mut table_key = output_table
+      .into_iter()
+      .map(|x| {
+        let mut v = Vec::<(graph::Value, bool)>::new();
+        for info in modifiers.order_by.iter()
+        {
+          let mut stack = Stack::default();
+          eval_instructions(&mut stack, &x, &info.instructions, &parameters)?;
+          v.push((stack.try_pop_into()?, info.asc));
+        }
+        Ok((x, v))
+      })
+      .collect::<Result<Vec<_>>>()?;
+    table_key.sort_by(|(_, a), (_, b)| {
+      a.iter()
+        .zip(b.iter())
+        .map(|((a, asc), (b, _))| handle_asc(a.orderability(b), *asc))
+        .find(|x| *x != std::cmp::Ordering::Equal)
+        .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    output_table = table_key.into_iter().map(|(x, _)| x).collect();
+  }
+
+  // Skip
+  if let Some(skip) = &modifiers.skip
+  {
+    let mut stack = Stack::default();
+    eval_instructions(&mut stack, &Default::default(), &skip, &parameters)?;
+    let q: i64 = stack
+      .try_pop_into()
+      .map_err(|_| RunTimeError::InvalidArgumentType)?;
+    if q >= 0
     {
-      let mut out_row = crate::value_table::Row::new();
-      for rw_expr in variables.iter()
-      {
-        assert_eq!(rw_expr.aggregations.len(), 0);
-        let mut stack = Stack::default();
-        eval_instructions(&mut stack, row, &rw_expr.instructions, &parameters)?;
-        let value: graph::Value = stack.try_pop_into()?;
-        out_row.insert(rw_expr.name.to_owned(), value.to_owned());
-      }
-      output_table.add_row(out_row);
+      output_table.remove_first_rows(q as usize);
+    }
+    else
+    {
+      Err(RunTimeError::NegativeIntegerArgument)?
     }
   }
-  Ok(output_table)
+
+  // Limit
+  if let Some(limit) = &modifiers.limit
+  {
+    let mut stack = Stack::default();
+    eval_instructions(&mut stack, &Default::default(), &limit, &parameters)?;
+    let q: i64 = stack
+      .try_pop_into()
+      .map_err(|_| RunTimeError::InvalidArgumentType)?;
+    if q >= 0
+    {
+      output_table.truncate(q as usize);
+    }
+    else
+    {
+      Err(RunTimeError::NegativeIntegerArgument)?
+    }
+  }
+
+  // Filter output_table
+  let variables_names = variables.iter().map(|x| &x.name).collect::<Vec<_>>();
+  Ok(
+    output_table
+      .into_iter()
+      .map(|row| {
+        row
+          .into_iter()
+          .filter(|(x, _)| variables_names.contains(&x))
+          .collect()
+      })
+      .collect(),
+  )
 }
 
 pub(crate) fn eval_program(
@@ -756,8 +865,8 @@ pub(crate) fn eval_program(
 ) -> crate::Result<crate::graph::Value>
 {
   let graph_name: String = "default".into();
-  let mut input_table = crate::value_table::ValueTable::new();
-  input_table.add_row(crate::value_table::Row::new());
+  let mut input_table = value_table::ValueTable::new();
+  input_table.add_row(value_table::Row::new());
   let mut tx = store.begin()?;
   let mut stack = Default::default();
   for block in program
@@ -771,7 +880,7 @@ pub(crate) fn eval_program(
     {
       instructions::Block::Create { actions } =>
       {
-        let mut output_table = crate::value_table::ValueTable::new();
+        let mut output_table = value_table::ValueTable::new();
         for row in input_table.iter()
         {
           let mut new_row = row.clone();
@@ -818,7 +927,7 @@ pub(crate) fn eval_program(
         optional,
       } =>
       {
-        let mut output_table = crate::value_table::ValueTable::new();
+        let mut output_table = value_table::ValueTable::new();
         for row in input_table.into_iter()
         {
           let mut current_rows: Vec<HashMap<String, graph::Value>> = vec![row.clone()];
@@ -987,11 +1096,11 @@ pub(crate) fn eval_program(
             {
               match block
               {
-                BlockMatch::MatchNode { variable, .. } =>
+                instructions::BlockMatch::MatchNode { variable, .. } =>
                 {
                   new_row.insert_none(&variable);
                 }
-                BlockMatch::MatchEdge {
+                instructions::BlockMatch::MatchEdge {
                   left_variable,
                   edge_variable,
                   right_variable,
@@ -1015,9 +1124,13 @@ pub(crate) fn eval_program(
         }
         input_table = output_table;
       }
-      instructions::Block::Return { variables } =>
+      instructions::Block::Return {
+        variables,
+        modifiers,
+      } =>
       {
-        let output_table = compute_return_with_table(&variables, input_table, &parameters)?;
+        let output_table =
+          compute_return_with_table(&variables, &modifiers, input_table, &parameters)?;
         let mut r = Vec::<crate::graph::Value>::new();
         r.push(crate::graph::Value::Array(
           variables
@@ -1041,13 +1154,16 @@ pub(crate) fn eval_program(
         tx.commit()?;
         return Ok(crate::graph::Value::Array(r));
       }
-      instructions::Block::With { variables } =>
+      instructions::Block::With {
+        variables,
+        modifiers,
+      } =>
       {
-        input_table = compute_return_with_table(&variables, input_table, &parameters)?;
+        input_table = compute_return_with_table(&variables, &modifiers, input_table, &parameters)?;
       }
       instructions::Block::Unwind { name, instructions } =>
       {
-        let mut output_table = crate::value_table::ValueTable::new();
+        let mut output_table = value_table::ValueTable::new();
         for row in input_table.iter()
         {
           let mut stack = Stack::default();
@@ -1116,7 +1232,7 @@ pub(crate) fn eval_program(
       }
       instructions::Block::Update { updates } =>
       {
-        let mut output_table = crate::value_table::ValueTable::new();
+        let mut output_table = value_table::ValueTable::new();
         for row in input_table.iter()
         {
           let mut out_row = row.clone();

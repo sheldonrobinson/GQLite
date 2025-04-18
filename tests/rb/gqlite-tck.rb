@@ -49,6 +49,15 @@ features = [
   'remove/Remove1', 'remove/Remove2',
   # UNWIND
   'unwind/Unwind1',
+  # RETURN ORDER BY
+  'return-orderby/ReturnOrderBy1', 'return-orderby/ReturnOrderBy2', 'return-orderby/ReturnOrderBy3', 'return-orderby/ReturnOrderBy4', 'return-orderby/ReturnOrderBy5',
+  # RETURN SKIP LIMIT
+  'return-skip-limit/ReturnSkipLimit1', 'return-skip-limit/ReturnSkipLimit2', 'return-skip-limit/ReturnSkipLimit3',
+  # WITH ORDER BY
+  'with-orderBy/WithOrderBy1', 'with-orderBy/WithOrderBy2', 'with-orderBy/WithOrderBy3', 'with-orderBy/WithOrderBy4',
+  'with/With3', 
+  # WITH SKIP LIMIT
+  'with-skip-limit/WithSkipLimit1', 'with-skip-limit/WithSkipLimit2', 'with-skip-limit/WithSkipLimit3',
 ]
 
 expressions = [
@@ -73,17 +82,6 @@ expressions = [
 
 # Validated
 # gql = ['Graph1']
-# features = [
-#   # RETURN ORDER BY
-#   'return-orderby/ReturnOrderBy2', 'return-orderby/ReturnOrderBy3', 'return-orderby/ReturnOrderBy4', 'return-orderby/ReturnOrderBy5',
-#   # RETURN SKIP LIMIT
-#   'return-skip-limit/ReturnSkipLimit1', 'return-skip-limit/ReturnSkipLimit2', 'return-skip-limit/ReturnSkipLimit3',
-#   # WITH ORDER BY
-#   'with-orderBy/WithOrderBy2', 'with-orderBy/WithOrderBy3', 'with-orderBy/WithOrderBy4',
-#   'with/With3', 
-#   # WITH SKIP LIMIT
-#   'with-skip-limit/WithSkipLimit1', 'with-skip-limit/WithSkipLimit2', 'with-skip-limit/WithSkipLimit3',
-# ]
 
 # expressions = [
 #   # Aggregations

@@ -152,6 +152,21 @@ pub(crate) enum UpdateOne
 }
 
 #[derive(Debug)]
+pub(crate) struct OrderBy
+{
+  pub asc: bool,
+  pub instructions: Instructions,
+}
+
+#[derive(Debug)]
+pub(crate) struct Modifiers
+{
+  pub limit: Option<Instructions>,
+  pub skip: Option<Instructions>,
+  pub order_by: Vec<OrderBy>,
+}
+
+#[derive(Debug)]
 pub(crate) enum Block
 {
   Create
@@ -166,7 +181,8 @@ pub(crate) enum Block
   },
   Return
   {
-    variables: Vec<RWExpression>
+    variables: Vec<RWExpression>,
+    modifiers: Modifiers,
   },
   Call
   {
@@ -175,7 +191,8 @@ pub(crate) enum Block
   },
   With
   {
-    variables: Vec<RWExpression>
+    variables: Vec<RWExpression>,
+    modifiers: Modifiers,
   },
   Unwind
   {

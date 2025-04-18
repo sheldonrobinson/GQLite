@@ -343,19 +343,21 @@ fn build_modifiers(
       }
       Rule::order_by =>
       {
+        let mut subpair = subpair.into_inner();
+        subpair.try_next()?; // eat order_by_kw
+
         order_by = Some(ast::OrderBy {
           expressions: subpair
-            .into_inner()
             .map(|r| match r.as_rule()
             {
-              // Rule::order_by_asc_expression => Ok(ast::OrderByExpression {
-              //   asc: true,
-              //   expression: build_expression(r.into_inner().try_next()?.into_inner(), pratt)?,
-              // }),
-              // Rule::order_by_desc_expression => Ok(ast::OrderByExpression {
-              //   asc: false,
-              //   expression: build_expression(r.into_inner().try_next()?.into_inner(), pratt)?,
-              // }),
+              Rule::order_by_asc_expression => Ok(ast::OrderByExpression {
+                asc: true,
+                expression: build_expression(r.into_inner().try_next()?.into_inner(), pratt)?,
+              }),
+              Rule::order_by_desc_expression => Ok(ast::OrderByExpression {
+                asc: false,
+                expression: build_expression(r.into_inner().try_next()?.into_inner(), pratt)?,
+              }),
               _ => Err::<_, crate::Error>(
                 InternalError::UnexpectedPair {
                   context: "build_modifiers/order_by",

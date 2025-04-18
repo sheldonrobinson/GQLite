@@ -16,6 +16,7 @@ mod functions;
 mod graph;
 mod interpreter;
 mod parser;
+mod serialize_with;
 mod store;
 mod value_table;
 

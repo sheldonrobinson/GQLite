@@ -12,9 +12,9 @@ def compare(a,b)
       end
       return true
     when Hash
-      if (a.keys.sort == ["labels", "properties", "type"] || a.keys.sort == ["key", "labels", "properties", "type"]) && (a["type"] == "node" || a["type"] == "edge")
+      if (a.keys.sort == ["labels", "properties", "type"] || a.keys.sort == ["key", "labels", "properties", "type"]) && (a["type"] == "node" || a["type"] == "edge")  && (b["type"] == "node" || b["type"] == "edge")
         return a["labels"].sort == b["labels"].sort && compare(a["properties"], b["properties"])
-      elsif (a.keys.sort == ["destination", "labels", "properties", "source", "type"] || a.keys.sort == ["destination", "key", "labels", "properties", "source", "type"]) && (a["type"] == "path")
+      elsif (a.keys.sort == ["destination", "labels", "properties", "source", "type"] || a.keys.sort == ["destination", "key", "labels", "properties", "source", "type"]) && (a["type"] == "path") && (b["type"] == "path")
         return a["labels"].sort == b["labels"].sort && compare(a["properties"], b["properties"]) && compare(a["source"], b["source"]) && compare(a["destination"], b["destination"])
       else
         return false unless a.keys.sort == b.keys.sort
@@ -82,7 +82,37 @@ def compare_table_in_any_order(actual, expected)
         break
       end
     end
-    return false unless match
+    if !match
+      puts("Mo match for #{actual[i]}")
+      return false
+    end
+  end
+  return true
+end
+
+def compare_table_in_order(actual, expected)
+  return false unless actual.length == expected.length
+  # Resort the column so that they match
+  unless actual[0] == expected[0]
+    return false unless actual[0].sort == expected[0].sort
+    sort_order = []
+    actual[0].each do |e|
+      sort_order.push expected[0].index(e)
+    end
+    expected = expected.map do |r|
+      nr = []
+      sort_order.each do |idx|
+        nr.push r[idx]
+      end
+      nr
+    end
+  end
+  # Find matches
+  for i in 1...actual.length
+    unless compare(actual[i], expected[i])
+      puts("actual '#{actual[i]}' != '#{expected[i]}'")
+      return false
+    end
   end
   return true
 end

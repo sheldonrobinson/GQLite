@@ -16,7 +16,8 @@ pub(crate) enum ExpressionType
   Edge,
   Boolean,
   Null,
-  Number,
+  Integer,
+  Float,
   Path,
   String,
   Variant,
@@ -241,7 +242,7 @@ impl ExpressionInfo
         ExpressionType::Variant,
         [Self::analyse(variables, function_manager, &ma.left)?],
       )),
-      ast::Expression::Parameter(_) => Ok(Self::new(ExpressionType::Variant, false, false)),
+      ast::Expression::Parameter(_) => Ok(Self::new(ExpressionType::Variant, true, false)),
       ast::Expression::Value(val) => Ok(Self::new(
         match val.value
         {
@@ -249,8 +250,8 @@ impl ExpressionInfo
           graph::Value::Boolean(_) => ExpressionType::Boolean,
           graph::Value::Edge(_) => ExpressionType::Edge,
           graph::Value::Node(_) => ExpressionType::Node,
-          graph::Value::Float(_) => ExpressionType::Number,
-          graph::Value::Integer(_) => ExpressionType::Number,
+          graph::Value::Float(_) => ExpressionType::Float,
+          graph::Value::Integer(_) => ExpressionType::Integer,
           graph::Value::Invalid => ExpressionType::Null,
           graph::Value::Object(_) => ExpressionType::Map,
           graph::Value::Path(_) => ExpressionType::Path,
