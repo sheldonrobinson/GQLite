@@ -4,7 +4,7 @@
 
 ## [Unreleased] - ReleaseDate
 - Improve support of comparison.
-- Add support for string as key in hash.
+- Add support for string as key in map, and allow to use operator [] for map.
 
 ## [0.3.3] - 2025-03-31
 

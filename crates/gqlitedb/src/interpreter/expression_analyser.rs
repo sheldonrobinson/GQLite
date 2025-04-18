@@ -86,6 +86,17 @@ mod validators
       _ => Err(error::CompileTimeError::InvalidArgumentType.into()),
     }
   }
+  pub(super) fn integer_or_string_or_null(x: ExpressionInfo) -> Result<ExpressionInfo>
+  {
+    match x.expression_type
+    {
+      ExpressionType::Integer
+      | ExpressionType::String
+      | ExpressionType::Null
+      | ExpressionType::Variant => Ok(x),
+      _ => Err(error::CompileTimeError::InvalidArgumentType.into()),
+    }
+  }
 }
 
 trait ExpressionAnalyser
@@ -425,13 +436,28 @@ impl ExpressionInfo
         ExpressionType::Variant,
         [Self::analyse(variables, function_manager, &ma.left)?],
       )),
-      ast::Expression::IndexAccess(ia) => Ok(Self::new_type(
-        ExpressionType::Variant,
-        [
-          validators::array(Self::analyse(variables, function_manager, &ia.left)?)?,
-          validators::integer_or_null(Self::analyse(variables, function_manager, &ia.index)?)?,
-        ],
-      )),
+      ast::Expression::IndexAccess(ia) => Ok({
+        let left = Self::analyse(variables, function_manager, &ia.left)?;
+        let index = Self::analyse(variables, function_manager, &ia.index)?;
+
+        match left.expression_type
+        {
+          ExpressionType::Array => Self::new_type(
+            ExpressionType::Variant,
+            [left, validators::integer_or_null(index)?],
+          ),
+          ExpressionType::Map | ExpressionType::Edge | ExpressionType::Node => Self::new_type(
+            ExpressionType::Variant,
+            [left, validators::string_or_null(index)?],
+          ),
+          ExpressionType::Null => Self::new_type(ExpressionType::Null, [left, index]),
+          ExpressionType::Variant => Self::new_type(
+            ExpressionType::Variant,
+            [left, validators::integer_or_string_or_null(index)?],
+          ),
+          _ => Err(crate::error::CompileTimeError::InvalidArgumentType)?,
+        }
+      }),
       ast::Expression::RangeAccess(ia) => Ok({
         let mut dependents = vec![validators::array(Self::analyse(
           variables,
