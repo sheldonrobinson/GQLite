@@ -57,6 +57,11 @@ pub enum InternalError
     context: &'static str,
     variable: String,
   },
+  #[error("Missing value from stack in {context}.")]
+  MissingStackValue
+  {
+    context: &'static str
+  },
 }
 
 /// GQLite errors

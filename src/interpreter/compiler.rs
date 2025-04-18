@@ -14,6 +14,16 @@ fn compile_expression(expression: &crate::parser::ast::Expression, instructions:
     ast::Expression::Variable(variable) => Instruction::GetVariable {
       name: variable.identifier.clone(),
     },
+    ast::Expression::Array(array) =>
+    {
+      for v in array.array.iter()
+      {
+        compile_expression(v, instructions);
+      }
+      Instruction::CreateArray {
+        length: array.array.len(),
+      }
+    }
     ast::Expression::Map(map) =>
     {
       let mut keys = Vec::new();
@@ -309,6 +319,18 @@ pub(crate) fn compile(statements: crate::parser::ast::Statements) -> Result<supe
             Vec::from([Block::With {
               all: with.all,
               variables,
+            }])
+            .into_iter(),
+          )
+        }
+        ast::Statement::Unwind(unwind) =>
+        {
+          let mut instructions = Instructions::new();
+          compile_expression(&unwind.expression, &mut instructions);
+          Ok(
+            Vec::from([Block::Unwind {
+              name: unwind.name.to_owned(),
+              instructions,
             }])
             .into_iter(),
           )

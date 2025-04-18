@@ -1,9 +1,6 @@
-use std::error;
-
 use ast::Expression;
 use pest::Parser;
 use pest_derive::Parser;
-use rand::Error;
 
 use crate::{error::CompileTimeError, error::InternalError, graph, Result};
 
@@ -36,6 +33,12 @@ fn build_expression(pair: pest::iterators::Pair<Rule>) -> Result<ast::Expression
     })),
     Rule::ident => Ok(ast::Expression::Variable(ast::Variable {
       identifier: pair.as_str().to_string(),
+    })),
+    Rule::array => Ok(ast::Expression::Array(ast::Array {
+      array: pair
+        .into_inner()
+        .map(|pair| build_expression(pair))
+        .collect::<Result<Vec<ast::Expression>>>()?,
     })),
     Rule::map => Ok(ast::Expression::Map({
       let mut map = std::collections::HashMap::new();
@@ -342,6 +345,31 @@ fn build_ast_from_statement(pair: pest::iterators::Pair<Rule>) -> Result<ast::St
         all,
         expressions,
         modifiers: ast::Modifiers::default(),
+      }))
+    }
+    Rule::unwind_statement =>
+    {
+      let pair = pair
+        .into_inner()
+        .next()
+        .ok_or_else(|| InternalError::MissingPair {
+          context: "build_ast_from_statement/inner",
+        })?;
+
+      let ne = match pair.as_rule()
+      {
+        Rule::named_expression => build_named_expression(pair),
+        _ => Err(
+          InternalError::UnexpectedPair {
+            context: "build_ast_from_statement/with_statement",
+            pair: pair.as_str().to_string(),
+          }
+          .into(),
+        ),
+      }?;
+      Ok(ast::Statement::Unwind(ast::Unwind {
+        expression: ne.expression,
+        name: ne.name,
       }))
     }
     Rule::call_statement =>

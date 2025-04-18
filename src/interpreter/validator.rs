@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::hash::Hash;
 
 use crate::error::{CompileTimeError, InternalError};
 use crate::parser::ast;
@@ -103,6 +102,7 @@ impl Validator
   {
     match expression
     {
+      ast::Expression::Array(_) => Ok(Variable::Variant),
       ast::Expression::Map(_) => Ok(Variable::Variant),
       ast::Expression::MemberAccess(_) => Ok(Variable::Variant),
       ast::Expression::Value(_) => Ok(Variable::Variant),
