@@ -8,6 +8,13 @@ use crate::graph;
 use crate::Error;
 use crate::Result;
 
+//   ____                 _     ___        __
+//  / ___|_ __ __ _ _ __ | |__ |_ _|_ __  / _| ___
+// | |  _| '__/ _` | '_ \| '_ \ | || '_ \| |_ / _ \
+// | |_| | | | (_| | |_) | | | || || | | |  _| (_) |
+//  \____|_|  \__,_| .__/|_| |_|___|_| |_|_|  \___/
+//                 |_|
+
 struct GraphInfo
 {
   name: String,
@@ -18,6 +25,12 @@ struct GraphInfo
   edges_source_uuid_index: String,
   edges_destination_uuid_index: String,
 }
+
+//  ____  _        _   _     _   _
+// / ___|| |_ __ _| |_(_)___| |_(_) ___ ___
+// \___ \| __/ _` | __| / __| __| |/ __/ __|
+//  ___) | || (_| | |_| \__ \ |_| | (__\__ \
+// |____/ \__\__,_|\__|_|___/\__|_|\___|___/
 
 pub(crate) struct Statistics
 {
@@ -49,6 +62,13 @@ where
   }
 }
 
+//  ____               _     _             _   _____    _
+// |  _ \ ___ _ __ ___(_)___| |_ ___ _ __ | |_| ____|__| | __ _  ___
+// | |_) / _ \ '__/ __| / __| __/ _ \ '_ \| __|  _| / _` |/ _` |/ _ \
+// |  __/  __/ |  \__ \ \__ \ ||  __/ | | | |_| |__| (_| | (_| |  __/
+// |_|   \___|_|  |___/_|___/\__\___|_| |_|\__|_____\__,_|\__, |\___|
+//                                                        |___/
+
 /// This structure is used to represent the internal storage of an edge.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 struct PersistentEdge
@@ -68,13 +88,29 @@ struct PersistentEdge
   pub properties: graph::ValueObject,
 }
 
+//  ____       _           _   _   _           _       ___
+// / ___|  ___| | ___  ___| |_| \ | | ___   __| | ___ / _ \ _   _  ___ _ __ _   _
+// \___ \ / _ \ |/ _ \/ __| __|  \| |/ _ \ / _` |/ _ \ | | | | | |/ _ \ '__| | | |
+//  ___) |  __/ |  __/ (__| |_| |\  | (_) | (_| |  __/ |_| | |_| |  __/ |  | |_| |
+// |____/ \___|_|\___|\___|\__|_| \_|\___/ \__,_|\___|\__\_\\__,_|\___|_|   \__, |
+//                                                                          |___/
+
 #[derive(Default)]
-pub(crate) struct SelectNodeQuery<'a, T: Iterator<Item = &'a crate::graph::Key>>
+pub(crate) struct SelectNodeQuery<'a, TKeys, TLabels>
+where
+  TKeys: Iterator<Item = &'a crate::graph::Key>,
+  TLabels: Iterator<Item = &'a String>,
 {
-  keys: Option<T>,
+  keys: Option<TKeys>,
+  labels: Option<TLabels>,
 }
 
-impl SelectNodeQuery<'static, core::slice::Iter<'static, crate::graph::Key>>
+impl
+  SelectNodeQuery<
+    'static,
+    core::slice::Iter<'static, crate::graph::Key>,
+    core::slice::Iter<'static, String>,
+  >
 {
   pub(crate) fn select_all() -> Self
   {
@@ -82,13 +118,36 @@ impl SelectNodeQuery<'static, core::slice::Iter<'static, crate::graph::Key>>
   }
 }
 
-impl<'a, T: Iterator<Item = &'a crate::graph::Key>> SelectNodeQuery<'a, T>
+impl<'a, TKeys: Iterator<Item = &'a crate::graph::Key>>
+  SelectNodeQuery<'a, TKeys, core::slice::Iter<'a, String>>
 {
-  pub(crate) fn select_keys(keys: T) -> Self
+  pub(crate) fn select_keys(keys: TKeys) -> Self
   {
-    Self { keys: Some(keys) }
+    Self {
+      keys: Some(keys),
+      labels: None,
+    }
   }
 }
+
+impl<'a, TLabels: Iterator<Item = &'a String>>
+  SelectNodeQuery<'a, core::slice::Iter<'a, crate::graph::Key>, TLabels>
+{
+  pub(crate) fn select_labels(labels: TLabels) -> Self
+  {
+    Self {
+      keys: None,
+      labels: Some(labels),
+    }
+  }
+}
+
+//  ____       _           _   _____    _             ___
+// / ___|  ___| | ___  ___| |_| ____|__| | __ _  ___ / _ \ _   _  ___ _ __ _   _
+// \___ \ / _ \ |/ _ \/ __| __|  _| / _` |/ _` |/ _ \ | | | | | |/ _ \ '__| | | |
+//  ___) |  __/ |  __/ (__| |_| |__| (_| | (_| |  __/ |_| | |_| |  __/ |  | |_| |
+// |____/ \___|_|\___|\___|\__|_____\__,_|\__, |\___|\__\_\\__,_|\___|_|   \__, |
+//                                        |___/                            |___/
 
 #[derive(Default)]
 pub(crate) struct SelectEdgeQuery<'a, T: Iterator<Item = &'a crate::graph::Key>>
@@ -111,6 +170,12 @@ impl<'a, T: Iterator<Item = &'a crate::graph::Key>> SelectEdgeQuery<'a, T>
     Self { keys: Some(keys) }
   }
 }
+
+//  ____  _
+// / ___|| |_ ___  _ __ ___
+// \___ \| __/ _ \| '__/ _ \
+//  ___) | || (_) | | |  __/
+// |____/ \__\___/|_|  \___|
 
 /// Storage, aka, interface to the underlying persy store.
 pub(crate) struct Store
@@ -202,12 +267,15 @@ impl Store
     Ok(())
   }
   /// Select nodes according to a given query
-  pub(crate) fn select_nodes<'a, T: Iterator<Item = &'a crate::graph::Key>>(
+  pub(crate) fn select_nodes<'a, TKeys, TLabels>(
     &self,
     transaction: &mut persy::Transaction,
     graph_name: impl Into<String>,
-    query: SelectNodeQuery<'a, T>,
+    query: SelectNodeQuery<'a, TKeys, TLabels>,
   ) -> Result<Vec<crate::graph::Node>>
+  where
+    TKeys: Iterator<Item = &'a crate::graph::Key>,
+    TLabels: Iterator<Item = &'a String>,
   {
     let graph_name = graph_name.into();
     let graph_info = self.graphs.get(&graph_name).unwrap();
@@ -239,13 +307,35 @@ impl Store
           .map(|(_, content)| Ok::<Vec<u8>, crate::Error>(content)),
       ) as Box<dyn Iterator<Item = Result<Vec<u8>>>>,
     };
-    let r = nodes_raw
-      .map(|v| {
-        Ok::<graph::Node, crate::Error>(ciborium::from_reader::<graph::Node, &[u8]>(
-          &mut v?.as_ref(),
-        )?)
-      })
-      .collect::<Result<Vec<crate::graph::Node>>>()?;
+    let r = nodes_raw.map(|v| {
+      Ok::<graph::Node, crate::Error>(ciborium::from_reader::<graph::Node, &[u8]>(
+        &mut v?.as_ref(),
+      )?)
+    });
+    let r = match query.labels
+    {
+      Some(labels) =>
+      {
+        let labels = labels.collect::<Vec<&'a String>>();
+        r.filter(|n| match n
+        {
+          Ok(n) =>
+          {
+            for l in labels.iter()
+            {
+              if !n.labels.contains(l)
+              {
+                return false;
+              }
+            }
+            true
+          }
+          Err(_) => true,
+        })
+        .collect::<Result<Vec<crate::graph::Node>>>()
+      }
+      None => r.collect::<Result<Vec<crate::graph::Node>>>(),
+    }?;
     Ok(r)
   }
   fn get_node_id(
@@ -450,11 +540,19 @@ mod tests
   #[test]
   fn test_add_nodes()
   {
-    let nodes = [crate::graph::Node {
-      labels: crate::labels!("hello", "world"),
-      properties: crate::properties!("key" => 42i64),
-      key: crate::graph::Key::default(),
-    }];
+    // Add a single empty node
+    let nodes = [
+      crate::graph::Node {
+        labels: crate::labels!("hello", "world"),
+        properties: crate::properties!("key" => 42i64),
+        key: crate::graph::Key::default(),
+      },
+      crate::graph::Node {
+        labels: crate::labels!("not"),
+        properties: Default::default(),
+        key: crate::graph::Key::default(),
+      },
+    ];
     let store = super::Store::new(crate::tests::get_tmp_file().unwrap()).unwrap();
 
     let mut tx = store.begin().unwrap();
@@ -471,8 +569,19 @@ mod tests
       )
       .unwrap();
 
-    assert_eq!(nodes.len(), selected_nodes.len());
+    assert_eq!(selected_nodes.len(), 1);
     assert_eq!(nodes[0], selected_nodes[0]);
+    // Add a single node with label
+    let selected_nodes = store
+      .select_nodes(
+        store.begin().unwrap().borrow_mut(),
+        "default",
+        crate::store::SelectNodeQuery::select_labels(["not".to_string()].iter()),
+      )
+      .unwrap();
+
+    assert_eq!(selected_nodes.len(), 1);
+    assert_eq!(nodes[1], selected_nodes[0]);
   }
   #[test]
   fn test_add_edges()
