@@ -288,7 +288,7 @@ fn build_pattern(
           variable: edge_pattern.0,
           source: source_node,
           destination: destination_node,
-          directivity: ast::EdgeDirectivity::Directed,
+          directivity: graph::EdgeDirectivity::Directed,
           labels: edge_pattern.1,
           properties: edge_pattern.2,
         }));
@@ -303,7 +303,7 @@ fn build_pattern(
           variable: edge_pattern.0,
           source: source_node,
           destination: destination_node,
-          directivity: ast::EdgeDirectivity::Directed,
+          directivity: graph::EdgeDirectivity::Directed,
           labels: edge_pattern.1,
           properties: edge_pattern.2,
         }));
@@ -323,19 +323,19 @@ fn build_pattern(
           source_node.variable = Some(format!("__gqlite_{}", source_node_key));
         }
 
-        vec.push(ast::Pattern::GraphEdge(ast::GraphEdge {
+        vec.push(ast::Pattern::Edge(ast::EdgePattern {
           variable: edge_left_pattern.0,
           source: source_node.clone(),
           destination: destination_left_node,
-          directivity: ast::EdgeDirectivity::Directed,
+          directivity: graph::EdgeDirectivity::Directed,
           labels: edge_left_pattern.1,
           properties: edge_left_pattern.2,
         }));
-        vec.push(ast::Pattern::GraphEdge(ast::GraphEdge {
+        vec.push(ast::Pattern::Edge(ast::EdgePattern {
           variable: edge_right_pattern.0,
           source: source_node,
           destination: destination_right_node,
-          directivity: ast::EdgeDirectivity::Directed,
+          directivity: graph::EdgeDirectivity::Directed,
           labels: edge_right_pattern.1,
           properties: edge_right_pattern.2,
         }));
@@ -352,7 +352,7 @@ fn build_pattern(
             variable: edge_pattern.0,
             source: source_node,
             destination: destination_node,
-            directivity: ast::EdgeDirectivity::Undirected,
+            directivity: graph::EdgeDirectivity::Undirected,
             labels: edge_pattern.1,
             properties: edge_pattern.2,
           }));
@@ -378,7 +378,7 @@ fn build_pattern(
             variable: edge_pattern.0,
             source: source_node,
             destination: destination_node,
-            directivity: ast::EdgeDirectivity::Directed,
+            directivity: graph::EdgeDirectivity::Directed,
             labels: edge_pattern.1,
             properties: edge_pattern.2,
           },

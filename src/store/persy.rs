@@ -1,12 +1,164 @@
+use itertools::{Itertools, Unique};
 use serde::{Deserialize, Serialize};
-use std::cell::RefCell;
-use std::{borrow::Borrow, collections::HashMap};
+use std::{borrow::Borrow, cell::RefCell, collections::HashMap, rc::Rc};
 
 use persy::PersyError;
 
 use crate::graph;
 use crate::Error;
 use crate::Result;
+
+//  ___           _
+// |_ _|_ __   __| | _____  __
+//  | || '_ \ / _` |/ _ \ \/ /
+//  | || | | | (_| |  __/>  <
+// |___|_| |_|\__,_|\___/_/\_\
+
+enum IndexRef<'a>
+{
+  KeyIndex(&'a KeyIndex),
+  CompositeIndex(&'a CompositeIndex),
+}
+
+impl<'a> IndexRef<'a>
+{
+  fn one(
+    &self,
+    transaction: Rc<RefCell<&mut persy::Transaction>>,
+    key: impl Into<u128>,
+  ) -> Result<Option<persy::PersyId>>
+  {
+    match self
+    {
+      Self::KeyIndex(ki) => ki.one(transaction, key),
+      Self::CompositeIndex(ci) => ci.one(transaction, key),
+    }
+  }
+  fn get(
+    &self,
+    transaction: Rc<RefCell<&'a mut persy::Transaction>>,
+    key: impl Into<u128>,
+  ) -> Result<Box<dyn Iterator<Item = persy::PersyId> + 'a>>
+  {
+    let key = key.into();
+    Ok(match self
+    {
+      Self::KeyIndex(ki) => Box::new(ki.get(transaction, key)?),
+      Self::CompositeIndex(ci) => Box::new(ci.get(transaction, key)?),
+    })
+  }
+}
+
+trait IndexTrait
+{
+  type Key: persy::IndexType;
+  type Value;
+  fn one(
+    &self,
+    transaction: Rc<RefCell<&mut persy::Transaction>>,
+    key: impl Into<Self::Key>,
+  ) -> Result<Option<Self::Value>>;
+  fn get(
+    &self,
+    transaction: Rc<RefCell<&mut persy::Transaction>>,
+    key: impl Into<Self::Key>,
+  ) -> Result<impl Iterator<Item = Self::Value>>;
+  fn to_index_ref(&self) -> IndexRef;
+}
+
+struct KeyIndex
+{
+  name: String,
+}
+
+impl KeyIndex
+{
+  fn update(
+    &self,
+    transaction: &mut persy::Transaction,
+    key: impl Into<u128>,
+    value: impl Into<persy::PersyId>,
+  ) -> Result<()>
+  {
+    transaction.put::<u128, persy::PersyId>(&self.name, key.into(), value.into())?;
+    Ok(())
+  }
+}
+
+impl IndexTrait for KeyIndex
+{
+  type Key = u128;
+  type Value = persy::PersyId;
+  fn one(
+    &self,
+    transaction: Rc<RefCell<&mut persy::Transaction>>,
+    key: impl Into<Self::Key>,
+  ) -> Result<Option<Self::Value>>
+  {
+    Ok(transaction.borrow_mut().one(&self.name, &key.into())?)
+  }
+  fn get(
+    &self,
+    transaction: Rc<RefCell<&mut persy::Transaction>>,
+    key: impl Into<Self::Key>,
+  ) -> Result<impl Iterator<Item = Self::Value>>
+  {
+    Ok(transaction.borrow_mut().get(&self.name, &key.into())?)
+  }
+  fn to_index_ref(&self) -> IndexRef
+  {
+    IndexRef::KeyIndex(self)
+  }
+}
+
+struct CompositeIndex
+{
+  indices: Vec<KeyIndex>,
+}
+
+impl IndexTrait for CompositeIndex
+{
+  type Key = u128;
+  type Value = persy::PersyId;
+  fn one(
+    &self,
+    transaction: Rc<RefCell<&mut persy::Transaction>>,
+    key: impl Into<Self::Key>,
+  ) -> Result<Option<Self::Value>>
+  {
+    let key = key.into();
+    for it in self.indices.iter()
+    {
+      let r = it.one(transaction.clone(), key)?;
+      if r.is_some()
+      {
+        return Ok(r);
+      }
+    }
+    Ok(None)
+  }
+  fn get(
+    &self,
+    transaction: Rc<RefCell<&mut persy::Transaction>>,
+    key: impl Into<Self::Key>,
+  ) -> Result<impl Iterator<Item = Self::Value>>
+  {
+    let key = key.into();
+    let mut keys = vec![];
+    for it in self.indices.iter()
+    {
+      let mut r = it
+        .get(transaction.clone(), key)?
+        .collect::<Vec<Self::Value>>();
+      keys.append(&mut r);
+    }
+    Ok(keys.into_iter().unique())
+  }
+  fn to_index_ref(&self) -> IndexRef
+  {
+    IndexRef::CompositeIndex(self)
+  }
+}
 
 //   ____                 _     ___        __
 //  / ___|_ __ __ _ _ __ | |__ |_ _|_ __  / _| ___
@@ -19,11 +171,12 @@ struct GraphInfo
 {
   name: String,
   nodes_segment: persy::SegmentId,
-  nodes_uuid_index: String,
+  nodes_uuid_index: KeyIndex,
   edges_segment: persy::SegmentId,
-  edges_uuid_index: String,
-  edges_source_uuid_index: String,
-  edges_destination_uuid_index: String,
+  edges_uuid_index: KeyIndex,
+  edges_source_uuid_index: KeyIndex,
+  edges_destination_uuid_index: KeyIndex,
+  edges_nodes_uuid_index: CompositeIndex,
 }
 
 fn persy_id_serialize<S>(x: &persy::PersyId, s: S) -> std::result::Result<S::Ok, S::Error>
@@ -111,11 +264,29 @@ impl Store
       GraphInfo {
         name: "default".into(),
         nodes_segment: s.persy_store.solve_segment_id("default_nodes")?,
-        nodes_uuid_index: "default_nodes_uuid_index".into(),
+        nodes_uuid_index: KeyIndex {
+          name: "default_nodes_uuid_index".into(),
+        },
         edges_segment: s.persy_store.solve_segment_id("default_edges")?,
-        edges_uuid_index: "default_edges_uuid_index".into(),
-        edges_source_uuid_index: "default_edges_source_uuid_index".into(),
-        edges_destination_uuid_index: "default_edges_destination_uuid_index".into(),
+        edges_uuid_index: KeyIndex {
+          name: "default_edges_uuid_index".into(),
+        },
+        edges_source_uuid_index: KeyIndex {
+          name: "default_edges_source_uuid_index".into(),
+        },
+        edges_destination_uuid_index: KeyIndex {
+          name: "default_edges_destination_uuid_index".into(),
+        },
+        edges_nodes_uuid_index: CompositeIndex {
+          indices: vec![
+            KeyIndex {
+              name: "default_edges_source_uuid_index".into(),
+            },
+            KeyIndex {
+              name: "default_edges_destination_uuid_index".into(),
+            },
+          ],
+        },
       },
     );
     Ok(s)
@@ -163,11 +334,9 @@ impl Store
       let mut data = Vec::<u8>::new();
       ciborium::into_writer(&x, &mut data)?;
       let pid = transaction.insert(graph_info.nodes_segment, &data)?;
-      transaction.put::<u128, persy::PersyId>(
-        graph_info.nodes_uuid_index.as_str(),
-        x.key.borrow().into(),
-        pid,
-      )?;
+      graph_info
+        .nodes_uuid_index
+        .update(transaction, &x.key, pid)?;
     }
     Ok(())
   }
@@ -189,9 +358,9 @@ impl Store
     let nodes_raw = match query.keys
     {
       Some(keys_iter) => Box::new(keys_iter.map(|key| {
-        let key: u128 = key.into();
-        if let Some(key) =
-          transaction.one::<u128, persy::PersyId>(graph_info.nodes_uuid_index.as_str(), &key)?
+        if let Some(key) = graph_info
+          .nodes_uuid_index
+          .one(Rc::new(RefCell::new(transaction)), key)?
         {
           if let Some(v) = transaction.read(graph_info.nodes_segment, key.borrow())?
           {
@@ -284,8 +453,9 @@ impl Store
   {
     let graph_info = self.graphs.get(graph_name).unwrap();
     let key: u128 = key.borrow().into();
-    if let Some(pid) =
-      transaction.one::<u128, persy::PersyId>(graph_info.nodes_uuid_index.as_str(), &key)?
+    if let Some(pid) = graph_info
+      .nodes_uuid_index
+      .one(Rc::new(RefCell::new(transaction)), key)?
     {
       Ok(pid)
     }
@@ -321,21 +491,15 @@ impl Store
         &mut data,
       )?;
       let pid = transaction.insert(graph_info.edges_segment, &data)?;
-      transaction.put::<u128, persy::PersyId>(
-        graph_info.edges_uuid_index.as_str(),
-        x.key.borrow().into(),
-        pid,
-      )?;
-      transaction.put::<u128, persy::PersyId>(
-        &graph_info.edges_source_uuid_index.as_str(),
-        x.source.key.borrow().into(),
-        pid,
-      )?;
-      transaction.put::<u128, persy::PersyId>(
-        graph_info.edges_destination_uuid_index.as_str(),
-        x.destination.key.borrow().into(),
-        pid,
-      )?;
+      graph_info
+        .edges_uuid_index
+        .update(transaction, &x.key, pid)?;
+      graph_info
+        .edges_source_uuid_index
+        .update(transaction, &x.source.key, pid)?;
+      graph_info
+        .edges_destination_uuid_index
+        .update(transaction, &x.destination.key, pid)?;
     }
     Ok(())
   }
@@ -385,6 +549,7 @@ impl Store
       TDestinationLabels,
       TDestinationProperties,
     >,
+    directivity: graph::EdgeDirectivity,
   ) -> Result<Vec<crate::graph::Edge>>
   where
     TSourceKeys: Iterator<Item = &'a crate::graph::Key>,
@@ -399,19 +564,30 @@ impl Store
   {
     let graph_name = graph_name.into();
     let graph_info = self.graphs.get(&graph_name).unwrap();
-    let transaction = RefCell::new(transaction);
+    let transaction = Rc::new(RefCell::new(transaction));
+    let (edges_source_uuid_index, edges_destination_uuid_index) = match directivity
+    {
+      graph::EdgeDirectivity::Directed => (
+        graph_info.edges_source_uuid_index.to_index_ref(),
+        graph_info.edges_destination_uuid_index.to_index_ref(),
+      ),
+      graph::EdgeDirectivity::Undirected => (
+        graph_info.edges_nodes_uuid_index.to_index_ref(),
+        graph_info.edges_nodes_uuid_index.to_index_ref(),
+      ),
+    };
 
     let edges_raw = {
-      let mut transaction = transaction.borrow_mut();
+      // let mut transaction = transaction.borrow_mut();
       match query.keys
       {
         Some(keys_iter) => keys_iter
           .map(|key| {
-            let key: u128 = key.into();
-            if let Some(key) =
-              transaction.one::<u128, persy::PersyId>(graph_info.edges_uuid_index.as_str(), &key)?
+            if let Some(key) = graph_info.edges_uuid_index.one(transaction.clone(), key)?
             {
-              if let Some(v) = transaction.read(graph_info.edges_segment, key.borrow())?
+              if let Some(v) = transaction
+                .borrow_mut()
+                .read(graph_info.edges_segment, key.borrow())?
               {
                 Ok(v)
               }
@@ -431,6 +607,7 @@ impl Store
           if query.source.is_select_all() && query.destination.is_select_all()
           {
             transaction
+              .borrow_mut()
               .scan(graph_info.edges_segment)?
               .map(|(_, content)| Ok::<Vec<u8>, crate::Error>(content))
               .collect::<Result<Vec<Vec<u8>>>>()?
@@ -439,39 +616,31 @@ impl Store
           {
             let edges_ids = if !query.destination.is_select_all() && !query.source.is_select_all()
             {
-              let dest_it: Vec<persy::PersyId> = self
-                .select_nodes(&mut transaction, graph_name.to_owned(), query.destination)?
+              let dest_it = self.select_nodes(
+                &mut transaction.borrow_mut(),
+                graph_name.to_owned(),
+                query.destination,
+              )?;
+              let dest_it: Vec<persy::PersyId> = dest_it
                 .into_iter()
-                .map(|n| {
-                  transaction.get(
-                    graph_info.edges_destination_uuid_index.as_str(),
-                    &(<&graph::Key as Into<u128>>::into(&n.key) as u128),
-                  )
-                })
-                .collect::<std::result::Result<
-                  Vec<persy::ValueIter<persy::PersyId>>,
-                  persy::PE<persy::IndexChangeError>,
-                >>()?
+                .map(|n| edges_destination_uuid_index.get(transaction.clone(), n.key))
+                .collect::<Result<Vec<_>>>()?
                 .into_iter()
                 .flatten()
                 .collect();
+              let nodes =
+                self.select_nodes(&mut transaction.borrow_mut(), graph_name, query.source)?;
               Box::new(
-                self
-                  .select_nodes(&mut transaction, graph_name, query.source)?
+                nodes
                   .into_iter()
-                  .map(|n| {
-                    transaction.get(
-                      graph_info.edges_source_uuid_index.as_str(),
-                      &(<&graph::Key as Into<u128>>::into(&n.key) as u128),
-                    )
-                  })
+                  .map(|n| edges_source_uuid_index.get(transaction.clone(), n.key))
                   .map(|id_iter| {
                     Ok({
                       let dest_it = dest_it.clone();
                       id_iter?.filter(move |id| dest_it.contains(id))
                     })
                   })
-                  .collect::<Vec<std::result::Result<_, persy::PE<persy::IndexChangeError>>>>()
+                  .collect::<Vec<Result<_>>>()
                   .into_iter()
                   .flatten()
                   .flatten(),
@@ -479,47 +648,35 @@ impl Store
             }
             else if !query.source.is_select_all()
             {
+              let nodes =
+                self.select_nodes(&mut transaction.borrow_mut(), graph_name, query.source)?;
               Box::new(
-                self
-                  .select_nodes(&mut transaction, graph_name, query.source)?
+                nodes
                   .into_iter()
-                  .map(|n| {
-                    transaction.get(
-                      graph_info.edges_source_uuid_index.as_str(),
-                      &(<&graph::Key as Into<u128>>::into(&n.key) as u128),
-                    )
-                  })
-                  .collect::<std::result::Result<
-                    Vec<persy::ValueIter<persy::PersyId>>,
-                    persy::PE<persy::IndexChangeError>,
-                  >>()?
+                  .map(|n| edges_source_uuid_index.get(transaction.clone(), n.key))
+                  .collect::<Result<Vec<_>>>()?
                   .into_iter()
                   .flatten(),
               ) as Box<dyn Iterator<Item = persy::PersyId>>
             }
             else
             {
+              let nodes =
+                self.select_nodes(&mut transaction.borrow_mut(), graph_name, query.destination)?;
               Box::new(
-                self
-                  .select_nodes(&mut transaction, graph_name, query.destination)?
+                nodes
                   .into_iter()
-                  .map(|n| {
-                    transaction.get(
-                      graph_info.edges_destination_uuid_index.as_str(),
-                      &(<&graph::Key as Into<u128>>::into(&n.key) as u128),
-                    )
-                  })
-                  .collect::<std::result::Result<
-                    Vec<persy::ValueIter<persy::PersyId>>,
-                    persy::PE<persy::IndexChangeError>,
-                  >>()?
+                  .map(|n| edges_destination_uuid_index.get(transaction.clone(), n.key))
+                  .collect::<Result<Vec<_>>>()?
                   .into_iter()
                   .flatten(),
               ) as Box<dyn Iterator<Item = persy::PersyId>>
             };
             edges_ids
               .map(|key| {
-                if let Some(v) = transaction.read(graph_info.edges_segment, &key)?
+                if let Some(v) = transaction
+                  .borrow_mut()
+                  .read(graph_info.edges_segment, &key)?
                 {
                   Ok(v)
                 }
@@ -630,7 +787,12 @@ impl Store
         .filter(|(_, v)| **v != graph::Value::Invalid)
         .count();
     }
-    for e in self.select_edges(transaction, "default", super::SelectEdgeQuery::select_all())?
+    for e in self.select_edges(
+      transaction,
+      "default",
+      super::SelectEdgeQuery::select_all(),
+      graph::EdgeDirectivity::Directed,
+    )?
     {
       edges_count += 1;
 
@@ -669,6 +831,8 @@ where
 mod tests
 {
   use std::borrow::BorrowMut;
+
+  use crate::graph;
 
   #[test]
   fn test_add_nodes()
@@ -759,6 +923,7 @@ mod tests
         store.begin().unwrap().borrow_mut(),
         "default",
         crate::store::SelectEdgeQuery::select_keys([edge.key].iter()),
+        graph::EdgeDirectivity::Directed,
       )
       .unwrap();
 

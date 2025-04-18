@@ -421,6 +421,7 @@ fn compile_match_edge(
     right_variable: destination_variable,
     path_variable,
     filter,
+    directivity: edge.directivity,
   })
 }
 

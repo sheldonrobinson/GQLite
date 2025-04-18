@@ -1,5 +1,7 @@
 #![allow(unused)]
 
+use crate::graph;
+
 #[derive(Debug)]
 pub(crate) enum Statement
 {
@@ -184,19 +186,12 @@ pub(crate) struct NodePattern
 }
 
 #[derive(Debug, Clone)]
-pub(crate) enum EdgeDirectivity
-{
-  Undirected,
-  Directed,
-}
-
-#[derive(Debug, Clone)]
 pub(crate) struct EdgePattern
 {
   pub(crate) variable: Option<String>,
   pub(crate) source: NodePattern,
   pub(crate) destination: NodePattern,
-  pub(crate) directivity: EdgeDirectivity,
+  pub(crate) directivity: graph::EdgeDirectivity,
   pub(crate) labels: LabelExpression,
   pub(crate) properties: Option<Expression>,
 }

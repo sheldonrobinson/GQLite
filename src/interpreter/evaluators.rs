@@ -356,6 +356,7 @@ pub(crate) fn eval_program(
         right_variable,
         path_variable,
         filter,
+        directivity,
       } =>
       {
         let mut output_table = crate::value_table::ValueTable::new();
@@ -395,6 +396,7 @@ pub(crate) fn eval_program(
                 template.destination.properties.iter(),
               ),
             ),
+            directivity,
           )?;
 
           for edge in edges.iter()

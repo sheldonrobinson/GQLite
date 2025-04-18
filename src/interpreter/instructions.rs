@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use crate::functions;
+use crate::{functions, graph};
 
 #[derive(Debug)]
 pub(crate) enum Instruction
@@ -82,6 +82,7 @@ pub(crate) enum Block
     right_variable: Option<String>,
     path_variable: Option<String>,
     filter: Instructions,
+    directivity: graph::EdgeDirectivity,
   },
   Return
   {
