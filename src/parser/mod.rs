@@ -24,6 +24,9 @@ fn build_expression(pair: pest::iterators::Pair<Rule>) -> Result<ast::Expression
 {
   match pair.as_rule()
   {
+    Rule::null_lit => Ok(ast::Expression::Value(ast::Value {
+      value: graph::Value::Invalid,
+    })),
     Rule::true_lit => Ok(ast::Expression::Value(ast::Value {
       value: graph::Value::Boolean(true),
     })),
@@ -59,7 +62,6 @@ fn build_expression(pair: pest::iterators::Pair<Rule>) -> Result<ast::Expression
     })),
     Rule::num =>
     {
-      println!("num : {:?}", pair);
       let mut it = pair.into_inner();
       let num_str = it
         .next()

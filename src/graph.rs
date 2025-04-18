@@ -24,8 +24,15 @@ pub type ValueObject = std::collections::HashMap<String, Value>;
 fn value_object_display(obj: &ValueObject, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
 {
   write!(f, "{{")?;
-  obj.iter().for_each(|(k, v)| {
-    write!(f, "{}: {}", k, v).unwrap();
+  obj.iter().enumerate().for_each(|(n, (k, v))| {
+    if n == 0
+    {
+      write!(f, "{}: {}", k, v).unwrap();
+    }
+    else
+    {
+      write!(f, ", {}: {}", k, v).unwrap();
+    }
   });
   write!(f, "}}")
 }
@@ -91,7 +98,7 @@ impl std::fmt::Display for Value
   {
     match self
     {
-      Value::Invalid => write!(f, "invalid"),
+      Value::Invalid => write!(f, "null"),
       Value::Boolean(b) => write!(f, "{}", b),
       Value::Integer(i) => write!(f, "{}", i),
       Value::Float(fl) => write!(f, "{}", fl),

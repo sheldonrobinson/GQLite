@@ -27,6 +27,7 @@ call_statement = { "CALL" ~ function_name ~ "()" }
 
 // literals
 int = { ("+" | "-")? ~ ASCII_DIGIT+ }
+null_lit = { "null" }
 true_lit = { "true" }
 false_lit = { "false" }
 num = { int ~ ("." ~ ASCII_DIGIT*)? ~ (^"e" ~ int)? }
@@ -37,7 +38,7 @@ function_name = { ident ~ ("." ~ ident)* }
 // Expression
 
 named_expression = { expression ~ "AS" ~ ident | expression }
-expression = _{ true_lit | false_lit | map | string_literal | num | member_access | ident }
+expression = _{ null_lit | true_lit | false_lit | num | string_literal | map | member_access | ident }
 
 member_access = { ident ~ ("." ~ ident)+}
 

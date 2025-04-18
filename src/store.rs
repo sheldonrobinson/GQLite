@@ -412,7 +412,11 @@ impl Store
           labels.push(l.to_owned());
         }
       }
-      properties_count += n.properties.len();
+      properties_count += n
+        .properties
+        .iter()
+        .filter(|(_, v)| **v != graph::Value::Invalid)
+        .count();
     }
 
     Ok(Statistics {
