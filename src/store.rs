@@ -488,9 +488,7 @@ impl Store
     transaction: &mut persy::Transaction,
   ) -> Result<Statistics>
   {
-    let edges_count = self
-      .select_edges(transaction, "default", SelectEdgeQuery::select_all())?
-      .len();
+    let mut edges_count = 0;
     let mut nodes_count = 0;
     let mut labels = Vec::new();
     let mut properties_count = 0;
@@ -506,6 +504,16 @@ impl Store
         }
       }
       properties_count += n
+        .properties
+        .iter()
+        .filter(|(_, v)| **v != graph::Value::Invalid)
+        .count();
+    }
+    for e in self.select_edges(transaction, "default", SelectEdgeQuery::select_all())?
+    {
+      edges_count += 1;
+
+      properties_count += e
         .properties
         .iter()
         .filter(|(_, v)| **v != graph::Value::Invalid)
