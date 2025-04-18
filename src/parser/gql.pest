@@ -36,7 +36,7 @@ function_name = { ident ~ ("." ~ ident)* }
 
 // Expression
 
-named_expression = { expression | ident ~ expression }
+named_expression = { expression ~ "AS" ~ ident | expression }
 expression = _{ map | string_literal | num | true_lit | false_lit | ident }
 
 pair = { ident ~ ":" ~ expression }

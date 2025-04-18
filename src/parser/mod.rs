@@ -69,10 +69,12 @@ fn build_named_expression(pair: pest::iterators::Pair<Rule>) -> Result<ast::Name
             expression: build_expression(expr)?,
           })
         }
-        2 => Ok(ast::NamedExpression {
-          name: inner.next().unwrap().as_str().to_string(),
-          expression: build_expression(inner.next().unwrap())?,
-        }),
+        2 =>
+        {
+          let expression = build_expression(inner.next().unwrap())?;
+          let name = inner.next().unwrap().as_str().to_string();
+          Ok(ast::NamedExpression { name, expression })
+        }
         _ =>
         {
           panic!(
