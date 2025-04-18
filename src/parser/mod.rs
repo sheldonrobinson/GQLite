@@ -806,7 +806,10 @@ fn build_ast_from_statement(
             let mut pair = pair.into_inner();
             let target = pair.try_next()?.as_str().to_string();
             let labels = pair.map(|el| el.as_str().to_string()).collect();
-            updates.push(ast::OneUpdate::AddLabels(ast::AddLabels { target, labels }));
+            updates.push(ast::OneUpdate::AddLabels(ast::AddRemoveLabels {
+              target,
+              labels,
+            }));
           }
           unknown_expression => Err(crate::Error::UnxpectedExpression(
             "build_ast_from_statement/set_statement",
@@ -823,15 +826,24 @@ fn build_ast_from_statement(
       {
         match pair.as_rule()
         {
-          Rule::remove_expression =>
+          Rule::remove_member_access =>
           {
             let mut pair = pair.into_inner();
-            let mut pair_left = pair.try_next()?.into_inner();
-            let target = pair_left.try_next()?.as_str().to_string();
-            let path = pair_left.map(|el| el.as_str().to_string()).collect();
+            let target = pair.try_next()?.as_str().to_string();
+            let path = pair.map(|el| el.as_str().to_string()).collect();
             updates.push(ast::OneUpdate::RemoveProperty(ast::RemoveProperty {
               target,
               path,
+            }));
+          }
+          Rule::set_label_expression =>
+          {
+            let mut pair = pair.into_inner();
+            let target = pair.try_next()?.as_str().to_string();
+            let labels = pair.map(|el| el.as_str().to_string()).collect();
+            updates.push(ast::OneUpdate::RemoveLabels(ast::AddRemoveLabels {
+              target,
+              labels,
             }));
           }
           unknown_expression => Err(crate::Error::UnxpectedExpression(

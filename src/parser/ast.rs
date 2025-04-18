@@ -106,7 +106,8 @@ pub(crate) enum OneUpdate
   SetProperty(UpdateProperty),
   AddProperty(UpdateProperty),
   RemoveProperty(RemoveProperty),
-  AddLabels(AddLabels),
+  AddLabels(AddRemoveLabels),
+  RemoveLabels(AddRemoveLabels),
 }
 
 #[derive(Debug)]
@@ -125,7 +126,7 @@ pub(crate) struct RemoveProperty
 }
 
 #[derive(Debug)]
-pub(crate) struct AddLabels
+pub(crate) struct AddRemoveLabels
 {
   pub(crate) target: String,
   pub(crate) labels: Vec<String>,

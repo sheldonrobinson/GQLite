@@ -1201,8 +1201,18 @@ pub(crate) fn eval_program(
                   })?,
                 }
               }
-              instructions::UpdateOne::AddLabels { target, labels } =>
+              instructions::UpdateOne::AddLabels { target, labels }
+              | instructions::UpdateOne::RemoveLabels { target, labels } =>
               {
+                let add_labels = match update
+                {
+                  instructions::UpdateOne::AddLabels { .. } => true,
+                  instructions::UpdateOne::RemoveLabels { .. } => false,
+                  _ => Err(InternalError::Unreachable {
+                    context: "evaluator/eval_program/add_remove_labels",
+                  })?,
+                };
+
                 let var = out_row.get(target).ok_or_else(|| {
                   crate::error::RunTimeError::UndefinedVariable {
                     name: target.to_owned(),
@@ -1213,14 +1223,36 @@ pub(crate) fn eval_program(
                   graph::Value::Node(n) =>
                   {
                     let mut n = n.to_owned();
-                    n.labels.append(&mut labels.clone());
+                    if add_labels
+                    {
+                      n.labels.append(&mut labels.clone());
+                    }
+                    else
+                    {
+                      n.labels = n
+                        .labels
+                        .into_iter()
+                        .filter(|x| !labels.contains(x))
+                        .collect();
+                    }
                     store.update_node(&mut tx, &graph_name, &n)?;
                     out_row.insert(target.to_owned(), n.into());
                   }
                   graph::Value::Edge(e) =>
                   {
                     let mut e = e.to_owned();
-                    e.labels.append(&mut labels.clone());
+                    if add_labels
+                    {
+                      e.labels.append(&mut labels.clone());
+                    }
+                    else
+                    {
+                      e.labels = e
+                        .labels
+                        .into_iter()
+                        .filter(|x| !labels.contains(x))
+                        .collect();
+                    }
                     store.update_edge(&mut tx, &graph_name, &e)?;
                     out_row.insert(target.to_owned(), e.into());
                   }

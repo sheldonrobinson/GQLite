@@ -45,6 +45,8 @@ features = [
   'delete/Delete1', 'delete/Delete2',
   # SET
   'set/Set1', 'set/Set2', 'set/Set3', 'set/Set4', 'set/Set5',
+  # REMOVE
+  'remove/Remove1', 'remove/Remove2',
 ]
 
 expressions = [
@@ -70,8 +72,6 @@ expressions = [
 # Validated
 # gql = ['Graph1']
 # features = [
-#   # REMOVE
-#   'remove/Remove1', 'remove/Remove2',
 #   # RETURN ORDER BY
 #   'return-orderby/ReturnOrderBy2', 'return-orderby/ReturnOrderBy3', 'return-orderby/ReturnOrderBy4', 'return-orderby/ReturnOrderBy5',
 #   # RETURN SKIP LIMIT

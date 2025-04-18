@@ -78,13 +78,13 @@ function_name  =  { ident ~ ("." ~ ident)* }
 
 // Expression
 
-set_expression           = _{ set_eq_expression | set_add_expression | set_label_expression }
-set_eq_expression        =  { set_eq_member_access ~ "=" ~ expression }
-set_add_expression       =  { set_eq_member_access ~ "+=" ~ expression }
-remove_expression        =  { set_remove_member_access }
-set_label_expression     =  { ident ~ (":" ~ ident)+ }
-set_eq_member_access     =  { (("(" ~ ident ~ ")") | ident) ~ ("." ~ ident)* }
-set_remove_member_access =  { (("(" ~ ident ~ ")") | ident) ~ ("." ~ ident)+ }
+set_expression       = _{ set_eq_expression | set_add_expression | set_label_expression }
+set_eq_expression    =  { set_eq_member_access ~ "=" ~ expression }
+set_add_expression   =  { set_eq_member_access ~ "+=" ~ expression }
+remove_expression    = _{ remove_member_access | set_label_expression }
+set_label_expression =  { ident ~ (":" ~ ident)+ }
+set_eq_member_access =  { (("(" ~ ident ~ ")") | ident) ~ ("." ~ ident)* }
+remove_member_access =  { (("(" ~ ident ~ ")") | ident) ~ ("." ~ ident)+ }
 
 expression = { prefix? ~ expression_term ~ postfix? ~ (infix ~ prefix? ~ expression_term ~ postfix?)* }
 

@@ -978,6 +978,10 @@ pub(crate) fn compile(
                 target: add_labels.target.to_owned(),
                 labels: add_labels.labels.to_owned(),
               }),
+              ast::OneUpdate::RemoveLabels(rm_labels) => Ok(instructions::UpdateOne::RemoveLabels {
+                target: rm_labels.target.to_owned(),
+                labels: rm_labels.labels.to_owned(),
+              }),
             })
             .collect::<Result<_>>()?,
         }),
