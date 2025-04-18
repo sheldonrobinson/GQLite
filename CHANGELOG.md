@@ -5,6 +5,7 @@
 ## [Unreleased] - ReleaseDate
 
 - Fix support for boolean, conditional, null.
+- Add toInteger function.
 
 ## [0.3.2] - 2025-02-22
 
