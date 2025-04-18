@@ -111,6 +111,7 @@ impl Validator
         todo!()
       } // Ok(Variable::Variant),
       ast::Expression::RelationalDifferent(_) => Ok(Variable::Boolean),
+      ast::Expression::RelationalIn(_) => Ok(Variable::Boolean),
       ast::Expression::Map(_) => Ok(Variable::Variant),
       ast::Expression::MemberAccess(_) => Ok(Variable::Variant),
       ast::Expression::Parameter(_) => Ok(Variable::Variant),

@@ -159,7 +159,7 @@ impl ValueTryIntoRef<Value> for Value
 }
 
 macro_rules! impl_to_value {
-  ($type:tt, $vn:tt) => {
+  ($type:ty, $vn:tt) => {
     impl Into<Value> for $type
     {
       fn into(self) -> Value
@@ -200,6 +200,7 @@ impl_to_value!(f64, Float);
 impl_to_value!(String, String);
 impl_to_value!(Node, Node);
 impl_to_value!(Edge, Edge);
+impl_to_value!(Vec<Value>, Array);
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub struct Key

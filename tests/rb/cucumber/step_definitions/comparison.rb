@@ -14,6 +14,8 @@ def compare(a,b)
     when Hash
       if (a.keys.sort == ["labels", "properties", "type"] || a.keys.sort == ["key", "labels", "properties", "type"]) && (a["type"] == "node" || a["type"] == "edge")
         return a["labels"].sort == b["labels"].sort && compare(a["properties"], b["properties"])
+      elsif (a.keys.sort == ["destination", "labels", "properties", "source", "type"] || a.keys.sort == ["destination", "key", "labels", "properties", "source", "type"]) && (a["type"] == "path")
+        return a["labels"].sort == b["labels"].sort && compare(a["properties"], b["properties"]) && compare(a["source"], b["source"]) && compare(a["destination"], b["destination"])
       else
         return false unless a.keys.sort == b.keys.sort
         a.keys.each do |k|

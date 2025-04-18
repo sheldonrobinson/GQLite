@@ -158,6 +158,7 @@ pub(crate) enum Expression
   Variable(Variable),
 
   RelationalDifferent(Box<RelationalDifferent>),
+  RelationalIn(Box<RelationalIn>),
 }
 
 // Order By Expression
@@ -409,6 +410,14 @@ impl Into<Expression> for RelationalDifferent
   fn into(self) -> Expression
   {
     Expression::RelationalDifferent(Box::new(self))
+  }
+}
+
+impl Into<Expression> for RelationalIn
+{
+  fn into(self) -> Expression
+  {
+    Expression::RelationalIn(Box::new(self))
   }
 }
 

@@ -25,12 +25,34 @@ fn build_pair(pair: pest::iterators::Pair<Rule>) -> Result<(String, ast::Express
 fn build_expression(pair: pest::iterators::Pair<Rule>) -> Result<ast::Expression>
 {
   let inner_pair = pair.into_inner().next().unwrap();
-  let mut it = inner_pair.into_inner();
+  build_expression_relational_different_bin_op(inner_pair)
+}
+
+fn build_expression_relational_different_bin_op(
+  pair: pest::iterators::Pair<Rule>,
+) -> Result<ast::Expression>
+{
+  let mut it = pair.into_inner();
+  let left = build_expression_in_bin_op(it.next().unwrap())?;
+  if let Some(right) = it.next()
+  {
+    let right = build_expression(right)?;
+    Ok(ast::RelationalDifferent { left, right }.into())
+  }
+  else
+  {
+    Ok(left)
+  }
+}
+
+fn build_expression_in_bin_op(pair: pest::iterators::Pair<Rule>) -> Result<ast::Expression>
+{
+  let mut it = pair.into_inner();
   let left = build_expression_term(it.next().unwrap())?;
   if let Some(right) = it.next()
   {
-    let right = build_expression_term(right)?;
-    Ok(ast::RelationalDifferent { left, right }.into())
+    let right = build_expression(right)?;
+    Ok(ast::RelationalIn { left, right }.into())
   }
   else
   {
