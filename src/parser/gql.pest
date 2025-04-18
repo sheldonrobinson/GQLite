@@ -1,9 +1,9 @@
 WHITESPACE = _{ " " | "\t" | "\n" }
-ident = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* ~ "'"* }
-char = {
+ident      = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* ~ "'"* }
+char       =  {
     !("'" | "\\") ~ ANY
-    | "\\" ~ ("\"" | "\\" | "/" | "b" | "f" | "n" | "r" | "t")
-    | "\\" ~ ("u" ~ ASCII_HEX_DIGIT{4})
+  | "\\" ~ ("\"" | "\\" | "/" | "b" | "f" | "n" | "r" | "t")
+  | "\\" ~ ("u" ~ ASCII_HEX_DIGIT{4})
 }
 
 // Query
@@ -11,67 +11,67 @@ query = _{ SOI ~ statement* ~ ";"? ~ EOI }
 
 // fragments
 
-labels = { ":" ~ label_expression }
-pattern = { ident? ~ labels? ~ map? }
-node_pattern = { "(" ~ pattern ~ ")" }
-edge_pattern = { "(" ~ pattern ~ ")-[" ~ pattern ~ "]->(" ~ pattern ~ ")" }
-reverse_edge_pattern = { "(" ~ pattern ~ ")<-[" ~ pattern ~ "]-(" ~ pattern ~ ")" }
-bidirection_edge_pattern = { "(" ~ pattern ~ ")<-[" ~ pattern ~ "]-(" ~ pattern ~ ")-[" ~ pattern ~ "]->(" ~ pattern ~ ")" }
-undirected_edge_pattern = { ( "(" ~ pattern ~ ")-[" ~ pattern ~ "]-(" ~ pattern ~ ")" ) | ( "(" ~ pattern ~ ")<-[" ~ pattern ~ "]->(" ~ pattern ~ ")" ) }
-edge_patterns = _{ edge_pattern | bidirection_edge_pattern | reverse_edge_pattern | undirected_edge_pattern }
-path_pattern = { ident ~ "=" ~ edge_patterns }
-node_or_edge_pattern = _{ edge_pattern | bidirection_edge_pattern | reverse_edge_pattern | undirected_edge_pattern | node_pattern  }
-node_or_edge_or_path_pattern = _{ edge_pattern | reverse_edge_pattern | undirected_edge_pattern | node_pattern | path_pattern }
+labels                       =  { ":" ~ label_expression }
+pattern                      =  { ident? ~ labels? ~ map? }
+node_pattern                 =  { "(" ~ pattern ~ ")" }
+edge_pattern                 =  { "(" ~ pattern ~ ")-[" ~ pattern ~ "]->(" ~ pattern ~ ")" }
+edge_empty_pattern           =  { "(" ~ pattern ~ ")-->(" ~ pattern ~ ")" }
+reverse_edge_pattern         =  { "(" ~ pattern ~ ")<-[" ~ pattern ~ "]-(" ~ pattern ~ ")" }
+bidirection_edge_pattern     =  { "(" ~ pattern ~ ")<-[" ~ pattern ~ "]-(" ~ pattern ~ ")-[" ~ pattern ~ "]->(" ~ pattern ~ ")" }
+undirected_edge_pattern      =  { ("(" ~ pattern ~ ")-[" ~ pattern ~ "]-(" ~ pattern ~ ")") | ("(" ~ pattern ~ ")<-[" ~ pattern ~ "]->(" ~ pattern ~ ")") }
+edge_patterns                = _{ edge_pattern | edge_empty_pattern | bidirection_edge_pattern | reverse_edge_pattern | undirected_edge_pattern }
+path_pattern                 =  { ident ~ "=" ~ edge_patterns }
+node_or_edge_pattern         = _{ edge_patterns | node_pattern }
+node_or_edge_or_path_pattern = _{ edge_patterns | node_pattern | path_pattern }
 
 // Statements
 statement = { create_statement | match_statement | return_statement | call_statement | with_statement | unwind_statement }
 
 star = { "*" }
 
-create_statement = { "CREATE" ~ node_or_edge_pattern ~ ( "," ~ node_or_edge_pattern )* }
-match_statement = { "MATCH" ~ node_or_edge_or_path_pattern ~ ( "," ~ node_or_edge_or_path_pattern )* }
-return_statement = { "RETURN" ~ named_expression ~ ("," ~ named_expression )* }
-call_statement = { "CALL" ~ function_name ~ "()" }
-with_statement = { "WITH" ~ (star | named_expression) ~ ("," ~ named_expression )* }
+create_statement = { "CREATE" ~ node_or_edge_pattern ~ ("," ~ node_or_edge_pattern)* }
+match_statement  = { "MATCH" ~ node_or_edge_or_path_pattern ~ ("," ~ node_or_edge_or_path_pattern)* }
+return_statement = { "RETURN" ~ named_expression ~ ("," ~ named_expression)* }
+call_statement   = { "CALL" ~ function_name ~ "()" }
+with_statement   = { "WITH" ~ (star | named_expression) ~ ("," ~ named_expression)* }
 unwind_statement = { "UNWIND" ~ named_expression }
 
 // literals
-int = { ("+" | "-")? ~ ASCII_DIGIT+ }
-null_lit = { "null" }
-true_lit = { "true" }
-false_lit = { "false" }
-num = { int ~ ("." ~ ASCII_DIGIT*)? ~ (^"e" ~ int)? }
+int            =  { ("+" | "-")? ~ ASCII_DIGIT+ }
+null_lit       =  { "null" }
+true_lit       =  { "true" }
+false_lit      =  { "false" }
+num            =  { int ~ ("." ~ ASCII_DIGIT*)? ~ (^"e" ~ int)? }
 string_literal = ${ "'" ~ inner ~ "'" }
-inner = @{ char* }
-function_name = { ident ~ ("." ~ ident)* }
+inner          = @{ char* }
+function_name  =  { ident ~ ("." ~ ident)* }
 
 // Expression
 
-named_expression = { expression ~ "AS" ~ ident | expression }
-function_call = { function_name ~ "(" ~ expression ~ ("," ~ expression)* ~ ")" }
-expression = _{ null_lit | true_lit | false_lit | num | string_literal | map | array | function_call | member_access | ident | parameter }
+named_expression =  { expression ~ "AS" ~ ident | expression }
+function_call    =  { function_name ~ "(" ~ expression ~ ("," ~ expression)* ~ ")" }
+expression       = _{ null_lit | true_lit | false_lit | num | string_literal | map | array | function_call | member_access | ident | parameter }
 
-parameter = { "$" ~ ident }
-member_access = { ident ~ ("." ~ ident)+}
+parameter     = { "$" ~ ident }
+member_access = { ident ~ ("." ~ ident)+ }
 
 pair = { ident ~ ":" ~ expression }
 
 array = {
-   "[" ~ "]" |
-   "[" ~ expression ~ ("," ~ expression)* ~ "]"
-  }
+    "[" ~ "]"
+  | "[" ~ expression ~ ("," ~ expression)* ~ "]"
+}
 
 map = {
-  "{" ~ "}" |
-  "{" ~ pair ~ ("," ~ pair)* ~ "}"
+    "{" ~ "}"
+  | "{" ~ pair ~ ("," ~ pair)* ~ "}"
 }
 
 // label_expression
 
-label_expression = _{ label_inclusion  }
+label_expression = _{ label_inclusion }
 
-label_inclusion = { label_alternative ~ (":" ~ label_expression)* }
+label_inclusion   = { label_alternative ~ (":" ~ label_expression)* }
 label_alternative = { label_atom ~ ("|" ~ label_expression)* }
-label_atom = { label_group | ident }
-label_group = { "(" ~ label_expression ~ ")" }
-
+label_atom        = { label_group | ident }
+label_group       = { "(" ~ label_expression ~ ")" }
