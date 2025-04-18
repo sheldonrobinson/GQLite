@@ -4,7 +4,7 @@ use std::cell::Cell;
 // use crate::graph::ToValue;
 use crate::interpreter::instructions::{Block, Instruction, Instructions};
 use crate::interpreter::{context, instructions};
-use crate::parser::ast;
+use crate::parser::ast::{self, MemberAccess};
 use crate::Error;
 use crate::Result;
 
@@ -27,6 +27,13 @@ fn compile_expression(expression: &crate::parser::ast::Expression, instructions:
         keys.push(k.to_owned());
       }
       Instruction::CreateMap { keys: keys }
+    }
+    ast::Expression::MemberAccess(member_access) =>
+    {
+      compile_expression(&member_access.left, instructions);
+      Instruction::MemberAccess {
+        path: member_access.path.to_owned(),
+      }
     }
   };
   instructions.push(expr);

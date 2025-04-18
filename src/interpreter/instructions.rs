@@ -23,6 +23,10 @@ pub(crate) enum Instruction
   {
     keys: Vec<String>,
   },
+  MemberAccess
+  {
+    path: Vec<String>,
+  },
   Duplicate,
   Rot3,
 }

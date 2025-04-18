@@ -84,6 +84,14 @@ fn eval_instructions(
         }
         stack.push(graph::Value::Object(m));
       }
+      instructions::Instruction::MemberAccess { path } =>
+      {
+        let v = stack
+          .pop()
+          .ok_or_else(|| Error::InternalError("Missing stack value for member access."))?;
+        println!("{:?} {:?}", v, path);
+        stack.push(v.access(path.iter()));
+      }
       instructions::Instruction::Duplicate => stack.push(
         stack
           .last()
@@ -288,8 +296,14 @@ pub(crate) fn eval_program(
           let mut res = graph::ValueObject::new();
           res.insert("nodes_count".into(), (stats.nodes_count as i64).into());
           res.insert("edges_count".into(), (stats.edges_count as i64).into());
-          res.insert("labels_nodes_count".into(), (stats.labels_nodes_count as i64).into());
-          res.insert("properties_count".into(), (stats.properties_count as i64).into());
+          res.insert(
+            "labels_nodes_count".into(),
+            (stats.labels_nodes_count as i64).into(),
+          );
+          res.insert(
+            "properties_count".into(),
+            (stats.properties_count as i64).into(),
+          );
           return Ok(crate::graph::Value::Object(res));
         }
         else

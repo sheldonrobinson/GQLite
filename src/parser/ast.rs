@@ -144,6 +144,7 @@ pub(crate) struct Modifiers
 pub(crate) enum Expression
 {
   Map(Map),
+  MemberAccess(Box<MemberAccess>),
   Value(Value),
   Variable(Variable),
 }
