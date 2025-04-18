@@ -372,32 +372,119 @@ pub(crate) fn eval_program(
             .ok_or_else(|| InternalError::ExpectedNode {
               context: "eval_program/MatchEdge",
             })?;
-          let nodes = store.select_nodes(
-            &mut tx,
-            "default",
-            crate::store::SelectNodeQuery::select_labels_properties(
-              template.labels.iter(),
-              template.properties.iter(),
-            ),
-          )?;
 
-          let edges = store.select_edges(
-            &mut tx,
-            "default",
-            crate::store::SelectEdgeQuery::select_source_destination_labels_properties(
-              crate::store::SelectNodeQuery::select_labels_properties(
-                template.source.labels.iter(),
-                template.source.properties.iter(),
+          let edges = if left_variable.is_some()
+            && row.contains_key(&left_variable.clone().unwrap())
+          {
+            if right_variable.is_some() && row.contains_key(&right_variable.clone().unwrap())
+            {
+              store.select_edges(
+                &mut tx,
+                "default",
+                crate::store::SelectEdgeQuery::select_source_destination_labels_properties(
+                  crate::store::SelectNodeQuery::select_keys(
+                    [&row
+                      .get(&left_variable.clone().unwrap())
+                      .unwrap()
+                      .to_node()
+                      .ok_or(InternalError::ExpectedNode {
+                        context: "MatchEdge",
+                      })?
+                      .key]
+                    .into_iter(),
+                  ),
+                  template.labels.iter(),
+                  template.properties.iter(),
+                  crate::store::SelectNodeQuery::select_keys(
+                    [&row
+                      .get(&right_variable.clone().unwrap())
+                      .unwrap()
+                      .to_node()
+                      .ok_or(InternalError::ExpectedNode {
+                        context: "MatchEdge",
+                      })?
+                      .key]
+                    .into_iter(),
+                  ),
+                ),
+                directivity,
+              )?
+            }
+            else
+            {
+              store.select_edges(
+                &mut tx,
+                "default",
+                crate::store::SelectEdgeQuery::select_source_destination_labels_properties(
+                  crate::store::SelectNodeQuery::select_keys(
+                    [&row
+                      .get(&left_variable.clone().unwrap())
+                      .unwrap()
+                      .to_node()
+                      .ok_or(InternalError::ExpectedNode {
+                        context: "MatchEdge",
+                      })?
+                      .key]
+                    .into_iter(),
+                  ),
+                  template.labels.iter(),
+                  template.properties.iter(),
+                  crate::store::SelectNodeQuery::select_labels_properties(
+                    template.destination.labels.iter(),
+                    template.destination.properties.iter(),
+                  ),
+                ),
+                directivity,
+              )?
+            }
+          }
+          else if right_variable.is_some() && row.contains_key(&right_variable.clone().unwrap())
+          {
+            store.select_edges(
+              &mut tx,
+              "default",
+              crate::store::SelectEdgeQuery::select_source_destination_labels_properties(
+                crate::store::SelectNodeQuery::select_labels_properties(
+                  template.source.labels.iter(),
+                  template.source.properties.iter(),
+                ),
+                template.labels.iter(),
+                template.properties.iter(),
+                crate::store::SelectNodeQuery::select_keys(
+                  [&row
+                    .get(&right_variable.clone().unwrap())
+                    .unwrap()
+                    .to_node()
+                    .ok_or(InternalError::ExpectedNode {
+                      context: "MatchEdge",
+                    })?
+                    .key]
+                  .into_iter(),
+                ),
               ),
-              template.labels.iter(),
-              template.properties.iter(),
-              crate::store::SelectNodeQuery::select_labels_properties(
-                template.destination.labels.iter(),
-                template.destination.properties.iter(),
+              directivity,
+            )?
+          }
+          else
+          {
+            store.select_edges(
+              &mut tx,
+              "default",
+              crate::store::SelectEdgeQuery::select_source_destination_labels_properties(
+                crate::store::SelectNodeQuery::select_labels_properties(
+                  template.source.labels.iter(),
+                  template.source.properties.iter(),
+                ),
+                template.labels.iter(),
+                template.properties.iter(),
+                crate::store::SelectNodeQuery::select_labels_properties(
+                  template.destination.labels.iter(),
+                  template.destination.properties.iter(),
+                ),
               ),
-            ),
-            directivity,
-          )?;
+              directivity,
+            )?
+          };
 
           for edge in edges.iter()
           {

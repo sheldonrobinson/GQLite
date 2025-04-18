@@ -283,29 +283,29 @@ fn build_pattern(
         let mut it = pair.into_inner();
         let source_node = build_node_pattern(it.next().unwrap())?;
         let edge_pattern = build_edge_pattern(it.next().unwrap())?;
-        let destination_node = build_node_pattern(it.next().unwrap())?;
+        let mut destination_node = build_node_pattern(it.next().unwrap())?;
         vec.push(ast::Pattern::Edge(ast::EdgePattern {
           variable: edge_pattern.0,
           source: source_node,
-          destination: destination_node,
+          destination: destination_node.clone(),
           directivity: graph::EdgeDirectivity::Directed,
           labels: edge_pattern.1,
           properties: edge_pattern.2,
         }));
-      }
-      Rule::edge_empty_pattern =>
-      {
-        let mut it = pair.into_inner();
-        let source_node = build_node_pattern(it.next().unwrap())?;
-        let destination_node = build_node_pattern(it.next().unwrap())?;
-        vec.push(ast::Pattern::Edge(ast::EdgePattern {
-          variable: None,
-          source: source_node,
-          destination: destination_node,
-          directivity: graph::EdgeDirectivity::Directed,
-          labels: ast::LabelExpression::None,
-          properties: None,
-        }));
+        while let Some(next) = it.next()
+        {
+          let source_node = destination_node;
+          let edge_pattern = build_edge_pattern(next)?;
+          destination_node = build_node_pattern(it.next().unwrap())?;
+          vec.push(ast::Pattern::Edge(ast::EdgePattern {
+            variable: edge_pattern.0,
+            source: source_node,
+            destination: destination_node.clone(),
+            directivity: graph::EdgeDirectivity::Directed,
+            labels: edge_pattern.1,
+            properties: edge_pattern.2,
+          }));
+        }
       }
       Rule::reverse_edge_pattern =>
       {

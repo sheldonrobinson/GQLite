@@ -1,25 +1,27 @@
-WHITESPACE = _{ " " | "\t" | "\n" }
-ident      = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* ~ "'"* }
-char       =  {
+WHITESPACE    = _{ " " | "\t" | "\n" }
+ident         = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* ~ "'"* }
+char          =  {
     !("'" | "\\") ~ ANY
   | "\\" ~ ("\"" | "\\" | "/" | "b" | "f" | "n" | "r" | "t")
   | "\\" ~ ("u" ~ ASCII_HEX_DIGIT{4})
 }
+nothing_ident = @{ "###"+ }
 
 // Query
 query = _{ SOI ~ statement* ~ ";"? ~ EOI }
+
+nothing = { nothing_ident? }
 
 // fragments
 
 labels                       =  { ":" ~ label_expression }
 pattern                      =  { ident? ~ labels? ~ map? }
 node_pattern                 =  { "(" ~ pattern ~ ")" }
-edge_pattern                 =  { "(" ~ pattern ~ ")-[" ~ pattern ~ "]->(" ~ pattern ~ ")" }
-edge_empty_pattern           =  { "(" ~ pattern ~ ")-->(" ~ pattern ~ ")" }
+edge_pattern                 =  { "(" ~ pattern ~ ((")-[" ~ pattern ~ "]->(") | (nothing ~ ")-->(")) ~ pattern ~ (((")-[" ~ pattern ~ "]->(") | (nothing ~ ")-->(")) ~ pattern)* ~ ")" }
 reverse_edge_pattern         =  { "(" ~ pattern ~ ")<-[" ~ pattern ~ "]-(" ~ pattern ~ ")" }
 bidirection_edge_pattern     =  { "(" ~ pattern ~ ")<-[" ~ pattern ~ "]-(" ~ pattern ~ ")-[" ~ pattern ~ "]->(" ~ pattern ~ ")" }
 undirected_edge_pattern      =  { ("(" ~ pattern ~ ")-[" ~ pattern ~ "]-(" ~ pattern ~ ")") | ("(" ~ pattern ~ ")<-[" ~ pattern ~ "]->(" ~ pattern ~ ")") }
-edge_patterns                = _{ edge_pattern | edge_empty_pattern | bidirection_edge_pattern | reverse_edge_pattern | undirected_edge_pattern }
+edge_patterns                = _{ edge_pattern | bidirection_edge_pattern | reverse_edge_pattern | undirected_edge_pattern }
 path_pattern                 =  { ident ~ "=" ~ edge_patterns }
 node_or_edge_pattern         = _{ edge_patterns | node_pattern }
 node_or_edge_or_path_pattern = _{ edge_patterns | node_pattern | path_pattern }
@@ -73,5 +75,5 @@ label_expression = _{ label_inclusion }
 
 label_inclusion   = { label_alternative ~ (":" ~ label_expression)* }
 label_alternative = { label_atom ~ ("|" ~ label_expression)* }
-label_atom        = { label_group | ident }
+label_atom        = { label_group | ":"? ~ ident }
 label_group       = { "(" ~ label_expression ~ ")" }

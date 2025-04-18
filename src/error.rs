@@ -35,6 +35,8 @@ pub enum CompileTimeError
   {
     context: &'static str
   },
+  #[error("NoSingleRelationshipType: an edge type need to be specified.")]
+  NoSingleRelationshipType,
   #[error("UnknownFunction: {name}")]
   UnknownFunction
   {

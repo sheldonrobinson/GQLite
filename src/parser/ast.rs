@@ -216,14 +216,6 @@ pub(crate) enum LabelExpression
 
 impl LabelExpression
 {
-  pub(crate) fn is_none(&self) -> bool
-  {
-    match self
-    {
-      LabelExpression::None => true,
-      _ => false,
-    }
-  }
   pub(crate) fn and(self, rhs: LabelExpression) -> LabelExpression
   {
     match self
@@ -303,6 +295,22 @@ impl LabelExpression
       LabelExpression::Or(_) => false,
       LabelExpression::String(_) => true,
       LabelExpression::Not(_) => false,
+    }
+  }
+  pub(crate) fn is_none(&self) -> bool
+  {
+    match self
+    {
+      LabelExpression::None => true,
+      _ => false,
+    }
+  }
+  pub(crate) fn is_string(&self) -> bool
+  {
+    match self
+    {
+      LabelExpression::String(_) => true,
+      _ => false,
     }
   }
 }
