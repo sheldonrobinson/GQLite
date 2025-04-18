@@ -1,11 +1,12 @@
-WHITESPACE    = _{ " " | "\t" | "\n" }
-ident         = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* ~ "'"* }
-char          =  {
+WHITESPACE     = _{ " " | "\t" | "\n" }
+ident          = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
+parameter_name = @{ (ASCII_ALPHANUMERIC | "_")* }
+char           =  {
     !("'" | "\\") ~ ANY
   | "\\" ~ ("\"" | "\\" | "/" | "b" | "f" | "n" | "r" | "t")
   | "\\" ~ ("u" ~ ASCII_HEX_DIGIT{4})
 }
-nothing_ident = @{ "###"+ }
+nothing_ident  = @{ "###"+ }
 
 // Query
 query = _{ SOI ~ statement* ~ ";"? ~ EOI }
@@ -96,7 +97,7 @@ function_call            = { function_name ~ "(" ~ expression ~ ("," ~ expressio
 count_star               = { "count" ~ "(" ~ "*" ~ ")" }
 expression_term          = { null_lit | true_lit | false_lit | num | int | string_literal | map | array | member_access | label_check_expression | parameter | parenthesised_expression | function_call | count_star | ident }
 
-parameter     = { "$" ~ ident }
+parameter     = { "$" ~ parameter_name }
 member_access = { ident ~ ("." ~ ident)+ }
 
 pair = { ident ~ ":" ~ expression }
