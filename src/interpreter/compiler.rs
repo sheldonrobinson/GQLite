@@ -792,6 +792,20 @@ pub(crate) fn compile(
         {
           let mut variables = Vec::<instructions::RWExpression>::new();
 
+          if return_statement.all
+          {
+            for (name, _) in validator.variables_ref()
+            {
+              variables.push(instructions::RWExpression {
+                name: name.to_owned(),
+                instructions: vec![Instruction::GetVariable {
+                  name: name.to_owned(),
+                }],
+                aggregations: Default::default(),
+              });
+            }
+          }
+
           for expr in return_statement.expressions.iter()
           {
             let mut instructions = Instructions::new();
@@ -831,6 +845,7 @@ pub(crate) fn compile(
             val_variables = validator.to_variables();
           }
           let mut variables = Vec::<RWExpression>::new();
+          let mut variable_names = Vec::<String>::new();
           for e in with.expressions.iter()
           {
             let mut instructions = Instructions::new();
@@ -841,6 +856,16 @@ pub(crate) fn compile(
               &mut instructions,
               &mut Some(&mut aggregations),
             )?;
+            if variable_names.contains(&e.name)
+            {
+              return Err(
+                CompileTimeError::ColumnNameConflict {
+                  name: e.name.to_owned(),
+                }
+                .into(),
+              );
+            }
+            variable_names.push(e.name.to_owned());
             variables.push(RWExpression {
               name: e.name.to_owned(),
               instructions,

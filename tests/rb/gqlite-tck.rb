@@ -39,6 +39,8 @@ features = [
   'match/Match1', 'match/Match2', 'match/Match3', 'match/Match7',
   # MatchWhere
   'match-where/MatchWhere1', 'match-where/MatchWhere2', 'match-where/MatchWhere3', 'match-where/MatchWhere4',
+   # WITH
+   'with/With1', 'with/With2',  'with/With4',
 ]
 
 expressions = [
@@ -64,8 +66,6 @@ expressions = [
 # Validated
 # gql = ['Graph1']
 # features = [
-#   # WITH
-#   'with/With1', 'with/With2', 'with/With3', 'with/With4',
 #   # DELETE
 #   'delete/Delete1', 'delete/Delete2',
 #   # SET
@@ -78,6 +78,7 @@ expressions = [
 #   'return-skip-limit/ReturnSkipLimit1', 'return-skip-limit/ReturnSkipLimit2', 'return-skip-limit/ReturnSkipLimit3',
 #   # WITH ORDER BY
 #   'with-orderBy/WithOrderBy2', 'with-orderBy/WithOrderBy3', 'with-orderBy/WithOrderBy4',
+#   'with/With3', 
 #   # WITH SKIP LIMIT
 #   'with-skip-limit/WithSkipLimit1', 'with-skip-limit/WithSkipLimit2', 'with-skip-limit/WithSkipLimit3',
 #   # UNWIND

@@ -36,7 +36,7 @@ modifiers      = { limit }
 where_modifier = { "WHERE" ~ expression }
 
 // Statements
-statement = { create_statement | optional_match_statement | match_statement | return_statement | call_statement | with_statement | unwind_statement }
+statement = { create_statement | optional_match_statement | match_statement | return_statement | return_all_statement | call_statement | with_statement | unwind_statement }
 
 star = { "*" }
 
@@ -44,6 +44,7 @@ create_statement         = { "CREATE" ~ node_or_edge_pattern ~ ("," ~ node_or_ed
 match_statement          = { "MATCH" ~ node_or_edge_or_path_pattern ~ ("," ~ node_or_edge_or_path_pattern)* ~ where_modifier? }
 optional_match_statement = { "OPTIONAL" ~ match_statement }
 return_statement         = { "RETURN" ~ named_expression ~ ("," ~ named_expression)* }
+return_all_statement     = { "RETURN" ~ "*" }
 call_statement           = { "CALL" ~ function_name ~ "()" }
 with_statement           = { "WITH" ~ (star | named_expression) ~ ("," ~ named_expression)* ~ modifiers? }
 unwind_statement         = { "UNWIND" ~ named_expression }
