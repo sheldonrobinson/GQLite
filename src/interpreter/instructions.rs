@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 #[derive(Debug)]
 pub(crate) enum Instruction
@@ -51,6 +51,6 @@ pub(crate) enum Block
   },
   Return
   {
-    variables: HashMap<String, Instructions>,
+    variables: BTreeMap<String, Instructions>,
   },
 }
