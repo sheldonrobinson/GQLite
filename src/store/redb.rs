@@ -24,6 +24,62 @@ struct PersistentEdge
   pub properties: graph::ValueObject,
 }
 
+impl redb::Value for PersistentEdge
+{
+  type AsBytes<'a> = Vec<u8>;
+  type SelfType<'a> = PersistentEdge;
+  fn as_bytes<'a, 'b: 'a>(value: &'a Self::SelfType<'b>) -> Self::AsBytes<'a>
+  where
+    Self: 'b,
+  {
+    let mut data = Vec::<u8>::new();
+    ciborium::into_writer(value, &mut data).unwrap(); // This unwrap should not happen, unless there is a bug
+    data
+  }
+  fn from_bytes<'a>(data: &'a [u8]) -> Self::SelfType<'a>
+  where
+    Self: 'a,
+  {
+    ciborium::from_reader(data).unwrap() // This unwrap should not happen, unless there is a bug
+  }
+  fn fixed_width() -> Option<usize>
+  {
+    None
+  }
+  fn type_name() -> redb::TypeName
+  {
+    redb::TypeName::new("PersistentEdge")
+  }
+}
+
+impl redb::Value for graph::Node
+{
+  type AsBytes<'a> = Vec<u8>;
+  type SelfType<'a> = graph::Node;
+  fn as_bytes<'a, 'b: 'a>(value: &'a Self::SelfType<'b>) -> Self::AsBytes<'a>
+  where
+    Self: 'b,
+  {
+    let mut data = Vec::<u8>::new();
+    ciborium::into_writer(value, &mut data).unwrap(); // This unwrap should not happen, unless there is a bug
+    data
+  }
+  fn from_bytes<'a>(data: &'a [u8]) -> Self::SelfType<'a>
+  where
+    Self: 'a,
+  {
+    ciborium::from_reader(data).unwrap() // This unwrap should not happen, unless there is a bug
+  }
+  fn fixed_width() -> Option<usize>
+  {
+    None
+  }
+  fn type_name() -> redb::TypeName
+  {
+    redb::TypeName::new("graph::Node")
+  }
+}
+
 impl redb::Value for graph::Key
 {
   type AsBytes<'a> = <u128 as redb::Value>::AsBytes<'a>;
@@ -62,7 +118,7 @@ impl redb::Key for graph::Key
 
 struct EdgeIdResult
 {
-  edge_data: Vec<u8>,
+  edge_data: PersistentEdge,
   reversed: Option<bool>,
   source_id: Option<graph::Key>,
   destination_id: Option<graph::Key>,
@@ -71,7 +127,7 @@ struct EdgeIdResult
 impl EdgeIdResult
 {
   fn new(
-    edge_data: Vec<u8>,
+    edge_data: PersistentEdge,
     reversed: Option<bool>,
     source_id: Option<graph::Key>,
     destination_id: Option<graph::Key>,
@@ -85,17 +141,17 @@ impl EdgeIdResult
       destination_id,
     }
   }
-  fn is_reversed(&self, edge: &graph::Edge) -> bool
+  fn is_reversed(&self) -> bool
   {
     match self.reversed
     {
       Some(v) => v,
       None => match self.source_id
       {
-        Some(v) => edge.destination.key == v,
+        Some(v) => self.edge_data.destination == v,
         None => match self.destination_id
         {
-          Some(v) => edge.source.key == v,
+          Some(v) => self.edge_data.source == v,
           None => panic!("is_reversed"),
         },
       },
@@ -185,11 +241,11 @@ impl GraphInfo
       edges_destination_index,
     }
   }
-  fn nodes_table_definition<'a, 'b>(&'a self) -> redb::TableDefinition<'a, graph::Key, &'b [u8]>
+  fn nodes_table_definition<'a>(&'a self) -> redb::TableDefinition<'a, graph::Key, graph::Node>
   {
     redb::TableDefinition::new(&self.nodes_table)
   }
-  fn edges_table_definition<'a, 'b>(&'a self) -> redb::TableDefinition<'a, graph::Key, &'b [u8]>
+  fn edges_table_definition<'a>(&'a self) -> redb::TableDefinition<'a, graph::Key, PersistentEdge>
   {
     redb::TableDefinition::new(&self.edges_table)
   }
@@ -273,9 +329,7 @@ impl Store
       transaction.open_table(graph_info.edges_destination_index_definition())?;
     for x in nodes_iter
     {
-      let mut data = Vec::<u8>::new();
-      ciborium::into_writer(&x, &mut data)?;
-      table.insert(x.key, data.as_slice())?;
+      table.insert(x.key, x)?;
       table_source.insert(x.key, vec![])?;
       table_destination.insert(x.key, vec![])?;
     }
@@ -286,15 +340,13 @@ impl Store
     &self,
     transaction: &mut redb::WriteTransaction,
     graph_name: impl Into<String>,
-    node: graph::Node,
+    node: &graph::Node,
   ) -> Result<()>
   {
     let graph_name = graph_name.into();
     let graph_info = self.graphs.get(&graph_name).unwrap();
     let mut table = transaction.open_table(graph_info.nodes_table_definition())?;
-    let mut data = Vec::<u8>::new();
-    ciborium::into_writer(&node, &mut data)?;
-    table.insert(node.key, data.as_slice())?;
+    table.insert(node.key, node)?;
     Ok(())
   }
   /// Delete nodes according to a given query
@@ -413,28 +465,26 @@ impl Store
   }
   fn select_nodes_from_table<'txn>(
     &self,
-    nodes_table: &redb::Table<'txn, graph::Key, &[u8]>,
+    nodes_table: &redb::Table<'txn, graph::Key, graph::Node>,
     query: super::SelectNodeQuery,
   ) -> Result<Vec<crate::graph::Node>>
   {
-    let nodes_raw = match query.keys
+    let r = match query.keys
     {
-      Some(keys) => Box::new(
-        keys
-          .into_iter()
-          .map(|key| Ok(nodes_table.get_required(key, error::Error::UnknownNode)?)),
-      ) as Box<dyn Iterator<Item = Result<redb::AccessGuard<'_, &[u8]>>>>,
+      Some(keys) => Box::new(keys.into_iter().map(|key| {
+        Ok(
+          nodes_table
+            .get_required(key, error::Error::UnknownNode)?
+            .value(),
+        )
+      })) as Box<dyn Iterator<Item = Result<graph::Node>>>,
       None => Box::new({
         nodes_table.range::<graph::Key>(..)?.into_iter().map(|r| {
           let (_, v) = r?;
-          Ok(v)
+          Ok(v.value())
         })
-      }) as Box<dyn Iterator<Item = Result<redb::AccessGuard<'_, &[u8]>>>>,
+      }) as Box<dyn Iterator<Item = Result<graph::Node>>>,
     };
-    let r = nodes_raw.map(|v| {
-      let c = ciborium::from_reader::<graph::Node, &[u8]>(&mut v?.value())?;
-      Ok::<graph::Node, crate::Error>(c)
-    });
     let r = match query.labels
     {
       Some(labels) => Box::new(r.filter(move |n| match n
@@ -502,8 +552,8 @@ impl Store
 
     for x in edges_iter
     {
-      let mut data = Vec::<u8>::new();
-      ciborium::into_writer(
+      table.insert(
+        x.key,
         &PersistentEdge {
           key: x.key,
           source: x.source.key,
@@ -511,9 +561,7 @@ impl Store
           labels: x.labels.clone(),
           properties: x.properties.clone(),
         },
-        &mut data,
       )?;
-      table.insert(x.key, data.as_slice())?;
       let mut keys = table_source
         .remove(x.source.key)?
         .ok_or(error::Error::UnknownNode)?
@@ -533,24 +581,22 @@ impl Store
     &self,
     transaction: &mut redb::WriteTransaction,
     graph_name: impl Into<String>,
-    edge: graph::Edge,
+    edge: &graph::Edge,
   ) -> Result<()>
   {
     let graph_name = graph_name.into();
     let graph_info = self.graphs.get(&graph_name).unwrap();
     let mut table = transaction.open_table(graph_info.edges_table_definition())?;
-    let mut data = Vec::<u8>::new();
-    ciborium::into_writer(
+    table.insert(
+      edge.key,
       &PersistentEdge {
         key: edge.key,
         source: edge.source.key,
         destination: edge.destination.key,
-        labels: edge.labels,
-        properties: edge.properties,
+        labels: edge.labels.to_owned(),
+        properties: edge.properties.to_owned(),
       },
-      &mut data,
     )?;
-    table.insert(edge.key, data.as_slice())?;
     Ok(())
   }
   /// Delete nodes according to a given query
@@ -646,8 +692,7 @@ impl Store
             edges_table
               .get(key)?
               .ok_or_else(|| error::show_backtrace(error::Error::UnknownNode))?
-              .value()
-              .to_vec(),
+              .value(),
             Some(false),
             None,
             None,
@@ -663,12 +708,7 @@ impl Store
             .into_iter()
             .map(|r| {
               let (_, v) = r?;
-              Ok(EdgeIdResult::new(
-                v.value().to_vec(),
-                Some(false),
-                None,
-                None,
-              ))
+              Ok(EdgeIdResult::new(v.value(), Some(false), None, None))
             })
             .collect::<Result<Vec<EdgeIdResult>>>()?
         }
@@ -711,8 +751,7 @@ impl Store
                       edges_raw.push(EdgeIdResult::new(
                         edges_table
                           .get_required(k, error::Error::UnknownEdge)?
-                          .value()
-                          .to_vec(),
+                          .value(),
                         None,
                         Some(nkey),
                         None,
@@ -742,8 +781,7 @@ impl Store
                     edges_raw.push(EdgeIdResult::new(
                       edges_table
                         .get_required(k, error::Error::UnknownEdge)?
-                        .value()
-                        .to_vec(),
+                        .value(),
                       None,
                       Some(nkey),
                       None,
@@ -771,8 +809,7 @@ impl Store
                     edges_raw.push(EdgeIdResult::new(
                       edges_table
                         .get_required(k, error::Error::UnknownEdge)?
-                        .value()
-                        .to_vec(),
+                        .value(),
                       None,
                       None,
                       Some(nkey),
@@ -790,10 +827,15 @@ impl Store
     // Get the edges
     let r = edges_raw.into_iter().map(|v| {
       Ok::<super::EdgeResult, crate::Error>({
-        let edge = ciborium::from_reader::<PersistentEdge, &[u8]>(&mut &v.edge_data.as_ref())?;
+        let reversed = v.is_reversed();
+        let edge = v.edge_data;
 
-        let source = nodes_table.get_node(edge.source)?;
-        let destination = nodes_table.get_node(edge.destination)?;
+        let source = nodes_table
+          .get_required(edge.source, error::Error::UnknownNode)?
+          .value();
+        let destination = nodes_table
+          .get_required(edge.destination, error::Error::UnknownNode)?
+          .value();
 
         let edge = graph::Edge {
           key: edge.key,
@@ -802,7 +844,6 @@ impl Store
           labels: edge.labels,
           properties: edge.properties,
         };
-        let reversed = v.is_reversed(&edge);
         super::EdgeResult { edge, reversed }
       })
     });
