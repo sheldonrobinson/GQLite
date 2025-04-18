@@ -114,6 +114,13 @@ fn build_expression(
         }
         .into(),
       ),
+      Rule::xor => Ok(
+        ast::LogicalXor {
+          left: lhs?,
+          right: rhs?,
+        }
+        .into(),
+      ),
       Rule::equal => Ok(
         ast::RelationalEqual {
           left: lhs?,
@@ -910,6 +917,7 @@ fn build_ast_from_statement(
 pub(crate) fn parse(input: &str) -> Result<ast::Statements>
 {
   let pratt = PrattParser::new()
+    .op(Op::infix(Rule::xor, Assoc::Left))
     .op(Op::infix(Rule::or, Assoc::Left))
     .op(Op::infix(Rule::and, Assoc::Left))
     .op(Op::infix(Rule::equal, Assoc::Left) | Op::infix(Rule::different, Assoc::Left))

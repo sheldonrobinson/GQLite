@@ -98,9 +98,9 @@ set_label_expression =  { ident ~ (":" ~ ident)+ }
 set_eq_member_access =  { (("(" ~ ident ~ ")") | ident) ~ ("." ~ ident)* }
 remove_member_access =  { (("(" ~ ident ~ ")") | ident) ~ ("." ~ ident)+ }
 
-expression = { prefix? ~ expression_term ~ postfix? ~ (infix ~ prefix? ~ expression_term ~ postfix?)* }
+expression = { prefix* ~ expression_term ~ postfix? ~ (infix ~ prefix? ~ expression_term ~ postfix?)* }
 
-infix   = _{ addition | substraction | multiplication | division | modulo | or | and | equal | different | in_ | not_in | superior | inferior | superior_equal | inferior_equal }
+infix   = _{ addition | substraction | multiplication | division | modulo | or | and | xor | equal | different | in_ | not_in | superior | inferior | superior_equal | inferior_equal }
 postfix = _{ is_null | is_not_null }
 prefix  = _{ negation | not }
 
@@ -110,6 +110,8 @@ multiplication = { "*" }
 division       = { "/" }
 modulo         = { "%" }
 
+xor_kw         = @{ "XOR" ~ !ASCII_ALPHA }
+xor            =  { xor_kw }
 or_kw          = @{ "OR" ~ !ASCII_ALPHA }
 or             =  { or_kw }
 and_kw         = @{ "AND" ~ !ASCII_ALPHA }
@@ -123,8 +125,9 @@ superior_equal =  { ">=" }
 not_in         =  { "NOT" ~ "IN" }
 in_            =  { "IN" }
 
-negation = { "-" }
-not      = { "NOT" }
+negation =  { "-" }
+not_kw   = @{ "NOT" ~ !ASCII_ALPHA }
+not      =  { not_kw }
 
 is_null     = { "IS" ~ "NULL" }
 is_not_null = { "IS" ~ "NOT" ~ "NULL" }

@@ -215,14 +215,99 @@ where
 
 fn execute_boolean_operator(
   stack: &mut Stack,
-  operand: impl FnOnce(bool, bool) -> bool,
+  instruction: &instructions::Instruction,
 ) -> Result<()>
 {
   let a = stack.try_pop()?;
   let b = stack.try_pop()?;
   let a: graph::Value = a.try_into()?;
   let b: graph::Value = b.try_into()?;
-  stack.push(operand(a.try_into()?, b.try_into()?).into());
+  match instruction
+  {
+    &instructions::Instruction::AndBinaryOperator =>
+    {
+      if a.is_null()
+      {
+        if b.is_null() || <graph::Value as TryInto<bool>>::try_into(b)? == true
+        {
+          stack.push(graph::Value::Invalid.into());
+        }
+        else
+        {
+          stack.push(false.into());
+        }
+      }
+      else
+      {
+        let a: bool = a.try_into()?;
+        if a
+        {
+          if b.is_null()
+          {
+            stack.push(graph::Value::Invalid.into());
+          }
+          else
+          {
+            stack.push(b.into());
+          }
+        }
+        else
+        {
+          stack.push(false.into());
+        }
+      }
+    }
+    &instructions::Instruction::OrBinaryOperator =>
+    {
+      if a.is_null()
+      {
+        if b.is_null() || <graph::Value as TryInto<bool>>::try_into(b)? == false
+        {
+          stack.push(graph::Value::Invalid.into());
+        }
+        else
+        {
+          stack.push(true.into());
+        }
+      }
+      else
+      {
+        let a: bool = a.try_into()?;
+        if a
+        {
+          stack.push(true.into());
+        }
+        else
+        {
+          if b.is_null()
+          {
+            stack.push(graph::Value::Invalid.into());
+          }
+          else
+          {
+            stack.push(b.into());
+          }
+        }
+      }
+    }
+    &instructions::Instruction::XorBinaryOperator =>
+    {
+      if a.is_null() || b.is_null()
+      {
+        stack.push(graph::Value::Invalid.into());
+      }
+      else
+      {
+        let a: bool = a.try_into()?;
+        let b: bool = b.try_into()?;
+        stack.push((a ^ b).into());
+      }
+    }
+    _ => Err(InternalError::Unreachable {
+      context: "evaluator/execute_boolean_operator",
+    })?,
+  }
+
   Ok(())
 }
 
@@ -233,7 +318,7 @@ fn execute_binary_operator<T: Into<crate::graph::Value>>(
 {
   let a = stack.try_pop()?;
   let b = stack.try_pop()?;
-  if a.is_null() || b.is_null()
+  if a.is_null() && b.is_null()
   {
     stack.push(graph::Value::Invalid.into());
   }
@@ -324,7 +409,10 @@ fn eval_instructions(
           {
             stack.push(store::SelectEdgeQuery::select_none().into());
           }
-          _ => Err(InternalError::InvalidValueCast)?,
+          _ => Err(InternalError::InvalidValueCast {
+            value: props,
+            typename: "Edge properties",
+          })?,
         }
       }
       instructions::Instruction::CreateNodeQuery { labels } =>
@@ -344,7 +432,10 @@ fn eval_instructions(
           {
             stack.push(store::SelectNodeQuery::select_none().into());
           }
-          _ => Err(InternalError::InvalidValueCast)?,
+          _ => Err(InternalError::InvalidValueCast {
+            value: props,
+            typename: "Node properties",
+          })?,
         }
       }
       instructions::Instruction::FunctionCall {
@@ -451,22 +542,21 @@ fn eval_instructions(
       {
         stack.try_pop()?;
       }
-      &instructions::Instruction::AndBinaryOperator =>
+      &instructions::Instruction::AndBinaryOperator
+      | &instructions::Instruction::OrBinaryOperator
+      | &instructions::Instruction::XorBinaryOperator =>
       {
-        execute_boolean_operator(stack, |a, b| a && b)?;
-      }
-      &instructions::Instruction::OrBinaryOperator =>
-      {
-        execute_boolean_operator(stack, |a, b| a || b)?;
-      }
-      &instructions::Instruction::XorBinaryOperator =>
-      {
-        execute_boolean_operator(stack, |a, b| a ^ b)?;
+        execute_boolean_operator(stack, instruction)?;
       }
       &instructions::Instruction::NotUnaryOperator =>
       {
-        let a: bool = stack.try_pop_into()?;
-        stack.push((!a).into());
+        let a: graph::Value = stack.try_pop_into()?;
+        match a
+        {
+          graph::Value::Invalid => stack.push(graph::Value::Invalid.into()),
+          graph::Value::Boolean(b) => stack.push((!b).into()),
+          _ => Err(RunTimeError::InvalidArgumentType)?,
+        }
       }
       &instructions::Instruction::NegationUnaryOperator =>
       {
@@ -1401,4 +1491,43 @@ pub(crate) fn eval_program<TStore: store::Store>(
   }
   store.commit(tx)?;
   Ok(crate::graph::Value::Invalid)
+}
+
+#[cfg(test)]
+mod tests
+{
+  use crate::{
+    graph,
+    interpreter::{
+      self,
+      instructions::Instruction::{AndBinaryOperator, OrBinaryOperator},
+    },
+  };
+
+  use super::{execute_boolean_operator, TryPopInto};
+
+  fn test_execute_boolean_operator_(
+    instruction: &interpreter::instructions::Instruction,
+    a: impl Into<super::Value>,
+    b: impl Into<super::Value>,
+    g: impl Into<graph::Value>,
+  )
+  {
+    let mut stack = super::Stack::default();
+    stack.push(b.into());
+    stack.push(a.into());
+    execute_boolean_operator(&mut stack, instruction).unwrap();
+    let r: graph::Value = stack.try_pop_into().unwrap();
+    assert_eq!(r, g.into());
+  }
+
+  #[test]
+  fn test_execute_boolean_operator()
+  {
+    test_execute_boolean_operator_(&AndBinaryOperator, true, true, true);
+    test_execute_boolean_operator_(&AndBinaryOperator, true, false, false);
+    test_execute_boolean_operator_(&AndBinaryOperator, false, true, false);
+    test_execute_boolean_operator_(&AndBinaryOperator, false, graph::Value::Invalid, false);
+    test_execute_boolean_operator_(&OrBinaryOperator, graph::Value::Invalid, false, false);
+  }
 }

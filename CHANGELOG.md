@@ -4,6 +4,8 @@
 
 ## [Unreleased] - ReleaseDate
 
+- Fix support for boolean, conditional, null.
+
 ## [0.3.2] - 2025-02-22
 
 - Fix order of arrays.
