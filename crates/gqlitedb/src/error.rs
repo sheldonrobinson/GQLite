@@ -63,6 +63,14 @@ pub enum CompileTimeError
   },
   #[error("InvalidDelete: invalid delete argument, expected node or edge.")]
   InvalidDelete,
+  /// Too few or too many arguments
+  #[error("InvalidNumberOfArguments: Invalid number of arguments for function '{function_name}' got {got} expected {expected}.")]
+  InvalidNumberOfArguments
+  {
+    function_name: &'static str,
+    got: usize,
+    expected: usize,
+  },
   #[error("NonConstantExpression: statement expect a constant expression.")]
   NonConstantExpression,
   #[error("InvalidArgumentType: invalid argument type.")]

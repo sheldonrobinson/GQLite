@@ -59,6 +59,14 @@ impl<T> FunctionTypeTrait for Vec<T>
   }
 }
 
+impl<T> FunctionTypeTrait for HashMap<String, T>
+{
+  fn result_type() -> ExpressionType
+  {
+    ExpressionType::Map
+  }
+}
+
 //  _____                 _   _           _____          _ _
 // |  ___|   _ _ __   ___| |_(_) ___  _ _|_   _| __ __ _(_) |_
 // | |_ | | | | '_ \ / __| __| |/ _ \| '_ \| || '__/ _` | | __|
@@ -117,6 +125,7 @@ impl Manager
           node::Labels::new(),
           path::Length::new(),
           scalar::Coalesce::new(),
+          scalar::Properties::new(),
           scalar::ToInteger::new(),
           value::HasLabel::new(),
           value::HasLabels::new(),
@@ -237,8 +246,60 @@ macro_rules! count_arguments {
   };
 }
 
+macro_rules! count_patterns {
+  ($count: expr, ) => {
+    $count
+  };
+  ($count: expr, $arg_type_0: pat, $( $arg_pat: pat , )*) => {
+    $crate::functions::count_patterns!($count + 1, $( $arg_pat, )*)
+  };
+  ($( $arg_pat: pat $(,)? )* ) => {
+    $crate::functions::count_patterns!(0, $( $arg_pat, )*)
+  };
+}
+
+#[rustfmt::skip]
+macro_rules! default_validate_ {
+  ($function_name: ident, $ret_type: ty) => {
+    |_: Vec<crate::interpreter::expression_analyser::ExpressionType>|
+      -> crate::Result<crate::interpreter::expression_analyser::ExpressionType>
+    {
+      // TODO
+      Ok(<$ret_type>::result_type())
+    }
+  };
+}
+
+#[rustfmt::skip]
+macro_rules! validate_args_ {
+  ($function_name: ident, $ret_type: ty, $( $expression_type: pat ),* ) => {
+    |args: Vec<crate::interpreter::expression_analyser::ExpressionType>|
+      -> crate::Result<crate::interpreter::expression_analyser::ExpressionType>
+    {
+      const ARG_COUNT: usize = $crate::functions::count_patterns!($( $expression_type,)*); 
+      if args.len() != ARG_COUNT
+      {
+        Err(crate::error::CompileTimeError::InvalidNumberOfArguments {
+          function_name: stringify!($function_name),
+          got: args.len(),
+          expected: ARG_COUNT
+        })?;
+      }
+      let mut it = args.into_iter();
+      $(
+        match it.next().unwrap()
+        {
+          $expression_type | ExpressionType::Variant => 
+          Ok(<$ret_type>::result_type()),
+          _ => Err(crate::error::CompileTimeError::InvalidArgumentType.into())
+        }
+      )*
+    }
+  };
+}
+
 macro_rules! declare_function_ {
-  ($function_name: ident, $type_name: ty, $f_name: ident (  $( $arg_type: ty $(,)? )* ) -> $ret_type: ty, $allow_null: expr ) => {
+  ($function_name: ident, $type_name: ty, $f_name: ident (  $( $arg_type: ty $(,)? )* ) -> $ret_type: ty, $allow_null: expr, $validator: block ) => {
     impl $type_name
     {
       pub(super) fn new() -> (String, crate::functions::Function)
@@ -253,9 +314,10 @@ macro_rules! declare_function_ {
     {
       fn call(&self, arguments: Vec<crate::graph::Value>) -> crate::Result<crate::graph::Value>
       {
-        if arguments.len() == $crate::functions::count_arguments!($( $arg_type,)*)
+        const ARG_COUNT: usize = $crate::functions::count_arguments!($( $arg_type,)*);
+        if arguments.len() == ARG_COUNT
         {
-          if !$allow_null && $crate::functions::count_arguments!($( $arg_type,)*) > 0 && arguments.iter().all(|x| x.is_null())
+          if !$allow_null && ARG_COUNT > 0 && arguments.iter().all(|x| x.is_null())
           {
             return Ok(crate::graph::Value::Invalid)
           }
@@ -268,16 +330,16 @@ macro_rules! declare_function_ {
         }
         else
         {
-          Err(RunTimeError::InvalidNumberOfArguments { function_name: stringify!($function_name), got: arguments.len(), expected: $crate::functions::count_arguments!($( $arg_type,)*) }.into())
+          Err(RunTimeError::InvalidNumberOfArguments { function_name: stringify!($function_name), got: arguments.len(), expected: ARG_COUNT }.into())
         }
       }
       fn validate_arguments(
         &self,
-        _: Vec<crate::interpreter::expression_analyser::ExpressionType>,
+        args: Vec<crate::interpreter::expression_analyser::ExpressionType>,
       ) -> crate::Result<crate::interpreter::expression_analyser::ExpressionType>
       {
-        // TODO
-        Ok(<$ret_type>::result_type())
+        let val_fn = $validator;
+        val_fn(args)
       }
       fn is_deterministic(&self) -> bool
       {
@@ -289,10 +351,19 @@ macro_rules! declare_function_ {
 
 macro_rules! declare_function {
   ($function_name: ident, $type_name: ty, $f_name: ident (  $( $arg_type: ty $(,)? )* ) -> $ret_type: ty ) => {
-    $crate::functions::declare_function_!($function_name, $type_name, $f_name (  $( $arg_type, )* ) -> $ret_type, false );
+    $crate::functions::declare_function_!($function_name, $type_name,
+      $f_name (  $( $arg_type, )* ) -> $ret_type, false,
+      {$crate::functions::default_validate_!($function_name, $ret_type)} );
   };
   ($function_name: ident, $type_name: ty, $f_name: ident (  $( $arg_type: ty $(,)? )* ) -> $ret_type: ty, accept_null ) => {
-    $crate::functions::declare_function_!($function_name, $type_name, $f_name (  $( $arg_type, )* ) -> $ret_type, true );
+    $crate::functions::declare_function_!($function_name, $type_name,
+      $f_name (  $( $arg_type, )* ) -> $ret_type, true,
+      {$crate::functions::default_validate_!($function_name, $ret_type)} );
+  };
+  ($function_name: ident, $type_name: ty, $f_name: ident (  $( $arg_type: ty $(,)? )* ) -> $ret_type: ty, validate_args( $( $expression_types: pat ),+ ) ) => {
+    $crate::functions::declare_function_!($function_name, $type_name,
+      $f_name (  $( $arg_type, )* ) -> $ret_type, false,
+      {$crate::functions::validate_args_!($function_name, $ret_type, $( $expression_types ),+ )} );
   };
   ($function_name: ident, $type_name: ty, custom_trait ) => {
     impl $type_name
@@ -309,7 +380,10 @@ macro_rules! declare_function {
 }
 
 pub(crate) use count_arguments;
+pub(crate) use count_patterns;
 pub(crate) use declare_function;
 pub(crate) use declare_function_;
+pub(crate) use default_validate_;
 pub(crate) use make_function_argument;
 pub(crate) use make_function_call;
+pub(crate) use validate_args_;
