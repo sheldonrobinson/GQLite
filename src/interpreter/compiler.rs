@@ -534,13 +534,13 @@ pub(crate) fn compile(
         }
         ast::Statement::Return(return_statement) =>
         {
-          let mut variables = std::collections::BTreeMap::<String, Instructions>::new();
+          let mut variables = Vec::<(String, Instructions)>::new();
 
           for expr in return_statement.expressions.iter()
           {
             let mut instructions = Instructions::new();
             compile_expression(function_manager, &expr.expression, &mut instructions)?;
-            variables.insert(expr.name.to_owned(), instructions);
+            variables.push((expr.name.to_owned(), instructions));
           }
 
           Ok(
@@ -572,12 +572,12 @@ pub(crate) fn compile(
           {
             val_variables = validator.to_variables();
           }
-          let mut variables = std::collections::BTreeMap::<String, Instructions>::new();
+          let mut variables = Vec::<(String, Instructions)>::new();
           for e in with.expressions.iter()
           {
             let mut instructions = Instructions::new();
             compile_expression(function_manager, &e.expression, &mut instructions)?;
-            variables.insert(e.name.to_owned(), instructions);
+            variables.push((e.name.to_owned(), instructions));
             val_variables.insert(e.name.to_owned(), validator.evaluate(&e.expression)?);
           }
           validator.set_variables(val_variables);

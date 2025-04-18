@@ -88,7 +88,7 @@ pub(crate) enum Block
   },
   Return
   {
-    variables: BTreeMap<String, Instructions>,
+    variables: Vec<(String, Instructions)>,
   },
   Call
   {
@@ -98,7 +98,7 @@ pub(crate) enum Block
   With
   {
     all: bool,
-    variables: BTreeMap<String, Instructions>,
+    variables: Vec<(String, Instructions)>,
   },
   Unwind
   {
