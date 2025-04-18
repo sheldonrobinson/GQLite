@@ -50,6 +50,111 @@ fn value_object_display(obj: &ValueObject, f: &mut std::fmt::Formatter<'_>) -> s
   write!(f, "}}")
 }
 
+pub(crate) trait ValueObjectExtension
+{
+  fn update_value<'a>(
+    &mut self,
+    field: Option<&'a String>,
+    path: impl Iterator<Item = &'a String>,
+    value: Value,
+  ) -> crate::Result<()>;
+}
+
+impl ValueObjectExtension for ValueObject
+{
+  fn update_value<'a>(
+    &mut self,
+    field: Option<&'a String>,
+    mut path: impl Iterator<Item = &'a String>,
+    value: Value,
+  ) -> crate::Result<()>
+  {
+    if let Some(field) = field
+    {
+      let v = self.get_mut(field);
+
+      if let Some(next_field) = path.next()
+      {
+        match v
+        {
+          Some(Value::Object(o)) =>
+          {
+            o.update_value(Some(next_field), path, value)?;
+          }
+          None =>
+          {
+            if !value.is_null()
+            {
+              let mut o = ValueObject::new();
+              o.update_value(Some(next_field), path, value)?;
+              self.insert(field.to_owned(), o.into());
+            }
+          }
+          _ => Err(crate::error::Error::Unimplemented(
+            "update_value should get a better error",
+          ))?, // TODO
+        }
+      }
+      else
+      {
+        if value.is_null()
+        {
+          self.remove(field);
+        }
+        else
+        {
+          match v
+          {
+            Some(v) =>
+            {
+              *v = value;
+            }
+            None =>
+            {
+              self.insert(field.to_owned(), value);
+            }
+          }
+        }
+      }
+
+      Ok(())
+    }
+    else
+    {
+      match value
+      {
+        Value::Object(o) =>
+        {
+          *self = o;
+          Ok(())
+        }
+        _ => Err(crate::error::Error::Unimplemented(
+          "update_value should get a better error",
+        )), // TODO
+      }
+    }
+  }
+
+  //   if let Some(e) = path.next()
+  //   {
+  //     let val = self.get_mut(e).ok_or(InternalError::UnknownValue)?;
+  //     match val
+  //     {
+  //       Value::Object(o) =>
+  //       {
+  //         *val = o.update_value(path, value)?;
+  //         Ok(self.into())
+  //       }
+  //       _ => Err(crate::error::Error::Unimplemented("update_value"))?,
+  //     }
+  //   }
+  //   else
+  //   {
+  //     Ok(value)
+  //   }
+  // }
+}
+
 impl Value
 {
   pub(crate) fn is_null(&self) -> bool
@@ -358,6 +463,7 @@ impl_to_value!(String, String);
 impl_to_value!(Node, Node);
 impl_to_value!(Edge, Edge);
 impl_to_value!(Vec<Value>, Array);
+impl_to_value!(ValueObject, Object);
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy, Hash)]
 pub struct Key

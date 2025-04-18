@@ -14,6 +14,7 @@ pub(crate) enum Statement
   With(With),
   Unwind(Unwind),
   Delete(Delete),
+  Update(Update),
 }
 
 pub(crate) type Statements = Vec<Statement>;
@@ -78,9 +79,9 @@ pub(crate) struct Delete
 }
 
 #[derive(Debug)]
-pub(crate) struct Set
+pub(crate) struct Update
 {
-  pub(crate) expressions: Vec<Expression>,
+  pub(crate) updates: Vec<OneUpdate>,
 }
 
 #[derive(Debug)]
@@ -100,17 +101,17 @@ pub(crate) struct Call
 // Set/remove Statements
 
 #[derive(Debug)]
-pub(crate) struct SetProperty
+pub(crate) enum OneUpdate
 {
-  pub(crate) left: String,
-  pub(crate) path: Vec<String>,
-  pub(crate) expression: Expression,
+  SetProperty(SetProperty),
+  RemoveProperty(RemoveProperty),
+  AddLabels(AddLabels),
 }
 
 #[derive(Debug)]
-pub(crate) struct AddProperty
+pub(crate) struct SetProperty
 {
-  pub(crate) left: String,
+  pub(crate) target: String,
   pub(crate) path: Vec<String>,
   pub(crate) expression: Expression,
 }
@@ -118,12 +119,12 @@ pub(crate) struct AddProperty
 #[derive(Debug)]
 pub(crate) struct RemoveProperty
 {
-  pub(crate) left: String,
+  pub(crate) target: String,
   pub(crate) path: Vec<String>,
 }
 
 #[derive(Debug)]
-pub(crate) struct EditLabels
+pub(crate) struct AddLabels
 {
   pub(crate) target: String,
   pub(crate) labels: Vec<String>,

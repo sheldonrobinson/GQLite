@@ -7,7 +7,7 @@ use crate::interpreter::instructions::{
   self, Block, CreateAction, Instruction, Instructions, RWAggregation, RWExpression,
 };
 use crate::interpreter::validator;
-use crate::parser::ast;
+use crate::parser::ast::{self, OneUpdate, SetProperty};
 use crate::{functions, graph, Result};
 
 use super::expression_analyser;
@@ -925,6 +925,42 @@ pub(crate) fn compile(
                 _ => Err(CompileTimeError::InvalidDelete)?,
               }
               Ok(instructions)
+            })
+            .collect::<Result<_>>()?,
+        }),
+        ast::Statement::Update(update_statement) => Ok(Block::Update {
+          updates: update_statement
+            .updates
+            .iter()
+            .map(|x| match x
+            {
+              ast::OneUpdate::SetProperty(set_property) =>
+              {
+                let mut instructions = Instructions::new();
+                compile_expression(
+                  function_manager,
+                  &set_property.expression,
+                  &mut instructions,
+                  &mut None,
+                )?;
+
+                Ok(instructions::UpdateOne::SetProperty {
+                  target: set_property.target.to_owned(),
+                  path: set_property.path.to_owned(),
+                  instructions,
+                })
+              }
+              ast::OneUpdate::RemoveProperty(remove_property) =>
+              {
+                Ok(instructions::UpdateOne::RemoveProperty {
+                  target: remove_property.target.to_owned(),
+                  path: remove_property.path.to_owned(),
+                })
+              }
+              ast::OneUpdate::AddLabels(add_labels) => Ok(instructions::UpdateOne::AddLabels {
+                target: add_labels.target.to_owned(),
+                labels: add_labels.labels.to_owned(),
+              }),
             })
             .collect::<Result<_>>()?,
         }),

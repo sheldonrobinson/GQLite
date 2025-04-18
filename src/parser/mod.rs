@@ -772,6 +772,40 @@ fn build_ast_from_statement(
         expressions,
       }))
     }
+    Rule::set_statement =>
+    {
+      let mut updates = Vec::<ast::OneUpdate>::new();
+      for pair in pair.into_inner()
+      {
+        match pair.as_rule()
+        {
+          Rule::set_eq_expression =>
+          {
+            let mut pair = pair.into_inner();
+            let mut pair_left = pair.try_next()?.into_inner();
+            let target = pair_left.try_next()?.as_str().to_string();
+            let path = pair_left.map(|el| el.as_str().to_string()).collect();
+            let expression = build_expression(pair.try_next()?.into_inner(), pratt)?;
+            updates.push(ast::OneUpdate::SetProperty(ast::SetProperty {
+              target,
+              path,
+              expression,
+            }));
+          }
+          Rule::set_label_expression =>
+          {
+            println!("pair {:#?}", pair);
+            println!("see");
+            todo!()
+          }
+          unknown_expression => Err(crate::Error::UnxpectedExpression(
+            "build_ast_from_statement/set_statement",
+            format!("{unknown_expression:?}"),
+          ))?,
+        }
+      }
+      Ok(ast::Statement::Update(ast::Update { updates }))
+    }
     Rule::call_statement =>
     {
       let name = pair
