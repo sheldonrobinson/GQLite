@@ -158,19 +158,6 @@ impl ValueTryIntoRef<Value> for Value
   }
 }
 
-impl TryInto<bool> for Value
-{
-  type Error = crate::error::Error;
-  fn try_into(self) -> Result<bool, Self::Error>
-  {
-    match self
-    {
-      Value::Boolean(v) => Ok(v),
-      _ => Err(InternalError::InvalidValueCast.into()),
-    }
-  }
-}
-
 macro_rules! impl_to_value {
   ($type:tt, $vn:tt) => {
     impl Into<Value> for $type
@@ -180,6 +167,19 @@ macro_rules! impl_to_value {
         Value::$vn(self.clone())
       }
     }
+    impl TryInto<$type> for Value
+    {
+      type Error = crate::error::Error;
+      fn try_into(self) -> Result<$type, Self::Error>
+      {
+        match self
+        {
+          Value::$vn(v) => Ok(v),
+          _ => Err(InternalError::InvalidValueCast.into()),
+        }
+      }
+    }
+
     impl ValueTryIntoRef<$type> for Value
     {
       fn try_into_ref<'a>(&'a self) -> Result<&'a $type, crate::error::Error>

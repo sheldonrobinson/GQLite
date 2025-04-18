@@ -13,6 +13,14 @@ pub(crate) enum Instruction
   {
     labels: Vec<String>,
   },
+  CreateNodeQuery
+  {
+    labels: Vec<String>,
+  },
+  CreateEdgeQuery
+  {
+    labels: Vec<String>,
+  },
   FunctionCall
   {
     function: functions::Function,

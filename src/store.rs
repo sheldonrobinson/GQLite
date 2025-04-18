@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 #[cfg(feature = "persy")]
 mod persy;
 #[cfg(feature = "pgql")]
@@ -45,119 +47,104 @@ pub(crate) struct EdgeResult
 // |____/ \___|_|\___|\___|\__|_| \_|\___/ \__,_|\___|\__\_\\__,_|\___|_|   \__, |
 //                                                                          |___/
 
-#[derive(Default)]
-pub(crate) struct SelectNodeQuery<'a, TKeys, TLabels, TProperties>
-where
-  TKeys: Iterator<Item = &'a crate::graph::Key>,
-  TLabels: Iterator<Item = &'a String>,
-  TProperties: Iterator<Item = (&'a String, &'a graph::Value)>,
+#[derive(Debug, Clone)]
+pub(crate) struct SelectNodeQuery
 {
-  keys: Option<TKeys>,
-  labels: Option<TLabels>,
-  properties: Option<TProperties>,
+  keys: Option<Vec<graph::Key>>,
+  labels: Option<Vec<String>>,
+  properties: Option<HashMap<String, graph::Value>>,
+  select_all: bool,
 }
 
-impl<'a, TKeys, TLabels, TProperties> SelectNodeQuery<'a, TKeys, TLabels, TProperties>
-where
-  TKeys: Iterator<Item = &'a crate::graph::Key>,
-  TLabels: Iterator<Item = &'a String>,
-  TProperties: Iterator<Item = (&'a String, &'a graph::Value)>,
+impl SelectNodeQuery
 {
   fn is_select_all(&self) -> bool
   {
-    self.keys.is_none() && self.labels.is_none() && self.properties.is_none()
+    self.select_all
   }
-}
-
-pub(crate) struct NullIterator<'a, T: 'a>
-{
-  _phantom: core::marker::PhantomData<&'a T>,
-}
-
-impl<'a, T: 'a> Default for NullIterator<'a, T>
-{
-  fn default() -> Self
+  fn is_select_none(&self) -> bool
   {
-    Self {
-      _phantom: Default::default(),
-    }
+    self.keys.is_none() && self.labels.is_none() && self.properties.is_none() && !self.select_all
   }
-}
-
-impl<'a, T: 'a> Iterator for NullIterator<'a, T>
-{
-  type Item = T;
-  fn next(&mut self) -> Option<Self::Item>
-  {
-    None
-  }
-}
-
-impl
-  SelectNodeQuery<
-    'static,
-    NullIterator<'static, &crate::graph::Key>,
-    NullIterator<'static, &String>,
-    NullIterator<'static, (&'static String, &'static graph::Value)>,
-  >
-{
   pub(crate) fn select_all() -> Self
   {
-    Self::default()
+    Self {
+      keys: None,
+      labels: None,
+      properties: None,
+      select_all: true,
+    }
   }
-}
-
-impl<'a, TKeys: Iterator<Item = &'a crate::graph::Key>>
-  SelectNodeQuery<
-    'a,
-    TKeys,
-    NullIterator<'a, &'a String>,
-    NullIterator<'a, (&'a String, &'a graph::Value)>,
-  >
-{
+  pub(crate) fn select_none() -> Self
+  {
+    Self {
+      keys: None,
+      labels: None,
+      properties: None,
+      select_all: false,
+    }
+  }
   #[allow(unused)]
-  pub(crate) fn select_keys(keys: TKeys) -> Self
+  pub(crate) fn select_keys(keys: Vec<graph::Key>) -> Self
   {
     Self {
       keys: Some(keys),
       labels: None,
       properties: None,
+      select_all: false,
     }
   }
-}
-
-#[cfg(test)]
-impl<'a, TLabels: Iterator<Item = &'a String>>
-  SelectNodeQuery<
-    'a,
-    NullIterator<'a, &'a graph::Key>,
-    TLabels,
-    NullIterator<'a, (&'a String, &'a graph::Value)>,
-  >
-{
-  pub(crate) fn select_labels(labels: TLabels) -> Self
+  pub(crate) fn select_labels(labels: Vec<String>) -> Self
   {
     Self {
       keys: None,
       labels: Some(labels),
       properties: None,
+      select_all: false,
     }
   }
-}
-
-impl<
-    'a,
-    TLabels: Iterator<Item = &'a String>,
-    TProperties: Iterator<Item = (&'a String, &'a graph::Value)>,
-  > SelectNodeQuery<'a, NullIterator<'a, &'a graph::Key>, TLabels, TProperties>
-{
-  pub(crate) fn select_labels_properties(labels: TLabels, properties: TProperties) -> Self
+  pub(crate) fn select_labels_properties(
+    labels: Vec<String>,
+    properties: HashMap<String, graph::Value>,
+  ) -> Self
   {
     Self {
       keys: None,
       labels: Some(labels),
       properties: Some(properties),
+      select_all: false,
     }
+  }
+  pub(crate) fn is_match(&self, node: &graph::Node) -> bool
+  {
+    if self.select_all
+    {
+      return true;
+    }
+    if let Some(keys) = &self.keys
+    {
+      if !keys.iter().any(|x| node.key == *x)
+      {
+        return false;
+      }
+    }
+    if let Some(labels) = &self.labels
+    {
+      if !labels.iter().all(|x| node.labels.contains(x))
+      {
+        return false;
+      }
+    }
+    if let Some(properties) = &self.properties
+    {
+      if !properties
+        .iter()
+        .all(|(k, v)| node.properties.get(k) == Some(v))
+      {
+        return false;
+      }
+    }
+    return true;
   }
 }
 
@@ -168,72 +155,40 @@ impl<
 // |____/ \___|_|\___|\___|\__|_____\__,_|\__, |\___|\__\_\\__,_|\___|_|   \__, |
 //                                        |___/                            |___/
 
-#[derive(Default)]
-pub(crate) struct SelectEdgeQuery<
-  'a,
-  TSourceKeys,
-  TSourceLabels,
-  TSourceProperties,
-  TKeys,
-  TLabels,
-  TProperties,
-  TDestinationKeys,
-  TDestinationLabels,
-  TDestinationProperties,
-> where
-  TSourceKeys: Iterator<Item = &'a crate::graph::Key>,
-  TSourceLabels: Iterator<Item = &'a String>,
-  TSourceProperties: Iterator<Item = (&'a String, &'a graph::Value)>,
-  TKeys: Iterator<Item = &'a crate::graph::Key>,
-  TLabels: Iterator<Item = &'a String>,
-  TProperties: Iterator<Item = (&'a String, &'a graph::Value)>,
-  TDestinationKeys: Iterator<Item = &'a crate::graph::Key>,
-  TDestinationLabels: Iterator<Item = &'a String>,
-  TDestinationProperties: Iterator<Item = (&'a String, &'a graph::Value)>,
+#[derive(Debug, Clone)]
+pub(crate) struct SelectEdgeQuery
 {
-  keys: Option<TKeys>,
-  labels: Option<TLabels>,
-  properties: Option<TProperties>,
-  source: SelectNodeQuery<'a, TSourceKeys, TSourceLabels, TSourceProperties>,
-  destination: SelectNodeQuery<'a, TDestinationKeys, TDestinationLabels, TDestinationProperties>,
+  keys: Option<Vec<graph::Key>>,
+  labels: Option<Vec<String>>,
+  properties: Option<HashMap<String, graph::Value>>,
+  source: SelectNodeQuery,
+  destination: SelectNodeQuery,
 }
 
-impl
-  SelectEdgeQuery<
-    'static,
-    NullIterator<'static, &crate::graph::Key>,
-    NullIterator<'static, &String>,
-    NullIterator<'static, (&'static String, &'static graph::Value)>,
-    NullIterator<'static, &crate::graph::Key>,
-    NullIterator<'static, &String>,
-    NullIterator<'static, (&'static String, &'static graph::Value)>,
-    NullIterator<'static, &crate::graph::Key>,
-    NullIterator<'static, &String>,
-    NullIterator<'static, (&'static String, &'static graph::Value)>,
-  >
+impl SelectEdgeQuery
 {
   pub(crate) fn select_all() -> Self
   {
-    Self::default()
+    Self {
+      keys: None,
+      labels: None,
+      properties: None,
+      source: SelectNodeQuery::select_all(),
+      destination: SelectNodeQuery::select_all(),
+    }
   }
-}
-
-impl<'a, T: Iterator<Item = &'a crate::graph::Key>>
-  SelectEdgeQuery<
-    'a,
-    NullIterator<'a, &'a crate::graph::Key>,
-    NullIterator<'a, &'a String>,
-    NullIterator<'a, (&'a String, &'a graph::Value)>,
-    T,
-    NullIterator<'a, &'a String>,
-    NullIterator<'a, (&'a String, &'a graph::Value)>,
-    NullIterator<'a, &'a crate::graph::Key>,
-    NullIterator<'a, &'a String>,
-    NullIterator<'a, (&'a String, &'a graph::Value)>,
-  >
-{
+  pub(crate) fn select_none() -> Self
+  {
+    Self {
+      keys: None,
+      labels: None,
+      properties: None,
+      source: SelectNodeQuery::select_none(),
+      destination: SelectNodeQuery::select_none(),
+    }
+  }
   #[allow(unused)]
-  pub(crate) fn select_keys(keys: T) -> Self
+  pub(crate) fn select_keys(keys: Vec<graph::Key>) -> Self
   {
     Self {
       keys: Some(keys),
@@ -243,52 +198,25 @@ impl<'a, T: Iterator<Item = &'a crate::graph::Key>>
       destination: SelectNodeQuery::select_all(),
     }
   }
-}
-
-impl<
-    'a,
-    TSourceKeys,
-    TSourceLabels,
-    TSourceProperties,
-    TLabels,
-    TProperties,
-    TDestinationKeys,
-    TDestinationLabels,
-    TDestinationProperties,
-  >
-  SelectEdgeQuery<
-    'a,
-    TSourceKeys,
-    TSourceLabels,
-    TSourceProperties,
-    NullIterator<'a, &'a crate::graph::Key>,
-    TLabels,
-    TProperties,
-    TDestinationKeys,
-    TDestinationLabels,
-    TDestinationProperties,
-  >
-where
-  TSourceKeys: Iterator<Item = &'a crate::graph::Key>,
-  TSourceLabels: Iterator<Item = &'a String>,
-  TSourceProperties: Iterator<Item = (&'a String, &'a graph::Value)>,
-  TLabels: Iterator<Item = &'a String>,
-  TProperties: Iterator<Item = (&'a String, &'a graph::Value)>,
-  TDestinationKeys: Iterator<Item = &'a crate::graph::Key>,
-  TDestinationLabels: Iterator<Item = &'a String>,
-  TDestinationProperties: Iterator<Item = (&'a String, &'a graph::Value)>,
-{
-  #[allow(unused)]
+  pub(crate) fn select_source_destination_keys(
+    source_query: SelectNodeQuery,
+    keys: Vec<graph::Key>,
+    destination_query: SelectNodeQuery,
+  ) -> Self
+  {
+    Self {
+      keys: Some(keys),
+      labels: None,
+      properties: None,
+      source: source_query,
+      destination: destination_query,
+    }
+  }
   pub(crate) fn select_source_destination_labels_properties(
-    source_query: SelectNodeQuery<'a, TSourceKeys, TSourceLabels, TSourceProperties>,
-    labels: TLabels,
-    properties: TProperties,
-    destination_query: SelectNodeQuery<
-      'a,
-      TDestinationKeys,
-      TDestinationLabels,
-      TDestinationProperties,
-    >,
+    source_query: SelectNodeQuery,
+    labels: Vec<String>,
+    properties: HashMap<String, graph::Value>,
+    destination_query: SelectNodeQuery,
   ) -> Self
   {
     Self {
@@ -298,5 +226,32 @@ where
       source: source_query,
       destination: destination_query,
     }
+  }
+  pub(crate) fn is_match(&self, edge: &graph::Edge) -> bool
+  {
+    if let Some(keys) = &self.keys
+    {
+      if !keys.iter().any(|x| edge.key == *x)
+      {
+        return false;
+      }
+    }
+    if let Some(labels) = &self.labels
+    {
+      if !labels.iter().all(|x| edge.labels.contains(x))
+      {
+        return false;
+      }
+    }
+    if let Some(properties) = &self.properties
+    {
+      if !properties
+        .iter()
+        .all(|(k, v)| edge.properties.get(k) == Some(v))
+      {
+        return false;
+      }
+    }
+    return self.source.is_match(&edge.source) && self.destination.is_match(&edge.destination);
   }
 }

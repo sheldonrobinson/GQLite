@@ -129,16 +129,23 @@ pub enum InternalError
   {
     context: &'static str
   },
-  #[error("Expected boolean {context}.")]
-  ExpectedBoolean
+  #[error("Expected graph value {context}.")]
+  ExpectedGraphValue
   {
     context: &'static str
   },
-  #[error("Empty stack in {context}.")]
-  EmptyStack
+  #[error("Expected node query {context}.")]
+  ExpectedNodeQuery
   {
     context: &'static str
   },
+  #[error("Expected edge query {context}.")]
+  ExpectedEdgeQuery
+  {
+    context: &'static str
+  },
+  #[error("Empty stack.")]
+  EmptyStack,
   #[error("Invalid value cast")]
   InvalidValueCast,
 }

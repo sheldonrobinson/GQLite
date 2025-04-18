@@ -82,7 +82,7 @@ fn compile_optional_expression(
   else
   {
     instructions.push(Instruction::Push {
-      value: crate::graph::Value::Invalid,
+      value: crate::graph::Value::Object(Default::default()),
     });
   }
   Ok(())
@@ -117,7 +117,8 @@ fn compile_create_node(
   variables: &mut Vec<Option<String>>,
 ) -> Result<()>
 {
-  validator.declare_node_variable(&node)?;
+  validator.check_unexisting_variable(&node.variable)?;
+  validator.validate_node(&node)?;
   variables.push(node.variable.to_owned());
   compile_optional_expression(function_manager, &node.properties, instructions)?;
   let mut labels = Default::default();
@@ -250,7 +251,8 @@ fn compile_create_patterns(
       }
       crate::parser::ast::Pattern::Edge(edge) =>
       {
-        if validator.check_existing_node(&edge.source)?
+        validator.check_unexisting_variable(&edge.variable)?;
+        if validator.is_valid_existing_node(&edge.source)?
         {
           instructions.push(Instruction::GetVariable {
             name: edge.source.variable.as_ref().unwrap().to_owned(),
@@ -273,7 +275,7 @@ fn compile_create_patterns(
         {
           instructions.push(Instruction::Duplicate);
         }
-        else if validator.check_existing_node(&edge.destination)?
+        else if validator.is_valid_existing_node(&edge.destination)?
         {
           instructions.push(Instruction::GetVariable {
             name: edge.destination.variable.as_ref().unwrap().to_owned(),
@@ -291,7 +293,7 @@ fn compile_create_patterns(
           instructions.push(Instruction::Duplicate);
           instructions.push(Instruction::Rot3);
         }
-        validator.declare_edge_variable(edge)?;
+        validator.validate_edge(edge)?;
         variables.push(edge.variable.to_owned());
         compile_optional_expression(function_manager, &edge.properties, &mut instructions)?;
         if !edge.labels.is_string()
@@ -349,7 +351,7 @@ fn compile_match_node(
     filter.push(Instruction::AndBinaryOperator);
     filter.push(Instruction::Swap);
   }
-  instructions.push(Instruction::CreateNodeLiteral { labels });
+  instructions.push(Instruction::CreateNodeQuery { labels });
   Ok(())
 }
 
@@ -364,14 +366,14 @@ fn compile_match_edge(
 ) -> Result<Block>
 {
   let mut instructions = Instructions::new();
-  validator.declare_edge_variable(edge)?;
   let mut source_variable = None;
   let mut filter = Instructions::new();
-  if validator.check_existing_node(&edge.source)?
+  if validator.is_valid_existing_node(&edge.source)?
   {
     instructions.push(Instruction::GetVariable {
       name: edge.source.variable.as_ref().unwrap().to_owned(),
     });
+    instructions.push(Instruction::CreateNodeQuery { labels: vec![] });
   }
   else
   {
@@ -385,11 +387,12 @@ fn compile_match_edge(
     )?;
   }
   let mut destination_variable = None;
-  if validator.check_existing_node(&edge.destination)?
+  if validator.is_valid_existing_node(&edge.destination)?
   {
     instructions.push(Instruction::GetVariable {
       name: edge.destination.variable.as_ref().unwrap().to_owned(),
     });
+    instructions.push(Instruction::CreateNodeQuery { labels: vec![] });
   }
   else
   {
@@ -402,22 +405,33 @@ fn compile_match_edge(
       Some("get_destination"),
     )?;
   }
-  compile_optional_expression(function_manager, &edge.properties, &mut instructions)?;
-  // Handle labels
-  let mut labels = Default::default();
-  if edge.labels.is_all_inclusive()
+  if validator.is_valid_existing_edge(edge)?
   {
-    compile_labels_expression(&mut labels, &edge.labels)?;
+    instructions.push(Instruction::GetVariable {
+      name: edge.variable.as_ref().unwrap().to_owned(),
+    });
+    instructions.push(Instruction::CreateEdgeQuery { labels: vec![] });
   }
   else
   {
-    let has_label_function = function_manager.get::<CompileTimeError>("has_label")?;
-    compile_filter_labels(&mut filter, &edge.labels, &has_label_function)?;
-    filter.push(Instruction::Rot3);
-    filter.push(Instruction::AndBinaryOperator);
-    filter.push(Instruction::Swap);
+    validator.validate_edge(edge)?;
+    compile_optional_expression(function_manager, &edge.properties, &mut instructions)?;
+    // Handle labels
+    let mut labels = Default::default();
+    if edge.labels.is_all_inclusive()
+    {
+      compile_labels_expression(&mut labels, &edge.labels)?;
+    }
+    else
+    {
+      let has_label_function = function_manager.get::<CompileTimeError>("has_label")?;
+      compile_filter_labels(&mut filter, &edge.labels, &has_label_function)?;
+      filter.push(Instruction::Rot3);
+      filter.push(Instruction::AndBinaryOperator);
+      filter.push(Instruction::Swap);
+    }
+    instructions.push(Instruction::CreateEdgeQuery { labels });
   }
-  instructions.push(Instruction::CreateEdgeLiteral { labels });
   // Make sure that this edge isn't equal to an already matched edge
   let edge_variable = if single_match
   {
@@ -474,7 +488,7 @@ fn compile_match_patterns(
       crate::parser::ast::Pattern::Node(node) =>
       {
         let mut instructions = Instructions::new();
-        validator.declare_node_variable(node)?;
+        validator.validate_node(node)?;
         let mut filter = Instructions::new();
         compile_match_node(function_manager, node, &mut instructions, &mut filter, None)?;
         Ok(Block::MatchNode {

@@ -384,23 +384,19 @@ impl Store
     Ok(())
   }
   /// Select nodes according to a given query
-  pub(crate) fn select_nodes<'a, TKeys, TLabels, TProperties>(
+  pub(crate) fn select_nodes(
     &self,
     transaction: &mut persy::Transaction,
     graph_name: impl Into<String>,
-    query: super::SelectNodeQuery<'a, TKeys, TLabels, TProperties>,
+    query: super::SelectNodeQuery,
   ) -> Result<Vec<crate::graph::Node>>
-  where
-    TKeys: Iterator<Item = &'a crate::graph::Key>,
-    TLabels: Iterator<Item = &'a String>,
-    TProperties: Iterator<Item = (&'a String, &'a graph::Value)>,
   {
     let graph_name = graph_name.into();
     let graph_info = self.graphs.get(&graph_name).unwrap();
 
     let nodes_raw = match query.keys
     {
-      Some(keys_iter) => Box::new(keys_iter.map(|key| {
+      Some(keys) => Box::new(keys.into_iter().map(|key| {
         if let Some(key) = graph_info
           .nodes_uuid_index
           .one(Rc::new(RefCell::new(transaction)), key)?
@@ -431,58 +427,50 @@ impl Store
     });
     let r = match query.labels
     {
-      Some(labels) =>
+      Some(labels) => Box::new(r.filter(move |n| match n
       {
-        let labels = labels.collect::<Vec<&'a String>>();
-        Box::new(r.filter(move |n| match n
+        Ok(n) =>
         {
-          Ok(n) =>
+          for l in labels.iter()
           {
-            for l in labels.iter()
+            if !n.labels.contains(l)
             {
-              if !n.labels.contains(l)
-              {
-                return false;
-              }
+              return false;
             }
-            true
           }
-          Err(_) => true,
-        })) as Box<dyn Iterator<Item = Result<crate::graph::Node>>>
-      }
+          true
+        }
+        Err(_) => true,
+      })) as Box<dyn Iterator<Item = Result<crate::graph::Node>>>,
       None => Box::new(r) as Box<dyn Iterator<Item = Result<crate::graph::Node>>>,
     };
     let r = match query.properties
     {
-      Some(properties) =>
+      Some(properties) => Box::new(r.filter(move |n| match n
       {
-        let properties = properties.collect::<Vec<(&'a String, &'a graph::Value)>>();
-        Box::new(r.filter(move |n| match n
+        Ok(n) =>
         {
-          Ok(n) =>
+          for (k, v) in properties.iter()
           {
-            for (k, v) in properties.iter()
+            match n.properties.get(k)
             {
-              match n.properties.get(*k)
+              Some(val) =>
               {
-                Some(val) =>
-                {
-                  if val != *v
-                  {
-                    return false;
-                  }
-                }
-                None =>
+                if val != v
                 {
                   return false;
                 }
               }
+              None =>
+              {
+                return false;
+              }
             }
-            true
           }
-          Err(_) => true,
-        })) as Box<dyn Iterator<Item = Result<crate::graph::Node>>>
-      }
+          true
+        }
+        Err(_) => true,
+      })) as Box<dyn Iterator<Item = Result<crate::graph::Node>>>,
       None => Box::new(r) as Box<dyn Iterator<Item = Result<crate::graph::Node>>>,
     };
     r.collect()
@@ -565,46 +553,18 @@ impl Store
     }
   }
   /// Select edges
-  pub(crate) fn select_edges<
-    'a,
-    TSourceKeys,
-    TSourceLabels,
-    TSourceProperties,
-    TKeys,
-    TLabels,
-    TProperties,
-    TDestinationKeys,
-    TDestinationLabels,
-    TDestinationProperties,
-  >(
+  pub(crate) fn select_edges(
     &self,
     transaction: &mut persy::Transaction,
     graph_name: impl Into<String>,
-    query: super::SelectEdgeQuery<
-      'a,
-      TSourceKeys,
-      TSourceLabels,
-      TSourceProperties,
-      TKeys,
-      TLabels,
-      TProperties,
-      TDestinationKeys,
-      TDestinationLabels,
-      TDestinationProperties,
-    >,
+    query: super::SelectEdgeQuery,
     directivity: graph::EdgeDirectivity,
   ) -> Result<Vec<super::EdgeResult>>
-  where
-    TSourceKeys: Iterator<Item = &'a crate::graph::Key>,
-    TSourceLabels: Iterator<Item = &'a String>,
-    TSourceProperties: Iterator<Item = (&'a String, &'a graph::Value)>,
-    TKeys: Iterator<Item = &'a crate::graph::Key>,
-    TLabels: Iterator<Item = &'a String>,
-    TProperties: Iterator<Item = (&'a String, &'a graph::Value)>,
-    TDestinationKeys: Iterator<Item = &'a crate::graph::Key>,
-    TDestinationLabels: Iterator<Item = &'a String>,
-    TDestinationProperties: Iterator<Item = (&'a String, &'a graph::Value)>,
   {
+    if query.source.is_select_none() || query.destination.is_select_none()
+    {
+      return Ok(Default::default());
+    }
     let graph_name = graph_name.into();
     let graph_info = self.graphs.get(&graph_name).unwrap();
     let transaction = Rc::new(RefCell::new(transaction));
@@ -623,9 +583,10 @@ impl Store
     // Get the UUID of the edges
     let edges_raw = {
       // let mut transaction = transaction.borrow_mut();
-      match query.keys
+      match &query.keys
       {
-        Some(keys_iter) => keys_iter
+        Some(keys) => keys
+          .iter()
           .map(|key| {
             if let Some(key) = graph_info.edges_uuid_index.one(transaction.clone(), key)?
             {
@@ -670,7 +631,7 @@ impl Store
               let dest_it = self.select_nodes(
                 &mut transaction.borrow_mut(),
                 graph_name.to_owned(),
-                query.destination,
+                query.destination.clone(),
               )?;
               let dest_it: Vec<persy::PersyId> = dest_it
                 .into_iter()
@@ -679,8 +640,11 @@ impl Store
                 .into_iter()
                 .flatten()
                 .collect();
-              let nodes =
-                self.select_nodes(&mut transaction.borrow_mut(), graph_name, query.source)?;
+              let nodes = self.select_nodes(
+                &mut transaction.borrow_mut(),
+                graph_name,
+                query.source.clone(),
+              )?;
               Box::new(
                 nodes
                   .into_iter()
@@ -709,8 +673,11 @@ impl Store
             }
             else if !query.source.is_select_all()
             {
-              let nodes =
-                self.select_nodes(&mut transaction.borrow_mut(), graph_name, query.source)?;
+              let nodes = self.select_nodes(
+                &mut transaction.borrow_mut(),
+                graph_name,
+                query.source.clone(),
+              )?;
               Box::new(
                 nodes
                   .into_iter()
@@ -732,8 +699,11 @@ impl Store
             }
             else
             {
-              let nodes =
-                self.select_nodes(&mut transaction.borrow_mut(), graph_name, query.destination)?;
+              let nodes = self.select_nodes(
+                &mut transaction.borrow_mut(),
+                graph_name,
+                query.destination.clone(),
+              )?;
               Box::new(
                 nodes
                   .into_iter()
@@ -788,63 +758,72 @@ impl Store
       })
     });
     // Filter using the labels
-    let r = match query.labels
+    let r = match &query.labels
     {
-      Some(labels) =>
+      Some(labels) => Box::new(r.filter(move |e| match e
       {
-        let labels = labels.collect::<Vec<&'a String>>();
-        Box::new(r.filter(move |e| match e
+        Ok(e) =>
         {
-          Ok(e) =>
+          for l in labels.iter()
           {
-            for l in labels.iter()
+            if !e.edge.labels.contains(l)
             {
-              if !e.edge.labels.contains(l)
-              {
-                return false;
-              }
+              return false;
             }
-            true
           }
-          Err(_) => true,
-        })) as Box<dyn Iterator<Item = Result<super::EdgeResult>>>
-      }
+          true
+        }
+        Err(_) => true,
+      })) as Box<dyn Iterator<Item = Result<super::EdgeResult>>>,
       None => Box::new(r) as Box<dyn Iterator<Item = Result<super::EdgeResult>>>,
     };
-    let r = match query.properties
+    let r = match &query.properties
     {
-      Some(properties) =>
+      Some(properties) => Box::new(r.filter(move |e| match e
       {
-        let properties = properties.collect::<Vec<(&'a String, &'a graph::Value)>>();
-        Box::new(r.filter(move |e| match e
+        Ok(e) =>
         {
-          Ok(e) =>
+          for (k, v) in properties.iter()
           {
-            for (k, v) in properties.iter()
+            match e.edge.properties.get(k)
             {
-              match e.edge.properties.get(*k)
+              Some(val) =>
               {
-                Some(val) =>
-                {
-                  if val != *v
-                  {
-                    return false;
-                  }
-                }
-                None =>
+                if val != v
                 {
                   return false;
                 }
               }
+              None =>
+              {
+                return false;
+              }
             }
-            true
           }
-          Err(_) => true,
-        })) as Box<dyn Iterator<Item = Result<super::EdgeResult>>>
-      }
+          true
+        }
+        Err(_) => true,
+      })) as Box<dyn Iterator<Item = Result<super::EdgeResult>>>,
       None => Box::new(r) as Box<dyn Iterator<Item = Result<super::EdgeResult>>>,
     };
-    r.collect()
+    if query.keys.is_some() && (!query.source.is_select_all() || !query.destination.is_select_all())
+    {
+      r.filter(|e| {
+        if let Ok(e) = &e
+        {
+          query.is_match(&e.edge)
+        }
+        else
+        {
+          return true;
+        }
+      })
+      .collect()
+    }
+    else
+    {
+      r.collect()
+    }
   }
   pub(crate) fn compute_statistics(
     &self,
