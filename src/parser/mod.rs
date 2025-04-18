@@ -779,18 +779,28 @@ fn build_ast_from_statement(
       {
         match pair.as_rule()
         {
-          Rule::set_eq_expression =>
+          Rule::set_eq_expression | Rule::set_add_expression =>
           {
+            let add_property = pair.as_rule() == Rule::set_add_expression;
+
             let mut pair = pair.into_inner();
             let mut pair_left = pair.try_next()?.into_inner();
             let target = pair_left.try_next()?.as_str().to_string();
             let path = pair_left.map(|el| el.as_str().to_string()).collect();
             let expression = build_expression(pair.try_next()?.into_inner(), pratt)?;
-            updates.push(ast::OneUpdate::SetProperty(ast::SetProperty {
+            let update_property = ast::UpdateProperty {
               target,
               path,
               expression,
-            }));
+            };
+            if add_property
+            {
+              updates.push(ast::OneUpdate::AddProperty(update_property));
+            }
+            else
+            {
+              updates.push(ast::OneUpdate::SetProperty(update_property));
+            }
           }
           Rule::set_label_expression =>
           {

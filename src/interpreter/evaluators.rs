@@ -584,13 +584,84 @@ impl HashMapExt for HashMap<String, graph::Value>
   }
 }
 
+pub(crate) fn eval_update_property(
+  store: &crate::store::Store,
+  mut tx: &mut crate::store::Transaction,
+  graph_name: &String,
+  row: &mut crate::value_table::Row,
+  target: &String,
+  path: &Vec<String>,
+  instructions: &instructions::Instructions,
+  parameters: &crate::graph::ValueObject,
+  set: bool,
+) -> Result<()>
+{
+  let var = row
+    .get(target)
+    .ok_or_else(|| crate::error::RunTimeError::UndefinedVariable {
+      name: target.to_owned(),
+    })?;
+  let mut stack = Stack::default();
+  eval_instructions(&mut stack, row, &instructions, &parameters)?;
+  let value: graph::Value = stack.try_pop_into()?;
+  let value = match value
+  {
+    graph::Value::Node(n) => n.properties.into(),
+    graph::Value::Edge(e) => e.properties.into(),
+    _ => value,
+  };
+  use crate::graph::ValueObjectExtension;
+  let mut piter = path.iter();
+  match var
+  {
+    graph::Value::Node(n) =>
+    {
+      let mut n = n.to_owned();
+      if set
+      {
+        n.properties
+          .set_value(piter.next(), piter, value.remove_null())?;
+      }
+      else
+      {
+        n.properties
+          .add_values(piter.next(), piter, value.try_into()?)?;
+      }
+      store.update_node(&mut tx, &graph_name, &n)?;
+      row.insert(target.to_owned(), n.into());
+    }
+    graph::Value::Edge(e) =>
+    {
+      let mut e = e.to_owned();
+      if set
+      {
+        e.properties
+          .set_value(piter.next(), piter, value.remove_null())?;
+      }
+      else
+      {
+        e.properties
+          .add_values(piter.next(), piter, value.try_into()?)?;
+      }
+      store.update_edge(&mut tx, &graph_name, &e)?;
+      row.insert(target.to_owned(), e.into());
+    }
+    graph::Value::Invalid =>
+    {}
+    _ => Err(InternalError::ExpectedEdge {
+      context: "evaluator/eval_program",
+    })?,
+  }
+  Ok(())
+}
+
 pub(crate) fn eval_program(
   store: &crate::store::Store,
   program: super::Program,
   parameters: crate::graph::ValueObject,
 ) -> crate::Result<crate::graph::Value>
 {
-  let graph_name = "default";
+  let graph_name: String = "default".into();
   let mut input_table = crate::value_table::ValueTable::new();
   input_table.add_row(crate::value_table::Row::new());
   let mut tx = store.begin()?;
@@ -622,7 +693,7 @@ pub(crate) fn eval_program(
               {
                 crate::graph::Value::Node(n) =>
                 {
-                  store.create_nodes(&mut tx, graph_name, vec![n.to_owned()].iter())?;
+                  store.create_nodes(&mut tx, &graph_name, vec![n.to_owned()].iter())?;
                   if let Some(var) = var
                   {
                     let _ = new_row.noreplace_insert(&var, crate::graph::Value::Node(n));
@@ -630,7 +701,7 @@ pub(crate) fn eval_program(
                 }
                 crate::graph::Value::Edge(e) =>
                 {
-                  store.create_edges(&mut tx, graph_name, vec![e.to_owned()].iter())?;
+                  store.create_edges(&mut tx, &graph_name, vec![e.to_owned()].iter())?;
                   if let Some(var) = var
                   {
                     new_row.insert(var.to_owned(), crate::graph::Value::Edge(e));
@@ -672,7 +743,7 @@ pub(crate) fn eval_program(
                 {
                   eval_instructions(&mut stack, &row, &instructions, &parameters)?;
                   let query: crate::store::SelectNodeQuery = stack.try_pop_into()?;
-                  let nodes = store.select_nodes(&mut tx, graph_name, query)?;
+                  let nodes = store.select_nodes(&mut tx, &graph_name, query)?;
 
                   for node in nodes.iter()
                   {
@@ -718,7 +789,7 @@ pub(crate) fn eval_program(
                   eval_instructions(&mut stack, &row, &instructions, &parameters)?;
                   let query = stack.try_pop_into()?;
 
-                  let edges = store.select_edges(&mut tx, graph_name, query, *directivity)?;
+                  let edges = store.select_edges(&mut tx, &graph_name, query, *directivity)?;
 
                   for edge in edges.iter()
                   {
@@ -1042,13 +1113,13 @@ pub(crate) fn eval_program(
 
         store.delete_edges(
           &mut tx,
-          graph_name,
+          &graph_name,
           store::SelectEdgeQuery::select_keys(edges_keys),
           graph::EdgeDirectivity::Directed,
         )?;
         store.delete_nodes(
           &mut tx,
-          graph_name,
+          &graph_name,
           store::SelectNodeQuery::select_keys(nodes_keys),
           detach,
         )?;
@@ -1069,44 +1140,35 @@ pub(crate) fn eval_program(
                 instructions,
               } =>
               {
-                let var = out_row.get(target).ok_or_else(|| {
-                  crate::error::RunTimeError::UndefinedVariable {
-                    name: target.to_owned(),
-                  }
-                })?;
-                let mut stack = Stack::default();
-                eval_instructions(&mut stack, row, &instructions, &parameters)?;
-                let value: graph::Value = stack.try_pop_into()?;
-                let value = match value
-                {
-                  graph::Value::Node(n) => n.properties.into(),
-                  graph::Value::Edge(e) => e.properties.into(),
-                  _ => value,
-                };
-                use crate::graph::ValueObjectExtension;
-                let mut piter = path.iter();
-                match var
-                {
-                  graph::Value::Node(n) =>
-                  {
-                    let mut n = n.to_owned();
-                    n.properties.update_value(piter.next(), piter, value)?;
-                    store.update_node(&mut tx, graph_name, &n)?;
-                    out_row.insert(target.to_owned(), n.into());
-                  }
-                  graph::Value::Edge(e) =>
-                  {
-                    let mut e = e.to_owned();
-                    e.properties.update_value(piter.next(), piter, value)?;
-                    store.update_edge(&mut tx, graph_name, &e)?;
-                    out_row.insert(target.to_owned(), e.into());
-                  }
-                  graph::Value::Invalid =>
-                  {}
-                  _ => Err(InternalError::ExpectedEdge {
-                    context: "evaluator/eval_program",
-                  })?,
-                }
+                eval_update_property(
+                  store,
+                  &mut tx,
+                  &graph_name,
+                  &mut out_row,
+                  target,
+                  path,
+                  instructions,
+                  &parameters,
+                  true,
+                )?;
+              }
+              instructions::UpdateOne::AddProperty {
+                target,
+                path,
+                instructions,
+              } =>
+              {
+                eval_update_property(
+                  store,
+                  &mut tx,
+                  &graph_name,
+                  &mut out_row,
+                  target,
+                  path,
+                  instructions,
+                  &parameters,
+                  false,
+                )?;
               }
               instructions::UpdateOne::RemoveProperty { target, path } =>
               {}
@@ -1123,14 +1185,14 @@ pub(crate) fn eval_program(
                   {
                     let mut n = n.to_owned();
                     n.labels.append(&mut labels.clone());
-                    store.update_node(&mut tx, graph_name, &n)?;
+                    store.update_node(&mut tx, &graph_name, &n)?;
                     out_row.insert(target.to_owned(), n.into());
                   }
                   graph::Value::Edge(e) =>
                   {
                     let mut e = e.to_owned();
                     e.labels.append(&mut labels.clone());
-                    store.update_edge(&mut tx, graph_name, &e)?;
+                    store.update_edge(&mut tx, &graph_name, &e)?;
                     out_row.insert(target.to_owned(), e.into());
                   }
                   graph::Value::Invalid =>

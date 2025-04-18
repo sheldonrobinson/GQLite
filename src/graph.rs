@@ -52,7 +52,14 @@ fn value_object_display(obj: &ValueObject, f: &mut std::fmt::Formatter<'_>) -> s
 
 pub(crate) trait ValueObjectExtension
 {
-  fn update_value<'a>(
+  fn remove_null(self) -> Self;
+  fn add_values<'a>(
+    &mut self,
+    field: Option<&'a String>,
+    path: impl Iterator<Item = &'a String>,
+    value: ValueObject,
+  ) -> crate::Result<()>;
+  fn set_value<'a>(
     &mut self,
     field: Option<&'a String>,
     path: impl Iterator<Item = &'a String>,
@@ -62,7 +69,96 @@ pub(crate) trait ValueObjectExtension
 
 impl ValueObjectExtension for ValueObject
 {
-  fn update_value<'a>(
+  fn remove_null(self) -> Self
+  {
+    self
+      .into_iter()
+      .filter(|(_, v)| !v.is_null())
+      .map(|(k, v)| (k, v.remove_null()))
+      .collect()
+  }
+
+  fn add_values<'a>(
+    &mut self,
+    field: Option<&'a String>,
+    mut path: impl Iterator<Item = &'a String>,
+    value: ValueObject,
+  ) -> crate::Result<()>
+  {
+    if let Some(field) = field
+    {
+      let v = self.get_mut(field);
+
+      if let Some(next_field) = path.next()
+      {
+        match v
+        {
+          Some(Value::Object(o)) =>
+          {
+            o.add_values(Some(next_field), path, value)?;
+          }
+          None =>
+          {
+            let mut o = ValueObject::new();
+            o.set_value(Some(next_field), path, value.remove_null().into())?;
+            self.insert(field.to_owned(), o.into());
+          }
+          _ => Err(crate::error::Error::Unimplemented(
+            "add_values should get a better error",
+          ))?, // TODO
+        }
+      }
+      else
+      {
+        match v
+        {
+          Some(v) =>
+          {
+            match v
+            {
+              Value::Object(object) =>
+              {
+                for (k, v) in value.into_iter()
+                {
+                  if v.is_null()
+                  {
+                    object.remove(&k);
+                  }
+                  else
+                  {
+                    object.insert(k, v);
+                  }
+                }
+              }
+              _ => Err(crate::error::Error::Unimplemented(
+                "add_values should get a better error",
+              ))?, // TODO
+            }
+          }
+          None =>
+          {
+            self.insert(field.to_owned(), value.remove_null().into());
+          }
+        }
+      }
+    }
+    else
+    {
+      for (k, v) in value.into_iter()
+      {
+        if v.is_null()
+        {
+          self.remove(&k);
+        }
+        else
+        {
+          self.insert(k, v);
+        }
+      }
+    }
+    Ok(())
+  }
+  fn set_value<'a>(
     &mut self,
     field: Option<&'a String>,
     mut path: impl Iterator<Item = &'a String>,
@@ -79,14 +175,14 @@ impl ValueObjectExtension for ValueObject
         {
           Some(Value::Object(o)) =>
           {
-            o.update_value(Some(next_field), path, value)?;
+            o.set_value(Some(next_field), path, value)?;
           }
           None =>
           {
             if !value.is_null()
             {
               let mut o = ValueObject::new();
-              o.update_value(Some(next_field), path, value)?;
+              o.set_value(Some(next_field), path, value)?;
               self.insert(field.to_owned(), o.into());
             }
           }
@@ -129,30 +225,11 @@ impl ValueObjectExtension for ValueObject
           Ok(())
         }
         _ => Err(crate::error::Error::Unimplemented(
-          "update_value should get a better error",
+          "set_value should get a better error",
         )), // TODO
       }
     }
   }
-
-  //   if let Some(e) = path.next()
-  //   {
-  //     let val = self.get_mut(e).ok_or(InternalError::UnknownValue)?;
-  //     match val
-  //     {
-  //       Value::Object(o) =>
-  //       {
-  //         *val = o.update_value(path, value)?;
-  //         Ok(self.into())
-  //       }
-  //       _ => Err(crate::error::Error::Unimplemented("update_value"))?,
-  //     }
-  //   }
-  //   else
-  //   {
-  //     Ok(value)
-  //   }
-  // }
 }
 
 impl Value
@@ -163,6 +240,14 @@ impl Value
     {
       Value::Invalid => true,
       _ => false,
+    }
+  }
+  pub(crate) fn remove_null(self) -> Self
+  {
+    match self
+    {
+      Value::Object(object) => object.remove_null().into(),
+      o => o,
     }
   }
   /// Return an object from the value, or an empty object
