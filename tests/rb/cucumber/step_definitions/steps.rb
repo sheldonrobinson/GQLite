@@ -512,12 +512,6 @@ Then(/^a SyntaxError should be raised at compile time: NoExpressionAlias$/) do
   expect(@exception.message).to match(/^\d+:\d+:Expected token AS got {}.$/)
 end
 
-Then(/^a ConstraintVerificationFailed should be raised at runtime: DeleteConnectedNode$/) do
-  pending if @ignored_scenario
-  expect(@exception).not_to be_nil
-  expect(@exception.message).to match(/^Cannot delete node with \d+ relationships.$/)
-end
-
 Then(/^a SyntaxError should be raised at compile time: InvalidDelete$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
@@ -597,7 +591,7 @@ Then(/^a SyntaxError should be raised at compile time: InvalidAggregation$/) do
   expect(@exception.message).to match(/^CompileTime: InvalidAggregation: aggregation is not accepted in this expression.$/)
 end
 
-Then(/^a ConstraintValidationFailed should be raised at runtime: DeleteConnectedNode$/) do
+Then(/^a ConstraintVerificationFailed should be raised at runtime: DeleteConnectedNode$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
   expect(@exception.message).to match(/^RunTime: DeleteConnectedNode: .*\.$/)

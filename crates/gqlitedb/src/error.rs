@@ -362,3 +362,22 @@ pub(crate) fn parse_int_error_to_compile_error<'a>(
     _ => e.into(),
   }
 }
+
+/// Convenient macro for mapping errors, for instance, from internal error to runtime error:
+///
+/// ```notest
+///   v.try_into()
+///     .map_err(|e| error::map_error!(e, Error::Internal(InternalError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))?;
+/// ```
+macro_rules! map_error {
+  ($err:expr, $source:pat => $destination:expr) => {{
+    use crate::error::*;
+    match $err
+    {
+      $source => $destination.into(),
+      o => o,
+    }
+  }};
+}
+
+pub(crate) use map_error;
