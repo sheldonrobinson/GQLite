@@ -1,4 +1,5 @@
 mod arithmetic;
+mod containers;
 mod count;
 
 use std::fmt::Debug;
@@ -60,5 +61,10 @@ pub(crate) use declare_aggregator;
 
 pub(crate) fn init_aggregators() -> std::collections::HashMap<String, Aggregator>
 {
-  [count::Count::new(), arithmetic::Sum::new()].into()
+  [
+    count::Count::new(),
+    arithmetic::Sum::new(),
+    containers::Collect::new(),
+  ]
+  .into()
 }
