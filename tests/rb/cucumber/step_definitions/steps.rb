@@ -616,7 +616,7 @@ end
 Then(/^a SyntaxError should be raised at compile time: InvalidAggregation$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
-  expect(@exception.message).to match(/^CompileTime: InvalidAggregation: .* \(\d+, \d+\)\.$/)
+  expect(@exception.message).to match(/^CompileTime: InvalidAggregation: aggregation is not accepted in this expression.$/)
 end
 
 Then(/^a ConstraintValidationFailed should be raised at runtime: DeleteConnectedNode$/) do

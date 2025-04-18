@@ -743,13 +743,23 @@ fn compile_match_patterns(
       &mut edge_variables,
     ),
   });
+  let blocks = blocks.collect::<Result<_>>()?;
   let mut filter = Instructions::new();
   if let Some(where_expression) = where_expression
   {
+    let ei = expression_analyser::ExpressionInfo::analyse(
+      validator.variables_ref(),
+      function_manager,
+      where_expression,
+    )?;
+    if ei.aggregation_result
+    {
+      return Err(CompileTimeError::InvalidAggregation.into());
+    }
     compile_expression(function_manager, where_expression, &mut filter, &mut None)?;
   }
   Ok(Block::BlockMatch {
-    blocks: blocks.collect::<Result<_>>()?,
+    blocks,
     filter,
     optional,
   })
