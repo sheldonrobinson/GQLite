@@ -36,7 +36,7 @@ features = [
   # Create
   'create/Create1', 'create/Create2', 'create/Create3',
   # Match
-  'match/Match1', 'match/Match2'
+  'match/Match1', 'match/Match2', 'match/Match3',
 ]
 
 expressions = [
@@ -45,7 +45,7 @@ expressions = [
 
 # In progress
 # gql = []
-# features = ['match/Match3']
+# features = []
 # expressions = []
 # Current dev
 # gql = []
