@@ -1,10 +1,29 @@
 #[cfg(feature = "persy")]
 mod persy;
+#[cfg(feature = "pgql")]
+mod pgql;
 
 #[cfg(feature = "persy")]
 pub(crate) use persy::Store;
 
+#[cfg(feature = "pgql")]
+pub(crate) use pgql::Store;
+
 use crate::graph;
+
+//  ____  _        _   _     _   _
+// / ___|| |_ __ _| |_(_)___| |_(_) ___ ___
+// \___ \| __/ _` | __| / __| __| |/ __/ __|
+//  ___) | || (_| | |_| \__ \ |_| | (__\__ \
+// |____/ \__\__,_|\__|_|___/\__|_|\___|___/
+
+pub(crate) struct Statistics
+{
+  pub nodes_count: usize,
+  pub edges_count: usize,
+  pub labels_nodes_count: usize,
+  pub properties_count: usize,
+}
 
 //  ____       _           _   _   _           _       ___
 // / ___|  ___| | ___  ___| |_| \ | | ___   __| | ___ / _ \ _   _  ___ _ __ _   _
