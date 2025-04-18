@@ -21,15 +21,15 @@ Amalgamate
 
 From the [releases page](https://gitlab.com/gqlite/GQLite/-/releases) it is possible to download an amalgamate variant of GQLite, which contains a single cpp file and two headers. This allow to easilly embedd GQLite in your own application build.
 
-Using lrs-pkg
+Using cc-pkg
 -------------
 
-Using [lrs-pkg](https://gitlab.com/cyloncore/lrs-pkg) build environment:
+Using [cc-pkg](https://gitlab.com/cyloncore/cc-pkg) build environment:
 
 ```bash
-lrs-pkg get --repo cyloncore-core https://gitlab.com/cyloncore/lrs-pkg-core-repositories.git
-lrs-pkg get gqlite
-lrs-pkg build
+cc-pkg get --repo cyloncore-core https://gitlab.com/cyloncore/cc-pkg-core-repositories.git
+cc-pkg get gqlite
+cc-pkg build
 ```
 
 Using pip (Python)

@@ -6,7 +6,7 @@
     {
       "label": "build gqlite and dependencies (debug)",
       "type": "shell",
-      "command": "lrs-pkg build --build-mode=debug gqlite",
+      "command": "cc-pkg build --build-mode=debug gqlite",
       "group": {
         "kind": "build"
       },
@@ -17,7 +17,7 @@
     {
       "label": "build gqlite and dependencies (release)",
       "type": "shell",
-      "command": "lrs-pkg build gqlite",
+      "command": "cc-pkg build gqlite",
       "group": {
         "kind": "build"
       },
@@ -28,7 +28,7 @@
     {
       "label": "build gqlite (debug)",
       "type": "shell",
-      "command": "lrs-pkg build --no-recursive --build-mode=debug gqlite",
+      "command": "cc-pkg build --no-recursive --build-mode=debug gqlite",
       "group": {
         "kind": "build",
         "isDefault": true
@@ -40,7 +40,7 @@
     {
       "label": "build gqlite (release)",
       "type": "shell",
-      "command": "lrs-pkg build --no-recursive gqlite",
+      "command": "cc-pkg build --no-recursive gqlite",
       "group": {
         "kind": "build"
       },
