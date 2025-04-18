@@ -18,21 +18,26 @@ edge_pattern = { "(" ~ pattern ~ ")-[" ~ pattern ~ "]->(" ~ pattern ~ ")" }
 node_or_edge_pattern = _{ edge_pattern | node_pattern }
 
 // Statements
-statement = { create_statement | match_statement | return_statement }
+statement = { create_statement | match_statement | return_statement | call_statement }
 
 create_statement = { "CREATE" ~ node_or_edge_pattern ~ ( "," ~ node_or_edge_pattern )* }
 match_statement = { "MATCH" ~ node_or_edge_pattern ~ ( "," ~ node_or_edge_pattern )* }
 return_statement = { "RETURN" ~ named_expression ~ ("," ~ named_expression )* }
+call_statement = { "CALL" ~ function_name ~ "()" }
 
 // literals
 int = { ("+" | "-")? ~ ASCII_DIGIT+ }
+true_lit = { "true" }
+false_lit = { "false" }
 num = @{ int ~ ("." ~ ASCII_DIGIT*)? ~ (^"e" ~ int)? }
 string_literal = ${ "'" ~ inner ~ "'" }
 inner = @{ char* }
+function_name = { ident ~ ("." ~ ident)* }
+
 // Expression
 
 named_expression = { expression | ident ~ expression }
-expression = _{ ident | map | string_literal | num}
+expression = _{ map | string_literal | num | true_lit | false_lit | ident }
 
 pair = { ident ~ ":" ~ expression }
 

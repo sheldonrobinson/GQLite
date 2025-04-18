@@ -1,6 +1,6 @@
 use std::env::var;
 
-use ast::{Expression, Variable};
+use ast::{Expression, Value, Variable};
 use pest::{error::Error, Parser};
 use pest_derive::Parser;
 
@@ -24,6 +24,12 @@ fn build_expression(pair: pest::iterators::Pair<Rule>) -> Result<ast::Expression
 {
   match pair.as_rule()
   {
+    Rule::true_lit => Ok(ast::Expression::Value(ast::Value {
+      value: graph::Value::Boolean(true),
+    })),
+    Rule::false_lit => Ok(ast::Expression::Value(ast::Value {
+      value: graph::Value::Boolean(false),
+    })),
     Rule::ident => Ok(ast::Expression::Variable(ast::Variable {
       identifier: pair.as_str().to_string(),
     })),
@@ -232,6 +238,19 @@ fn build_ast_from_statement(pair: pest::iterators::Pair<Rule>) -> Result<ast::St
         all: false,
         expressions: named_expressions,
         modifiers: ast::Modifiers::default(),
+      }))
+    }
+    Rule::call_statement =>
+    {
+      let name = pair
+        .into_inner()
+        .map(|pair| pair.as_str())
+        .collect::<Vec<&str>>()
+        .join(".");
+      Ok(ast::Statement::Call(ast::Call {
+        name: name,
+        arguments: Default::default(),
+        yield_: Default::default(),
       }))
     }
     unknown_expression => Err(crate::Error::UnxpectedExpression(
