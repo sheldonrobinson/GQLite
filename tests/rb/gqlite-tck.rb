@@ -34,7 +34,7 @@ end
 gql = []
 features = [
   # Create
-  'create/Create1', 'create/Create2'
+  'create/Create1', 'create/Create2', 'create/Create3'
 ]
 
 expressions = [
@@ -47,7 +47,7 @@ expressions = [
 # expressions = []
 # Current dev
 # gql = []
-# features = ['create/Create3']
+# features = []
 # expressions = []
 
 

@@ -253,6 +253,9 @@ IgnoredScenario = [
   # MERGE not supported
   "[6] Creating nodes from an unwound parameter list",
   "[14] Unwind with merge",
+  "[11] WITH-MERGE-CREATE: A bound node should be recognized after projection with WITH + MERGE node",
+  "[12] WITH-MERGE-CREATE: A bound node should be recognized after projection with WITH + MERGE pattern",
+  "[13] Merge followed by multiple creates",
   # WITH WHERE not supported
   "[5] Conjunction is commutative on null",
   "[7] Conjunction is associative on null",
@@ -310,7 +313,7 @@ IgnoredScenario = [
   "[20] Fail if more complex expressions, even if projected, are used inside an order by item which contains an aggregation expression",
   # No checking of index type
   "[8] Fail when indexing with a non-integer",
-  "[9] Fail when indexing with a non-integer given by a parameter"
+  "[9] Fail when indexing with a non-integer given by a parameter",
 ]
 
 Before do |scenario|
