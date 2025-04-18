@@ -26,6 +26,9 @@ pub type Connection = connection::Connection;
 /// GQLite Value
 pub type Value = graph::Value;
 
+/// GQLite ValueObject
+pub type ValueObject = graph::ValueObject;
+
 #[cfg(test)]
 pub(crate) mod tests
 {
