@@ -46,29 +46,29 @@ mod templates
   use askama::Template;
   #[derive(Template)]
   #[template(path = "sql/sqlite/graph_create.sql", escape = "none")]
-  pub(super) struct GraphCreate
+  pub(super) struct GraphCreate<'a>
   {
-    pub graph_name: String,
+    pub graph_name: &'a String,
   }
   #[derive(Template)]
   #[template(path = "sql/sqlite/node_create.sql", escape = "none")]
-  pub(super) struct NodeCreate
+  pub(super) struct NodeCreate<'a>
   {
-    pub graph_name: String,
+    pub graph_name: &'a String,
   }
   #[derive(Template)]
   #[template(path = "sql/sqlite/node_delete.sql", escape = "none")]
-  pub(super) struct NodeDelege
+  pub(super) struct NodeDelete<'a>
   {
-    pub graph_name: String,
-    pub what: String,
+    pub graph_name: &'a String,
+    pub keys: &'a String,
   }
   #[derive(Template)]
   #[template(path = "sql/sqlite/edge_delete_by_nodes.sql", escape = "none")]
-  pub(super) struct EdgeDeleteByNodes
+  pub(super) struct EdgeDeleteByNodes<'a>
   {
-    pub graph_name: String,
-    pub what: String,
+    pub graph_name: &'a String,
+    pub keys: &'a String,
   }
 }
 
@@ -88,12 +88,11 @@ impl store::Store for Store
   }
   fn create_graph(&mut self, name: impl Into<String>, _ignore_if_exists: bool) -> Result<()>
   {
+    let name = name.into();
     self.connection.execute(
-      templates::GraphCreate {
-        graph_name: name.into(),
-      }
-      .render()?
-      .as_str(),
+      templates::GraphCreate { graph_name: &name }
+        .render()?
+        .as_str(),
       (),
     )?;
     Ok(())
@@ -130,6 +129,31 @@ impl store::Store for Store
     detach: bool,
   ) -> Result<()>
   {
+    let nodes = self.select_nodes(transaction, graph_name, query)?;
+    let nodes_keys: Vec<u128> = nodes.into_iter().map(|x| x.key.into()).collect();
+    let nodes_keys_jsons = serde_json::to_string(&nodes_keys)?;
+    if detach
+    {
+      transaction.connection.execute(
+        templates::EdgeDeleteByNodes {
+          graph_name: &graph_name.into(),
+          keys: &nodes_keys_jsons,
+        }
+        .render()?
+        .as_str(),
+        (),
+      )?;
+    }
+    transaction.connection.execute(
+      templates::NodeDelete {
+        graph_name: &graph_name,
+        keys: &nodes_keys_jsons,
+      }
+      .render()?
+      .as_str(),
+      (),
+    )?;
+    Ok(())
   }
   fn update_node(
     &self,
