@@ -17,6 +17,18 @@ pub(crate) enum Statement
   Update(Update),
 }
 
+macro_rules! create_into_statement {
+  ( $x:tt ) => {
+    impl Into<Statement> for $x
+    {
+      fn into(self) -> Statement
+      {
+        Statement::$x(self)
+      }
+    }
+  };
+}
+
 pub(crate) type Statements = Vec<Statement>;
 
 #[derive(Debug)]
@@ -40,6 +52,8 @@ pub(crate) struct Create
   pub(crate) patterns: Vec<Pattern>,
 }
 
+create_into_statement! {Create}
+
 #[derive(Debug)]
 pub(crate) struct Match
 {
@@ -47,6 +61,8 @@ pub(crate) struct Match
   pub(crate) where_expression: Option<Expression>,
   pub(crate) optional: bool,
 }
+
+create_into_statement! {Match}
 
 #[derive(Debug)]
 pub(crate) struct Return
@@ -57,6 +73,8 @@ pub(crate) struct Return
   pub(crate) where_expression: Option<Expression>,
 }
 
+create_into_statement! {Return}
+
 #[derive(Debug)]
 pub(crate) struct With
 {
@@ -66,12 +84,16 @@ pub(crate) struct With
   pub(crate) where_expression: Option<Expression>,
 }
 
+create_into_statement! {With}
+
 #[derive(Debug)]
 pub(crate) struct Unwind
 {
   pub(crate) name: String,
   pub(crate) expression: Expression,
 }
+
+create_into_statement! {Unwind}
 
 #[derive(Debug)]
 pub(crate) struct Delete
@@ -178,7 +200,7 @@ pub(crate) enum Expression
   RelationalNotIn(Box<RelationalNotIn>),
 
   Addition(Box<Addition>),
-  Substraction(Box<Substraction>),
+  Subtraction(Box<Subtraction>),
   Multiplication(Box<Multiplication>),
   Division(Box<Division>),
   Modulo(Box<Modulo>),
@@ -346,32 +368,31 @@ impl LabelExpression
   }
 }
 
-// Values
-
-#[derive(Debug)]
-pub(crate) struct All {}
-#[derive(Debug)]
-pub(crate) struct EndOfList {}
-
-#[derive(Debug, Clone, PartialEq)]
-pub(crate) struct Value
-{
-  pub(crate) value: crate::graph::Value,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub(crate) struct Map
-{
-  pub(crate) map: std::collections::HashMap<String, Expression>,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub(crate) struct Array
-{
-  pub(crate) array: Vec<Expression>,
-}
-
 // Expressions
+
+macro_rules! create_into_expr {
+  ( $x:tt ) => {
+    impl Into<Expression> for $x
+    {
+      fn into(self) -> Expression
+      {
+        Expression::$x(self)
+      }
+    }
+  };
+}
+
+macro_rules! create_into_boxed_expr {
+  ( $x:tt ) => {
+    impl Into<Expression> for $x
+    {
+      fn into(self) -> Expression
+      {
+        Expression::$x(Box::new(self))
+      }
+    }
+  };
+}
 
 #[derive(Debug)]
 pub(crate) struct NamedExpression
@@ -392,6 +413,8 @@ pub(crate) struct Variable
   pub(crate) identifier: String,
 }
 
+create_into_expr! {Variable}
+
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct MemberAccess
 {
@@ -399,12 +422,16 @@ pub(crate) struct MemberAccess
   pub(crate) path: Vec<String>,
 }
 
+create_into_boxed_expr! {MemberAccess}
+
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct IndexAccess
 {
   pub(crate) left: Expression,
   pub(crate) index: Expression,
 }
+
+create_into_boxed_expr! {IndexAccess}
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct RangeAccess
@@ -427,6 +454,8 @@ pub(crate) struct FunctionCall
   pub(crate) arguments: Vec<Expression>,
 }
 
+create_into_expr! {FunctionCall}
+
 macro_rules! create_binary_op {
   ( $x:tt ) => {
     #[derive(Debug, Clone, PartialEq)]
@@ -436,13 +465,7 @@ macro_rules! create_binary_op {
       pub(crate) right: Expression,
     }
 
-    impl Into<Expression> for $x
-    {
-      fn into(self) -> Expression
-      {
-        Expression::$x(Box::new(self))
-      }
-    }
+    create_into_boxed_expr! { $x }
   };
 }
 
@@ -459,7 +482,7 @@ create_binary_op! {RelationalIn}
 create_binary_op! {RelationalNotIn}
 
 create_binary_op! {Addition}
-create_binary_op! {Substraction}
+create_binary_op! {Subtraction}
 create_binary_op! {Multiplication}
 create_binary_op! {Division}
 create_binary_op! {Modulo}
@@ -471,13 +494,7 @@ macro_rules! create_unary_op {
     {
       pub(crate) value: Expression,
     }
-    impl Into<Expression> for $x
-    {
-      fn into(self) -> Expression
-      {
-        Expression::$x(Box::new(self))
-      }
-    }
+    create_into_boxed_expr! { $x }
   };
 }
 
@@ -485,3 +502,34 @@ create_unary_op! {LogicalNegation}
 create_unary_op! {Negation}
 create_unary_op! {IsNull}
 create_unary_op! {IsNotNull}
+
+// Values
+
+#[derive(Debug)]
+pub(crate) struct All {}
+#[derive(Debug)]
+pub(crate) struct EndOfList {}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct Value
+{
+  pub(crate) value: crate::graph::Value,
+}
+
+create_into_expr! {Value}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct Map
+{
+  pub(crate) map: Vec<(String, Expression)>,
+}
+
+create_into_expr! {Map}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct Array
+{
+  pub(crate) array: Vec<Expression>,
+}
+
+create_into_expr! {Array}

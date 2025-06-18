@@ -1,0 +1,596 @@
+use std::collections::HashMap;
+
+use crate::prelude::*;
+
+use compiler::expression_analyser::{self, ExpressionInfo, ExpressionType};
+use parser::ast;
+
+// __     __         _       _     _
+// \ \   / /_ _ _ __(_) __ _| |__ | | ___
+//  \ \ / / _` | '__| |/ _` | '_ \| |/ _ \
+//   \ V / (_| | |  | | (_| | |_) | |  __/
+//    \_/ \__,_|_|  |_|\__,_|_.__/|_|\___|
+
+#[derive(Debug, Clone)]
+pub(crate) enum VariableContent
+{
+  Node(ast::NodePattern),
+  Edge(ast::EdgePattern),
+  None,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct Variable
+{
+  content: VariableContent,
+  variable_type: ExpressionType,
+  col_id: value_table::ColId,
+}
+
+impl Variable
+{
+  fn from_node(value: ast::NodePattern, col_id: value_table::ColId) -> Self
+  {
+    Self {
+      content: VariableContent::Node(value),
+      variable_type: ExpressionType::Node,
+      col_id,
+    }
+  }
+  fn from_edge(value: ast::EdgePattern, col_id: value_table::ColId) -> Self
+  {
+    Self {
+      content: VariableContent::Edge(value),
+      variable_type: ExpressionType::Edge,
+      col_id,
+    }
+  }
+  fn from_expression(value: ExpressionType, col_id: value_table::ColId) -> Self
+  {
+    match value
+    {
+      ExpressionType::Edge => Self {
+        content: VariableContent::Edge(ast::EdgePattern {
+          variable: None,
+          labels: ast::LabelExpression::None,
+          properties: None,
+          source: ast::NodePattern {
+            variable: None,
+            labels: ast::LabelExpression::None,
+            properties: None,
+          },
+          destination: ast::NodePattern {
+            variable: None,
+            labels: ast::LabelExpression::None,
+            properties: None,
+          },
+          directivity: crate::graph::EdgeDirectivity::Directed,
+        }),
+        variable_type: ExpressionType::Edge,
+        col_id,
+      },
+      ExpressionType::Node => Self {
+        content: VariableContent::Node(ast::NodePattern {
+          variable: None,
+          labels: ast::LabelExpression::None,
+          properties: None,
+        }),
+        variable_type: ExpressionType::Node,
+        col_id,
+      },
+      variable_type => Self {
+        content: VariableContent::None,
+        variable_type,
+        col_id,
+      },
+    }
+  }
+  pub(crate) fn col_id(&self) -> value_table::ColId
+  {
+    self.col_id
+  }
+}
+
+// __     __    _ _     _       _
+// \ \   / /_ _| (_) __| | __ _| |_ ___  _ __
+//  \ \ / / _` | | |/ _` |/ _` | __/ _ \| '__|
+//   \ V / (_| | | | (_| | (_| | || (_) | |
+//    \_/ \__,_|_|_|\__,_|\__,_|\__\___/|_|
+
+#[derive(Debug)]
+pub(crate) struct VariablesManager
+{
+  variables: HashMap<String, Variable>,
+  set_variables: Vec<String>,
+  function_manager: functions::Manager,
+}
+
+impl VariablesManager
+{
+  pub(crate) fn new(function_manager: &functions::Manager) -> Self
+  {
+    Self {
+      variables: Default::default(),
+      set_variables: Default::default(),
+      function_manager: function_manager.clone(),
+    }
+  }
+  pub(crate) fn has_variable(&self, identifier: &Option<String>) -> bool
+  {
+    identifier
+      .as_ref()
+      .map_or(false, |identifier| self.variables.contains_key(identifier))
+  }
+  /// Get the index of the variable in the row of variables
+  pub(crate) fn get_variable_index(&self, identifier: &String) -> Result<usize>
+  {
+    self
+      .variables
+      .get(identifier)
+      .ok_or_else(|| {
+        InternalError::UnknownVariable {
+          name: identifier.clone(),
+        }
+        .into()
+      })
+      .map(|x| x.col_id)
+  }
+  /// Get the index of the variable in the row of variables
+  pub(crate) fn get_variable_index_option(
+    &self,
+    identifier: &Option<String>,
+  ) -> Result<Option<usize>>
+  {
+    match identifier
+    {
+      Some(identifier) => Ok(Some(self.get_variable_index(identifier)?)),
+      None => Ok(None),
+    }
+  }
+  pub(crate) fn variables_count(&self) -> usize
+  {
+    self.variables.len()
+  }
+  pub(crate) fn variables_iter(&self) -> std::collections::hash_map::Iter<'_, String, Variable>
+  {
+    self.variables.iter()
+  }
+  pub(crate) fn is_set_variable(&self, name: &Option<String>) -> bool
+  {
+    name
+      .as_ref()
+      .map_or(false, |name| self.set_variables.contains(name))
+  }
+  pub(crate) fn mark_variables_as_set<'a>(&mut self, name: impl Into<Option<&'a String>>)
+  {
+    if let Some(name) = name.into()
+    {
+      if !self.set_variables.contains(name)
+      {
+        self.set_variables.push(name.clone());
+      }
+    }
+  }
+  fn declare_variable(
+    &mut self,
+    variable: impl Into<String>,
+    expression_type: ExpressionType,
+  ) -> Result<()>
+  {
+    let variable = variable.into();
+    if self.variables.contains_key(&variable)
+    {
+      Err(
+        CompileTimeError::VariableAlreadyBound {
+          name: variable.to_owned(),
+        }
+        .into(),
+      )
+    }
+    else
+    {
+      self.variables.insert(
+        variable.clone(),
+        Variable::from_expression(expression_type, self.variables.len()),
+      );
+      Ok(())
+    }
+  }
+  // Validate a node variable, and if unknown, declare it
+  fn validate_node(&mut self, node: &ast::NodePattern) -> Result<()>
+  {
+    if let Some(var_name) = &node.variable
+    {
+      if let Some(var) = self.variables.get(var_name)
+      {
+        match var.variable_type
+        {
+          ExpressionType::Node => match &var.content
+          {
+            VariableContent::Node(var_node) =>
+            {
+              if (!node.labels.is_none() || !node.properties.is_none())
+                && (node.labels != var_node.labels || node.properties != var_node.properties)
+              {
+                Err(
+                  CompileTimeError::VariableAlreadyBound {
+                    name: var_name.to_owned(),
+                  }
+                  .into(),
+                )
+              }
+              else
+              {
+                Ok(())
+              }
+            }
+            _ => Err(
+              InternalError::ExpectedNode {
+                context: "validate_node",
+              }
+              .into(),
+            ),
+          },
+          ExpressionType::Variant => Ok(()), // Cannot be checked at compile time
+          _ => Err(
+            CompileTimeError::VariableTypeConflict {
+              name: var_name.to_owned(),
+            }
+            .into(),
+          ),
+        }
+      }
+      else
+      {
+        if let Some(props) = &node.properties
+        {
+          ExpressionInfo::analyse(&self, &self.function_manager, &props)?;
+        }
+        self.variables.insert(
+          var_name.to_owned(),
+          Variable::from_node((*node).to_owned(), self.variables.len()),
+        );
+        Ok(())
+      }
+    }
+    else
+    {
+      Ok(())
+    }
+  }
+  fn validate_edge(&mut self, edge: &ast::EdgePattern) -> Result<()>
+  {
+    self.validate_node(&edge.source)?;
+    self.validate_node(&edge.destination)?;
+    if let Some(var_name) = &edge.variable
+    {
+      if let Some(var) = self.variables.get(var_name)
+      {
+        match var.content
+        {
+          VariableContent::Edge { .. } => Err(
+            CompileTimeError::VariableAlreadyBound {
+              name: var_name.to_owned(),
+            }
+            .into(),
+          ),
+          _ => Err(
+            CompileTimeError::VariableTypeConflict {
+              name: var_name.to_owned(),
+            }
+            .into(),
+          ),
+        }
+      }
+      else
+      {
+        if let Some(props) = &edge.properties
+        {
+          ExpressionInfo::analyse(self, &self.function_manager, &props)?;
+        }
+        self.variables.insert(
+          var_name.to_owned(),
+          Variable::from_edge((*edge).to_owned(), self.variables.len()),
+        );
+        Ok(())
+      }
+    }
+    else
+    {
+      Ok(())
+    }
+  }
+  /// Check if the node variable exists, and that it is a node and that the definition
+  /// is compatible.
+  fn is_valid_existing_node(&self, node: &ast::NodePattern) -> Result<bool>
+  {
+    if let Some(var_name) = &node.variable
+    {
+      if let Some(var) = self.variables.get(var_name)
+      {
+        match var.variable_type
+        {
+          ExpressionType::Node => match &var.content
+          {
+            VariableContent::Node(var_node) =>
+            {
+              if (!node.labels.is_none() || !node.properties.is_none())
+                && (node.labels != var_node.labels || node.properties != var_node.properties)
+              {
+                Err(
+                  CompileTimeError::VariableAlreadyBound {
+                    name: var_name.to_owned(),
+                  }
+                  .into(),
+                )
+              }
+              else
+              {
+                Ok(true)
+              }
+            }
+            _ => Err(
+              InternalError::ExpectedNode {
+                context: "is_valid_existing_node",
+              }
+              .into(),
+            ),
+          },
+          ExpressionType::Variant => Ok(true), // Cannot be checked at compile time
+          _ => Err(
+            CompileTimeError::VariableTypeConflict {
+              name: var_name.to_owned(),
+            }
+            .into(),
+          ),
+        }
+      }
+      else
+      {
+        Ok(false)
+      }
+    }
+    else
+    {
+      Ok(false)
+    }
+  }
+  /// Check if the edge variable exists, and that it is a edge and that the definition
+  /// is compatible.
+  fn is_valid_existing_edge(&self, edge: &ast::EdgePattern) -> Result<bool>
+  {
+    if let Some(var_name) = &edge.variable
+    {
+      if let Some(var) = self.variables.get(var_name)
+      {
+        match var.variable_type
+        {
+          ExpressionType::Edge => match &var.content
+          {
+            VariableContent::Edge(var_edge) =>
+            {
+              if (!edge.labels.is_none() || !edge.properties.is_none())
+                && (var_edge.labels != edge.labels || var_edge.properties != edge.properties)
+              {
+                Err(
+                  CompileTimeError::VariableAlreadyBound {
+                    name: var_name.to_owned(),
+                  }
+                  .into(),
+                )
+              }
+              else
+              {
+                Ok(true)
+              }
+            }
+            _ => Err(
+              InternalError::ExpectedEdge {
+                context: "is_valid_existing_edge",
+              }
+              .into(),
+            ),
+          },
+          ExpressionType::Variant => Ok(true), // Cannot be checked at compile time
+          _ => Err(
+            CompileTimeError::VariableTypeConflict {
+              name: var_name.to_owned(),
+            }
+            .into(),
+          ),
+        }
+      }
+      else
+      {
+        Ok(false)
+      }
+    }
+    else
+    {
+      Ok(false)
+    }
+  }
+
+  /// Expression type for the given expression type
+  pub(crate) fn expression_type(&self, name: impl Into<String>) -> Result<ExpressionType>
+  {
+    let name = name.into();
+    Ok(
+      self
+        .variables
+        .get(&name)
+        .ok_or_else(|| CompileTimeError::UndefinedVariable {
+          name: name.to_owned(),
+        })?
+        .variable_type,
+    )
+  }
+
+  fn analyse_edge_path(
+    &mut self,
+    path_variable: Option<String>,
+    edge: &crate::parser::ast::EdgePattern,
+    is_create: bool,
+  ) -> Result<()>
+  {
+    if let Some(path_variable) = &path_variable
+    {
+      self.declare_variable(
+        path_variable.to_owned(),
+        expression_analyser::ExpressionType::Path,
+      )?;
+    }
+    if !self.is_valid_existing_node(&edge.source)?
+    {
+      self.validate_node(&edge.source)?;
+    }
+    if !self.is_valid_existing_node(&edge.destination)?
+    {
+      self.validate_node(&edge.destination)?;
+    }
+    if is_create || !self.is_valid_existing_edge(&edge)?
+    {
+      self.validate_edge(edge)?;
+    }
+    Ok(())
+  }
+
+  fn analyse_pattern(&mut self, pattern: &ast::Pattern, is_create: bool) -> Result<()>
+  {
+    match pattern
+    {
+      ast::Pattern::Node(node) =>
+      {
+        self.validate_node(node)?;
+      }
+      ast::Pattern::Edge(edge) =>
+      {
+        self.analyse_edge_path(None, edge, is_create)?;
+      }
+      ast::Pattern::Path(path) =>
+      {
+        self.analyse_edge_path(None, &path.edge, is_create)?;
+        self.declare_variable(&path.variable, ExpressionType::Path)?;
+      }
+    }
+    Ok(())
+  }
+  /// Analyse a named expression and return a col id
+  pub(crate) fn analyse_named_expression(
+    &mut self,
+    named_expression: &ast::NamedExpression,
+  ) -> Result<usize>
+  {
+    let expression_info = expression_analyser::ExpressionInfo::analyse(
+      self,
+      &self.function_manager,
+      &named_expression.expression,
+    )?;
+    let col_id = self
+      .variables
+      .get(&named_expression.name)
+      .map_or(self.variables.len(), |var| var.col_id);
+    self.variables.insert(
+      named_expression.name.clone(),
+      Variable::from_expression(expression_info.expression_type, col_id),
+    );
+    if !self.set_variables.contains(&named_expression.name)
+    {
+      self.set_variables.push(named_expression.name.clone());
+    }
+    Ok(col_id)
+  }
+  pub(crate) fn keep_variables<'a>(
+    &mut self,
+    names: impl IntoIterator<Item = &'a String>,
+  ) -> Result<()>
+  {
+    let mut new_variables = HashMap::<String, Variable>::default();
+    for (col_id, var_name) in names.into_iter().enumerate()
+    {
+      let mut var =
+        self
+          .variables
+          .remove(var_name)
+          .ok_or_else(|| InternalError::UnknownVariable {
+            name: var_name.clone(),
+          })?;
+      var.col_id = col_id;
+      new_variables.insert(var_name.clone(), var);
+    }
+    self.variables = new_variables;
+    self.set_variables = self
+      .variables
+      .iter()
+      .map(|(name, _)| name.clone())
+      .collect();
+    Ok(())
+  }
+  pub(crate) fn analyse(&mut self, statement: &ast::Statement) -> Result<()>
+  {
+    if self.set_variables.len() != self.variables.len()
+    {
+      return Err(
+        InternalError::NotAllVariablesAreSet {
+          set_variables: self.set_variables.clone(),
+          all_variables: self.variables.keys().cloned().collect(),
+        }
+        .into(),
+      );
+    }
+    #[allow(unused_variables)]
+    match statement
+    {
+      ast::Statement::Create(create) =>
+      {
+        for pattern in create.patterns.iter()
+        {
+          match &pattern
+          {
+            ast::Pattern::Node(n) =>
+            {
+              if self.has_variable(&n.variable)
+              {
+                return Err(
+                  CompileTimeError::VariableAlreadyBound {
+                    name: n.variable.clone().unwrap().to_owned(),
+                  }
+                  .into(),
+                );
+              }
+            }
+            _ =>
+            {}
+          }
+          self.analyse_pattern(pattern, true)?;
+        }
+      }
+      ast::Statement::Match(match_statement) =>
+      {
+        for pattern in match_statement.patterns.iter()
+        {
+          self.analyse_pattern(pattern, false)?;
+        }
+      }
+      ast::Statement::Return(return_statement) =>
+      {}
+      ast::Statement::Call(call) =>
+      {}
+      ast::Statement::With(with) =>
+      {}
+      ast::Statement::Unwind(unwind) =>
+      {
+        self.declare_variable(
+          unwind.name.to_owned(),
+          expression_analyser::ExpressionType::Variant,
+        )?;
+        self.mark_variables_as_set(&unwind.name);
+      }
+      ast::Statement::Delete(delete) =>
+      {}
+      ast::Statement::Update(update) =>
+      {}
+    }
+    Ok(())
+  }
+}

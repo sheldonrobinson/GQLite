@@ -1,6 +1,10 @@
 use std::collections::HashMap;
 
-use crate::prelude::*;
+use crate::{
+  interpreter::instructions::VariablesSizes,
+  prelude::*,
+  value_table::{MutableRowInterface, Row, RowInterface},
+};
 use interpreter::instructions;
 
 #[derive(Debug, Clone)]
@@ -359,7 +363,7 @@ fn execute_binary_operator<T: Into<crate::graph::Value>>(
 
 fn eval_instructions(
   stack: &mut Stack,
-  row: &value_table::Row,
+  row: &impl value_table::RowInterface,
   instructions: &instructions::Instructions,
   parameters: &crate::graph::ValueObject,
 ) -> Result<()>
@@ -481,21 +485,9 @@ fn eval_instructions(
       {
         stack.push(value.clone());
       }
-      instructions::Instruction::GetVariable { name } =>
+      instructions::Instruction::GetVariable { col_id } =>
       {
-        if let Some(value) = row.get(name)
-        {
-          stack.push(value.to_owned());
-        }
-        else
-        {
-          return Err(
-            crate::error::RunTimeError::UndefinedVariable {
-              name: name.to_owned(),
-            }
-            .into(),
-          );
-        }
+        stack.push(row.get_owned(*col_id)?);
       }
       instructions::Instruction::GetParameter { name } =>
       {
@@ -812,7 +804,7 @@ fn eval_instructions(
       {
         execute_binary_operator(stack, |a, b| a + b)?;
       }
-      &instructions::Instruction::SubstractionBinaryOperator =>
+      &instructions::Instruction::SubtractionBinaryOperator =>
       {
         execute_binary_operator(stack, |a, b| a - b)?;
       }
@@ -833,47 +825,19 @@ fn eval_instructions(
   Ok(())
 }
 
-trait HashMapExt
-{
-  fn noreplace_insert(&mut self, k: &String, v: graph::Value);
-  fn insert_none(&mut self, k: &Option<String>);
-}
-
-impl HashMapExt for HashMap<String, graph::Value>
-{
-  fn noreplace_insert(&mut self, k: &String, v: graph::Value)
-  {
-    if !self.contains_key(k)
-    {
-      self.insert(k.to_owned(), v);
-    }
-  }
-  fn insert_none(&mut self, k: &Option<String>)
-  {
-    if let Some(k) = k
-    {
-      let _ = self.noreplace_insert(k, graph::Value::Invalid.into());
-    }
-  }
-}
-
 pub(crate) fn eval_update_property<TStore: store::Store>(
   store: &TStore,
   mut tx: &mut TStore::Transaction,
   graph_name: &String,
   row: &mut value_table::Row,
-  target: &String,
+  target: value_table::ColId,
   path: &Vec<String>,
   instructions: &instructions::Instructions,
   parameters: &crate::graph::ValueObject,
   set: bool,
 ) -> Result<()>
 {
-  let var = row
-    .get(target)
-    .ok_or_else(|| crate::error::RunTimeError::UndefinedVariable {
-      name: target.to_owned(),
-    })?;
+  let var = row.get(target)?;
   let mut stack = Stack::default();
   eval_instructions(&mut stack, row, &instructions, &parameters)?;
   let value: graph::Value = stack.try_pop_into()?;
@@ -901,7 +865,7 @@ pub(crate) fn eval_update_property<TStore: store::Store>(
           .add_values(piter.next(), piter, value.try_into()?)?;
       }
       store.update_node(&mut tx, &graph_name, &n)?;
-      row.insert(target.to_owned(), n.into());
+      row.set(target, n.into())?;
     }
     graph::Value::Edge(e) =>
     {
@@ -917,7 +881,7 @@ pub(crate) fn eval_update_property<TStore: store::Store>(
           .add_values(piter.next(), piter, value.try_into()?)?;
       }
       store.update_edge(&mut tx, &graph_name, &e)?;
-      row.insert(target.to_owned(), e.into());
+      row.set(target, e.into())?;
     }
     graph::Value::Invalid =>
     {}
@@ -960,19 +924,20 @@ fn compute_order_by(
 }
 
 fn compute_return_with_table(
-  variables: &Vec<instructions::RWExpression>,
+  variables: Vec<&instructions::RWExpression>,
   filter: &instructions::Instructions,
   modifiers: &instructions::Modifiers,
-  input_table: value_table::ValueTable,
+  input_table: value_table::ValueTable<usize>,
   parameters: &crate::graph::ValueObject,
-) -> Result<value_table::ValueTable>
+  variables_sizes: &VariablesSizes,
+) -> Result<value_table::ValueTable<usize>>
 {
-  let mut output_table = value_table::ValueTable::new();
+  let mut output_table = value_table::ValueTable::new(variables_sizes.total_size());
   // Compute table
   if variables.iter().any(|v| v.aggregations.len() > 0)
   {
     // Initialise aggregation states
-    let mut aggregations_states: Vec<HashMap<String, Box<dyn aggregators::AggregatorState>>> =
+    let mut aggregations_states: Vec<HashMap<usize, Box<dyn aggregators::AggregatorState>>> =
       variables
         .iter()
         .map(|rw_expr| {
@@ -984,7 +949,7 @@ fn compute_return_with_table(
 
               eval_instructions(
                 &mut stack,
-                &Default::default(),
+                &value_table::Row::default(),
                 &agg.init_instructions,
                 parameters,
               )?;
@@ -1003,14 +968,15 @@ fn compute_return_with_table(
         .collect::<Result<Vec<_>>>()?;
 
     // Compute aggregations
-    for row in input_table.iter()
+    for row in input_table.row_iter()
     {
+      let row = row.to_extended_row(variables_sizes.total_size())?;
       for (rw_expr, aggregation_states) in variables.iter().zip(aggregations_states.iter_mut())
       {
         for (name, agg) in rw_expr.aggregations.iter()
         {
           let mut stack = Stack::default();
-          eval_instructions(&mut stack, row, &agg.argument_instructions, parameters)?;
+          eval_instructions(&mut stack, &row, &agg.argument_instructions, parameters)?;
           let value: graph::Value = stack.try_pop_into()?;
           aggregation_states
             .get_mut(name)
@@ -1020,51 +986,53 @@ fn compute_return_with_table(
       }
     }
     // Export the end result
-    let mut out_row = value_table::Row::new();
+    let mut out_row = value_table::Row::new(Default::default(), variables_sizes.total_size());
     for (rw_expr, aggregation_states) in variables.iter().zip(aggregations_states.into_iter())
     {
-      let mut in_row = input_table
-        .first_row()
-        .map_or_else(|| Default::default(), |m| m.to_owned());
+      let mut in_row = input_table.first_row().map_or_else(
+        || Ok(Row::new(Default::default(), variables_sizes.total_size())),
+        |m| m.to_row().extended(variables_sizes.total_size()),
+      )?;
       for (name, s) in aggregation_states.into_iter()
       {
-        in_row.insert(name, s.finalise()?);
+        in_row.set(name, s.finalise()?)?;
       }
       let mut stack = Stack::default();
       eval_instructions(&mut stack, &in_row, &rw_expr.instructions, &parameters)?;
       let value: graph::Value = stack.try_pop_into()?;
-      out_row.insert(rw_expr.name.to_owned(), value.to_owned());
+      out_row.set(rw_expr.col_id, value.to_owned())?;
     }
-    output_table.add_row(out_row);
+    output_table.add_truncated_row(out_row)?;
   }
   else
   {
     output_table = input_table
-      .into_iter()
-      .map(|mut row| {
+      .into_row_iter()
+      .map(|row| {
+        let mut out_row = row.extended(variables_sizes.total_size())?;
         for rw_expr in variables.iter()
         {
           assert_eq!(rw_expr.aggregations.len(), 0);
           let mut stack = Stack::default();
-          eval_instructions(&mut stack, &row, &rw_expr.instructions, &parameters)?;
+          eval_instructions(&mut stack, &out_row, &rw_expr.instructions, &parameters)?;
           let value: graph::Value = stack.try_pop_into()?;
-          row.insert(rw_expr.name.to_owned(), value.to_owned());
+          out_row.set(rw_expr.col_id, value.to_owned())?;
         }
-        Ok(row)
+        Ok(out_row)
       })
-      .collect::<Result<_>>()?;
+      .collect::<Result<Result<_>>>()??;
   }
   // Apply filter
   if !filter.is_empty()
   {
-    output_table = filter_rows(output_table.into_iter(), &filter, &parameters)?.into();
+    output_table = filter_rows(output_table.into_row_iter(), &filter, &parameters)?.try_into()?;
   }
   // Apply modifiers
   // Sort the table according to order_by
   if !modifiers.order_by.is_empty()
   {
     let mut table_key = output_table
-      .into_iter()
+      .into_row_iter()
       .map(|x| {
         let mut v = Vec::<(graph::Value, bool)>::new();
         for info in modifiers.order_by.iter()
@@ -1083,14 +1051,17 @@ fn compute_return_with_table(
         .find(|x| *x != std::cmp::Ordering::Equal)
         .unwrap_or(std::cmp::Ordering::Equal)
     });
-    output_table = table_key.into_iter().map(|(x, _)| x).collect();
+    output_table = table_key
+      .into_iter()
+      .map(|(x, _)| x)
+      .collect::<Result<_>>()?;
   }
 
   // Skip
   if let Some(skip) = &modifiers.skip
   {
     let mut stack = Stack::default();
-    eval_instructions(&mut stack, &Default::default(), &skip, &parameters)?;
+    eval_instructions(&mut stack, &value_table::Row::default(), &skip, &parameters)?;
     let q: i64 = stack
       .try_pop_into()
       .map_err(|_| RunTimeError::InvalidArgumentType)?;
@@ -1108,7 +1079,12 @@ fn compute_return_with_table(
   if let Some(limit) = &modifiers.limit
   {
     let mut stack = Stack::default();
-    eval_instructions(&mut stack, &Default::default(), &limit, &parameters)?;
+    eval_instructions(
+      &mut stack,
+      &value_table::Row::default(),
+      &limit,
+      &parameters,
+    )?;
     let q: i64 = stack
       .try_pop_into()
       .map_err(|_| RunTimeError::InvalidArgumentType)?;
@@ -1122,29 +1098,28 @@ fn compute_return_with_table(
     }
   }
 
-  // Filter output_table
-  let variables_names = variables.iter().map(|x| &x.name).collect::<Vec<_>>();
-  Ok(
-    output_table
-      .into_iter()
-      .map(|row| {
-        row
-          .into_iter()
-          .filter(|(x, _)| variables_names.contains(&x))
-          .collect()
-      })
-      .collect(),
-  )
+  output_table
+    .into_row_iter()
+    .map(|mut row| {
+      Ok(Row::new(
+        variables
+          .iter()
+          .map(|rw_expr| row.take(rw_expr.col_id))
+          .collect::<Result<_>>()?,
+        0,
+      ))
+    })
+    .map(|r| value_table::RowResult(r))
+    .collect()
 }
 
 fn filter_rows(
-  current_rows: impl IntoIterator<Item = HashMap<String, graph::Value>>,
+  current_rows: impl Iterator<Item = value_table::Row>,
   filter: &instructions::Instructions,
   parameters: &crate::graph::ValueObject,
-) -> Result<Vec<HashMap<String, graph::Value>>>
+) -> Result<Vec<value_table::Row>>
 {
   current_rows
-    .into_iter()
     .filter_map(|row| {
       let res: Result<bool> = (|| {
         let mut stack = Stack::default();
@@ -1173,13 +1148,13 @@ fn filter_rows(
 ///
 pub(crate) fn eval_program<TStore: store::Store>(
   store: &TStore,
-  program: super::Program,
+  program: &super::Program,
   parameters: crate::graph::ValueObject,
 ) -> crate::Result<crate::graph::Value>
 {
   let graph_name: String = "default".into();
-  let mut input_table = value_table::ValueTable::new();
-  input_table.add_row(value_table::Row::new());
+  let mut input_table = value_table::ValueTable::new(0);
+  input_table.add_full_row(value_table::Row::default())?;
   let mut tx = store.begin()?;
   let mut stack = Default::default();
   for block in program
@@ -1191,12 +1166,15 @@ pub(crate) fn eval_program<TStore: store::Store>(
     }
     match block
     {
-      instructions::Block::Create { actions } =>
+      instructions::Block::Create {
+        actions,
+        variables_size,
+      } =>
       {
-        let mut output_table = value_table::ValueTable::new();
-        for row in input_table.iter()
+        let mut output_table = value_table::ValueTable::new(variables_size.total_size());
+        for row in input_table.into_row_iter()
         {
-          let mut new_row = row.clone();
+          let mut new_row = row.extended(variables_size.total_size())?;
           for action in actions.iter()
           {
             eval_instructions(&mut stack, &new_row, &action.instructions, &parameters)?;
@@ -1212,7 +1190,7 @@ pub(crate) fn eval_program<TStore: store::Store>(
                   store.create_nodes(&mut tx, &graph_name, vec![n.to_owned()].iter())?;
                   if let Some(var) = var
                   {
-                    let _ = new_row.noreplace_insert(&var, crate::graph::Value::Node(n));
+                    new_row.set_if_unset(*var, crate::graph::Value::Node(n))?;
                   }
                 }
                 crate::graph::Value::Edge(e) =>
@@ -1220,7 +1198,7 @@ pub(crate) fn eval_program<TStore: store::Store>(
                   store.create_edges(&mut tx, &graph_name, vec![e.to_owned()].iter())?;
                   if let Some(var) = var
                   {
-                    new_row.insert(var.to_owned(), crate::graph::Value::Edge(e));
+                    new_row.set(*var, crate::graph::Value::Edge(e))?;
                   }
                 }
                 _ =>
@@ -1230,7 +1208,7 @@ pub(crate) fn eval_program<TStore: store::Store>(
               }
             }
           }
-          output_table.add_row(new_row);
+          output_table.add_truncated_row(new_row)?;
         }
         input_table = output_table;
       }
@@ -1238,15 +1216,16 @@ pub(crate) fn eval_program<TStore: store::Store>(
         blocks,
         filter,
         optional,
+        variables_size,
       } =>
       {
-        let mut output_table = value_table::ValueTable::new();
-        for row in input_table.into_iter()
+        let mut output_table = value_table::ValueTable::new(variables_size.persistent_variables);
+        for row in input_table.into_row_iter()
         {
-          let mut current_rows: Vec<HashMap<String, graph::Value>> = vec![row.clone()];
+          let mut current_rows: Vec<_> = vec![row.clone().extended(variables_size.total_size())?];
           for block in blocks.iter()
           {
-            let mut new_rows = Vec::<HashMap<String, graph::Value>>::default();
+            let mut new_rows = Vec::<value_table::Row>::default();
             for row in current_rows
             {
               match block
@@ -1268,7 +1247,7 @@ pub(crate) fn eval_program<TStore: store::Store>(
                     {
                       Some(variable) =>
                       {
-                        new_row.noreplace_insert(&variable, node.to_owned().into());
+                        new_row.set_if_unset(*variable, node.to_owned().into())?;
                       }
                       None =>
                       {}
@@ -1312,7 +1291,7 @@ pub(crate) fn eval_program<TStore: store::Store>(
                     let mut new_row = row.clone();
                     if let Some(left_variable) = left_variable.to_owned()
                     {
-                      new_row.insert(
+                      new_row.set(
                         left_variable,
                         if edge.reversed
                         {
@@ -1323,11 +1302,11 @@ pub(crate) fn eval_program<TStore: store::Store>(
                           edge.edge.source.to_owned()
                         }
                         .into(),
-                      );
+                      )?;
                     }
                     if let Some(right_variable) = right_variable.to_owned()
                     {
-                      new_row.insert(
+                      new_row.set(
                         right_variable,
                         if edge.reversed
                         {
@@ -1338,18 +1317,18 @@ pub(crate) fn eval_program<TStore: store::Store>(
                           edge.edge.destination.to_owned()
                         }
                         .into(),
-                      );
+                      )?;
                     }
                     if let Some(edge_variable) = edge_variable.to_owned()
                     {
-                      new_row.insert(edge_variable, edge.edge.to_owned().into());
+                      new_row.set(edge_variable, edge.edge.to_owned().into())?;
                     }
                     if let Some(path_variable) = path_variable.to_owned()
                     {
-                      new_row.insert(
+                      new_row.set(
                         path_variable,
                         crate::graph::Value::Path(edge.edge.to_owned().into()),
-                      );
+                      )?;
                     }
                     let should_add_row = if filter.is_empty()
                     {
@@ -1376,39 +1355,15 @@ pub(crate) fn eval_program<TStore: store::Store>(
           }
           if !filter.is_empty()
           {
-            current_rows = filter_rows(current_rows, &filter, &parameters)?;
+            current_rows = filter_rows(current_rows.into_iter(), &filter, &parameters)?;
           }
-          if current_rows.is_empty() && optional
+          if current_rows.is_empty() && *optional
           {
-            let mut new_row = row;
-            for block in blocks.iter()
-            {
-              match block
-              {
-                instructions::BlockMatch::MatchNode { variable, .. } =>
-                {
-                  new_row.insert_none(&variable);
-                }
-                instructions::BlockMatch::MatchEdge {
-                  left_variable,
-                  edge_variable,
-                  right_variable,
-                  path_variable,
-                  ..
-                } =>
-                {
-                  new_row.insert_none(left_variable);
-                  new_row.insert_none(edge_variable);
-                  new_row.insert_none(right_variable);
-                  new_row.insert_none(path_variable);
-                }
-              }
-            }
-            output_table.add_row(new_row);
+            output_table.add_truncated_row(row.extended(variables_size.persistent_variables)?)?;
           }
           else
           {
-            output_table.add_rows(&mut current_rows);
+            output_table.add_truncated_rows(current_rows)?;
           }
         }
         input_table = output_table;
@@ -1417,49 +1372,60 @@ pub(crate) fn eval_program<TStore: store::Store>(
         variables,
         filter,
         modifiers,
+        variables_size,
       } =>
       {
-        let output_table =
-          compute_return_with_table(&variables, &filter, &modifiers, input_table, &parameters)?;
+        let (names, variables): (Vec<_>, Vec<_>) =
+          variables.into_iter().map(|(s, e)| (s, e)).unzip();
+        let output_table = compute_return_with_table(
+          variables,
+          &filter,
+          &modifiers,
+          input_table,
+          &parameters,
+          &variables_size,
+        )?;
         let mut r = Vec::<crate::graph::Value>::new();
         r.push(crate::graph::Value::Array(
-          variables
-            .iter()
-            .map(|rw_expr| crate::graph::Value::String(rw_expr.name.to_owned()))
+          names
+            .into_iter()
+            .map(|name| crate::graph::Value::String(name.to_owned()))
             .collect(),
         ));
-        for row in output_table.iter()
+        for row in output_table.into_row_iter()
         {
-          r.push(crate::graph::Value::Array(
-            variables
-              .iter()
-              .map(|rw_expr| match row.get(&rw_expr.name)
-              {
-                Some(v) => v.to_owned(),
-                None => crate::graph::Value::Invalid,
-              })
-              .collect(),
-          ));
+          r.push(row.into());
         }
         store.commit(tx)?;
-        return Ok(crate::graph::Value::Array(r));
+        return Ok(r.into());
       }
       instructions::Block::With {
         variables,
         filter,
         modifiers,
+        variables_size,
       } =>
       {
-        input_table =
-          compute_return_with_table(&variables, &filter, &modifiers, input_table, &parameters)?;
+        input_table = compute_return_with_table(
+          variables.iter().collect(),
+          &filter,
+          &modifiers,
+          input_table,
+          &parameters,
+          &variables_size,
+        )?;
       }
-      instructions::Block::Unwind { name, instructions } =>
+      instructions::Block::Unwind {
+        col_id,
+        instructions,
+        variables_size,
+      } =>
       {
-        let mut output_table = value_table::ValueTable::new();
-        for row in input_table.iter()
+        let mut output_table = value_table::ValueTable::new(variables_size.persistent_variables);
+        for row in input_table.into_row_iter()
         {
           let mut stack = Stack::default();
-          eval_instructions(&mut stack, row, &instructions, &parameters)?;
+          eval_instructions(&mut stack, &row, &instructions, &parameters)?;
           let value = stack.try_pop_into()?;
           match value
           {
@@ -1467,18 +1433,18 @@ pub(crate) fn eval_program<TStore: store::Store>(
             {
               for v in arr.into_iter()
               {
-                let mut out_row = row.clone();
-                out_row.insert(name.to_owned(), v);
-                output_table.add_row(out_row);
+                let mut out_row = row.clone().extended(variables_size.total_size())?;
+                out_row.set(*col_id, v)?;
+                output_table.add_truncated_row(out_row)?;
               }
             }
             graph::Value::Invalid =>
             {}
             _ =>
             {
-              let mut out_row = row.clone();
-              out_row.insert(name.to_owned(), value);
-              output_table.add_row(out_row);
+              let mut out_row = row.extended(variables_size.total_size())?;
+              out_row.set(*col_id, value)?;
+              output_table.add_truncated_row(out_row)?;
             }
           }
         }
@@ -1491,12 +1457,12 @@ pub(crate) fn eval_program<TStore: store::Store>(
       {
         let mut nodes_keys = Vec::<graph::Key>::new();
         let mut edges_keys = Vec::<graph::Key>::new();
-        for row in input_table.iter()
+        for row in input_table.row_iter()
         {
           for instructions in instructions.iter()
           {
             let mut stack = Stack::default();
-            eval_instructions(&mut stack, row, &instructions, &parameters)?;
+            eval_instructions(&mut stack, &row, &instructions, &parameters)?;
             let value: graph::Value = stack.try_pop_into()?;
             match value
             {
@@ -1519,15 +1485,18 @@ pub(crate) fn eval_program<TStore: store::Store>(
           &mut tx,
           &graph_name,
           store::SelectNodeQuery::select_keys(nodes_keys),
-          detach,
+          *detach,
         )?;
       }
-      instructions::Block::Update { updates } =>
+      instructions::Block::Update {
+        updates,
+        variables_size,
+      } =>
       {
-        let mut output_table = value_table::ValueTable::new();
-        for row in input_table.iter()
+        let mut output_table = value_table::ValueTable::new(variables_size.persistent_variables);
+        for row in input_table.into_row_iter()
         {
-          let mut out_row = row.clone();
+          let mut out_row = row.extended(variables_size.total_size())?;
           for update in updates.iter()
           {
             match update
@@ -1543,7 +1512,7 @@ pub(crate) fn eval_program<TStore: store::Store>(
                   &mut tx,
                   &graph_name,
                   &mut out_row,
-                  target,
+                  *target,
                   path,
                   instructions,
                   &parameters,
@@ -1561,7 +1530,7 @@ pub(crate) fn eval_program<TStore: store::Store>(
                   &mut tx,
                   &graph_name,
                   &mut out_row,
-                  target,
+                  *target,
                   path,
                   instructions,
                   &parameters,
@@ -1570,11 +1539,7 @@ pub(crate) fn eval_program<TStore: store::Store>(
               }
               instructions::UpdateOne::RemoveProperty { target, path } =>
               {
-                let var = out_row.get(target).ok_or_else(|| {
-                  crate::error::RunTimeError::UndefinedVariable {
-                    name: target.to_owned(),
-                  }
-                })?;
+                let var = out_row.get(*target)?;
                 use crate::graph::ValueObjectExtension;
                 let mut piter = path.iter();
                 match var
@@ -1584,14 +1549,14 @@ pub(crate) fn eval_program<TStore: store::Store>(
                     let mut n = n.to_owned();
                     n.properties.remove_value(piter.next(), piter)?;
                     store.update_node(&mut tx, &graph_name, &n)?;
-                    out_row.insert(target.to_owned(), n.into());
+                    out_row.set(*target, n.into())?;
                   }
                   graph::Value::Edge(e) =>
                   {
                     let mut e = e.to_owned();
                     e.properties.remove_value(piter.next(), piter)?;
                     store.update_edge(&mut tx, &graph_name, &e)?;
-                    out_row.insert(target.to_owned(), e.into());
+                    out_row.set(*target, e.into())?;
                   }
                   graph::Value::Invalid =>
                   {}
@@ -1612,11 +1577,7 @@ pub(crate) fn eval_program<TStore: store::Store>(
                   })?,
                 };
 
-                let var = out_row.get(target).ok_or_else(|| {
-                  crate::error::RunTimeError::UndefinedVariable {
-                    name: target.to_owned(),
-                  }
-                })?;
+                let var = out_row.get(*target)?;
                 match var
                 {
                   graph::Value::Node(n) =>
@@ -1635,7 +1596,7 @@ pub(crate) fn eval_program<TStore: store::Store>(
                         .collect();
                     }
                     store.update_node(&mut tx, &graph_name, &n)?;
-                    out_row.insert(target.to_owned(), n.into());
+                    out_row.set(*target, n.into())?;
                   }
                   graph::Value::Edge(e) =>
                   {
@@ -1653,7 +1614,7 @@ pub(crate) fn eval_program<TStore: store::Store>(
                         .collect();
                     }
                     store.update_edge(&mut tx, &graph_name, &e)?;
-                    out_row.insert(target.to_owned(), e.into());
+                    out_row.set(*target, e.into())?;
                   }
                   graph::Value::Invalid =>
                   {}
@@ -1664,7 +1625,7 @@ pub(crate) fn eval_program<TStore: store::Store>(
               }
             }
           }
-          output_table.add_row(out_row);
+          output_table.add_truncated_row(out_row)?;
         }
         input_table = output_table;
       }

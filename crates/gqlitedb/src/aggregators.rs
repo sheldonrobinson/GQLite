@@ -5,7 +5,7 @@ mod count;
 use std::fmt::Debug;
 
 use crate::prelude::*;
-use interpreter::expression_analyser::ExpressionType;
+use compiler::expression_analyser::ExpressionType;
 
 pub(crate) trait AggregatorState: Debug
 {
@@ -45,8 +45,8 @@ macro_rules! declare_aggregator {
       #[allow(unused_variables)]
       fn validate_arguments(
         &self,
-        arguments: Vec<crate::interpreter::expression_analyser::ExpressionType>,
-      ) -> Result<crate::interpreter::expression_analyser::ExpressionType>
+        arguments: Vec<$crate::compiler::expression_analyser::ExpressionType>,
+      ) -> Result<$crate::compiler::expression_analyser::ExpressionType>
       {
         use crate::functions::FunctionTypeTrait;
         // TODO

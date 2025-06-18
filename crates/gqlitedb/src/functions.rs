@@ -1,19 +1,18 @@
 use std::{collections::HashMap, fmt::Debug};
 
-use crate::{aggregators, error, graph, Result};
-
 mod containers;
 mod edge;
 mod math;
 mod node;
 mod path;
 mod scalar;
-mod value;
 mod string;
+mod value;
 
 pub(crate) type FResult<T> = std::result::Result<T, error::RunTimeError>;
 
-use crate::interpreter::expression_analyser::ExpressionType;
+use crate::prelude::*;
+use compiler::expression_analyser::ExpressionType;
 
 pub(crate) trait FunctionTypeTrait
 {
@@ -263,8 +262,8 @@ macro_rules! count_patterns {
 #[rustfmt::skip]
 macro_rules! default_validate_ {
   ($function_name: ident, $ret_type: ty) => {
-    |_: Vec<crate::interpreter::expression_analyser::ExpressionType>|
-      -> crate::Result<crate::interpreter::expression_analyser::ExpressionType>
+    |_: Vec<$crate::compiler::expression_analyser::ExpressionType>|
+      -> crate::Result<$crate::compiler::expression_analyser::ExpressionType>
     {
       // TODO
       Ok(<$ret_type>::result_type())
@@ -275,8 +274,8 @@ macro_rules! default_validate_ {
 #[rustfmt::skip]
 macro_rules! validate_args_ {
   ($function_name: ident, $ret_type: ty, $( $expression_type: pat ),* ) => {
-    |args: Vec<crate::interpreter::expression_analyser::ExpressionType>|
-      -> crate::Result<crate::interpreter::expression_analyser::ExpressionType>
+    |args: Vec<$crate::compiler::expression_analyser::ExpressionType>|
+      -> crate::Result<$crate::compiler::expression_analyser::ExpressionType>
     {
       const ARG_COUNT: usize = $crate::functions::count_patterns!($( $expression_type,)*); 
       if args.len() != ARG_COUNT
@@ -337,8 +336,8 @@ macro_rules! declare_function_ {
       }
       fn validate_arguments(
         &self,
-        args: Vec<crate::interpreter::expression_analyser::ExpressionType>,
-      ) -> crate::Result<crate::interpreter::expression_analyser::ExpressionType>
+        args: Vec<$crate::compiler::expression_analyser::ExpressionType>,
+      ) -> crate::Result<$crate::compiler::expression_analyser::ExpressionType>
       {
         let val_fn = $validator;
         val_fn(args)

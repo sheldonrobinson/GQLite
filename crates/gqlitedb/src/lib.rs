@@ -9,6 +9,7 @@
 mod aggregators;
 #[cfg(feature = "capi")]
 mod capi;
+mod compiler;
 mod connection;
 mod consts;
 mod error;
@@ -21,6 +22,9 @@ mod serialize_with;
 mod store;
 mod value;
 mod value_table;
+
+#[cfg(test)]
+pub(crate) mod tests;
 
 /// GQLite error
 pub type Error = error::Error;
@@ -36,26 +40,3 @@ pub type Value = graph::Value;
 
 /// GQLite ValueObject
 pub type ValueObject = graph::ValueObject;
-
-#[cfg(test)]
-pub(crate) mod tests
-{
-  use rand::Rng;
-  pub(crate) fn get_tmp_file() -> Result<std::path::PathBuf, std::io::Error>
-  {
-    let mut rng = rand::rng();
-    loop
-    {
-      let rand: u32 = rng.random();
-      let path = std::path::PathBuf::from(format!(
-        "{}/tmp_gqlite_{}",
-        std::env::temp_dir().to_str().unwrap(),
-        rand
-      ));
-      if !path.exists()
-      {
-        return Ok(path);
-      }
-    }
-  }
-}

@@ -161,8 +161,8 @@ fn build_expression(
         }
         .into(),
       ),
-      Rule::substraction => Ok(
-        ast::Substraction {
+      Rule::subtraction => Ok(
+        ast::Subtraction {
           left: lhs?,
           right: rhs?,
         }
@@ -406,13 +406,11 @@ fn build_map(
   match pair.as_rule()
   {
     Rule::map => Ok(ast::Expression::Map({
-      let mut map = std::collections::HashMap::new();
-      for k_v_pair in pair.into_inner()
-      {
-        let (k, v) = build_pair(k_v_pair, pratt)?;
-        map.insert(k, v);
-      }
-      ast::Map { map: map }
+      let map = pair
+        .into_inner()
+        .map(|k_v_pair| build_pair(k_v_pair, pratt))
+        .collect::<Result<_>>()?;
+      ast::Map { map }
     })),
     unknown_expression => Err(crate::Error::UnxpectedExpression(
       "build_map",
@@ -1044,7 +1042,7 @@ pub(crate) fn parse(input: &str) -> Result<ast::Statements>
         | Op::infix(Rule::superior_equal, Assoc::Left),
     )
     .op(Op::infix(Rule::not_in, Assoc::Left) | Op::infix(Rule::in_, Assoc::Left))
-    .op(Op::infix(Rule::addition, Assoc::Left) | Op::infix(Rule::substraction, Assoc::Left))
+    .op(Op::infix(Rule::addition, Assoc::Left) | Op::infix(Rule::subtraction, Assoc::Left))
     .op(
       Op::infix(Rule::multiplication, Assoc::Left)
         | Op::infix(Rule::division, Assoc::Left)

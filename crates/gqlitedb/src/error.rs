@@ -81,12 +81,6 @@ pub enum CompileTimeError
 #[derive(thiserror::Error, Debug)]
 pub enum RunTimeError
 {
-  /// Variable is not defined
-  #[error("UndefinedVariable: Unknown variable '{name}'.")]
-  UndefinedVariable
-  {
-    name: String
-  },
   /// Parameter is not known
   #[error("UnknownParameter: Unknown parameter '{name}'.")]
   UnknownParameter
@@ -215,6 +209,34 @@ pub enum InternalError
   {
     context: &'static str
   },
+  #[error("Invalid number of columns in row {actual} but expected {expected}.")]
+  InvalidNumberColumns
+  {
+    actual: usize, expected: usize
+  },
+  #[error("Unknown variable '{name}'.")]
+  UnknownVariable
+  {
+    name: String
+  },
+  #[error("Invalid index {index} access of a vector of length {length}.")]
+  InvalidIndex
+  {
+    index: usize, length: usize
+  },
+  #[error("Invalid row length got {got} expected {expected}.")]
+  InvalidRowLength
+  {
+    got: usize, expected: usize
+  },
+  #[error("Some variables were declared, but not set. Set variables are {set_variables:?}, all variables are {all_variables:?}")]
+  NotAllVariablesAreSet
+  {
+    set_variables: Vec<String>,
+    all_variables: Vec<String>,
+  },
+  #[error("A generic error occured {0}.")]
+  GenericStdError(#[from] Box<dyn std::error::Error>),
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -299,6 +321,8 @@ pub enum Error
   InternalError(&'static str),
   #[error("Unimplemented error at {0}")]
   Unimplemented(&'static str),
+  #[error("Infallible.")]
+  Infallible(#[from] Infallible),
 }
 
 #[allow(dead_code)]
@@ -391,5 +415,7 @@ macro_rules! map_error {
     }
   }};
 }
+
+use std::convert::Infallible;
 
 pub(crate) use map_error;

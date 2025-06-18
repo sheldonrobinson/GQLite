@@ -1,6 +1,4 @@
-use std::collections::HashMap;
-
-use crate::{aggregators, functions, graph};
+use crate::{prelude::*, value_table::ColId};
 
 #[derive(Debug)]
 pub(crate) enum Instruction
@@ -28,11 +26,11 @@ pub(crate) enum Instruction
   },
   Push
   {
-    value: crate::graph::Value,
+    value: graph::Value,
   },
   GetVariable
   {
-    name: String,
+    col_id: value_table::ColId,
   },
   GetParameter
   {
@@ -76,7 +74,7 @@ pub(crate) enum Instruction
   InBinaryOperator,
   NotInBinaryOperator,
   AdditionBinaryOperator,
-  SubstractionBinaryOperator,
+  SubtractionBinaryOperator,
   MultiplicationBinaryOperator,
   DivisionBinaryOperator,
   ModuloBinaryOperator,
@@ -88,7 +86,7 @@ pub(crate) type Instructions = Vec<Instruction>;
 pub(crate) struct CreateAction
 {
   pub(crate) instructions: Instructions,
-  pub(crate) variables: Vec<Option<String>>,
+  pub(crate) variables: Vec<Option<ColId>>,
 }
 
 #[derive(Debug)]
@@ -97,16 +95,16 @@ pub(crate) enum BlockMatch
   MatchNode
   {
     instructions: Instructions,
-    variable: Option<String>,
+    variable: Option<ColId>,
     filter: Instructions,
   },
   MatchEdge
   {
     instructions: Instructions,
-    left_variable: Option<String>,
-    edge_variable: Option<String>,
-    right_variable: Option<String>,
-    path_variable: Option<String>,
+    left_variable: Option<ColId>,
+    edge_variable: Option<ColId>,
+    right_variable: Option<ColId>,
+    path_variable: Option<ColId>,
     filter: Instructions,
     directivity: graph::EdgeDirectivity,
   },
@@ -120,40 +118,53 @@ pub(crate) struct RWAggregation
   pub(crate) aggregator: aggregators::Aggregator,
 }
 
+/// R(eturn)W(ith)Expression are expressions computed in Return or With blocks.
 #[derive(Debug)]
 pub(crate) struct RWExpression
 {
-  pub(crate) name: String,
+  /// Id of the column where to get the value from
+  pub(crate) col_id: ColId,
+  /// Instructions to compute this expression
   pub(crate) instructions: Instructions,
-  pub(crate) aggregations: HashMap<String, RWAggregation>,
+  /// Potential aggregations used by this expression
+  pub(crate) aggregations: Vec<(value_table::ColId, RWAggregation)>,
 }
 
+/// Update one node/edge.
 #[derive(Debug)]
 pub(crate) enum UpdateOne
 {
   SetProperty
   {
-    target: String,
+    /// Target is the column containing the node/edge to modify
+    target: ColId,
     path: Vec<String>,
     instructions: Instructions,
   },
   AddProperty
   {
-    target: String,
+    /// Target is the column containing the node/edge to modify
+    target: ColId,
     path: Vec<String>,
     instructions: Instructions,
   },
   RemoveProperty
   {
-    target: String, path: Vec<String>
+    /// Target is the column containing the node/edge to modify
+    target: ColId,
+    path: Vec<String>,
   },
   AddLabels
   {
-    target: String, labels: Vec<String>
+    /// Target is the column containing the node/edge to modify
+    target: ColId,
+    labels: Vec<String>,
   },
   RemoveLabels
   {
-    target: String, labels: Vec<String>
+    /// Target is the column containing the node/edge to modify
+    target: ColId,
+    labels: Vec<String>,
   },
 }
 
@@ -173,23 +184,44 @@ pub(crate) struct Modifiers
 }
 
 #[derive(Debug)]
+pub(crate) struct VariablesSizes
+{
+  /// How many variables are persistent, after the block has been executed.
+  pub persistent_variables: usize,
+  /// How many temporary variables are used by the block.
+  pub temporary_variables: usize,
+}
+
+impl VariablesSizes
+{
+  /// Return the total size, `persistent+temporary` variables
+  pub(crate) fn total_size(&self) -> usize
+  {
+    self.temporary_variables + self.persistent_variables
+  }
+}
+
+#[derive(Debug)]
 pub(crate) enum Block
 {
   Create
   {
-    actions: Vec<CreateAction>
+    actions: Vec<CreateAction>,
+    variables_size: VariablesSizes,
   },
   BlockMatch
   {
     blocks: Vec<BlockMatch>,
     filter: Instructions,
     optional: bool,
+    variables_size: VariablesSizes,
   },
   Return
   {
-    variables: Vec<RWExpression>,
+    variables: Vec<(String, RWExpression)>,
     filter: Instructions,
     modifiers: Modifiers,
+    variables_size: VariablesSizes,
   },
   Call
   {
@@ -201,11 +233,13 @@ pub(crate) enum Block
     variables: Vec<RWExpression>,
     filter: Instructions,
     modifiers: Modifiers,
+    variables_size: VariablesSizes,
   },
   Unwind
   {
-    name: String,
+    col_id: ColId,
     instructions: Instructions,
+    variables_size: VariablesSizes,
   },
   Delete
   {
@@ -214,6 +248,7 @@ pub(crate) enum Block
   },
   Update
   {
-    updates: Vec<UpdateOne>
+    updates: Vec<UpdateOne>,
+    variables_size: VariablesSizes,
   },
 }
