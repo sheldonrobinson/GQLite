@@ -215,6 +215,21 @@ pub enum InternalError
   {
     context: &'static str
   },
+  #[error("Invalid number of columns in row {actual} but expected {expected}.")]
+  InvalidNumberColumns
+  {
+    actual: usize, expected: usize
+  },
+  #[error("Unknown variable '{name}'.")]
+  UnknownVariable
+  {
+    name: String
+  },
+  #[error("Invalid index {index} access of a vector of length {length}.")]
+  InvalidIndex
+  {
+    index: usize, length: usize
+  },
 }
 
 #[derive(thiserror::Error, Debug)]

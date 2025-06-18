@@ -178,7 +178,7 @@ pub(crate) enum Expression
   RelationalNotIn(Box<RelationalNotIn>),
 
   Addition(Box<Addition>),
-  Substraction(Box<Substraction>),
+  Subtraction(Box<Subtraction>),
   Multiplication(Box<Multiplication>),
   Division(Box<Division>),
   Modulo(Box<Modulo>),
@@ -459,7 +459,7 @@ create_binary_op! {RelationalIn}
 create_binary_op! {RelationalNotIn}
 
 create_binary_op! {Addition}
-create_binary_op! {Substraction}
+create_binary_op! {Subtraction}
 create_binary_op! {Multiplication}
 create_binary_op! {Division}
 create_binary_op! {Modulo}

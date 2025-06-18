@@ -409,7 +409,7 @@ impl ExpressionInfo
           validators::any,
         )?,
       )),
-      ast::Expression::Substraction(ri) => Ok(Self::new_type(
+      ast::Expression::Subtraction(ri) => Ok(Self::new_type(
         ExpressionType::Variant,
         Self::analyses(
           variables,
