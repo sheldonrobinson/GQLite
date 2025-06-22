@@ -1,25 +1,9 @@
 use std::collections::HashMap;
 
-use crate::error::{CompileTimeError, InternalError};
-use crate::interpreter::expression_analyser::{ExpressionInfo, ExpressionType};
-use crate::parser::ast;
-use crate::{functions, Result};
+use crate::prelude::*;
 
-impl crate::interpreter::expression_analyser::Variables for HashMap<String, Variable>
-{
-  fn expression_type(&self, name: impl Into<String>) -> Result<ExpressionType>
-  {
-    let name = name.into();
-    Ok(
-      self
-        .get(&name)
-        .ok_or_else(|| CompileTimeError::UndefinedVariable {
-          name: name.to_owned(),
-        })?
-        .variable_type,
-    )
-  }
-}
+use compiler::expression_analyser::{ExpressionInfo, ExpressionType};
+use parser::ast;
 
 // __     __         _       _     _
 // \ \   / /_ _ _ __(_) __ _| |__ | | ___
@@ -40,33 +24,28 @@ pub(crate) struct Variable
 {
   content: VariableContent,
   variable_type: ExpressionType,
+  col_id: value_table::ColId,
 }
 
-impl From<ast::NodePattern> for Variable
+impl Variable
 {
-  fn from(value: ast::NodePattern) -> Self
+  fn from_node(value: ast::NodePattern, col_id: value_table::ColId) -> Self
   {
     Self {
       content: VariableContent::Node(value),
       variable_type: ExpressionType::Node,
+      col_id,
     }
   }
-}
-
-impl From<ast::EdgePattern> for Variable
-{
-  fn from(value: ast::EdgePattern) -> Self
+  fn from_edge(value: ast::EdgePattern, col_id: value_table::ColId) -> Self
   {
     Self {
       content: VariableContent::Edge(value),
       variable_type: ExpressionType::Edge,
+      col_id,
     }
   }
-}
-
-impl From<ExpressionType> for Variable
-{
-  fn from(value: ExpressionType) -> Self
+  fn from_expression(value: ExpressionType, col_id: value_table::ColId) -> Self
   {
     match value
     {
@@ -88,6 +67,7 @@ impl From<ExpressionType> for Variable
           directivity: crate::graph::EdgeDirectivity::Directed,
         }),
         variable_type: ExpressionType::Edge,
+        col_id,
       },
       ExpressionType::Node => Self {
         content: VariableContent::Node(ast::NodePattern {
@@ -96,12 +76,18 @@ impl From<ExpressionType> for Variable
           properties: None,
         }),
         variable_type: ExpressionType::Node,
+        col_id,
       },
       variable_type => Self {
         content: VariableContent::None,
         variable_type,
+        col_id,
       },
     }
+  }
+  pub(crate) fn col_id(&self) -> value_table::ColId
+  {
+    self.col_id
   }
 }
 
@@ -112,32 +98,55 @@ impl From<ExpressionType> for Variable
 //    \_/ \__,_|_|_|\__,_|\__,_|\__\___/|_|
 
 #[derive(Debug)]
-pub(crate) struct Validator
+pub(crate) struct VariablesManager
 {
   variables: HashMap<String, Variable>,
   function_manager: functions::Manager,
 }
 
-impl Validator
+impl VariablesManager
 {
-  pub(crate) fn new(function_manager: functions::Manager) -> Self
+  pub(crate) fn new(function_manager: &functions::Manager) -> Self
   {
     Self {
       variables: Default::default(),
-      function_manager,
+      function_manager: function_manager.clone(),
     }
   }
-  pub(crate) fn to_variables(&self) -> HashMap<String, Variable>
+
+  /// Get the index of the variable in the row of variables
+  pub(crate) fn get_variable_index(&self, identifier: &String) -> Result<usize>
   {
-    self.variables.to_owned()
+    self
+      .variables
+      .get(identifier)
+      .ok_or_else(|| {
+        InternalError::UnknownVariable {
+          name: identifier.clone(),
+        }
+        .into()
+      })
+      .map(|x| x.col_id)
   }
-  pub(crate) fn variables_ref(&self) -> &HashMap<String, Variable>
+  /// Get the index of the variable in the row of variables
+  pub(crate) fn get_variable_index_option(
+    &self,
+    identifier: &Option<String>,
+  ) -> Result<Option<usize>>
   {
-    &self.variables
+    match identifier
+    {
+      Some(identifier) => Ok(Some(self.get_variable_index(identifier)?)),
+      None => Ok(None),
+    }
   }
-  pub(crate) fn set_variables(&mut self, variables: HashMap<String, Variable>)
+  pub(crate) fn variables_count(&self) -> usize
   {
-    self.variables = variables;
+    self.variables.len()
+  }
+  pub(crate) fn variables_iter(&self) -> std::collections::hash_map::Iter<'_, String, Variable>
+  {
+    self.variables.iter()
   }
   pub(crate) fn declare_variable(
     &mut self,
@@ -157,7 +166,10 @@ impl Validator
     }
     else
     {
-      self.variables.insert(variable, expression_type.into());
+      self.variables.insert(
+        variable,
+        Variable::from_expression(expression_type, self.variables.len()),
+      );
       Ok(())
     }
   }
@@ -209,11 +221,12 @@ impl Validator
       {
         if let Some(props) = &node.properties
         {
-          ExpressionInfo::analyse(&self.variables, &self.function_manager, &props)?;
+          ExpressionInfo::analyse(&self, &self.function_manager, &props)?;
         }
-        self
-          .variables
-          .insert(var_name.to_owned(), (*node).to_owned().into());
+        self.variables.insert(
+          var_name.to_owned(),
+          Variable::from_node((*node).to_owned(), self.variables.len()),
+        );
         Ok(())
       }
     }
@@ -250,11 +263,12 @@ impl Validator
       {
         if let Some(props) = &edge.properties
         {
-          ExpressionInfo::analyse(&self.variables, &self.function_manager, &props)?;
+          ExpressionInfo::analyse(self, &self.function_manager, &props)?;
         }
-        self
-          .variables
-          .insert(var_name.to_owned(), (*edge).to_owned().into());
+        self.variables.insert(
+          var_name.to_owned(),
+          Variable::from_edge((*edge).to_owned(), self.variables.len()),
+        );
         Ok(())
       }
     }
@@ -373,27 +387,18 @@ impl Validator
       Ok(false)
     }
   }
-  pub(crate) fn check_unexisting_variable(&self, var_name: &Option<String>) -> Result<()>
+
+  pub(crate) fn expression_type(&self, name: impl Into<String>) -> Result<ExpressionType>
   {
-    if let Some(var_name) = &var_name
-    {
-      if self.variables.contains_key(var_name)
-      {
-        Err(
-          CompileTimeError::VariableAlreadyBound {
-            name: var_name.to_owned(),
-          }
-          .into(),
-        )
-      }
-      else
-      {
-        Ok(())
-      }
-    }
-    else
-    {
-      Ok(())
-    }
+    let name = name.into();
+    Ok(
+      self
+        .variables
+        .get(&name)
+        .ok_or_else(|| CompileTimeError::UndefinedVariable {
+          name: name.to_owned(),
+        })?
+        .variable_type,
+    )
   }
 }

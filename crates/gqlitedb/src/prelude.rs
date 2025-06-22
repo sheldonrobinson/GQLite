@@ -1,5 +1,5 @@
 pub(crate) use crate::{
-  aggregators,
+  aggregators, compiler,
   error::{self, CompileTimeError, InternalError, RunTimeError},
-  functions, graph, interpreter, store, value, value_table, Error, Result,
+  functions, graph, interpreter, parser, store, value, value_table, Error, Result,
 };

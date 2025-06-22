@@ -1,13 +1,28 @@
+use std::fmt::Debug;
+
 use crate::prelude::*;
 
 pub(crate) type ColId = usize;
 
-pub(crate) trait RowInterface
+pub(crate) trait RowInterface: Debug
 {
-  fn set(&mut self, index: usize, value: graph::Value) -> Result<()>;
   fn get(&self, index: usize) -> Result<&graph::Value>;
+  fn get_owned(&self, index: usize) -> Result<graph::Value>
+  {
+    Ok(self.get(index)?.to_owned())
+  }
+  fn len(&self) -> usize;
 }
 
+pub(crate) trait MutableRowInterface: RowInterface
+{
+  /// Set the value.
+  fn set(&mut self, index: usize, value: graph::Value) -> Result<()>;
+  /// Set the value, if it is not set.
+  fn set_if_unset(&mut self, index: usize, value: graph::Value) -> Result<()>;
+}
+
+#[derive(Debug, Default, Clone)]
 pub(crate) struct Row
 {
   values: Vec<graph::Value>,
@@ -17,10 +32,48 @@ impl Row
 {
   /// Creates a new Row from an initial vector and a total size.
   /// If `extra_size` > initial.len(), it will fill with default values.
-  pub fn new(mut values: Vec<graph::Value>, extra_size: usize) -> Self
+  pub(crate) fn new(mut values: Vec<graph::Value>, extra_size: usize) -> Self
   {
     values.resize(extra_size + values.len(), Default::default());
     Row { values }
+  }
+  pub(crate) fn len(&self) -> usize
+  {
+    self.values.len()
+  }
+  /// Extend the row to the targeted size
+  pub(crate) fn extended(self, target_size: usize) -> Result<Self>
+  {
+    let values_len = self.values.len();
+    if target_size < values_len
+    {
+      Err(
+        error::InternalError::InvalidRowLength {
+          got: target_size,
+          expected: values_len,
+        }
+        .into(),
+      )
+    }
+    else
+    {
+      Ok(Self::new(self.values, target_size - values_len))
+    }
+  }
+}
+
+// Implement the RowInterface trait for Row
+impl RowInterface for Row
+{
+  fn get(&self, index: usize) -> Result<&graph::Value>
+  {
+    self.values.get(index).ok_or(
+      InternalError::InvalidIndex {
+        index,
+        length: self.values.len(),
+      }
+      .into(),
+    )
   }
   fn len(&self) -> usize
   {
@@ -28,8 +81,7 @@ impl Row
   }
 }
 
-// Implement the RowInterface trait for Row
-impl RowInterface for Row
+impl MutableRowInterface for Row
 {
   fn set(&mut self, index: usize, value: graph::Value) -> Result<()>
   {
@@ -44,76 +96,155 @@ impl RowInterface for Row
     *elem = value;
     Ok(())
   }
-
-  fn get(&self, index: usize) -> Result<&graph::Value>
+  fn set_if_unset(&mut self, index: usize, value: graph::Value) -> Result<()>
   {
-    self.values.get(index).ok_or(
-      InternalError::InvalidIndex {
+    let values_length = self.values.len();
+    let elem = self
+      .values
+      .get_mut(index)
+      .ok_or_else(|| InternalError::InvalidIndex {
         index,
-        length: self.values.len(),
-      }
-      .into(),
-    )
+        length: values_length,
+      })?;
+    if elem.is_null()
+    {
+      *elem = value;
+    }
+    Ok(())
+  }
+}
+
+impl Into<graph::Value> for Row
+{
+  fn into(self) -> graph::Value
+  {
+    graph::Value::Array(self.values)
+  }
+}
+
+pub(crate) trait Header
+{
+  fn columns(&self) -> usize;
+  fn titles(&self) -> Option<Vec<String>>;
+}
+
+impl Header for usize
+{
+  fn columns(&self) -> usize
+  {
+    *self
+  }
+  fn titles(&self) -> Option<Vec<String>>
+  {
+    None
+  }
+}
+
+impl Header for Vec<String>
+{
+  fn columns(&self) -> usize
+  {
+    self.len()
+  }
+  fn titles(&self) -> Option<Vec<String>>
+  {
+    Some(self.clone())
   }
 }
 
 #[derive(Debug)]
-pub(crate) struct ValueTable
+pub(crate) struct ValueTable<HeaderType>
+where
+  HeaderType: Header,
 {
-  columns: Vec<String>,
+  header: HeaderType,
+  row_count: usize,
   data: Vec<graph::Value>,
 }
 
-impl ValueTable
+impl<HeaderType> ValueTable<HeaderType>
+where
+  HeaderType: Header,
 {
-  pub(crate) fn new() -> Self
+  pub(crate) fn new(header: HeaderType) -> Self
   {
     Self {
-      columns: Default::default(),
+      header,
+      row_count: 0,
       data: Default::default(),
     }
   }
-  pub(crate) fn add_row(&mut self, mut row: Row) -> Result<()>
+  /// Add the full row to the table, return an error if the size of the row doesn't match the column.
+  pub(crate) fn add_full_row(&mut self, mut row: Row) -> Result<()>
   {
-    if row.len() != self.columns.len()
+    if row.len() != self.header.columns()
     {
       Err(
         error::InternalError::InvalidNumberColumns {
           actual: row.len(),
-          expected: self.columns.len(),
+          expected: self.header.columns(),
         }
         .into(),
       )
     }
     else
     {
+      self.row_count += 1;
       self.data.append(&mut row.values);
       Ok(())
     }
   }
-
-  pub fn row_count(&self) -> usize
+  /// Add the row to the table, if the row is larger, the row is truncated, if the row is smaller, an error is returned.
+  pub(crate) fn add_truncated_row(&mut self, row: Row) -> Result<()>
   {
-    if self.columns.is_empty()
+    if row.len() < self.header.columns()
     {
-      0
+      Err(
+        error::InternalError::InvalidNumberColumns {
+          actual: row.len(),
+          expected: self.header.columns(),
+        }
+        .into(),
+      )
     }
     else
     {
-      self.data.len() / self.columns.len()
+      self.row_count += 1;
+      self
+        .data
+        .extend(row.values.into_iter().take(self.header.columns()));
+      Ok(())
     }
   }
 
-  /// Create a mutable RowView into a specific row
-  pub fn row_view(&mut self, row_index: usize) -> Option<RowView<'_>>
+  pub fn add_truncated_rows(&mut self, rows: Vec<Row>) -> Result<()>
   {
-    let num_cols = self.columns.len();
-    let start = row_index.checked_mul(num_cols)?;
-    let end = start + num_cols;
+    for row in rows.into_iter()
+    {
+      self.add_truncated_row(row)?;
+    }
+    Ok(())
+  }
+
+  pub fn row_count(&self) -> usize
+  {
+    self.row_count
+  }
+
+  /// Create a RowView into a specific row
+  pub fn row_view(&self, row_index: usize) -> Option<RowView<'_>>
+  {
+    if self.header.columns() == 0 && row_index >= self.row_count
+    {
+      return None;
+    }
+    let columns = self.header.columns();
+    let start = row_index.checked_mul(columns)?;
+    let end = start + columns;
     if end <= self.data.len()
     {
       Some(RowView {
-        row: &mut self.data[start..end],
+        row: &self.data[start..end],
       })
     }
     else
@@ -121,43 +252,54 @@ impl ValueTable
       None
     }
   }
-
-  // pub(crate) fn iter(&self) -> core::slice::Iter<'_, Row>
-  // {
-  //   self.data.iter()
-  // }
-  // pub(crate) fn first_row(&self) -> Option<&Row>
-  // {
-  //   self.data.first()
-  // }
-  // pub(crate) fn remove_first_rows(&mut self, n: usize)
-  // {
-  //   if n < self.data.len()
-  //   {
-  //     self.data.drain(0..n);
-  //   }
-  //   else
-  //   {
-  //     self.data.clear();
-  //   }
-  // }
-  // pub(crate) fn truncate(&mut self, n: usize)
-  // {
-  //   self.data.truncate(n);
-  // }
-  // pub(crate) fn sort_by_cached_key<K, F>(&mut self, f: F)
-  // where
-  //   F: FnMut(&Row) -> K,
-  //   K: Ord,
-  // {
-  //   self.data.sort_by_cached_key(f);
-  // }
+  /// Create an iterator over the rows in the table
+  pub(crate) fn row_iter(&self) -> RowIter<'_>
+  {
+    RowIter {
+      data: &self.data,
+      columns: self.header.columns(),
+      index: 0,
+      row_count: self.row_count,
+    }
+  }
+  /// Transform into an iterator over the rows in the table
+  pub(crate) fn into_row_iter(self) -> IntoRowIter
+  {
+    IntoRowIter {
+      data: self.data.into_iter(),
+      columns: self.header.columns(),
+      row_count: self.row_count,
+      index: 0,
+    }
+  }
+  pub(crate) fn first_row(&self) -> Option<RowView>
+  {
+    self.row_view(0)
+  }
+  pub(crate) fn remove_first_rows(&mut self, n: usize)
+  {
+    let n = n * self.header.columns();
+    if n < self.data.len()
+    {
+      self.data.drain(0..n);
+    }
+    else
+    {
+      self.data.clear();
+    }
+  }
+  pub(crate) fn truncate(&mut self, n: usize)
+  {
+    let n = n * self.header.columns();
+    self.data.truncate(n);
+  }
 }
 
-/// A mutable view into a single row of the ValueTable
-pub struct RowView<'a>
+/// A view into a single row of the ValueTable
+#[derive(Debug)]
+pub(crate) struct RowView<'a>
 {
-  row: &'a mut [graph::Value], // length = columns.len()
+  row: &'a [graph::Value], // length = columns.len()
 }
 
 impl<'a> RowView<'a>
@@ -173,19 +315,6 @@ impl<'a> RowView<'a>
 
 impl<'a> RowInterface for RowView<'a>
 {
-  fn set(&mut self, index: usize, value: graph::Value) -> Result<(), InternalError>
-  {
-    let values_length = self.row.len();
-    let elem = self
-      .row
-      .get_mut(index)
-      .ok_or_else(|| InternalError::InvalidIndex {
-        index,
-        length: values_length,
-      })?;
-    *elem = value;
-    Ok(())
-  }
   fn get(&self, index: usize) -> Result<&graph::Value>
   {
     self.row.get(index).ok_or(
@@ -196,32 +325,219 @@ impl<'a> RowInterface for RowView<'a>
       .into(),
     )
   }
+  fn len(&self) -> usize
+  {
+    self.row.len()
+  }
 }
 
-// impl IntoIterator for ValueTable
-// {
-//   type IntoIter = <Vec<Row> as IntoIterator>::IntoIter;
-//   type Item = Row;
-//   fn into_iter(self) -> Self::IntoIter
-//   {
-//     self.data.into_iter()
-//   }
-// }
+/// Iterator over the row of the value table that yields RowViews
+pub(crate) struct RowIter<'a>
+{
+  data: &'a Vec<graph::Value>,
+  columns: usize,
+  index: usize,
+  row_count: usize,
+}
 
-// impl FromIterator<Row> for ValueTable
-// {
-//   fn from_iter<T: IntoIterator<Item = Row>>(iter: T) -> Self
-//   {
-//     Self {
-//       data: iter.into_iter().collect(),
-//     }
-//   }
-// }
+impl<'a> Iterator for RowIter<'a>
+{
+  type Item = RowView<'a>;
 
-// impl From<Vec<HashMap<String, crate::graph::Value>>> for ValueTable
-// {
-//   fn from(value: Vec<HashMap<String, crate::graph::Value>>) -> Self
-//   {
-//     Self { data: value }
-//   }
-// }
+  fn next(&mut self) -> Option<Self::Item>
+  {
+    if self.columns == 0
+    {
+      if self.index < self.row_count
+      {
+        self.index += 1;
+        Some(RowView {
+          row: &self.data[0..0],
+        })
+      }
+      else
+      {
+        None
+      }
+    }
+    else
+    {
+      let start = self.index * self.columns;
+      let end = start + self.columns;
+
+      if self.columns == 0 || end > self.data.len()
+      {
+        return None;
+      }
+
+      let rv = RowView {
+        row: &self.data[start..end],
+      };
+
+      self.index += 1;
+
+      Some(rv)
+    }
+  }
+}
+
+pub(crate) struct IntoRowIter
+{
+  data: std::vec::IntoIter<graph::Value>,
+  columns: usize,
+  /// index used to output empty rows, when columns is 0
+  index: usize,
+  row_count: usize,
+}
+
+impl Iterator for IntoRowIter
+{
+  type Item = Row;
+
+  fn next(&mut self) -> Option<Self::Item>
+  {
+    if self.columns == 0
+    {
+      if self.index < self.row_count
+      {
+        self.index += 1;
+        Some(Row::default())
+      }
+      else
+      {
+        None
+      }
+    }
+    else
+    {
+      let v: Vec<_> = self.data.by_ref().take(self.columns).collect();
+      if v.len() == 0
+      {
+        None
+      }
+      else
+      {
+        Some(Row::new(v, 0))
+      }
+    }
+  }
+}
+
+impl FromIterator<Row> for Result<ValueTable<usize>>
+{
+  fn from_iter<I: IntoIterator<Item = Row>>(iter: I) -> Self
+  {
+    let mut data = Vec::new();
+    let mut header = None;
+    let mut row_count = 0;
+
+    for row in iter.into_iter()
+    {
+      row_count += 1;
+      match header
+      {
+        Some(header) =>
+        {
+          if header != row.len()
+          {
+            return Err(
+              InternalError::InvalidRowLength {
+                got: row.len(),
+                expected: header,
+              }
+              .into(),
+            );
+          }
+        }
+        None => header = Some(row.len()),
+      }
+
+      data.extend(row.values);
+    }
+
+    let header = header.unwrap_or_default();
+    Ok(ValueTable {
+      header,
+      data,
+      row_count,
+    })
+  }
+}
+
+impl TryFrom<Vec<Row>> for ValueTable<usize>
+{
+  type Error = Error;
+  fn try_from(value: Vec<Row>) -> Result<Self>
+  {
+    value.into_iter().collect()
+  }
+}
+
+#[cfg(test)]
+mod tests
+{
+  use super::*;
+  #[test]
+  fn test_table_0_column()
+  {
+    let mut table = ValueTable::new(0);
+
+    // Test emptiness
+    assert_eq!(table.row_count(), 0);
+    let mut it = table.row_iter();
+    assert!(it.next().is_none());
+    assert!(table.row_view(0).is_none());
+
+    // Add a row
+    table.add_full_row(Default::default()).unwrap();
+    assert_eq!(table.row_count(), 1);
+    let mut it = table.row_iter();
+    let first_row = it.next().unwrap();
+    assert_eq!(first_row.len(), 0);
+    assert!(it.next().is_none());
+    assert!(table.row_view(0).is_some());
+    assert!(table.row_view(1).is_none());
+  }
+  #[test]
+  fn test_table_1_column()
+  {
+    let mut table = ValueTable::new(1);
+
+    // Test emptiness
+    assert_eq!(table.row_count(), 0);
+    let mut it = table.row_iter();
+    assert!(it.next().is_none());
+    assert!(table.row_view(0).is_none());
+
+    // Add a row
+    table.add_full_row(Row::new(vec![1.into()], 0)).unwrap();
+    assert_eq!(table.row_count(), 1);
+    let mut it = table.row_iter();
+    let first_row = it.next().unwrap();
+    assert_eq!(first_row.len(), 1);
+    assert_eq!(*first_row.get(0).unwrap(), (1 as i64).into());
+    assert!(it.next().is_none());
+    let first_row = table.row_view(0).unwrap();
+    assert_eq!(first_row.len(), 1);
+    assert_eq!(*first_row.get(0).unwrap(), (1 as i64).into());
+    assert!(table.row_view(1).is_none());
+  }
+  #[test]
+  fn test_row()
+  {
+    let row = Row::new(vec!["a".into(), 1.0.into()], 1);
+    assert_eq!(row.len(), 3);
+    assert_eq!(*row.get(0).unwrap(), "a".into());
+    assert_eq!(*row.get(1).unwrap(), 1.0.into());
+    assert!(row.get(2).unwrap().is_null());
+    assert!(row.get(3).is_err());
+
+    let row = row.extended(4).unwrap();
+    assert_eq!(row.len(), 4);
+    assert_eq!(*row.get(0).unwrap(), "a".into());
+    assert_eq!(*row.get(1).unwrap(), 1.0.into());
+    assert!(row.get(2).unwrap().is_null());
+    assert!(row.get(3).unwrap().is_null());
+    assert!(row.get(4).is_err());
+  }
+}

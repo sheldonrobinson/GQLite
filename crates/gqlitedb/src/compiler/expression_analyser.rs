@@ -1,4 +1,4 @@
-use crate::{functions, graph, parser::ast, Result};
+use crate::{compiler::variables_manager::VariablesManager, functions, graph, parser::ast, Result};
 
 // __     __         _       _     _     _____
 // \ \   / /_ _ _ __(_) __ _| |__ | | __|_   _|   _ _ __   ___
@@ -29,11 +29,6 @@ pub(crate) struct ExpressionInfo
   pub(crate) expression_type: ExpressionType,
   pub(crate) constant: bool,
   pub(crate) aggregation_result: bool,
-}
-
-pub(crate) trait Variables
-{
-  fn expression_type(&self, name: impl Into<String>) -> Result<ExpressionType>;
 }
 
 mod validators
@@ -116,8 +111,8 @@ trait ExpressionAnalyser
 {
   fn analyse(
     self,
-    variables: &impl Variables,
-    function_manager: &functions::Manager,
+    variables_manager: &VariablesManager,
+    functions_manager: &functions::Manager,
   ) -> Result<Vec<ExpressionInfo>>;
 }
 
@@ -128,13 +123,19 @@ where
 {
   fn analyse(
     self,
-    variables: &impl Variables,
-    function_manager: &functions::Manager,
+    variables_manager: &VariablesManager,
+    functions_manager: &functions::Manager,
   ) -> Result<Vec<ExpressionInfo>>
   {
     self
       .0
-      .map(|x| self.1(ExpressionInfo::analyse(variables, function_manager, x)?))
+      .map(|x| {
+        self.1(ExpressionInfo::analyse(
+          variables_manager,
+          functions_manager,
+          x,
+        )?)
+      })
       .collect::<Result<_>>()
   }
 }
@@ -145,13 +146,13 @@ where
 {
   fn analyse(
     self,
-    variables: &impl Variables,
-    function_manager: &functions::Manager,
+    variables_manager: &VariablesManager,
+    functions_manager: &functions::Manager,
   ) -> Result<Vec<ExpressionInfo>>
   {
     Ok(vec![self.1(ExpressionInfo::analyse(
-      variables,
-      function_manager,
+      variables_manager,
+      functions_manager,
       self.0,
     )?)?])
   }
@@ -164,19 +165,19 @@ where
 {
   fn analyse(
     self,
-    variables: &impl Variables,
-    function_manager: &functions::Manager,
+    variables_manager: &VariablesManager,
+    functions_manager: &functions::Manager,
   ) -> Result<Vec<ExpressionInfo>>
   {
     Ok(vec![
       self.1 .0(ExpressionInfo::analyse(
-        variables,
-        function_manager,
+        variables_manager,
+        functions_manager,
         self.0 .0,
       )?)?,
       self.1 .1(ExpressionInfo::analyse(
-        variables,
-        function_manager,
+        variables_manager,
+        functions_manager,
         self.0 .1,
       )?)?,
     ])
@@ -203,25 +204,25 @@ impl ExpressionInfo
     }
   }
   fn analyses<'a, TExpressions, TValidatorType>(
-    variables: &impl Variables,
-    function_manager: &functions::Manager,
+    variables_manager: &VariablesManager,
+    functions_manager: &functions::Manager,
     expressions: TExpressions,
     validator: TValidatorType,
   ) -> Result<Vec<ExpressionInfo>>
   where
     (TExpressions, TValidatorType): ExpressionAnalyser,
   {
-    (expressions, validator).analyse(variables, function_manager)
+    (expressions, validator).analyse(variables_manager, functions_manager)
   }
   fn analyses_in<'a>(
-    variables: &impl Variables,
-    function_manager: &functions::Manager,
+    variables_manager: &VariablesManager,
+    functions_manager: &functions::Manager,
     left_expr: &'a ast::Expression,
     right_expr: &'a ast::Expression,
   ) -> Result<Vec<ExpressionInfo>>
   {
-    let mut left_expr = ExpressionInfo::analyse(variables, function_manager, left_expr)?;
-    let right_expr = ExpressionInfo::analyse(variables, function_manager, right_expr)?;
+    let mut left_expr = ExpressionInfo::analyse(variables_manager, functions_manager, left_expr)?;
+    let right_expr = ExpressionInfo::analyse(variables_manager, functions_manager, right_expr)?;
     let right_expr = validators::array_or_map(right_expr)?;
 
     if right_expr.expression_type == ExpressionType::Map
@@ -232,8 +233,8 @@ impl ExpressionInfo
     Ok(vec![left_expr, right_expr])
   }
   pub(crate) fn analyse(
-    variables: &impl Variables,
-    function_manager: &functions::Manager,
+    variables_manager: &VariablesManager,
+    functions_manager: &functions::Manager,
     expression: &ast::Expression,
   ) -> Result<ExpressionInfo>
   {
@@ -242,8 +243,8 @@ impl ExpressionInfo
       ast::Expression::Array(arr) => Ok(Self::new_type(
         ExpressionType::Array,
         Self::analyses(
-          variables,
-          function_manager,
+          variables_manager,
+          functions_manager,
           arr.array.iter(),
           validators::any,
         )?,
@@ -251,26 +252,26 @@ impl ExpressionInfo
       ast::Expression::FunctionCall(call) =>
       {
         let arguments = Self::analyses(
-          variables,
-          function_manager,
+          variables_manager,
+          functions_manager,
           call.arguments.iter(),
           validators::any,
         )?;
         Ok(Self::new(
-          function_manager.validate_arguments(
+          functions_manager.validate_arguments(
             &call.name,
             arguments.iter().map(|x| x.expression_type).collect(),
           )?,
-          function_manager.is_deterministic(&call.name)?
+          functions_manager.is_deterministic(&call.name)?
             && arguments.iter().all(|x| x.constant == true),
-          function_manager.is_aggregate(&call.name),
+          functions_manager.is_aggregate(&call.name),
         ))
       }
       ast::Expression::IsNull(isn) => Ok(Self::new_type(
         ExpressionType::Boolean,
         Self::analyses(
-          variables,
-          function_manager,
+          variables_manager,
+          functions_manager,
           [&isn.value].into_iter(),
           validators::any,
         )?,
@@ -278,8 +279,8 @@ impl ExpressionInfo
       ast::Expression::IsNotNull(isn) => Ok(Self::new_type(
         ExpressionType::Boolean,
         Self::analyses(
-          variables,
-          function_manager,
+          variables_manager,
+          functions_manager,
           [&isn.value].into_iter(),
           validators::any,
         )?,
@@ -287,8 +288,8 @@ impl ExpressionInfo
       ast::Expression::Negation(ln) => Ok(Self::new_type(
         ExpressionType::Variant,
         Self::analyses(
-          variables,
-          function_manager,
+          variables_manager,
+          functions_manager,
           [&ln.value].into_iter(),
           validators::any,
         )?,
@@ -296,8 +297,8 @@ impl ExpressionInfo
       ast::Expression::LogicalNegation(ln) => Ok(Self::new_type(
         ExpressionType::Boolean,
         Self::analyses(
-          variables,
-          function_manager,
+          variables_manager,
+          functions_manager,
           [&ln.value].into_iter(),
           validators::boolean_or_null,
         )?,
@@ -305,8 +306,8 @@ impl ExpressionInfo
       ast::Expression::LogicalAnd(rd) => Ok(Self::new_type(
         ExpressionType::Boolean,
         Self::analyses(
-          variables,
-          function_manager,
+          variables_manager,
+          functions_manager,
           [&rd.left, &rd.right].into_iter(),
           validators::boolean_or_null,
         )?,
@@ -314,8 +315,8 @@ impl ExpressionInfo
       ast::Expression::LogicalOr(rd) => Ok(Self::new_type(
         ExpressionType::Boolean,
         Self::analyses(
-          variables,
-          function_manager,
+          variables_manager,
+          functions_manager,
           [&rd.left, &rd.right].into_iter(),
           validators::boolean_or_null,
         )?,
@@ -323,8 +324,8 @@ impl ExpressionInfo
       ast::Expression::LogicalXor(rd) => Ok(Self::new_type(
         ExpressionType::Boolean,
         Self::analyses(
-          variables,
-          function_manager,
+          variables_manager,
+          functions_manager,
           [&rd.left, &rd.right].into_iter(),
           validators::boolean_or_null,
         )?,
@@ -332,8 +333,8 @@ impl ExpressionInfo
       ast::Expression::RelationalEqual(rd) => Ok(Self::new_type(
         ExpressionType::Boolean,
         Self::analyses(
-          variables,
-          function_manager,
+          variables_manager,
+          functions_manager,
           [&rd.left, &rd.right].into_iter(),
           validators::any,
         )?,
@@ -341,8 +342,8 @@ impl ExpressionInfo
       ast::Expression::RelationalDifferent(rd) => Ok(Self::new_type(
         ExpressionType::Boolean,
         Self::analyses(
-          variables,
-          function_manager,
+          variables_manager,
+          functions_manager,
           [&rd.left, &rd.right].into_iter(),
           validators::any,
         )?,
@@ -350,8 +351,8 @@ impl ExpressionInfo
       ast::Expression::RelationalInferior(rd) => Ok(Self::new_type(
         ExpressionType::Boolean,
         Self::analyses(
-          variables,
-          function_manager,
+          variables_manager,
+          functions_manager,
           [&rd.left, &rd.right].into_iter(),
           validators::any,
         )?,
@@ -359,8 +360,8 @@ impl ExpressionInfo
       ast::Expression::RelationalSuperior(rd) => Ok(Self::new_type(
         ExpressionType::Boolean,
         Self::analyses(
-          variables,
-          function_manager,
+          variables_manager,
+          functions_manager,
           [&rd.left, &rd.right].into_iter(),
           validators::any,
         )?,
@@ -368,8 +369,8 @@ impl ExpressionInfo
       ast::Expression::RelationalInferiorEqual(rd) => Ok(Self::new_type(
         ExpressionType::Boolean,
         Self::analyses(
-          variables,
-          function_manager,
+          variables_manager,
+          functions_manager,
           [&rd.left, &rd.right].into_iter(),
           validators::any,
         )?,
@@ -377,25 +378,25 @@ impl ExpressionInfo
       ast::Expression::RelationalSuperiorEqual(rd) => Ok(Self::new_type(
         ExpressionType::Boolean,
         Self::analyses(
-          variables,
-          function_manager,
+          variables_manager,
+          functions_manager,
           [&rd.left, &rd.right].into_iter(),
           validators::any,
         )?,
       )),
       ast::Expression::RelationalIn(ri) => Ok(Self::new_type(
         ExpressionType::Boolean,
-        Self::analyses_in(variables, function_manager, &ri.left, &ri.right)?,
+        Self::analyses_in(variables_manager, functions_manager, &ri.left, &ri.right)?,
       )),
       ast::Expression::RelationalNotIn(ri) => Ok(Self::new_type(
         ExpressionType::Boolean,
-        Self::analyses_in(variables, function_manager, &ri.left, &ri.right)?,
+        Self::analyses_in(variables_manager, functions_manager, &ri.left, &ri.right)?,
       )),
       ast::Expression::Addition(ri) => Ok(Self::new_type(
         ExpressionType::Variant,
         Self::analyses(
-          variables,
-          function_manager,
+          variables_manager,
+          functions_manager,
           [&ri.left, &ri.right].into_iter(),
           validators::any,
         )?,
@@ -403,8 +404,8 @@ impl ExpressionInfo
       ast::Expression::Multiplication(ri) => Ok(Self::new_type(
         ExpressionType::Variant,
         Self::analyses(
-          variables,
-          function_manager,
+          variables_manager,
+          functions_manager,
           [&ri.left, &ri.right].into_iter(),
           validators::any,
         )?,
@@ -412,8 +413,8 @@ impl ExpressionInfo
       ast::Expression::Subtraction(ri) => Ok(Self::new_type(
         ExpressionType::Variant,
         Self::analyses(
-          variables,
-          function_manager,
+          variables_manager,
+          functions_manager,
           [&ri.left, &ri.right].into_iter(),
           validators::any,
         )?,
@@ -421,8 +422,8 @@ impl ExpressionInfo
       ast::Expression::Division(ri) => Ok(Self::new_type(
         ExpressionType::Variant,
         Self::analyses(
-          variables,
-          function_manager,
+          variables_manager,
+          functions_manager,
           [&ri.left, &ri.right].into_iter(),
           validators::any,
         )?,
@@ -430,8 +431,8 @@ impl ExpressionInfo
       ast::Expression::Modulo(ri) => Ok(Self::new_type(
         ExpressionType::Variant,
         Self::analyses(
-          variables,
-          function_manager,
+          variables_manager,
+          functions_manager,
           [&ri.left, &ri.right].into_iter(),
           validators::any,
         )?,
@@ -439,8 +440,8 @@ impl ExpressionInfo
       ast::Expression::Map(map) => Ok(Self::new_type(
         ExpressionType::Map,
         Self::analyses(
-          variables,
-          function_manager,
+          variables_manager,
+          functions_manager,
           map.map.values(),
           validators::any,
         )?,
@@ -448,14 +449,14 @@ impl ExpressionInfo
       ast::Expression::MemberAccess(ma) => Ok(Self::new_type(
         ExpressionType::Variant,
         [validators::map_or_edge_or_node_or_null(Self::analyse(
-          variables,
-          function_manager,
+          variables_manager,
+          functions_manager,
           &ma.left,
         )?)?],
       )),
       ast::Expression::IndexAccess(ia) => Ok({
-        let left = Self::analyse(variables, function_manager, &ia.left)?;
-        let index = Self::analyse(variables, function_manager, &ia.index)?;
+        let left = Self::analyse(variables_manager, functions_manager, &ia.left)?;
+        let index = Self::analyse(variables_manager, functions_manager, &ia.index)?;
 
         match left.expression_type
         {
@@ -477,23 +478,23 @@ impl ExpressionInfo
       }),
       ast::Expression::RangeAccess(ia) => Ok({
         let mut dependents = vec![validators::array(Self::analyse(
-          variables,
-          function_manager,
+          variables_manager,
+          functions_manager,
           &ia.left,
         )?)?];
         if let Some(start) = &ia.start
         {
           dependents.push(validators::integer_or_null(Self::analyse(
-            variables,
-            function_manager,
+            variables_manager,
+            functions_manager,
             start,
           )?)?);
         }
         if let Some(end) = &ia.end
         {
           dependents.push(validators::integer_or_null(Self::analyse(
-            variables,
-            function_manager,
+            variables_manager,
+            functions_manager,
             end,
           )?)?);
         }
@@ -518,7 +519,7 @@ impl ExpressionInfo
         false,
       )),
       ast::Expression::Variable(var) => Ok(ExpressionInfo::new(
-        variables.expression_type(&var.identifier)?,
+        variables_manager.expression_type(&var.identifier)?,
         false,
         false,
       )),

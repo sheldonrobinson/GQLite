@@ -1,4 +1,5 @@
-use crate::{error, graph::ValueTryIntoRef, interpreter, store};
+use crate::prelude::*;
+use graph::ValueTryIntoRef;
 
 trait ConnectionTrait
 {
@@ -25,7 +26,7 @@ impl<TStore: store::Store> ConnectionTrait for ConnectionImpl<TStore>
   {
     let q: String = query.into();
     let q = crate::parser::parse(q.as_str())?;
-    let q = interpreter::compiler::compile(&self.function_manager, q)?;
+    let q = compiler::compile(&self.function_manager, q)?;
     return interpreter::evaluators::eval_program(&self.store, q, parameters);
   }
 }

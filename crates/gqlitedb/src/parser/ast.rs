@@ -346,32 +346,31 @@ impl LabelExpression
   }
 }
 
-// Values
-
-#[derive(Debug)]
-pub(crate) struct All {}
-#[derive(Debug)]
-pub(crate) struct EndOfList {}
-
-#[derive(Debug, Clone, PartialEq)]
-pub(crate) struct Value
-{
-  pub(crate) value: crate::graph::Value,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub(crate) struct Map
-{
-  pub(crate) map: std::collections::HashMap<String, Expression>,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub(crate) struct Array
-{
-  pub(crate) array: Vec<Expression>,
-}
-
 // Expressions
+
+macro_rules! create_into_expr {
+  ( $x:tt ) => {
+    impl Into<Expression> for $x
+    {
+      fn into(self) -> Expression
+      {
+        Expression::$x(self)
+      }
+    }
+  };
+}
+
+macro_rules! create_into_boxed_expr {
+  ( $x:tt ) => {
+    impl Into<Expression> for $x
+    {
+      fn into(self) -> Expression
+      {
+        Expression::$x(Box::new(self))
+      }
+    }
+  };
+}
 
 #[derive(Debug)]
 pub(crate) struct NamedExpression
@@ -392,6 +391,8 @@ pub(crate) struct Variable
   pub(crate) identifier: String,
 }
 
+create_into_expr! {Variable}
+
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct MemberAccess
 {
@@ -399,12 +400,16 @@ pub(crate) struct MemberAccess
   pub(crate) path: Vec<String>,
 }
 
+create_into_boxed_expr! {MemberAccess}
+
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct IndexAccess
 {
   pub(crate) left: Expression,
   pub(crate) index: Expression,
 }
+
+create_into_boxed_expr! {IndexAccess}
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct RangeAccess
@@ -485,3 +490,32 @@ create_unary_op! {LogicalNegation}
 create_unary_op! {Negation}
 create_unary_op! {IsNull}
 create_unary_op! {IsNotNull}
+
+// Values
+
+#[derive(Debug)]
+pub(crate) struct All {}
+#[derive(Debug)]
+pub(crate) struct EndOfList {}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct Value
+{
+  pub(crate) value: crate::graph::Value,
+}
+
+create_into_expr! {Value}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct Map
+{
+  pub(crate) map: std::collections::HashMap<String, Expression>,
+}
+
+create_into_expr! {Map}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct Array
+{
+  pub(crate) array: Vec<Expression>,
+}

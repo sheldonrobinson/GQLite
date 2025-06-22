@@ -161,8 +161,8 @@ fn build_expression(
         }
         .into(),
       ),
-      Rule::substraction => Ok(
-        ast::Substraction {
+      Rule::subtraction => Ok(
+        ast::Subtraction {
           left: lhs?,
           right: rhs?,
         }
@@ -1044,7 +1044,7 @@ pub(crate) fn parse(input: &str) -> Result<ast::Statements>
         | Op::infix(Rule::superior_equal, Assoc::Left),
     )
     .op(Op::infix(Rule::not_in, Assoc::Left) | Op::infix(Rule::in_, Assoc::Left))
-    .op(Op::infix(Rule::addition, Assoc::Left) | Op::infix(Rule::substraction, Assoc::Left))
+    .op(Op::infix(Rule::addition, Assoc::Left) | Op::infix(Rule::subtraction, Assoc::Left))
     .op(
       Op::infix(Rule::multiplication, Assoc::Left)
         | Op::infix(Rule::division, Assoc::Left)

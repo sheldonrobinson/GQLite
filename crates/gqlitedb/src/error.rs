@@ -81,12 +81,6 @@ pub enum CompileTimeError
 #[derive(thiserror::Error, Debug)]
 pub enum RunTimeError
 {
-  /// Variable is not defined
-  #[error("UndefinedVariable: Unknown variable '{name}'.")]
-  UndefinedVariable
-  {
-    name: String
-  },
   /// Parameter is not known
   #[error("UnknownParameter: Unknown parameter '{name}'.")]
   UnknownParameter
@@ -229,6 +223,11 @@ pub enum InternalError
   InvalidIndex
   {
     index: usize, length: usize
+  },
+  #[error("Invalid row length got {got} expected {expected}.")]
+  InvalidRowLength
+  {
+    got: usize, expected: usize
   },
 }
 

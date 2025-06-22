@@ -1,21 +1,15 @@
-use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use crate::interpreter::instructions::Modifiers;
-use crate::value_table;
-use crate::{
-  error::{self, CompileTimeError, InternalError},
-  functions,
-  interpreter::{
-    expression_analyser,
-    instructions::{
-      self, Block, BlockMatch, CreateAction, Instruction, Instructions, RWAggregation, RWExpression,
-    },
-    validator,
-  },
-  parser::ast,
-  Result,
+pub(crate) mod expression_analyser;
+pub(crate) mod variables_manager;
+
+use crate::{compiler::variables_manager::VariablesManager, prelude::*};
+
+use interpreter::instructions::{
+  self, Block, BlockMatch, CreateAction, Instruction, Instructions, Modifiers, RWAggregation,
+  RWExpression,
 };
+use parser::ast;
 
 static FAKE_VARIABLE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -29,9 +23,7 @@ macro_rules! compile_binary_op {
 struct Compiler
 {
   function_manager: functions::Manager,
-  validator: validator::Validator,
-  variables: HashMap<String, value_table::ColId>,
-  persistent_variables: HashMap<String, usize>,
+  variables_manager: variables_manager::VariablesManager,
   temporary_variables: usize,
 }
 
@@ -42,33 +34,19 @@ impl Compiler
   {
     instructions::VariablesSizes {
       temporary_variables: self.temporary_variables,
-      persistent_variables: self.persistent_variables.len(),
+      persistent_variables: self.variables_manager.variables_count(),
     }
   }
 
-  /// Get the index of the variable in the row of variables
-  fn get_variable_index(&self, identifier: &String) -> Result<usize>
-  {
-    self
-      .variables
-      .get(identifier)
-      .ok_or_else(|| {
-        InternalError::UnknownVariable {
-          name: identifier.clone(),
-        }
-        .into()
-      })
-      .map(|x| *x)
-  }
   fn compile_expression(
     &mut self,
     expression: &crate::parser::ast::Expression,
     instructions: &mut Instructions,
-    aggregations: &mut Option<&mut HashMap<value_table::ColId, RWAggregation>>,
+    aggregations: &mut Option<&mut Vec<(value_table::ColId, RWAggregation)>>,
   ) -> Result<()>
   {
     expression_analyser::ExpressionInfo::analyse(
-      self.validator.variables_ref(),
+      &self.variables_manager,
       &self.function_manager,
       &expression,
     )?;
@@ -79,7 +57,9 @@ impl Compiler
         value: value.value.clone(),
       },
       ast::Expression::Variable(variable) => Instruction::GetVariable {
-        col_id: self.get_variable_index(&variable.identifier)?,
+        col_id: self
+          .variables_manager
+          .get_variable_index(&variable.identifier)?,
       },
       ast::Expression::Parameter(parameter) => Instruction::GetParameter {
         name: parameter.name.clone(),
@@ -114,14 +94,14 @@ impl Compiler
             aggregations
               .as_mut()
               .ok_or(error::InternalError::MissingAggregations)?
-              .insert(
+              .push((
                 var_col_id,
                 RWAggregation {
                   init_instructions,
                   aggregator,
                   argument_instructions,
                 },
-              );
+              ));
             Instruction::GetVariable { col_id: var_col_id }
           }
           Err(_) =>
@@ -259,10 +239,10 @@ impl Compiler
         compile_binary_op!(self, addition, instructions, aggregations);
         Instruction::AdditionBinaryOperator
       }
-      ast::Expression::Subtraction(substraction) =>
+      ast::Expression::Subtraction(subtraction) =>
       {
-        compile_binary_op!(self, substraction, instructions, aggregations);
-        Instruction::SubstractionBinaryOperator
+        compile_binary_op!(self, subtraction, instructions, aggregations);
+        Instruction::SubtractionBinaryOperator
       }
       ast::Expression::Multiplication(multiplication) =>
       {
@@ -313,7 +293,7 @@ impl Compiler
   {
     if let Some(expr) = properties
     {
-      self.compile_expression(function_manager, validator, expr, instructions, &mut None)?;
+      self.compile_expression(expr, instructions, &mut None)?;
     }
     else
     {
@@ -328,18 +308,16 @@ impl Compiler
     &mut self,
     node: &crate::parser::ast::NodePattern,
     instructions: &mut Instructions,
-    variables: &mut Vec<Option<String>>,
+    variables: &mut Vec<Option<value_table::ColId>>,
   ) -> Result<()>
   {
-    validator.check_unexisting_variable(&node.variable)?;
-    validator.validate_node(&node)?;
-    variables.push(node.variable.to_owned());
-    self.compile_optional_expression(
-      function_manager,
-      validator,
-      &node.properties,
-      instructions,
-    )?;
+    self.variables_manager.validate_node(&node)?;
+    variables.push(
+      self
+        .variables_manager
+        .get_variable_index_option(&node.variable)?,
+    );
+    self.compile_optional_expression(&node.properties, instructions)?;
     let mut labels = Default::default();
     self.compile_labels_expression(&mut labels, &node.labels)?;
     instructions.push(Instruction::CreateNodeLiteral { labels });
@@ -393,7 +371,7 @@ impl Compiler
         instructions.push(Instruction::Swap);
         for expr in expressions.iter()
         {
-          compile_filter_labels(instructions, expr, has_label_function)?;
+          self.compile_filter_labels(instructions, expr, has_label_function)?;
           // stack contains (a: bool) (b: labels) (c: bool)
           instructions.push(Instruction::InverseRot3);
           // stack contains (c: bool) (a: bool) (b: labels)
@@ -412,7 +390,7 @@ impl Compiler
         instructions.push(Instruction::Swap);
         for expr in expressions.iter()
         {
-          compile_filter_labels(instructions, expr, has_label_function)?;
+          self.compile_filter_labels(instructions, expr, has_label_function)?;
           // stack contains (a: bool) (b: labels) (c: bool)
           instructions.push(Instruction::InverseRot3);
           // stack contains (c: bool) (a: bool) (b: labels)
@@ -425,7 +403,7 @@ impl Compiler
       }
       &ast::LabelExpression::Not(expr) =>
       {
-        compile_filter_labels(instructions, expr, has_label_function)?;
+        self.compile_filter_labels(instructions, expr, has_label_function)?;
         instructions.push(Instruction::NotUnaryOperator);
         Ok(())
       }
@@ -456,37 +434,28 @@ impl Compiler
   {
     let actions = patterns.iter().map(|c| {
       let mut instructions = Instructions::new();
-      let mut variables = Vec::<Option<String>>::new();
+      let mut variables = Vec::<Option<value_table::ColId>>::new();
       match c
       {
         crate::parser::ast::Pattern::Node(node) =>
         {
-          compile_create_node(
-            function_manager,
-            validator,
-            node,
-            &mut instructions,
-            &mut variables,
-          )?;
+          self.compile_create_node(node, &mut instructions, &mut variables)?;
         }
         crate::parser::ast::Pattern::Edge(edge) =>
         {
-          validator.check_unexisting_variable(&edge.variable)?;
-          if validator.is_valid_existing_node(&edge.source)?
+          if self
+            .variables_manager
+            .is_valid_existing_node(&edge.source)?
           {
             instructions.push(Instruction::GetVariable {
-              name: edge.source.variable.as_ref().unwrap().to_owned(),
+              col_id: self
+                .variables_manager
+                .get_variable_index(edge.source.variable.as_ref().unwrap())?,
             });
           }
           else
           {
-            compile_create_node(
-              function_manager,
-              validator,
-              &edge.source,
-              &mut instructions,
-              &mut variables,
-            )?;
+            self.compile_create_node(&edge.source, &mut instructions, &mut variables)?;
             instructions.push(Instruction::Duplicate);
           }
           if edge.source.variable.is_some()
@@ -495,38 +464,35 @@ impl Compiler
           {
             instructions.push(Instruction::Duplicate);
           }
-          else if validator.is_valid_existing_node(&edge.destination)?
+          else if self
+            .variables_manager
+            .is_valid_existing_node(&edge.destination)?
           {
             instructions.push(Instruction::GetVariable {
-              name: edge.destination.variable.as_ref().unwrap().to_owned(),
+              col_id: self
+                .variables_manager
+                .get_variable_index(edge.destination.variable.as_ref().unwrap())?,
             });
           }
           else
           {
-            compile_create_node(
-              function_manager,
-              validator,
-              &edge.destination,
-              &mut instructions,
-              &mut variables,
-            )?;
+            self.compile_create_node(&edge.destination, &mut instructions, &mut variables)?;
             instructions.push(Instruction::Duplicate);
             instructions.push(Instruction::Rot3);
           }
-          validator.validate_edge(edge)?;
-          variables.push(edge.variable.to_owned());
-          compile_optional_expression(
-            function_manager,
-            validator,
-            &edge.properties,
-            &mut instructions,
-          )?;
+          self.variables_manager.validate_edge(edge)?;
+          variables.push(
+            self
+              .variables_manager
+              .get_variable_index_option(&edge.variable)?,
+          );
+          self.compile_optional_expression(&edge.properties, &mut instructions)?;
           if !edge.labels.is_string()
           {
             Err(CompileTimeError::NoSingleRelationshipType)?;
           }
           let mut labels = Default::default();
-          compile_labels_expression(&mut labels, &edge.labels)?;
+          self.compile_labels_expression(&mut labels, &edge.labels)?;
           instructions.push(Instruction::CreateEdgeLiteral { labels });
         }
         crate::parser::ast::Pattern::Path(_) =>
@@ -543,6 +509,7 @@ impl Compiler
     });
     Ok(Block::Create {
       actions: actions.collect::<Result<Vec<CreateAction>>>()?,
+      variables_size: self.variables_size(),
     })
   }
 
@@ -554,16 +521,11 @@ impl Compiler
     get_node_function_name: Option<&'static str>,
   ) -> Result<()>
   {
-    self.compile_optional_expression(
-      function_manager,
-      validator,
-      &node.properties,
-      instructions,
-    )?;
+    self.compile_optional_expression(&node.properties, instructions)?;
     let mut labels = Default::default();
     if node.labels.is_all_inclusive()
     {
-      compile_labels_expression(&mut labels, &node.labels)?;
+      self.compile_labels_expression(&mut labels, &node.labels)?;
     }
     else
     {
@@ -571,12 +533,16 @@ impl Compiler
       {
         filter.push(Instruction::Duplicate);
         filter.push(Instruction::FunctionCall {
-          function: function_manager.get_function::<CompileTimeError>(get_node_function_name)?,
+          function: self
+            .function_manager
+            .get_function::<CompileTimeError>(get_node_function_name)?,
           arguments_count: 1,
         });
       }
-      let has_label_function = function_manager.get_function::<CompileTimeError>("has_label")?;
-      compile_filter_labels(filter, &node.labels, &has_label_function)?;
+      let has_label_function = self
+        .function_manager
+        .get_function::<CompileTimeError>("has_label")?;
+      self.compile_filter_labels(filter, &node.labels, &has_label_function)?;
       filter.push(Instruction::Rot3);
       filter.push(Instruction::AndBinaryOperator);
       filter.push(Instruction::Swap);
@@ -595,7 +561,7 @@ impl Compiler
   {
     if let Some(path_variable) = &path_variable
     {
-      validator.declare_variable(
+      self.variables_manager.declare_variable(
         path_variable.to_owned(),
         expression_analyser::ExpressionType::Path,
       )?;
@@ -604,19 +570,21 @@ impl Compiler
     let mut instructions = Instructions::new();
     let mut source_variable = None;
     let mut filter = Instructions::new();
-    if validator.is_valid_existing_node(&edge.source)?
+    if self
+      .variables_manager
+      .is_valid_existing_node(&edge.source)?
     {
       instructions.push(Instruction::GetVariable {
-        name: edge.source.variable.as_ref().unwrap().to_owned(),
+        col_id: self
+          .variables_manager
+          .get_variable_index(edge.source.variable.as_ref().unwrap())?,
       });
       instructions.push(Instruction::CreateNodeQuery { labels: vec![] });
     }
     else
     {
       source_variable = edge.source.variable.to_owned();
-      compile_match_node(
-        function_manager,
-        validator,
+      self.compile_match_node(
         &edge.source,
         &mut instructions,
         &mut filter,
@@ -624,59 +592,64 @@ impl Compiler
       )?;
     }
     let mut destination_variable = None;
-    if validator.is_valid_existing_node(&edge.destination)?
+    if self
+      .variables_manager
+      .is_valid_existing_node(&edge.destination)?
     {
       instructions.push(Instruction::GetVariable {
-        name: edge.destination.variable.as_ref().unwrap().to_owned(),
+        col_id: self
+          .variables_manager
+          .get_variable_index(edge.destination.variable.as_ref().unwrap())?,
       });
       instructions.push(Instruction::CreateNodeQuery { labels: vec![] });
     }
     else
     {
       destination_variable = edge.destination.variable.to_owned();
-      compile_match_node(
-        function_manager,
-        validator,
+      self.compile_match_node(
         &edge.destination,
         &mut instructions,
         &mut filter,
         Some("get_destination"),
       )?;
     }
-    if validator.is_valid_existing_edge(edge)?
+    if self.variables_manager.is_valid_existing_edge(edge)?
     {
-      if !validator.is_valid_existing_node(&edge.source)?
+      if !self
+        .variables_manager
+        .is_valid_existing_node(&edge.source)?
       {
-        validator.validate_node(&edge.source)?;
+        self.variables_manager.validate_node(&edge.source)?;
       }
-      if !validator.is_valid_existing_node(&edge.destination)?
+      if !self
+        .variables_manager
+        .is_valid_existing_node(&edge.destination)?
       {
-        validator.validate_node(&edge.destination)?;
+        self.variables_manager.validate_node(&edge.destination)?;
       }
       instructions.push(Instruction::GetVariable {
-        name: edge.variable.as_ref().unwrap().to_owned(),
+        col_id: self
+          .variables_manager
+          .get_variable_index(edge.variable.as_ref().unwrap())?,
       });
       instructions.push(Instruction::CreateEdgeQuery { labels: vec![] });
     }
     else
     {
-      validator.validate_edge(edge)?;
-      compile_optional_expression(
-        function_manager,
-        validator,
-        &edge.properties,
-        &mut instructions,
-      )?;
+      self.variables_manager.validate_edge(edge)?;
+      self.compile_optional_expression(&edge.properties, &mut instructions)?;
       // Handle labels
       let mut labels = Default::default();
       if edge.labels.is_all_inclusive()
       {
-        compile_labels_expression(&mut labels, &edge.labels)?;
+        self.compile_labels_expression(&mut labels, &edge.labels)?;
       }
       else
       {
-        let has_label_function = function_manager.get_function::<CompileTimeError>("has_label")?;
-        compile_filter_labels(&mut filter, &edge.labels, &has_label_function)?;
+        let has_label_function = self
+          .function_manager
+          .get_function::<CompileTimeError>("has_label")?;
+        self.compile_filter_labels(&mut filter, &edge.labels, &has_label_function)?;
         filter.push(Instruction::Rot3);
         filter.push(Instruction::AndBinaryOperator);
         filter.push(Instruction::Swap);
@@ -700,7 +673,7 @@ impl Compiler
       {
         filter.push(Instruction::Duplicate);
         filter.push(Instruction::GetVariable {
-          name: other.clone(),
+          col_id: self.variables_manager.get_variable_index(other)?,
         });
         filter.push(Instruction::NotEqualBinaryOperator);
         filter.push(Instruction::InverseRot3);
@@ -713,10 +686,18 @@ impl Compiler
     // Create block
     Ok(BlockMatch::MatchEdge {
       instructions: instructions,
-      left_variable: source_variable,
-      edge_variable,
-      right_variable: destination_variable,
-      path_variable,
+      left_variable: self
+        .variables_manager
+        .get_variable_index_option(&source_variable)?,
+      edge_variable: self
+        .variables_manager
+        .get_variable_index_option(&edge_variable)?,
+      right_variable: self
+        .variables_manager
+        .get_variable_index_option(&destination_variable)?,
+      path_variable: self
+        .variables_manager
+        .get_variable_index_option(&path_variable)?,
       filter,
       directivity: edge.directivity,
     })
@@ -731,35 +712,30 @@ impl Compiler
   ) -> Result<(Vec<RWExpression>, Instructions, Modifiers)>
   {
     let mut variables = Vec::<RWExpression>::new();
-    let mut val_variables = Default::default();
-    let mut filter = Default::default();
+    let filter = Default::default();
     if all
     {
-      val_variables = validator.to_variables();
-      for (name, _) in validator.variables_ref()
+      for (name, var) in self.variables_manager.variables_iter()
       {
         variables.push(instructions::RWExpression {
-          name: name.to_owned(),
+          name: name.clone(),
           instructions: vec![Instruction::GetVariable {
-            name: name.to_owned(),
+            col_id: var.col_id(),
           }],
           aggregations: Default::default(),
         });
       }
     }
-    let mut variable_names = Vec::<String>::new();
     for e in expressions.iter()
     {
       let mut instructions = Instructions::new();
-      let mut aggregations = HashMap::<String, RWAggregation>::new();
-      compile_expression(
-        function_manager,
-        validator,
+      let mut aggregations = Vec::<(usize, RWAggregation)>::new();
+      self.compile_expression(
         &e.expression,
         &mut instructions,
         &mut Some(&mut aggregations),
       )?;
-      if variable_names.contains(&e.name)
+      if variables.iter().any(|v| v.name == e.name)
       {
         return Err(
           CompileTimeError::ColumnNameConflict {
@@ -768,51 +744,45 @@ impl Compiler
           .into(),
         );
       }
-      variable_names.push(e.name.to_owned());
       variables.push(RWExpression {
-        name: e.name.to_owned(),
+        name: e.name.clone(),
         instructions,
         aggregations,
       });
-      val_variables.insert(
-        e.name.to_owned(),
-        expression_analyser::ExpressionInfo::analyse(
-          validator.variables_ref(),
-          &function_manager,
-          &e.expression,
-        )?
-        .expression_type
-        .into(),
-      );
+      // val_variables.insert(
+      //   e.name.to_owned(),
+      //   expression_analyser::ExpressionInfo::analyse(
+      //     &self.variables_manager,
+      //     &self.function_manager,
+      //     &e.expression,
+      //   )?
+      //   .expression_type
+      //   .into(),
+      // );
     }
-    // TODO this is ugly, there need to be a better way to have two sets of variables for validation
-    let mut variables_tmp = validator.variables_ref().to_owned();
-    variables_tmp.extend(val_variables.to_owned().into_iter());
-    validator.set_variables(variables_tmp);
+    // // TODO this is ugly, there need to be a better way to have two sets of variables for validation
+    // let mut variables_tmp = self.variables_manager.variables_ref().to_owned();
+    // variables_tmp.extend(val_variables.to_owned().into_iter());
+    // self.variables_manager.set_variables(variables_tmp);
 
-    // Compile where expression
-    if let Some(where_expression) = where_expression
+    // // Compile where expression
+    if let Some(_where_expression) = where_expression
     {
-      let ei = expression_analyser::ExpressionInfo::analyse(
-        validator.variables_ref(),
-        function_manager,
-        where_expression,
-      )?;
-      if ei.aggregation_result
-      {
-        return Err(CompileTimeError::InvalidAggregation.into());
-      }
-      compile_expression(
-        function_manager,
-        validator,
-        where_expression,
-        &mut filter,
-        &mut None,
-      )?;
+      todo!("Fix me.")
+      //   let ei = expression_analyser::ExpressionInfo::analyse(
+      //     &self.variables_manager,
+      //     &self.function_manager,
+      //     where_expression,
+      //   )?;
+      //   if ei.aggregation_result
+      //   {
+      //     return Err(CompileTimeError::InvalidAggregation.into());
+      //   }
+      //   self.compile_expression(where_expression, &mut filter, &mut None)?;
     }
 
-    let modifiers = compile_modifiers(function_manager, validator, &modifiers)?;
-    validator.set_variables(val_variables);
+    let modifiers = self.compile_modifiers(&modifiers)?;
+    // self.variables_manager.set_variables(val_variables);
 
     Ok((variables, filter, modifiers))
   }
@@ -831,33 +801,22 @@ impl Compiler
       crate::parser::ast::Pattern::Node(node) =>
       {
         let mut instructions = Instructions::new();
-        validator.validate_node(node)?;
+        self.variables_manager.validate_node(node)?;
         let mut filter = Instructions::new();
-        compile_match_node(
-          function_manager,
-          validator,
-          node,
-          &mut instructions,
-          &mut filter,
-          None,
-        )?;
+        self.compile_match_node(node, &mut instructions, &mut filter, None)?;
         Ok(BlockMatch::MatchNode {
           instructions: instructions,
-          variable: node.variable.to_owned(),
+          variable: self
+            .variables_manager
+            .get_variable_index_option(&node.variable)?,
           filter,
         })
       }
-      crate::parser::ast::Pattern::Edge(edge) => compile_match_edge(
-        function_manager,
-        validator,
-        None,
-        &edge,
-        is_single_match,
-        &mut edge_variables,
-      ),
-      crate::parser::ast::Pattern::Path(path) => compile_match_edge(
-        function_manager,
-        validator,
+      crate::parser::ast::Pattern::Edge(edge) =>
+      {
+        self.compile_match_edge(None, &edge, is_single_match, &mut edge_variables)
+      }
+      crate::parser::ast::Pattern::Path(path) => self.compile_match_edge(
         Some(path.variable.to_owned()),
         &path.edge,
         is_single_match,
@@ -869,34 +828,29 @@ impl Compiler
     if let Some(where_expression) = where_expression
     {
       let ei = expression_analyser::ExpressionInfo::analyse(
-        validator.variables_ref(),
-        function_manager,
+        &self.variables_manager,
+        &self.function_manager,
         where_expression,
       )?;
       if ei.aggregation_result
       {
         return Err(CompileTimeError::InvalidAggregation.into());
       }
-      compile_expression(
-        function_manager,
-        validator,
-        where_expression,
-        &mut filter,
-        &mut None,
-      )?;
+      self.compile_expression(where_expression, &mut filter, &mut None)?;
     }
     Ok(Block::BlockMatch {
       blocks,
       filter,
       optional,
+      variables_size: self.variables_size(),
     })
   }
 
   fn check_for_constant_integer_expression(&mut self, x: &ast::Expression) -> Result<()>
   {
     let ei = expression_analyser::ExpressionInfo::analyse(
-      validator.variables_ref(),
-      function_manager,
+      &self.variables_manager,
+      &self.function_manager,
       &x,
     )?;
     if !ei.constant
@@ -923,15 +877,9 @@ impl Compiler
       .limit
       .as_ref()
       .map(|x| {
-        check_for_constant_integer_expression(function_manager, validator, x)?;
+        self.check_for_constant_integer_expression(x)?;
         let mut instructions = Instructions::new();
-        compile_expression(
-          function_manager,
-          validator,
-          &x,
-          &mut instructions,
-          &mut None,
-        )?;
+        self.compile_expression(&x, &mut instructions, &mut None)?;
         Ok::<_, error::Error>(instructions)
       })
       .transpose()?;
@@ -939,15 +887,9 @@ impl Compiler
       .skip
       .as_ref()
       .map(|x| {
-        check_for_constant_integer_expression(function_manager, validator, x)?;
+        self.check_for_constant_integer_expression(x)?;
         let mut instructions = Instructions::new();
-        compile_expression(
-          function_manager,
-          validator,
-          &x,
-          &mut instructions,
-          &mut None,
-        )?;
+        self.compile_expression(&x, &mut instructions, &mut None)?;
         Ok::<_, error::Error>(instructions)
       })
       .transpose()?;
@@ -959,13 +901,7 @@ impl Compiler
           .map(|x| {
             let mut instructions = Instructions::new();
 
-            compile_expression(
-              function_manager,
-              validator,
-              &x.expression,
-              &mut instructions,
-              &mut None,
-            )?;
+            self.compile_expression(&x.expression, &mut instructions, &mut None)?;
 
             Ok(instructions::OrderBy {
               asc: x.asc,
@@ -986,14 +922,11 @@ impl Compiler
 pub(crate) fn compile(
   function_manager: &functions::Manager,
   statements: crate::parser::ast::Statements,
-) -> Result<super::Program>
+) -> Result<interpreter::Program>
 {
-  let validator = validator::Validator::new(function_manager.clone());
-  let compiler = Compiler {
+  let mut compiler = Compiler {
+    variables_manager: VariablesManager::new(function_manager),
     function_manager: function_manager.clone(),
-    validator,
-    variables: Default::default(),
-    persistent_variables: 0,
     temporary_variables: 0,
   };
   let mut statements_err = Ok(());
@@ -1021,7 +954,6 @@ pub(crate) fn compile(
             variables,
             filter,
             modifiers,
-            variables_size: compiler.variables_size(),
           })
         }
         ast::Statement::Call(call) =>
@@ -1034,7 +966,6 @@ pub(crate) fn compile(
           Ok(Block::Call {
             arguments: instructions,
             name: call.name.to_owned(),
-            variables_size: compiler.variables_size(),
           })
         }
         ast::Statement::With(with) =>
@@ -1049,19 +980,20 @@ pub(crate) fn compile(
             variables,
             filter,
             modifiers,
-            variables_size: compiler.variables_size(),
           })
         }
         ast::Statement::Unwind(unwind) =>
         {
           let mut instructions = Instructions::new();
           compiler.compile_expression(&unwind.expression, &mut instructions, &mut None)?;
-          validator.declare_variable(
+          compiler.variables_manager.declare_variable(
             unwind.name.to_owned(),
             expression_analyser::ExpressionType::Variant,
           )?;
           Ok(Block::Unwind {
-            name: unwind.name.to_owned(),
+            col_id: compiler
+              .variables_manager
+              .get_variable_index(&unwind.name)?,
             instructions,
             variables_size: compiler.variables_size(),
           })
@@ -1074,7 +1006,7 @@ pub(crate) fn compile(
             .map(|expr| {
               let mut instructions = Instructions::new();
               let ei = expression_analyser::ExpressionInfo::analyse(
-                validator.variables_ref(),
+                &compiler.variables_manager,
                 function_manager,
                 expr,
               )?;
@@ -1091,7 +1023,6 @@ pub(crate) fn compile(
               Ok(instructions)
             })
             .collect::<Result<_>>()?,
-          variables_size: compiler.variables_size(),
         }),
         ast::Statement::Update(update_statement) => Ok(Block::Update {
           updates: update_statement
@@ -1103,9 +1034,7 @@ pub(crate) fn compile(
               | ast::OneUpdate::AddProperty(update_property) =>
               {
                 let mut instructions = Instructions::new();
-                compile_expression(
-                  function_manager,
-                  &mut validator,
+                compiler.compile_expression(
                   &update_property.expression,
                   &mut instructions,
                   &mut None,
@@ -1114,12 +1043,16 @@ pub(crate) fn compile(
                 match x
                 {
                   ast::OneUpdate::SetProperty(_) => Ok(instructions::UpdateOne::SetProperty {
-                    target: update_property.target.to_owned(),
+                    target: compiler
+                      .variables_manager
+                      .get_variable_index(&update_property.target)?,
                     path: update_property.path.to_owned(),
                     instructions,
                   }),
                   ast::OneUpdate::AddProperty(_) => Ok(instructions::UpdateOne::AddProperty {
-                    target: update_property.target.to_owned(),
+                    target: compiler
+                      .variables_manager
+                      .get_variable_index(&update_property.target)?,
                     path: update_property.path.to_owned(),
                     instructions,
                   }),
@@ -1134,18 +1067,24 @@ pub(crate) fn compile(
               ast::OneUpdate::RemoveProperty(remove_property) =>
               {
                 Ok(instructions::UpdateOne::RemoveProperty {
-                  target: remove_property.target.to_owned(),
+                  target: compiler
+                    .variables_manager
+                    .get_variable_index(&remove_property.target)?,
                   path: remove_property.path.to_owned(),
                 })
               }
               ast::OneUpdate::AddLabels(add_labels) => Ok(instructions::UpdateOne::AddLabels {
-                target: add_labels.target.to_owned(),
+                target: compiler
+                  .variables_manager
+                  .get_variable_index(&add_labels.target)?,
                 labels: add_labels.labels.to_owned(),
               }),
               ast::OneUpdate::RemoveLabels(rm_labels) =>
               {
                 Ok(instructions::UpdateOne::RemoveLabels {
-                  target: rm_labels.target.to_owned(),
+                  target: compiler
+                    .variables_manager
+                    .get_variable_index(&rm_labels.target)?,
                   labels: rm_labels.labels.to_owned(),
                 })
               }
@@ -1159,7 +1098,7 @@ pub(crate) fn compile(
     .scan(&mut statements_err, |err, gp| {
       gp.map_err(|e| **err = Err(e)).ok()
     });
-  let program = program.collect::<super::Program>();
+  let program = program.collect::<interpreter::Program>();
   statements_err?;
   if crate::consts::SHOW_PROGRAM
   {

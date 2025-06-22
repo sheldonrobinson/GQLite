@@ -745,6 +745,14 @@ impl_to_value!(Edge, Edge);
 impl_to_value!(Vec<Value>, Array);
 impl_to_value!(ValueObject, Object);
 
+impl Into<Value> for &str
+{
+  fn into(self) -> Value
+  {
+    Value::String(self.into())
+  }
+}
+
 #[derive(Debug, Eq, PartialEq, Clone, Copy, Hash)]
 pub struct Key
 {
@@ -882,6 +890,21 @@ impl std::fmt::Display for Path
     write!(f, "])->{}", self.destination)
   }
 }
+
+#[cfg(test)]
+macro_rules! array {
+  () => (
+      $crate::graph::Value::Array(Default::default())
+  );
+  ($($x:expr),+ $(,)?) => (
+    $crate::graph::Value::Array(
+      vec![$($x.into()),+]
+    )
+  );
+}
+
+#[cfg(test)]
+pub(crate) use array;
 
 #[cfg(test)]
 macro_rules! properties {

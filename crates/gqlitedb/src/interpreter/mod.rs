@@ -1,7 +1,4 @@
-pub(crate) mod compiler;
 pub(crate) mod evaluators;
-pub(crate) mod expression_analyser;
-mod instructions;
-pub(crate) mod validator;
+pub(crate) mod instructions;
 
-type Program = Vec<instructions::Block>;
+pub(crate) type Program = Vec<instructions::Block>;
