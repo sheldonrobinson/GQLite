@@ -1,6 +1,23 @@
+# Prevent two pipelines to run for a merge request and for wip branches
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_COMMIT_REF_NAME =~ /wip\/.*/
+      when: always
+    - if: $CI_COMMIT_REF_NAME =~ /wip\/.*/
+      when: never
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: never
+    - if: $CI_COMMIT_BRANCH
+
 stages: # List of stages for jobs, and their order of execution
+  - precheck
   - build
   - test
+
+include:
+  - project: "cyloncore/cc_ci_templates"
+    file: "/scripts-ci.yml"
+    ref: "stable"
 
 .build_template: &build_definition
   script:
@@ -40,6 +57,17 @@ stages: # List of stages for jobs, and their order of execution
       junit:
         - build/Testing/junit/*.xml
         - target/nextest/default/junit
+
+precheck:
+  stage: precheck
+  extends:
+    - .cc_retrieve_scripts
+    - .cc_check_binary_files
+    - .cc_check_commit_message
+  script:
+    - echo "Pre-check are running."
+  variables:
+    CC_CI_REF_BRANCH: "dev/2"
 
 # Debian
 debian:build:
