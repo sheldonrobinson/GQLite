@@ -259,6 +259,7 @@ endif()
 ## Run tests
 
 option(GQLITE_TESTS_OUTPUT_JUNIT "Make GQLite test output junit" OFF)
+option(GQLITE_TESTS_DISABLE_RUST_TESTS "Disable rust unittest (intended for CI)" OFF)
 
 if(GQLITE_TESTS_OUTPUT_JUNIT)
   make_directory(${CMAKE_BINARY_DIR}/Testing/junit)
@@ -269,6 +270,14 @@ if(GQLITE_TESTS_OUTPUT_JUNIT)
 endif()
 
 # add_test(NAME gqlite-cpp COMMAND ${CMAKE_CURRENT_BINARY_DIR}/gqlite_cpp_tests ${GQLITE_CPP_EXTRA_ARGS})
+
+if(NOT GQLITE_TESTS_DISABLE_RUST_TESTS)
+  add_test(NAME gqlite-rs COMMAND
+      ${CMAKE_COMMAND} -E env
+      CARGO_TARGET_DIR=${CMAKE_BINARY_DIR}/cargo/build
+      ${Rust_CARGO_CACHED} test
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/)
+endif()
 
 if(RSPEC_FOUND)
   add_test(NAME gqlite-rb-rspec COMMAND ${RSPEC_EXECUTABLE} ${GQLITE_RSPEC_EXTRA_ARGS} ${CMAKE_CURRENT_SOURCE_DIR}/tests/rb/gqlite-rspec.rb  )

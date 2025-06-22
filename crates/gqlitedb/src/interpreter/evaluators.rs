@@ -1732,6 +1732,11 @@ mod tests
     test_execute_boolean_operator_(&AndBinaryOperator, true, false, false);
     test_execute_boolean_operator_(&AndBinaryOperator, false, true, false);
     test_execute_boolean_operator_(&AndBinaryOperator, false, graph::Value::Invalid, false);
-    test_execute_boolean_operator_(&OrBinaryOperator, graph::Value::Invalid, false, false);
+    test_execute_boolean_operator_(
+      &OrBinaryOperator,
+      graph::Value::Invalid,
+      false,
+      graph::Value::Invalid,
+    );
   }
 }

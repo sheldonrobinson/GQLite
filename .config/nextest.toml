@@ -1,0 +1,8 @@
+[profile.default.junit]
+path = "junit.xml"
+# These are the default values, specified for clarity.
+store-success-output = false
+store-failure-output = true
+
+[profile.default]
+default-filter = 'all()'

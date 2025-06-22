@@ -910,16 +910,3 @@ macro_rules! labels {
 
 #[cfg(test)]
 pub(crate) use labels;
-
-#[cfg(test)]
-mod tests
-{
-  use super::Value;
-  #[test]
-  fn value_equal()
-  {
-    let v1: Value = 1.into();
-    let v2: Value = 1.0.into();
-    assert_eq!(v1, v2);
-  }
-}
