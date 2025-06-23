@@ -316,9 +316,7 @@ impl Compiler
         .variables_manager
         .get_variable_index_option(&node.variable)?,
     );
-    self
-      .variables_manager
-      .remove_from_unset_variables(&node.variable);
+    self.variables_manager.mark_variables_as_set(&node.variable);
     self.compile_optional_expression(&node.properties, instructions)?;
     let mut labels = Default::default();
     self.compile_labels_expression(&mut labels, &node.labels)?;
@@ -447,18 +445,18 @@ impl Compiler
         {
           if self
             .variables_manager
-            .is_unset_variable(&edge.source.variable)
-          {
-            self.compile_create_node(&edge.source, &mut instructions, &mut variables)?;
-            instructions.push(Instruction::Duplicate);
-          }
-          else
+            .is_set_variable(&edge.source.variable)
           {
             instructions.push(Instruction::GetVariable {
               col_id: self
                 .variables_manager
                 .get_variable_index(edge.source.variable.as_ref().unwrap())?,
             });
+          }
+          else
+          {
+            self.compile_create_node(&edge.source, &mut instructions, &mut variables)?;
+            instructions.push(Instruction::Duplicate);
           }
           if edge.source.variable.is_some()
             && edge.destination.variable.is_some()
@@ -468,13 +466,7 @@ impl Compiler
           }
           else if self
             .variables_manager
-            .is_unset_variable(&edge.destination.variable)
-          {
-            self.compile_create_node(&edge.destination, &mut instructions, &mut variables)?;
-            instructions.push(Instruction::Duplicate);
-            instructions.push(Instruction::Rot3);
-          }
-          else
+            .is_set_variable(&edge.destination.variable)
           {
             instructions.push(Instruction::GetVariable {
               col_id: self
@@ -482,11 +474,18 @@ impl Compiler
                 .get_variable_index(edge.destination.variable.as_ref().unwrap())?,
             });
           }
+          else
+          {
+            self.compile_create_node(&edge.destination, &mut instructions, &mut variables)?;
+            instructions.push(Instruction::Duplicate);
+            instructions.push(Instruction::Rot3);
+          }
           variables.push(
             self
               .variables_manager
               .get_variable_index_option(&edge.variable)?,
           );
+          self.variables_manager.mark_variables_as_set(&edge.variable);
           self.compile_optional_expression(&edge.properties, &mut instructions)?;
           if !edge.labels.is_string()
           {
@@ -522,6 +521,7 @@ impl Compiler
     get_node_function_name: Option<&'static str>,
   ) -> Result<()>
   {
+    self.variables_manager.mark_variables_as_set(&node.variable);
     self.compile_optional_expression(&node.properties, instructions)?;
     let mut labels = Default::default();
     if node.labels.is_all_inclusive()
@@ -565,7 +565,16 @@ impl Compiler
     let mut filter = Instructions::new();
     if self
       .variables_manager
-      .is_unset_variable(&edge.source.variable)
+      .is_set_variable(&edge.source.variable)
+    {
+      instructions.push(Instruction::GetVariable {
+        col_id: self
+          .variables_manager
+          .get_variable_index(edge.source.variable.as_ref().unwrap())?,
+      });
+      instructions.push(Instruction::CreateNodeQuery { labels: vec![] });
+    }
+    else
     {
       source_variable = edge.source.variable.to_owned();
       self.compile_match_node(
@@ -575,19 +584,19 @@ impl Compiler
         Some("get_source"),
       )?;
     }
-    else
+    let mut destination_variable = None;
+    if self
+      .variables_manager
+      .is_set_variable(&edge.destination.variable)
     {
       instructions.push(Instruction::GetVariable {
         col_id: self
           .variables_manager
-          .get_variable_index(edge.source.variable.as_ref().unwrap())?,
+          .get_variable_index(edge.destination.variable.as_ref().unwrap())?,
       });
       instructions.push(Instruction::CreateNodeQuery { labels: vec![] });
     }
-    let mut destination_variable = None;
-    if self
-      .variables_manager
-      .is_unset_variable(&edge.destination.variable)
+    else
     {
       destination_variable = edge.destination.variable.to_owned();
       self.compile_match_node(
@@ -597,17 +606,18 @@ impl Compiler
         Some("get_destination"),
       )?;
     }
-    else
+    if self.variables_manager.is_set_variable(&edge.variable)
     {
       instructions.push(Instruction::GetVariable {
         col_id: self
           .variables_manager
-          .get_variable_index(edge.destination.variable.as_ref().unwrap())?,
+          .get_variable_index(edge.variable.as_ref().unwrap())?,
       });
-      instructions.push(Instruction::CreateNodeQuery { labels: vec![] });
+      instructions.push(Instruction::CreateEdgeQuery { labels: vec![] });
     }
-    if self.variables_manager.is_unset_variable(&edge.variable)
+    else
     {
+      self.variables_manager.mark_variables_as_set(&edge.variable);
       self.compile_optional_expression(&edge.properties, &mut instructions)?;
       // Handle labels
       let mut labels = Default::default();
@@ -626,15 +636,6 @@ impl Compiler
         filter.push(Instruction::Swap);
       }
       instructions.push(Instruction::CreateEdgeQuery { labels });
-    }
-    else
-    {
-      instructions.push(Instruction::GetVariable {
-        col_id: self
-          .variables_manager
-          .get_variable_index(edge.variable.as_ref().unwrap())?,
-      });
-      instructions.push(Instruction::CreateEdgeQuery { labels: vec![] });
     }
     // Make sure that this edge isn't equal to an already matched edge
     let edge_variable = if single_match
@@ -663,6 +664,7 @@ impl Compiler
       previous_edges.push(edge_variable.clone());
       Some(edge_variable)
     };
+    self.variables_manager.mark_variables_as_set(&path_variable);
     // Create block
     Ok(BlockMatch::MatchEdge {
       instructions: instructions,

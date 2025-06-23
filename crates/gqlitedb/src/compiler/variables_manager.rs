@@ -101,7 +101,7 @@ impl Variable
 pub(crate) struct VariablesManager
 {
   variables: HashMap<String, Variable>,
-  unset_variables: Vec<String>,
+  set_variables: Vec<String>,
   function_manager: functions::Manager,
 }
 
@@ -111,11 +111,16 @@ impl VariablesManager
   {
     Self {
       variables: Default::default(),
-      unset_variables: Default::default(),
+      set_variables: Default::default(),
       function_manager: function_manager.clone(),
     }
   }
-
+  pub(crate) fn has_variable(&self, identifier: &Option<String>) -> bool
+  {
+    identifier
+      .as_ref()
+      .map_or(false, |identifier| self.variables.contains_key(identifier))
+  }
   /// Get the index of the variable in the row of variables
   pub(crate) fn get_variable_index(&self, identifier: &String) -> Result<usize>
   {
@@ -150,17 +155,17 @@ impl VariablesManager
   {
     self.variables.iter()
   }
-  pub(crate) fn is_unset_variable(&self, name: &Option<String>) -> bool
+  pub(crate) fn is_set_variable(&self, name: &Option<String>) -> bool
   {
     name
       .as_ref()
-      .map_or(false, |name| self.unset_variables.contains(name))
+      .map_or(false, |name| self.set_variables.contains(name))
   }
-  pub(crate) fn remove_from_unset_variables(&mut self, name: &Option<String>)
+  pub(crate) fn mark_variables_as_set(&mut self, name: &Option<String>)
   {
     if let Some(name) = name
     {
-      self.unset_variables.retain(|x| x != name);
+      self.set_variables.push(name.clone());
     }
   }
   fn declare_variable(
@@ -185,7 +190,6 @@ impl VariablesManager
         variable.clone(),
         Variable::from_expression(expression_type, self.variables.len()),
       );
-      self.unset_variables.push(variable);
       Ok(())
     }
   }
@@ -243,7 +247,6 @@ impl VariablesManager
           var_name.to_owned(),
           Variable::from_node((*node).to_owned(), self.variables.len()),
         );
-        self.unset_variables.push(var_name.clone());
         Ok(())
       }
     }
@@ -286,7 +289,6 @@ impl VariablesManager
           var_name.to_owned(),
           Variable::from_edge((*edge).to_owned(), self.variables.len()),
         );
-        self.unset_variables.push(var_name.to_owned());
         Ok(())
       }
     }
@@ -468,9 +470,9 @@ impl VariablesManager
 
   pub(crate) fn analyse(&mut self, statement: &ast::Statement) -> Result<()>
   {
-    if !self.unset_variables.is_empty()
+    if self.set_variables.len() != self.variables.len()
     {
-      return Err(InternalError::UnsetVariablesIsNotEmpty.into());
+      return Err(InternalError::NotAllVariablesAreSet.into());
     }
     #[allow(unused_variables)]
     match statement
@@ -479,6 +481,23 @@ impl VariablesManager
       {
         for pattern in create.patterns.iter()
         {
+          match &pattern
+          {
+            ast::Pattern::Node(n) =>
+            {
+              if self.has_variable(&n.variable)
+              {
+                return Err(
+                  CompileTimeError::VariableAlreadyBound {
+                    name: n.variable.clone().unwrap().to_owned(),
+                  }
+                  .into(),
+                );
+              }
+            }
+            _ =>
+            {}
+          }
           self.analyse_pattern(pattern)?;
         }
       }
