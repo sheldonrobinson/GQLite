@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::prelude::*;
 
-use compiler::expression_analyser::{ExpressionInfo, ExpressionType};
+use compiler::expression_analyser::{self, ExpressionInfo, ExpressionType};
 use parser::ast;
 
 // __     __         _       _     _
@@ -101,6 +101,7 @@ impl Variable
 pub(crate) struct VariablesManager
 {
   variables: HashMap<String, Variable>,
+  unset_variables: Vec<String>,
   function_manager: functions::Manager,
 }
 
@@ -110,6 +111,7 @@ impl VariablesManager
   {
     Self {
       variables: Default::default(),
+      unset_variables: Default::default(),
       function_manager: function_manager.clone(),
     }
   }
@@ -148,7 +150,20 @@ impl VariablesManager
   {
     self.variables.iter()
   }
-  pub(crate) fn declare_variable(
+  pub(crate) fn is_unset_variable(&self, name: &Option<String>) -> bool
+  {
+    name
+      .as_ref()
+      .map_or(false, |name| self.unset_variables.contains(name))
+  }
+  pub(crate) fn remove_from_unset_variables(&mut self, name: &Option<String>)
+  {
+    if let Some(name) = name
+    {
+      self.unset_variables.retain(|x| x != name);
+    }
+  }
+  fn declare_variable(
     &mut self,
     variable: impl Into<String>,
     expression_type: ExpressionType,
@@ -167,14 +182,15 @@ impl VariablesManager
     else
     {
       self.variables.insert(
-        variable,
+        variable.clone(),
         Variable::from_expression(expression_type, self.variables.len()),
       );
+      self.unset_variables.push(variable);
       Ok(())
     }
   }
   // Validate a node variable, and if unknown, declare it
-  pub(crate) fn validate_node(&mut self, node: &ast::NodePattern) -> Result<()>
+  fn validate_node(&mut self, node: &ast::NodePattern) -> Result<()>
   {
     if let Some(var_name) = &node.variable
     {
@@ -227,6 +243,7 @@ impl VariablesManager
           var_name.to_owned(),
           Variable::from_node((*node).to_owned(), self.variables.len()),
         );
+        self.unset_variables.push(var_name.clone());
         Ok(())
       }
     }
@@ -235,7 +252,7 @@ impl VariablesManager
       Ok(())
     }
   }
-  pub(crate) fn validate_edge(&mut self, edge: &ast::EdgePattern) -> Result<()>
+  fn validate_edge(&mut self, edge: &ast::EdgePattern) -> Result<()>
   {
     self.validate_node(&edge.source)?;
     self.validate_node(&edge.destination)?;
@@ -269,6 +286,7 @@ impl VariablesManager
           var_name.to_owned(),
           Variable::from_edge((*edge).to_owned(), self.variables.len()),
         );
+        self.unset_variables.push(var_name.to_owned());
         Ok(())
       }
     }
@@ -279,7 +297,7 @@ impl VariablesManager
   }
   /// Check if the node variable exists, and that it is a node and that the definition
   /// is compatible.
-  pub(crate) fn is_valid_existing_node(&self, node: &ast::NodePattern) -> Result<bool>
+  fn is_valid_existing_node(&self, node: &ast::NodePattern) -> Result<bool>
   {
     if let Some(var_name) = &node.variable
     {
@@ -334,7 +352,7 @@ impl VariablesManager
   }
   /// Check if the edge variable exists, and that it is a edge and that the definition
   /// is compatible.
-  pub(crate) fn is_valid_existing_edge(&self, edge: &ast::EdgePattern) -> Result<bool>
+  fn is_valid_existing_edge(&self, edge: &ast::EdgePattern) -> Result<bool>
   {
     if let Some(var_name) = &edge.variable
     {
@@ -388,6 +406,7 @@ impl VariablesManager
     }
   }
 
+  /// Expression type for the given expression type
   pub(crate) fn expression_type(&self, name: impl Into<String>) -> Result<ExpressionType>
   {
     let name = name.into();
@@ -400,5 +419,106 @@ impl VariablesManager
         })?
         .variable_type,
     )
+  }
+
+  fn analyse_edge_path(
+    &mut self,
+    path_variable: Option<String>,
+    edge: &crate::parser::ast::EdgePattern,
+  ) -> Result<()>
+  {
+    if let Some(path_variable) = &path_variable
+    {
+      self.declare_variable(
+        path_variable.to_owned(),
+        expression_analyser::ExpressionType::Path,
+      )?;
+    }
+    if !self.is_valid_existing_node(&edge.destination)?
+    {
+      self.validate_node(&edge.source)?;
+    }
+    if !self.is_valid_existing_node(&edge.destination)?
+    {
+      self.validate_node(&edge.destination)?;
+    }
+    self.validate_edge(edge)?;
+    Ok(())
+  }
+
+  fn analyse_pattern(&mut self, pattern: &ast::Pattern) -> Result<()>
+  {
+    match pattern
+    {
+      ast::Pattern::Node(node) =>
+      {
+        self.validate_node(node)?;
+      }
+      ast::Pattern::Edge(edge) =>
+      {
+        self.analyse_edge_path(None, edge)?;
+      }
+      ast::Pattern::Path(path) =>
+      {
+        self.analyse_edge_path(None, &path.edge)?;
+      }
+    }
+    Ok(())
+  }
+
+  pub(crate) fn analyse(&mut self, statement: &ast::Statement) -> Result<()>
+  {
+    if !self.unset_variables.is_empty()
+    {
+      return Err(InternalError::UnsetVariablesIsNotEmpty.into());
+    }
+    #[allow(unused_variables)]
+    match statement
+    {
+      ast::Statement::Create(create) =>
+      {
+        for pattern in create.patterns.iter()
+        {
+          self.analyse_pattern(pattern)?;
+        }
+      }
+      ast::Statement::Match(match_statement) =>
+      {
+        for pattern in match_statement.patterns.iter()
+        {
+          self.analyse_pattern(pattern)?;
+        }
+        //   if !self
+        //   .variables_manager
+        //   .is_valid_existing_node(&edge.source)?
+        // {
+        //   self.variables_manager.validate_node(&edge.source)?;
+        // }
+        // if !self
+        //   .variables_manager
+        //   .is_valid_existing_node(&edge.destination)?
+        // {
+        //   self.variables_manager.validate_node(&edge.destination)?;
+        // }
+      }
+      ast::Statement::Return(return_statement) =>
+      {}
+      ast::Statement::Call(call) =>
+      {}
+      ast::Statement::With(with) =>
+      {}
+      ast::Statement::Unwind(unwind) =>
+      {
+        self.declare_variable(
+          unwind.name.to_owned(),
+          expression_analyser::ExpressionType::Variant,
+        )?;
+      }
+      ast::Statement::Delete(delete) =>
+      {}
+      ast::Statement::Update(update) =>
+      {}
+    }
+    Ok(())
   }
 }

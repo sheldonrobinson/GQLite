@@ -38,3 +38,19 @@ fn test_evaluate_create_named_node()
 
   assert_eq!(value, array![array!["p"], array!["foo"]]);
 }
+
+#[test]
+fn test_evaluate_create_named_node_double_return()
+{
+  let store = crate::store::redb::Store::new(crate::tests::get_tmp_file().unwrap()).unwrap();
+
+  let value = eval_program(
+    &store,
+    programs::create_named_node_double_return(),
+    Default::default(),
+  )
+  .unwrap();
+  check_stats(store, 1, 0, 0, 2);
+
+  assert_eq!(value, array![array!["id", "p"], array![12, "foo"]]);
+}

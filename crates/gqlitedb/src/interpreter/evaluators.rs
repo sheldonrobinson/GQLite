@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
   prelude::*,
-  value_table::{MutableRowInterface, RowInterface},
+  value_table::{MutableRowInterface, Row, RowInterface},
 };
 use interpreter::instructions;
 
@@ -1007,16 +1007,17 @@ fn compute_return_with_table(
   {
     output_table = input_table
       .into_row_iter()
-      .map(|mut row| {
+      .map(|row| {
+        let mut out_row = Row::new(Default::default(), variables.len());
         for (col_index, rw_expr) in variables.iter().enumerate()
         {
           assert_eq!(rw_expr.aggregations.len(), 0);
           let mut stack = Stack::default();
           eval_instructions(&mut stack, &row, &rw_expr.instructions, &parameters)?;
           let value: graph::Value = stack.try_pop_into()?;
-          row.set(col_index, value.to_owned())?;
+          out_row.set(col_index, value.to_owned())?;
         }
-        Ok(row)
+        Ok(out_row)
       })
       .collect::<Result<Result<_>>>()??;
   }

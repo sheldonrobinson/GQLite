@@ -229,6 +229,8 @@ pub enum InternalError
   {
     got: usize, expected: usize
   },
+  #[error("Unset variables is not empty.")]
+  UnsetVariablesIsNotEmpty,
 }
 
 #[derive(thiserror::Error, Debug)]

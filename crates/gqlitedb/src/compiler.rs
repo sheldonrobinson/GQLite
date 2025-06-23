@@ -311,12 +311,14 @@ impl Compiler
     variables: &mut Vec<Option<value_table::ColId>>,
   ) -> Result<()>
   {
-    self.variables_manager.validate_node(&node)?;
     variables.push(
       self
         .variables_manager
         .get_variable_index_option(&node.variable)?,
     );
+    self
+      .variables_manager
+      .remove_from_unset_variables(&node.variable);
     self.compile_optional_expression(&node.properties, instructions)?;
     let mut labels = Default::default();
     self.compile_labels_expression(&mut labels, &node.labels)?;
@@ -445,18 +447,18 @@ impl Compiler
         {
           if self
             .variables_manager
-            .is_valid_existing_node(&edge.source)?
+            .is_unset_variable(&edge.source.variable)
+          {
+            self.compile_create_node(&edge.source, &mut instructions, &mut variables)?;
+            instructions.push(Instruction::Duplicate);
+          }
+          else
           {
             instructions.push(Instruction::GetVariable {
               col_id: self
                 .variables_manager
                 .get_variable_index(edge.source.variable.as_ref().unwrap())?,
             });
-          }
-          else
-          {
-            self.compile_create_node(&edge.source, &mut instructions, &mut variables)?;
-            instructions.push(Instruction::Duplicate);
           }
           if edge.source.variable.is_some()
             && edge.destination.variable.is_some()
@@ -466,7 +468,13 @@ impl Compiler
           }
           else if self
             .variables_manager
-            .is_valid_existing_node(&edge.destination)?
+            .is_unset_variable(&edge.destination.variable)
+          {
+            self.compile_create_node(&edge.destination, &mut instructions, &mut variables)?;
+            instructions.push(Instruction::Duplicate);
+            instructions.push(Instruction::Rot3);
+          }
+          else
           {
             instructions.push(Instruction::GetVariable {
               col_id: self
@@ -474,13 +482,6 @@ impl Compiler
                 .get_variable_index(edge.destination.variable.as_ref().unwrap())?,
             });
           }
-          else
-          {
-            self.compile_create_node(&edge.destination, &mut instructions, &mut variables)?;
-            instructions.push(Instruction::Duplicate);
-            instructions.push(Instruction::Rot3);
-          }
-          self.variables_manager.validate_edge(edge)?;
           variables.push(
             self
               .variables_manager
@@ -559,29 +560,12 @@ impl Compiler
     previous_edges: &mut Vec<String>,
   ) -> Result<BlockMatch>
   {
-    if let Some(path_variable) = &path_variable
-    {
-      self.variables_manager.declare_variable(
-        path_variable.to_owned(),
-        expression_analyser::ExpressionType::Path,
-      )?;
-    }
-
     let mut instructions = Instructions::new();
     let mut source_variable = None;
     let mut filter = Instructions::new();
     if self
       .variables_manager
-      .is_valid_existing_node(&edge.source)?
-    {
-      instructions.push(Instruction::GetVariable {
-        col_id: self
-          .variables_manager
-          .get_variable_index(edge.source.variable.as_ref().unwrap())?,
-      });
-      instructions.push(Instruction::CreateNodeQuery { labels: vec![] });
-    }
-    else
+      .is_unset_variable(&edge.source.variable)
     {
       source_variable = edge.source.variable.to_owned();
       self.compile_match_node(
@@ -591,19 +575,19 @@ impl Compiler
         Some("get_source"),
       )?;
     }
-    let mut destination_variable = None;
-    if self
-      .variables_manager
-      .is_valid_existing_node(&edge.destination)?
+    else
     {
       instructions.push(Instruction::GetVariable {
         col_id: self
           .variables_manager
-          .get_variable_index(edge.destination.variable.as_ref().unwrap())?,
+          .get_variable_index(edge.source.variable.as_ref().unwrap())?,
       });
       instructions.push(Instruction::CreateNodeQuery { labels: vec![] });
     }
-    else
+    let mut destination_variable = None;
+    if self
+      .variables_manager
+      .is_unset_variable(&edge.destination.variable)
     {
       destination_variable = edge.destination.variable.to_owned();
       self.compile_match_node(
@@ -613,30 +597,17 @@ impl Compiler
         Some("get_destination"),
       )?;
     }
-    if self.variables_manager.is_valid_existing_edge(edge)?
+    else
     {
-      if !self
-        .variables_manager
-        .is_valid_existing_node(&edge.source)?
-      {
-        self.variables_manager.validate_node(&edge.source)?;
-      }
-      if !self
-        .variables_manager
-        .is_valid_existing_node(&edge.destination)?
-      {
-        self.variables_manager.validate_node(&edge.destination)?;
-      }
       instructions.push(Instruction::GetVariable {
         col_id: self
           .variables_manager
-          .get_variable_index(edge.variable.as_ref().unwrap())?,
+          .get_variable_index(edge.destination.variable.as_ref().unwrap())?,
       });
-      instructions.push(Instruction::CreateEdgeQuery { labels: vec![] });
+      instructions.push(Instruction::CreateNodeQuery { labels: vec![] });
     }
-    else
+    if self.variables_manager.is_unset_variable(&edge.variable)
     {
-      self.variables_manager.validate_edge(edge)?;
       self.compile_optional_expression(&edge.properties, &mut instructions)?;
       // Handle labels
       let mut labels = Default::default();
@@ -655,6 +626,15 @@ impl Compiler
         filter.push(Instruction::Swap);
       }
       instructions.push(Instruction::CreateEdgeQuery { labels });
+    }
+    else
+    {
+      instructions.push(Instruction::GetVariable {
+        col_id: self
+          .variables_manager
+          .get_variable_index(edge.variable.as_ref().unwrap())?,
+      });
+      instructions.push(Instruction::CreateEdgeQuery { labels: vec![] });
     }
     // Make sure that this edge isn't equal to an already matched edge
     let edge_variable = if single_match
@@ -801,7 +781,6 @@ impl Compiler
       crate::parser::ast::Pattern::Node(node) =>
       {
         let mut instructions = Instructions::new();
-        self.variables_manager.validate_node(node)?;
         let mut filter = Instructions::new();
         self.compile_match_node(node, &mut instructions, &mut filter, None)?;
         Ok(BlockMatch::MatchNode {
@@ -934,6 +913,7 @@ pub(crate) fn compile(
     .iter()
     .map(|stmt| {
       compiler.temporary_variables = 0;
+      compiler.variables_manager.analyse(stmt)?;
       let inst = match stmt
       {
         ast::Statement::Create(create) => compiler.compile_create_patterns(&create.patterns),
@@ -986,10 +966,6 @@ pub(crate) fn compile(
         {
           let mut instructions = Instructions::new();
           compiler.compile_expression(&unwind.expression, &mut instructions, &mut None)?;
-          compiler.variables_manager.declare_variable(
-            unwind.name.to_owned(),
-            expression_analyser::ExpressionType::Variant,
-          )?;
           Ok(Block::Unwind {
             col_id: compiler
               .variables_manager

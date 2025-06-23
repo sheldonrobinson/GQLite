@@ -27,3 +27,12 @@ fn test_compile_create_named_node()
   let program = compile(&function_manager, ast::create_named_node()).unwrap();
   compare_program(program, programs::create_named_node())
 }
+
+#[test]
+fn test_compile_create_named_node_double_return()
+{
+  let function_manager = functions::Manager::new();
+
+  let program = compile(&function_manager, ast::create_named_node_double_return()).unwrap();
+  compare_program(program, programs::create_named_node_double_return())
+}

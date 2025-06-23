@@ -69,3 +69,57 @@ pub(crate) fn create_named_node() -> Program
     },
   ]
 }
+
+pub(crate) fn create_named_node_double_return() -> Program
+{
+  vec![
+    Block::Create {
+      actions: vec![CreateAction {
+        instructions: vec![
+          Instruction::Push { value: 12.into() },
+          Instruction::Push {
+            value: "foo".into(),
+          },
+          Instruction::CreateMap {
+            keys: vec!["id".into(), "name".into()],
+          },
+          Instruction::CreateNodeLiteral {
+            labels: Default::default(),
+          },
+        ],
+        variables: vec![Some(0)],
+      }],
+      variables_size: create_variable_size(1, 0),
+    },
+    Block::Return {
+      variables: vec![
+        RWExpression {
+          name: "id".into(),
+          instructions: vec![
+            Instruction::GetVariable { col_id: 0 },
+            Instruction::MemberAccess {
+              path: vec!["id".into()],
+            },
+          ],
+          aggregations: Default::default(),
+        },
+        RWExpression {
+          name: "p".into(),
+          instructions: vec![
+            Instruction::GetVariable { col_id: 0 },
+            Instruction::MemberAccess {
+              path: vec!["name".into()],
+            },
+          ],
+          aggregations: Default::default(),
+        },
+      ],
+      filter: vec![],
+      modifiers: Modifiers {
+        limit: None,
+        skip: None,
+        order_by: vec![],
+      },
+    },
+  ]
+}
