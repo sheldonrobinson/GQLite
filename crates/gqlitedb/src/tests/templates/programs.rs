@@ -50,16 +50,18 @@ pub(crate) fn create_named_node() -> Program
       variables_size: create_variable_size(1, 0),
     },
     Block::Return {
-      variables: vec![RWExpression {
-        name: "p".into(),
-        instructions: vec![
-          Instruction::GetVariable { col_id: 0 },
-          Instruction::MemberAccess {
-            path: vec!["name".into()],
-          },
-        ],
-        aggregations: Default::default(),
-      }],
+      variables: vec![(
+        "p".into(),
+        RWExpression {
+          instructions: vec![
+            Instruction::GetVariable { col_id: 0 },
+            Instruction::MemberAccess {
+              path: vec!["name".into()],
+            },
+          ],
+          aggregations: Default::default(),
+        },
+      )],
       filter: vec![],
       modifiers: Modifiers {
         limit: None,
@@ -93,27 +95,88 @@ pub(crate) fn create_named_node_double_return() -> Program
     },
     Block::Return {
       variables: vec![
+        (
+          "id".into(),
+          RWExpression {
+            instructions: vec![
+              Instruction::GetVariable { col_id: 0 },
+              Instruction::MemberAccess {
+                path: vec!["id".into()],
+              },
+            ],
+            aggregations: Default::default(),
+          },
+        ),
+        (
+          "p".into(),
+          RWExpression {
+            instructions: vec![
+              Instruction::GetVariable { col_id: 0 },
+              Instruction::MemberAccess {
+                path: vec!["name".into()],
+              },
+            ],
+            aggregations: Default::default(),
+          },
+        ),
+      ],
+      filter: vec![],
+      modifiers: Modifiers {
+        limit: None,
+        skip: None,
+        order_by: vec![],
+      },
+    },
+  ]
+}
+
+pub(crate) fn double_with_return() -> Program
+{
+  vec![
+    Block::With {
+      variables: vec![
         RWExpression {
-          name: "id".into(),
-          instructions: vec![
-            Instruction::GetVariable { col_id: 0 },
-            Instruction::MemberAccess {
-              path: vec!["id".into()],
-            },
-          ],
-          aggregations: Default::default(),
+          instructions: vec![Instruction::Push { value: 1.into() }],
+          aggregations: vec![],
         },
         RWExpression {
-          name: "p".into(),
-          instructions: vec![
-            Instruction::GetVariable { col_id: 0 },
-            Instruction::MemberAccess {
-              path: vec!["name".into()],
-            },
-          ],
-          aggregations: Default::default(),
+          instructions: vec![Instruction::Push { value: 2.into() }],
+          aggregations: vec![],
         },
       ],
+      filter: vec![],
+      modifiers: Modifiers {
+        limit: None,
+        skip: None,
+        order_by: vec![],
+      },
+    },
+    Block::With {
+      variables: vec![
+        RWExpression {
+          instructions: vec![Instruction::GetVariable { col_id: 0 }],
+          aggregations: vec![],
+        },
+        RWExpression {
+          instructions: vec![Instruction::GetVariable { col_id: 1 }],
+          aggregations: vec![],
+        },
+      ],
+      filter: vec![],
+      modifiers: Modifiers {
+        limit: None,
+        skip: None,
+        order_by: vec![],
+      },
+    },
+    Block::Return {
+      variables: vec![(
+        "a".into(),
+        RWExpression {
+          instructions: vec![Instruction::GetVariable { col_id: 0 }],
+          aggregations: vec![],
+        },
+      )],
       filter: vec![],
       modifiers: Modifiers {
         limit: None,

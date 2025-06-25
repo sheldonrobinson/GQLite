@@ -54,3 +54,13 @@ fn test_evaluate_create_named_node_double_return()
 
   assert_eq!(value, array![array!["id", "p"], array![12, "foo"]]);
 }
+#[test]
+fn test_evaluate_double_with_return()
+{
+  let store = crate::store::redb::Store::new(crate::tests::get_tmp_file().unwrap()).unwrap();
+
+  let value = eval_program(&store, programs::double_with_return(), Default::default()).unwrap();
+  check_stats(store, 0, 0, 0, 0);
+
+  assert_eq!(value, array![array!["a"], array![1]]);
+}

@@ -2,20 +2,21 @@ use crate::parser::ast::*;
 
 pub(crate) fn simple_create_node() -> Statements
 {
-  vec![Statement::Create(Create {
+  vec![Create {
     patterns: vec![Pattern::Node(NodePattern {
       variable: None,
       labels: LabelExpression::None,
       properties: None,
     })],
-  })]
+  }
+  .into()]
 }
 
 /// AST for `CREATE (n {name: 'foo'}) RETURN n.name AS p`
 pub(crate) fn create_named_node() -> Statements
 {
   vec![
-    Statement::Create(Create {
+    Create {
       patterns: vec![Pattern::Node(NodePattern {
         variable: Some("n".into()),
         labels: LabelExpression::None,
@@ -32,8 +33,9 @@ pub(crate) fn create_named_node() -> Statements
           .into(),
         ),
       })],
-    }),
-    Statement::Return(Return {
+    }
+    .into(),
+    Return {
       all: false,
       expressions: vec![NamedExpression {
         name: "p".into(),
@@ -52,7 +54,8 @@ pub(crate) fn create_named_node() -> Statements
         order_by: None,
       },
       where_expression: None,
-    }),
+    }
+    .into(),
   ]
 }
 
@@ -60,7 +63,7 @@ pub(crate) fn create_named_node() -> Statements
 pub(crate) fn create_named_node_double_return() -> Statements
 {
   vec![
-    Statement::Create(Create {
+    Create {
       patterns: vec![Pattern::Node(NodePattern {
         variable: Some("n".into()),
         labels: LabelExpression::None,
@@ -80,8 +83,9 @@ pub(crate) fn create_named_node_double_return() -> Statements
           .into(),
         ),
       })],
-    }),
-    Statement::Return(Return {
+    }
+    .into(),
+    Return {
       all: false,
       expressions: vec![
         NamedExpression {
@@ -113,6 +117,77 @@ pub(crate) fn create_named_node_double_return() -> Statements
         order_by: None,
       },
       where_expression: None,
-    }),
+    }
+    .into(),
+  ]
+}
+
+/// AST for `WITH 1 AS n, 2 AS m WITH n AS a, m AS b RETURN a`
+pub(crate) fn double_with_return() -> Statements
+{
+  vec![
+    With {
+      all: false,
+      expressions: vec![
+        NamedExpression {
+          name: "n".into(),
+          expression: Value { value: 1.into() }.into(),
+        },
+        NamedExpression {
+          name: "m".into(),
+          expression: Value { value: 2.into() }.into(),
+        },
+      ],
+      modifiers: Modifiers {
+        skip: None,
+        limit: None,
+        order_by: None,
+      },
+      where_expression: None,
+    }
+    .into(),
+    With {
+      all: false,
+      expressions: vec![
+        NamedExpression {
+          name: "a".into(),
+          expression: Variable {
+            identifier: "n".into(),
+          }
+          .into(),
+        },
+        NamedExpression {
+          name: "b".into(),
+          expression: Variable {
+            identifier: "m".into(),
+          }
+          .into(),
+        },
+      ],
+      modifiers: Modifiers {
+        skip: None,
+        limit: None,
+        order_by: None,
+      },
+      where_expression: None,
+    }
+    .into(),
+    Return {
+      all: false,
+      expressions: vec![NamedExpression {
+        name: "a".into(),
+        expression: Variable {
+          identifier: "a".into(),
+        }
+        .into(),
+      }],
+      modifiers: Modifiers {
+        skip: None,
+        limit: None,
+        order_by: None,
+      },
+      where_expression: None,
+    }
+    .into(),
   ]
 }

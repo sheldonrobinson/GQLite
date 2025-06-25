@@ -691,21 +691,23 @@ impl Compiler
     expressions: &Vec<ast::NamedExpression>,
     where_expression: &Option<ast::Expression>,
     modifiers: &ast::Modifiers,
-  ) -> Result<(Vec<RWExpression>, Instructions, Modifiers)>
+  ) -> Result<(Vec<(String, RWExpression)>, Instructions, Modifiers)>
   {
-    let mut variables = Vec::<RWExpression>::new();
+    let mut variables = Vec::<(String, RWExpression)>::new();
     let filter = Default::default();
     if all
     {
       for (name, var) in self.variables_manager.variables_iter()
       {
-        variables.push(instructions::RWExpression {
-          name: name.clone(),
-          instructions: vec![Instruction::GetVariable {
-            col_id: var.col_id(),
-          }],
-          aggregations: Default::default(),
-        });
+        variables.push((
+          name.clone(),
+          instructions::RWExpression {
+            instructions: vec![Instruction::GetVariable {
+              col_id: var.col_id(),
+            }],
+            aggregations: Default::default(),
+          },
+        ));
       }
     }
     for e in expressions.iter()
@@ -717,7 +719,7 @@ impl Compiler
         &mut instructions,
         &mut Some(&mut aggregations),
       )?;
-      if variables.iter().any(|v| v.name == e.name)
+      if variables.iter().any(|(name, _)| *name == e.name)
       {
         return Err(
           CompileTimeError::ColumnNameConflict {
@@ -726,11 +728,14 @@ impl Compiler
           .into(),
         );
       }
-      variables.push(RWExpression {
-        name: e.name.clone(),
-        instructions,
-        aggregations,
-      });
+      variables.push((
+        e.name.clone(),
+        RWExpression {
+          instructions,
+          aggregations,
+        },
+      ));
+      self.variables_manager.analyse_named_expression(&e)?;
       // val_variables.insert(
       //   e.name.to_owned(),
       //   expression_analyser::ExpressionInfo::analyse(
@@ -765,6 +770,9 @@ impl Compiler
 
     let modifiers = self.compile_modifiers(&modifiers)?;
     // self.variables_manager.set_variables(val_variables);
+    self
+      .variables_manager
+      .keep_variables(variables.iter().map(|(n, _)| n))?;
 
     Ok((variables, filter, modifiers))
   }
@@ -959,7 +967,7 @@ pub(crate) fn compile(
             &with.modifiers,
           )?;
           Ok(Block::With {
-            variables,
+            variables: variables.into_iter().map(|(_, v)| v).collect(),
             filter,
             modifiers,
           })

@@ -67,13 +67,13 @@ impl RowInterface for Row
 {
   fn get(&self, index: usize) -> Result<&graph::Value>
   {
-    self.values.get(index).ok_or(
+    self.values.get(index).ok_or_else(|| {
       InternalError::InvalidIndex {
         index,
         length: self.values.len(),
       }
-      .into(),
-    )
+      .into()
+    })
   }
   fn len(&self) -> usize
   {

@@ -17,6 +17,18 @@ pub(crate) enum Statement
   Update(Update),
 }
 
+macro_rules! create_into_statement {
+  ( $x:tt ) => {
+    impl Into<Statement> for $x
+    {
+      fn into(self) -> Statement
+      {
+        Statement::$x(self)
+      }
+    }
+  };
+}
+
 pub(crate) type Statements = Vec<Statement>;
 
 #[derive(Debug)]
@@ -40,6 +52,8 @@ pub(crate) struct Create
   pub(crate) patterns: Vec<Pattern>,
 }
 
+create_into_statement! {Create}
+
 #[derive(Debug)]
 pub(crate) struct Match
 {
@@ -57,6 +71,8 @@ pub(crate) struct Return
   pub(crate) where_expression: Option<Expression>,
 }
 
+create_into_statement! {Return}
+
 #[derive(Debug)]
 pub(crate) struct With
 {
@@ -65,6 +81,8 @@ pub(crate) struct With
   pub(crate) modifiers: Modifiers,
   pub(crate) where_expression: Option<Expression>,
 }
+
+create_into_statement! {With}
 
 #[derive(Debug)]
 pub(crate) struct Unwind

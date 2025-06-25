@@ -161,9 +161,9 @@ impl VariablesManager
       .as_ref()
       .map_or(false, |name| self.set_variables.contains(name))
   }
-  pub(crate) fn mark_variables_as_set(&mut self, name: &Option<String>)
+  pub(crate) fn mark_variables_as_set<'a>(&mut self, name: impl Into<Option<&'a String>>)
   {
-    if let Some(name) = name
+    if let Some(name) = name.into()
     {
       self.set_variables.push(name.clone());
     }
@@ -467,7 +467,59 @@ impl VariablesManager
     }
     Ok(())
   }
-
+  pub(crate) fn analyse_named_expression(
+    &mut self,
+    named_expression: &ast::NamedExpression,
+  ) -> Result<()>
+  {
+    let expression_info = expression_analyser::ExpressionInfo::analyse(
+      self,
+      &self.function_manager,
+      &named_expression.expression,
+    )?;
+    println!("before {:?}", self.variables);
+    let col_id = self
+      .variables
+      .get(&named_expression.name)
+      .map_or(self.variables.len(), |var| var.col_id);
+    println!("------ {:?}", self.variables);
+    self.variables.insert(
+      named_expression.name.clone(),
+      Variable::from_expression(expression_info.expression_type, col_id),
+    );
+    println!("after  {:?}", self.variables);
+    if !self.set_variables.contains(&named_expression.name)
+    {
+      self.set_variables.push(named_expression.name.clone());
+    }
+    Ok(())
+  }
+  pub(crate) fn keep_variables<'a>(
+    &mut self,
+    names: impl IntoIterator<Item = &'a String>,
+  ) -> Result<()>
+  {
+    let mut new_variables = HashMap::<String, Variable>::default();
+    for (col_id, var_name) in names.into_iter().enumerate()
+    {
+      let mut var =
+        self
+          .variables
+          .remove(var_name)
+          .ok_or_else(|| InternalError::UnknownVariable {
+            name: var_name.clone(),
+          })?;
+      var.col_id = col_id;
+      new_variables.insert(var_name.clone(), var);
+    }
+    self.variables = new_variables;
+    self.set_variables = self
+      .variables
+      .iter()
+      .map(|(name, _)| name.clone())
+      .collect();
+    Ok(())
+  }
   pub(crate) fn analyse(&mut self, statement: &ast::Statement) -> Result<()>
   {
     if self.set_variables.len() != self.variables.len()

@@ -122,8 +122,6 @@ pub(crate) struct RWAggregation
 #[derive(Debug)]
 pub(crate) struct RWExpression
 {
-  /// Name of the expression
-  pub(crate) name: String,
   /// Instructions to compute this expression
   pub(crate) instructions: Instructions,
   /// Potential aggregations used by this expression
@@ -218,7 +216,7 @@ pub(crate) enum Block
   },
   Return
   {
-    variables: Vec<RWExpression>,
+    variables: Vec<(String, RWExpression)>,
     filter: Instructions,
     modifiers: Modifiers,
   },

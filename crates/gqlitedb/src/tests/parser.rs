@@ -29,3 +29,10 @@ fn test_parse_create_named_node_double_return()
     parse("CREATE (n {id: 12, name: 'foo'}) RETURN n.id AS id, n.name AS p").unwrap();
   compare_ast(create_ast, ast::create_named_node_double_return())
 }
+
+#[test]
+fn test_parse_double_with_return()
+{
+  let create_ast = parse("WITH 1 AS n, 2 AS m WITH n AS a, m AS b RETURN a").unwrap();
+  compare_ast(create_ast, ast::double_with_return())
+}

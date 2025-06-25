@@ -36,3 +36,12 @@ fn test_compile_create_named_node_double_return()
   let program = compile(&function_manager, ast::create_named_node_double_return()).unwrap();
   compare_program(program, programs::create_named_node_double_return())
 }
+
+#[test]
+fn test_compile_double_with_return()
+{
+  let function_manager = functions::Manager::new();
+
+  let program = compile(&function_manager, ast::double_with_return()).unwrap();
+  compare_program(program, programs::double_with_return())
+}

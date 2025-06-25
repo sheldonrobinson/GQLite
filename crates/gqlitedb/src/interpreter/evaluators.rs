@@ -1361,13 +1361,14 @@ pub(crate) fn eval_program<TStore: store::Store>(
         modifiers,
       } =>
       {
+        let (names, variables): (Vec<_>, Vec<_>) = variables.into_iter().unzip();
         let output_table =
           compute_return_with_table(&variables, &filter, &modifiers, input_table, &parameters)?;
         let mut r = Vec::<crate::graph::Value>::new();
         r.push(crate::graph::Value::Array(
-          variables
-            .iter()
-            .map(|expr| crate::graph::Value::String(expr.name.to_owned()))
+          names
+            .into_iter()
+            .map(|name| crate::graph::Value::String(name.to_owned()))
             .collect(),
         ));
         for row in output_table.into_row_iter()
