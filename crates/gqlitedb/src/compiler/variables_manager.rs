@@ -477,17 +477,14 @@ impl VariablesManager
       &self.function_manager,
       &named_expression.expression,
     )?;
-    println!("before {:?}", self.variables);
     let col_id = self
       .variables
       .get(&named_expression.name)
       .map_or(self.variables.len(), |var| var.col_id);
-    println!("------ {:?}", self.variables);
     self.variables.insert(
       named_expression.name.clone(),
       Variable::from_expression(expression_info.expression_type, col_id),
     );
-    println!("after  {:?}", self.variables);
     if !self.set_variables.contains(&named_expression.name)
     {
       self.set_variables.push(named_expression.name.clone());
@@ -584,6 +581,7 @@ impl VariablesManager
           unwind.name.to_owned(),
           expression_analyser::ExpressionType::Variant,
         )?;
+        self.mark_variables_as_set(&unwind.name);
       }
       ast::Statement::Delete(delete) =>
       {}

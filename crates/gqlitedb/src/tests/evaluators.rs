@@ -1,5 +1,8 @@
 use crate::{
-  graph::array, interpreter::evaluators::eval_program, store::Store, tests::templates::programs,
+  graph::{self, array},
+  interpreter::evaluators::eval_program,
+  store::Store,
+  tests::templates::programs,
 };
 
 fn check_stats(
@@ -54,6 +57,7 @@ fn test_evaluate_create_named_node_double_return()
 
   assert_eq!(value, array![array!["id", "p"], array![12, "foo"]]);
 }
+
 #[test]
 fn test_evaluate_double_with_return()
 {
@@ -63,4 +67,51 @@ fn test_evaluate_double_with_return()
   check_stats(store, 0, 0, 0, 0);
 
   assert_eq!(value, array![array!["a"], array![1]]);
+}
+
+#[test]
+fn test_evaluate_unwind()
+{
+  let store = crate::store::redb::Store::new(crate::tests::get_tmp_file().unwrap()).unwrap();
+
+  let value = eval_program(&store, programs::unwind(), Default::default()).unwrap();
+  check_stats(store, 0, 0, 0, 0);
+
+  assert_eq!(value, array![array!["i"], array![0]]);
+}
+
+#[test]
+fn test_evaluate_match_loop()
+{
+  let store = crate::store::redb::Store::new(crate::tests::get_tmp_file().unwrap()).unwrap();
+
+  let node = graph::Node {
+    key: graph::Key { uuid: 1 },
+    labels: vec![],
+    properties: Default::default(),
+  };
+  let mut tx = store.begin().unwrap();
+  store
+    .create_nodes(&mut tx, &"default".to_string(), vec![&node].into_iter())
+    .unwrap();
+  store
+    .create_edges(
+      &mut tx,
+      &"default".to_string(),
+      vec![&graph::Edge {
+        key: graph::Key { uuid: 2 },
+        source: node.clone(),
+        destination: node.clone(),
+        labels: vec![],
+        properties: Default::default(),
+      }]
+      .into_iter(),
+    )
+    .unwrap();
+  store.commit(tx).unwrap();
+
+  let value = eval_program(&store, programs::match_loop(), Default::default()).unwrap();
+  check_stats(store, 1, 1, 0, 0);
+
+  assert_eq!(value, array![array!["n"], array![node]]);
 }

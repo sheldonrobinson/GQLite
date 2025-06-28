@@ -62,6 +62,8 @@ pub(crate) struct Match
   pub(crate) optional: bool,
 }
 
+create_into_statement! {Match}
+
 #[derive(Debug)]
 pub(crate) struct Return
 {
@@ -90,6 +92,8 @@ pub(crate) struct Unwind
   pub(crate) name: String,
   pub(crate) expression: Expression,
 }
+
+create_into_statement! {Unwind}
 
 #[derive(Debug)]
 pub(crate) struct Delete
@@ -459,13 +463,7 @@ macro_rules! create_binary_op {
       pub(crate) right: Expression,
     }
 
-    impl Into<Expression> for $x
-    {
-      fn into(self) -> Expression
-      {
-        Expression::$x(Box::new(self))
-      }
-    }
+    create_into_boxed_expr! { $x }
   };
 }
 
@@ -494,13 +492,7 @@ macro_rules! create_unary_op {
     {
       pub(crate) value: Expression,
     }
-    impl Into<Expression> for $x
-    {
-      fn into(self) -> Expression
-      {
-        Expression::$x(Box::new(self))
-      }
-    }
+    create_into_boxed_expr! { $x }
   };
 }
 
@@ -537,3 +529,5 @@ pub(crate) struct Array
 {
   pub(crate) array: Vec<Expression>,
 }
+
+create_into_expr! {Array}

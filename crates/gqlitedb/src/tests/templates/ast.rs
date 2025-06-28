@@ -1,4 +1,26 @@
-use crate::parser::ast::*;
+use crate::{graph::EdgeDirectivity, parser::ast::*};
+
+fn return_statement(var_name: impl Into<String>) -> Statement
+{
+  let var_name = var_name.into();
+  Return {
+    all: false,
+    expressions: vec![NamedExpression {
+      name: var_name.clone(),
+      expression: Variable {
+        identifier: var_name.clone(),
+      }
+      .into(),
+    }],
+    modifiers: Modifiers {
+      skip: None,
+      limit: None,
+      order_by: None,
+    },
+    where_expression: None,
+  }
+  .into()
+}
 
 pub(crate) fn simple_create_node() -> Statements
 {
@@ -172,22 +194,51 @@ pub(crate) fn double_with_return() -> Statements
       where_expression: None,
     }
     .into(),
-    Return {
-      all: false,
-      expressions: vec![NamedExpression {
-        name: "a".into(),
-        expression: Variable {
-          identifier: "a".into(),
-        }
-        .into(),
-      }],
-      modifiers: Modifiers {
-        skip: None,
-        limit: None,
-        order_by: None,
-      },
-      where_expression: None,
+    return_statement("a"),
+  ]
+}
+
+/// AST for `UNWIND [0] AS i`
+pub(crate) fn unwind() -> Statements
+{
+  vec![
+    Unwind {
+      name: "i".into(),
+      expression: Array {
+        array: vec![Value { value: 0.into() }.into()],
+      }
+      .into(),
     }
     .into(),
+    return_statement("i"),
+  ]
+}
+
+/// AST for `MATCH (n)-[]->(n) RETURN n`
+pub(crate) fn match_loop() -> Statements
+{
+  vec![
+    Match {
+      patterns: vec![Pattern::Edge(EdgePattern {
+        variable: None,
+        source: NodePattern {
+          variable: Some("n".into()),
+          labels: LabelExpression::None,
+          properties: None,
+        },
+        destination: NodePattern {
+          variable: Some("n".into()),
+          labels: LabelExpression::None,
+          properties: None,
+        },
+        labels: LabelExpression::None,
+        properties: None,
+        directivity: EdgeDirectivity::Directed,
+      })],
+      where_expression: None,
+      optional: false,
+    }
+    .into(),
+    return_statement("n"),
   ]
 }

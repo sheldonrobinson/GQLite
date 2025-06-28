@@ -45,3 +45,21 @@ fn test_compile_double_with_return()
   let program = compile(&function_manager, ast::double_with_return()).unwrap();
   compare_program(program, programs::double_with_return())
 }
+
+#[test]
+fn test_compile_unwind()
+{
+  let function_manager = functions::Manager::new();
+
+  let program = compile(&function_manager, ast::unwind()).unwrap();
+  compare_program(program, programs::unwind())
+}
+
+#[test]
+fn test_compile_match_loop()
+{
+  let function_manager = functions::Manager::new();
+
+  let program = compile(&function_manager, ast::match_loop()).unwrap();
+  compare_program(program, programs::match_loop())
+}

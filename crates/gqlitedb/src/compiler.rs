@@ -1,5 +1,3 @@
-use std::sync::atomic::{AtomicU64, Ordering};
-
 pub(crate) mod expression_analyser;
 pub(crate) mod variables_manager;
 
@@ -10,8 +8,6 @@ use interpreter::instructions::{
   RWExpression,
 };
 use parser::ast;
-
-static FAKE_VARIABLE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 macro_rules! compile_binary_op {
   ( $this:tt, $x:tt, $instructions:tt, $aggregations:tt ) => {
@@ -36,6 +32,13 @@ impl Compiler
       temporary_variables: self.temporary_variables,
       persistent_variables: self.variables_manager.variables_count(),
     }
+  }
+
+  fn create_temporary_variable(&mut self) -> usize
+  {
+    let col_id = self.temporary_variables;
+    self.temporary_variables += 1;
+    col_id
   }
 
   fn compile_expression(
@@ -73,8 +76,7 @@ impl Compiler
         {
           Ok(aggregator) =>
           {
-            let var_col_id = self.temporary_variables;
-            self.temporary_variables += 1;
+            let var_col_id = self.create_temporary_variable();
             let mut init_instructions = Instructions::new();
             let mut argument_instructions = Instructions::new();
 
@@ -557,7 +559,7 @@ impl Compiler
     path_variable: Option<String>,
     edge: &crate::parser::ast::EdgePattern,
     single_match: bool,
-    previous_edges: &mut Vec<String>,
+    previous_edges: &mut Vec<usize>,
   ) -> Result<BlockMatch>
   {
     let mut instructions = Instructions::new();
@@ -640,28 +642,26 @@ impl Compiler
     // Make sure that this edge isn't equal to an already matched edge
     let edge_variable = if single_match
     {
-      edge.variable.to_owned()
+      self
+        .variables_manager
+        .get_variable_index_option(&edge.variable)?
     }
     else
     {
-      let edge_variable = edge.variable.to_owned().unwrap_or_else(|| {
-        format!(
-          "__gqlite_edge_{}",
-          FAKE_VARIABLE_COUNTER.fetch_add(1, Ordering::Relaxed)
-        )
-      });
+      let edge_variable = self
+        .variables_manager
+        .get_variable_index_option(&edge.variable)?
+        .unwrap_or_else(|| self.create_temporary_variable());
       for other in previous_edges.iter()
       {
         filter.push(Instruction::Duplicate);
-        filter.push(Instruction::GetVariable {
-          col_id: self.variables_manager.get_variable_index(other)?,
-        });
+        filter.push(Instruction::GetVariable { col_id: *other });
         filter.push(Instruction::NotEqualBinaryOperator);
         filter.push(Instruction::InverseRot3);
         filter.push(Instruction::AndBinaryOperator);
         filter.push(Instruction::Swap);
       }
-      previous_edges.push(edge_variable.clone());
+      previous_edges.push(edge_variable);
       Some(edge_variable)
     };
     self.variables_manager.mark_variables_as_set(&path_variable);
@@ -671,9 +671,7 @@ impl Compiler
       left_variable: self
         .variables_manager
         .get_variable_index_option(&source_variable)?,
-      edge_variable: self
-        .variables_manager
-        .get_variable_index_option(&edge_variable)?,
+      edge_variable,
       right_variable: self
         .variables_manager
         .get_variable_index_option(&destination_variable)?,

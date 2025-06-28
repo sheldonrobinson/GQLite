@@ -1405,7 +1405,7 @@ pub(crate) fn eval_program<TStore: store::Store>(
             {
               for v in arr.into_iter()
               {
-                let mut out_row = row.to_row();
+                let mut out_row = row.to_extended_row(variables_size.total_size())?;
                 out_row.set(col_id, v)?;
                 output_table.add_truncated_row(out_row)?;
               }
@@ -1414,7 +1414,7 @@ pub(crate) fn eval_program<TStore: store::Store>(
             {}
             _ =>
             {
-              let mut out_row = row.to_row();
+              let mut out_row = row.to_extended_row(variables_size.total_size())?;
               out_row.set(col_id, value)?;
               output_table.add_truncated_row(out_row)?;
             }

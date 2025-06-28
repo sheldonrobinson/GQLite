@@ -311,6 +311,14 @@ impl<'a> RowView<'a>
       values: self.row.to_vec(),
     }
   }
+  /// Create an owned Row by cloning the values in this row view, and extend it to the given size
+  pub fn to_extended_row(&self, length: usize) -> Result<Row>
+  {
+    Row {
+      values: self.row.to_vec(),
+    }
+    .extended(length)
+  }
 }
 
 impl<'a> RowInterface for RowView<'a>

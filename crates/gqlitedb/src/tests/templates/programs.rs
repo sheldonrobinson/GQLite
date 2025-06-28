@@ -1,4 +1,5 @@
 use crate::{
+  graph::EdgeDirectivity,
   interpreter::{instructions::*, Program},
   ValueObject,
 };
@@ -172,6 +173,87 @@ pub(crate) fn double_with_return() -> Program
     Block::Return {
       variables: vec![(
         "a".into(),
+        RWExpression {
+          instructions: vec![Instruction::GetVariable { col_id: 0 }],
+          aggregations: vec![],
+        },
+      )],
+      filter: vec![],
+      modifiers: Modifiers {
+        limit: None,
+        skip: None,
+        order_by: vec![],
+      },
+    },
+  ]
+}
+
+pub(crate) fn unwind() -> Program
+{
+  vec![
+    Block::Unwind {
+      col_id: 0,
+      instructions: vec![
+        Instruction::Push { value: 0.into() },
+        Instruction::CreateArray { length: 1 },
+      ],
+      variables_size: VariablesSizes {
+        persistent_variables: 1,
+        temporary_variables: 0,
+      },
+    },
+    Block::Return {
+      variables: vec![(
+        "i".into(),
+        RWExpression {
+          instructions: vec![Instruction::GetVariable { col_id: 0 }],
+          aggregations: vec![],
+        },
+      )],
+      filter: vec![],
+      modifiers: Modifiers {
+        limit: None,
+        skip: None,
+        order_by: vec![],
+      },
+    },
+  ]
+}
+
+pub(crate) fn match_loop() -> Program
+{
+  vec![
+    Block::BlockMatch {
+      blocks: vec![BlockMatch::MatchEdge {
+        instructions: vec![
+          Instruction::Push {
+            value: ValueObject::default().into(),
+          },
+          Instruction::CreateNodeQuery { labels: vec![] },
+          Instruction::GetVariable { col_id: 0 },
+          Instruction::CreateNodeQuery { labels: vec![] },
+          Instruction::Push {
+            value: ValueObject::default().into(),
+          },
+          Instruction::CreateEdgeQuery { labels: vec![] },
+        ],
+        left_variable: Some(0),
+        edge_variable: None,
+        right_variable: None,
+        path_variable: None,
+        filter: vec![],
+        directivity: EdgeDirectivity::Directed,
+      }],
+      filter: vec![],
+      optional: false,
+      variables_size: VariablesSizes {
+        persistent_variables: 1,
+        temporary_variables: 0,
+      },
+    },
+    Block::Return {
+      variables: vec![(
+        "n".into(),
         RWExpression {
           instructions: vec![Instruction::GetVariable { col_id: 0 }],
           aggregations: vec![],
