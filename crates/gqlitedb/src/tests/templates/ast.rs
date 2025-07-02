@@ -1,16 +1,12 @@
 use crate::{graph::EdgeDirectivity, parser::ast::*};
 
-fn return_statement(var_name: impl Into<String>) -> Statement
+fn return_statement(var_id: VariableIdentifier) -> Statement
 {
-  let var_name = var_name.into();
   Return {
     all: false,
     expressions: vec![NamedExpression {
-      name: var_name.clone(),
-      expression: Variable {
-        identifier: var_name.clone(),
-      }
-      .into(),
+      identifier: var_id.clone(),
+      expression: Variable { identifier: var_id }.into(),
     }],
     modifiers: Modifiers {
       skip: None,
@@ -37,10 +33,11 @@ pub(crate) fn simple_create_node() -> Statements
 /// AST for `CREATE (n {name: 'foo'}) RETURN n.name AS p`
 pub(crate) fn create_named_node() -> Statements
 {
+  let var_ids = VariableIdentifiers::default();
   vec![
     Create {
       patterns: vec![Pattern::Node(NodePattern {
-        variable: Some("n".into()),
+        variable: Some(var_ids.from_name("n")),
         labels: LabelExpression::None,
         properties: Some(
           Map {
@@ -60,10 +57,10 @@ pub(crate) fn create_named_node() -> Statements
     Return {
       all: false,
       expressions: vec![NamedExpression {
-        name: "p".into(),
+        identifier: var_ids.from_name("p"),
         expression: MemberAccess {
           left: Variable {
-            identifier: "n".into(),
+            identifier: var_ids.from_name("n"),
           }
           .into(),
           path: vec!["name".into()],
@@ -84,10 +81,11 @@ pub(crate) fn create_named_node() -> Statements
 /// AST for `CREATE (n {id: 12, name: 'foo'}) RETURN n.id AS id, n.name AS p`
 pub(crate) fn create_named_node_double_return() -> Statements
 {
+  let var_ids = VariableIdentifiers::default();
   vec![
     Create {
       patterns: vec![Pattern::Node(NodePattern {
-        variable: Some("n".into()),
+        variable: Some(var_ids.from_name("n")),
         labels: LabelExpression::None,
         properties: Some(
           Map {
@@ -111,10 +109,10 @@ pub(crate) fn create_named_node_double_return() -> Statements
       all: false,
       expressions: vec![
         NamedExpression {
-          name: "id".into(),
+          identifier: var_ids.from_name("id"),
           expression: MemberAccess {
             left: Variable {
-              identifier: "n".into(),
+              identifier: var_ids.from_name("n"),
             }
             .into(),
             path: vec!["id".into()],
@@ -122,10 +120,10 @@ pub(crate) fn create_named_node_double_return() -> Statements
           .into(),
         },
         NamedExpression {
-          name: "p".into(),
+          identifier: var_ids.from_name("p"),
           expression: MemberAccess {
             left: Variable {
-              identifier: "n".into(),
+              identifier: var_ids.from_name("n"),
             }
             .into(),
             path: vec!["name".into()],
@@ -147,16 +145,17 @@ pub(crate) fn create_named_node_double_return() -> Statements
 /// AST for `WITH 1 AS n, 2 AS m WITH n AS a, m AS b RETURN a`
 pub(crate) fn double_with_return() -> Statements
 {
+  let var_ids = VariableIdentifiers::default();
   vec![
     With {
       all: false,
       expressions: vec![
         NamedExpression {
-          name: "n".into(),
+          identifier: var_ids.from_name("n"),
           expression: Value { value: 1.into() }.into(),
         },
         NamedExpression {
-          name: "m".into(),
+          identifier: var_ids.from_name("m"),
           expression: Value { value: 2.into() }.into(),
         },
       ],
@@ -172,16 +171,16 @@ pub(crate) fn double_with_return() -> Statements
       all: false,
       expressions: vec![
         NamedExpression {
-          name: "a".into(),
+          identifier: var_ids.from_name("a"),
           expression: Variable {
-            identifier: "n".into(),
+            identifier: var_ids.from_name("n"),
           }
           .into(),
         },
         NamedExpression {
-          name: "b".into(),
+          identifier: var_ids.from_name("b"),
           expression: Variable {
-            identifier: "m".into(),
+            identifier: var_ids.from_name("m"),
           }
           .into(),
         },
@@ -194,40 +193,42 @@ pub(crate) fn double_with_return() -> Statements
       where_expression: None,
     }
     .into(),
-    return_statement("a"),
+    return_statement(var_ids.from_name("a")),
   ]
 }
 
 /// AST for `UNWIND [0] AS i RETURN i`
 pub(crate) fn unwind() -> Statements
 {
+  let var_ids = VariableIdentifiers::default();
   vec![
     Unwind {
-      name: "i".into(),
+      identifier: var_ids.from_name("i"),
       expression: Array {
         array: vec![Value { value: 0.into() }.into()],
       }
       .into(),
     }
     .into(),
-    return_statement("i"),
+    return_statement(var_ids.from_name("i")),
   ]
 }
 
 /// AST for `MATCH (n)-[]->(n) RETURN n`
 pub(crate) fn match_loop() -> Statements
 {
+  let var_ids = VariableIdentifiers::default();
   vec![
     Match {
       patterns: vec![Pattern::Edge(EdgePattern {
         variable: None,
         source: NodePattern {
-          variable: Some("n".into()),
+          variable: Some(var_ids.from_name("n")),
           labels: LabelExpression::None,
           properties: None,
         },
         destination: NodePattern {
-          variable: Some("n".into()),
+          variable: Some(var_ids.from_name("n")),
           labels: LabelExpression::None,
           properties: None,
         },
@@ -239,17 +240,18 @@ pub(crate) fn match_loop() -> Statements
       optional: false,
     }
     .into(),
-    return_statement("n"),
+    return_statement(var_ids.from_name("n")),
   ]
 }
 
 /// AST for `OPTIONAL MATCH (a) RETURN a`
 pub(crate) fn optional_match() -> Statements
 {
+  let var_ids = VariableIdentifiers::default();
   vec![
     Match {
       patterns: vec![Pattern::Node(NodePattern {
-        variable: Some("a".into()),
+        variable: Some(var_ids.from_name("a")),
         labels: LabelExpression::None,
         properties: None,
       })],
@@ -257,17 +259,18 @@ pub(crate) fn optional_match() -> Statements
       optional: true,
     }
     .into(),
-    return_statement("a"),
+    return_statement(var_ids.from_name("a")),
   ]
 }
 
 /// AST for `MATCH (a) RETURN COUNT(*)`
 pub(crate) fn match_count() -> Statements
 {
+  let var_ids = VariableIdentifiers::default();
   vec![
     Match {
       patterns: vec![Pattern::Node(NodePattern {
-        variable: Some("a".into()),
+        variable: Some(var_ids.from_name("a")),
         labels: LabelExpression::None,
         properties: None,
       })],
@@ -278,7 +281,7 @@ pub(crate) fn match_count() -> Statements
     Return {
       all: false,
       expressions: vec![NamedExpression {
-        name: "count(*)".into(),
+        identifier: var_ids.from_name("count(*)"),
         expression: FunctionCall {
           name: "count".into(),
           arguments: vec![Value { value: 0.into() }.into()],

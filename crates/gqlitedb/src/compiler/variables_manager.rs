@@ -5,6 +5,14 @@ use crate::prelude::*;
 use compiler::expression_analyser::{self, ExpressionInfo, ExpressionType};
 use parser::ast;
 
+fn unknown_variable_error(name: &ast::VariableIdentifier) -> Error
+{
+  InternalError::UnknownVariable {
+    name: name.name().clone(),
+  }
+  .into()
+}
+
 // __     __         _       _     _
 // \ \   / /_ _ _ __(_) __ _| |__ | | ___
 //  \ \ / / _` | '__| |/ _` | '_ \| |/ _ \
@@ -25,6 +33,8 @@ pub(crate) struct Variable
   content: VariableContent,
   variable_type: ExpressionType,
   col_id: value_table::ColId,
+  /// Track if the variable is expected to have been set or has just been declared.
+  is_set: bool,
 }
 
 impl Variable
@@ -35,6 +45,7 @@ impl Variable
       content: VariableContent::Node(value),
       variable_type: ExpressionType::Node,
       col_id,
+      is_set: false,
     }
   }
   fn from_edge(value: ast::EdgePattern, col_id: value_table::ColId) -> Self
@@ -43,6 +54,7 @@ impl Variable
       content: VariableContent::Edge(value),
       variable_type: ExpressionType::Edge,
       col_id,
+      is_set: false,
     }
   }
   fn from_expression(value: ExpressionType, col_id: value_table::ColId) -> Self
@@ -68,6 +80,7 @@ impl Variable
         }),
         variable_type: ExpressionType::Edge,
         col_id,
+        is_set: false,
       },
       ExpressionType::Node => Self {
         content: VariableContent::Node(ast::NodePattern {
@@ -77,17 +90,24 @@ impl Variable
         }),
         variable_type: ExpressionType::Node,
         col_id,
+        is_set: false,
       },
       variable_type => Self {
         content: VariableContent::None,
         variable_type,
         col_id,
+        is_set: false,
       },
     }
   }
   pub(crate) fn col_id(&self) -> value_table::ColId
   {
     self.col_id
+  }
+  pub(crate) fn mark_set(mut self) -> Self
+  {
+    self.is_set = true;
+    self
   }
 }
 
@@ -100,8 +120,7 @@ impl Variable
 #[derive(Debug)]
 pub(crate) struct VariablesManager
 {
-  variables: HashMap<String, Variable>,
-  set_variables: Vec<String>,
+  variables: HashMap<ast::VariableIdentifier, Variable>,
   function_manager: functions::Manager,
 }
 
@@ -111,34 +130,28 @@ impl VariablesManager
   {
     Self {
       variables: Default::default(),
-      set_variables: Default::default(),
       function_manager: function_manager.clone(),
     }
   }
-  pub(crate) fn has_variable(&self, identifier: &Option<String>) -> bool
+  pub(crate) fn has_variable(&self, identifier: &Option<ast::VariableIdentifier>) -> bool
   {
     identifier
       .as_ref()
-      .map_or(false, |identifier| self.variables.contains_key(identifier))
+      .map_or(false, |identifier| self.variables.contains_key(&identifier))
   }
   /// Get the index of the variable in the row of variables
-  pub(crate) fn get_variable_index(&self, identifier: &String) -> Result<usize>
+  pub(crate) fn get_variable_index(&self, identifier: &ast::VariableIdentifier) -> Result<usize>
   {
     self
       .variables
-      .get(identifier)
-      .ok_or_else(|| {
-        InternalError::UnknownVariable {
-          name: identifier.clone(),
-        }
-        .into()
-      })
+      .get(&identifier)
+      .ok_or_else(|| unknown_variable_error(identifier))
       .map(|x| x.col_id)
   }
   /// Get the index of the variable in the row of variables
   pub(crate) fn get_variable_index_option(
     &self,
-    identifier: &Option<String>,
+    identifier: &Option<ast::VariableIdentifier>,
   ) -> Result<Option<usize>>
   {
     match identifier
@@ -151,38 +164,52 @@ impl VariablesManager
   {
     self.variables.len()
   }
-  pub(crate) fn variables_iter(&self) -> std::collections::hash_map::Iter<'_, String, Variable>
+  pub(crate) fn variables_iter(
+    &self,
+  ) -> std::collections::hash_map::Iter<'_, ast::VariableIdentifier, Variable>
   {
     self.variables.iter()
   }
-  pub(crate) fn is_set_variable(&self, name: &Option<String>) -> bool
+  pub(crate) fn is_set_variable(&self, var_id: &Option<ast::VariableIdentifier>) -> Result<bool>
   {
-    name
-      .as_ref()
-      .map_or(false, |name| self.set_variables.contains(name))
+    var_id.as_ref().map_or(Ok(false), |name| {
+      self
+        .variables
+        .get(&name)
+        .ok_or_else(|| unknown_variable_error(name))
+        .map(|x| x.is_set)
+    })
   }
-  pub(crate) fn mark_variables_as_set<'a>(&mut self, name: impl Into<Option<&'a String>>)
+  /// Mark a variable as set.
+  pub(crate) fn mark_variables_as_set<'a>(
+    &mut self,
+    var_id: impl Into<Option<&'a ast::VariableIdentifier>>,
+  ) -> Result<()>
   {
-    if let Some(name) = name.into()
+    if let Some(var_id) = var_id.into()
     {
-      if !self.set_variables.contains(name)
-      {
-        self.set_variables.push(name.clone());
-      }
+      self
+        .variables
+        .get_mut(&var_id)
+        .ok_or_else(|| unknown_variable_error(var_id))
+        .map(|x| x.is_set = true)
+    }
+    else
+    {
+      Ok(())
     }
   }
   fn declare_variable(
     &mut self,
-    variable: impl Into<String>,
+    var_id: &ast::VariableIdentifier,
     expression_type: ExpressionType,
   ) -> Result<()>
   {
-    let variable = variable.into();
-    if self.variables.contains_key(&variable)
+    if self.variables.contains_key(&var_id)
     {
       Err(
         CompileTimeError::VariableAlreadyBound {
-          name: variable.to_owned(),
+          name: var_id.name().clone(),
         }
         .into(),
       )
@@ -190,7 +217,7 @@ impl VariablesManager
     else
     {
       self.variables.insert(
-        variable.clone(),
+        var_id.clone(),
         Variable::from_expression(expression_type, self.variables.len()),
       );
       Ok(())
@@ -199,9 +226,9 @@ impl VariablesManager
   // Validate a node variable, and if unknown, declare it
   fn validate_node(&mut self, node: &ast::NodePattern) -> Result<()>
   {
-    if let Some(var_name) = &node.variable
+    if let Some(var_id) = &node.variable
     {
-      if let Some(var) = self.variables.get(var_name)
+      if let Some(var) = self.variables.get(&var_id)
       {
         match var.variable_type
         {
@@ -214,7 +241,7 @@ impl VariablesManager
               {
                 Err(
                   CompileTimeError::VariableAlreadyBound {
-                    name: var_name.to_owned(),
+                    name: var_id.name().clone(),
                   }
                   .into(),
                 )
@@ -234,7 +261,7 @@ impl VariablesManager
           ExpressionType::Variant => Ok(()), // Cannot be checked at compile time
           _ => Err(
             CompileTimeError::VariableTypeConflict {
-              name: var_name.to_owned(),
+              name: var_id.name().to_owned(),
             }
             .into(),
           ),
@@ -247,7 +274,7 @@ impl VariablesManager
           ExpressionInfo::analyse(&self, &self.function_manager, &props)?;
         }
         self.variables.insert(
-          var_name.to_owned(),
+          var_id.clone(),
           Variable::from_node((*node).to_owned(), self.variables.len()),
         );
         Ok(())
@@ -262,21 +289,21 @@ impl VariablesManager
   {
     self.validate_node(&edge.source)?;
     self.validate_node(&edge.destination)?;
-    if let Some(var_name) = &edge.variable
+    if let Some(var_id) = &edge.variable
     {
-      if let Some(var) = self.variables.get(var_name)
+      if let Some(var) = self.variables.get(&var_id)
       {
         match var.content
         {
           VariableContent::Edge { .. } => Err(
             CompileTimeError::VariableAlreadyBound {
-              name: var_name.to_owned(),
+              name: var_id.name().clone(),
             }
             .into(),
           ),
           _ => Err(
             CompileTimeError::VariableTypeConflict {
-              name: var_name.to_owned(),
+              name: var_id.name().clone(),
             }
             .into(),
           ),
@@ -289,7 +316,7 @@ impl VariablesManager
           ExpressionInfo::analyse(self, &self.function_manager, &props)?;
         }
         self.variables.insert(
-          var_name.to_owned(),
+          var_id.clone(),
           Variable::from_edge((*edge).to_owned(), self.variables.len()),
         );
         Ok(())
@@ -304,9 +331,9 @@ impl VariablesManager
   /// is compatible.
   fn is_valid_existing_node(&self, node: &ast::NodePattern) -> Result<bool>
   {
-    if let Some(var_name) = &node.variable
+    if let Some(var_id) = &node.variable
     {
-      if let Some(var) = self.variables.get(var_name)
+      if let Some(var) = self.variables.get(&var_id)
       {
         match var.variable_type
         {
@@ -319,7 +346,7 @@ impl VariablesManager
               {
                 Err(
                   CompileTimeError::VariableAlreadyBound {
-                    name: var_name.to_owned(),
+                    name: var_id.name().clone(),
                   }
                   .into(),
                 )
@@ -339,7 +366,7 @@ impl VariablesManager
           ExpressionType::Variant => Ok(true), // Cannot be checked at compile time
           _ => Err(
             CompileTimeError::VariableTypeConflict {
-              name: var_name.to_owned(),
+              name: var_id.name().clone(),
             }
             .into(),
           ),
@@ -359,9 +386,9 @@ impl VariablesManager
   /// is compatible.
   fn is_valid_existing_edge(&self, edge: &ast::EdgePattern) -> Result<bool>
   {
-    if let Some(var_name) = &edge.variable
+    if let Some(var_id) = &edge.variable
     {
-      if let Some(var) = self.variables.get(var_name)
+      if let Some(var) = self.variables.get(&var_id)
       {
         match var.variable_type
         {
@@ -374,7 +401,7 @@ impl VariablesManager
               {
                 Err(
                   CompileTimeError::VariableAlreadyBound {
-                    name: var_name.to_owned(),
+                    name: var_id.name().clone(),
                   }
                   .into(),
                 )
@@ -394,7 +421,7 @@ impl VariablesManager
           ExpressionType::Variant => Ok(true), // Cannot be checked at compile time
           _ => Err(
             CompileTimeError::VariableTypeConflict {
-              name: var_name.to_owned(),
+              name: var_id.name().clone(),
             }
             .into(),
           ),
@@ -412,15 +439,17 @@ impl VariablesManager
   }
 
   /// Expression type for the given expression type
-  pub(crate) fn expression_type(&self, name: impl Into<String>) -> Result<ExpressionType>
+  pub(crate) fn expression_type(
+    &self,
+    identifier: &ast::VariableIdentifier,
+  ) -> Result<ExpressionType>
   {
-    let name = name.into();
     Ok(
       self
         .variables
-        .get(&name)
+        .get(identifier)
         .ok_or_else(|| CompileTimeError::UndefinedVariable {
-          name: name.to_owned(),
+          name: identifier.name().to_owned(),
         })?
         .variable_type,
     )
@@ -428,17 +457,14 @@ impl VariablesManager
 
   fn analyse_edge_path(
     &mut self,
-    path_variable: Option<String>,
+    path_variable: Option<ast::VariableIdentifier>,
     edge: &crate::parser::ast::EdgePattern,
     is_create: bool,
   ) -> Result<()>
   {
     if let Some(path_variable) = &path_variable
     {
-      self.declare_variable(
-        path_variable.to_owned(),
-        expression_analyser::ExpressionType::Path,
-      )?;
+      self.declare_variable(path_variable, expression_analyser::ExpressionType::Path)?;
     }
     if !self.is_valid_existing_node(&edge.source)?
     {
@@ -488,52 +514,49 @@ impl VariablesManager
     )?;
     let col_id = self
       .variables
-      .get(&named_expression.name)
+      .get(&named_expression.identifier)
       .map_or(self.variables.len(), |var| var.col_id);
     self.variables.insert(
-      named_expression.name.clone(),
-      Variable::from_expression(expression_info.expression_type, col_id),
+      named_expression.identifier.clone(),
+      Variable::from_expression(expression_info.expression_type, col_id).mark_set(),
     );
-    if !self.set_variables.contains(&named_expression.name)
-    {
-      self.set_variables.push(named_expression.name.clone());
-    }
     Ok(col_id)
   }
   pub(crate) fn keep_variables<'a>(
     &mut self,
-    names: impl IntoIterator<Item = &'a String>,
+    names: impl IntoIterator<Item = &'a ast::VariableIdentifier>,
   ) -> Result<()>
   {
-    let mut new_variables = HashMap::<String, Variable>::default();
-    for (col_id, var_name) in names.into_iter().enumerate()
+    let mut new_variables = HashMap::<ast::VariableIdentifier, Variable>::default();
+    for (col_id, var_id) in names.into_iter().enumerate()
     {
-      let mut var =
-        self
-          .variables
-          .remove(var_name)
-          .ok_or_else(|| InternalError::UnknownVariable {
-            name: var_name.clone(),
-          })?;
+      let mut var = self
+        .variables
+        .remove(&var_id)
+        .ok_or_else(|| unknown_variable_error(var_id))?;
       var.col_id = col_id;
-      new_variables.insert(var_name.clone(), var);
+      new_variables.insert(var_id.clone(), var.mark_set());
     }
     self.variables = new_variables;
-    self.set_variables = self
-      .variables
-      .iter()
-      .map(|(name, _)| name.clone())
-      .collect();
     Ok(())
   }
   pub(crate) fn analyse(&mut self, statement: &ast::Statement) -> Result<()>
   {
-    if self.set_variables.len() != self.variables.len()
+    if self.variables.iter().any(|(_, var)| var.is_set != true)
     {
       return Err(
         InternalError::NotAllVariablesAreSet {
-          set_variables: self.set_variables.clone(),
-          all_variables: self.variables.keys().cloned().collect(),
+          set_variables: self
+            .variables
+            .iter()
+            .filter(|(_, var)| var.is_set)
+            .map(|(key, _)| key.name().clone())
+            .collect(),
+          all_variables: self
+            .variables
+            .keys()
+            .map(|key| key.name().clone())
+            .collect(),
         }
         .into(),
       );
@@ -553,7 +576,7 @@ impl VariablesManager
               {
                 return Err(
                   CompileTimeError::VariableAlreadyBound {
-                    name: n.variable.clone().unwrap().to_owned(),
+                    name: n.variable.clone().unwrap().name().clone(),
                   }
                   .into(),
                 );
@@ -581,10 +604,10 @@ impl VariablesManager
       ast::Statement::Unwind(unwind) =>
       {
         self.declare_variable(
-          unwind.name.to_owned(),
+          &unwind.identifier.to_owned(),
           expression_analyser::ExpressionType::Variant,
         )?;
-        self.mark_variables_as_set(&unwind.name);
+        self.mark_variables_as_set(&unwind.identifier)?;
       }
       ast::Statement::Delete(delete) =>
       {}

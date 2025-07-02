@@ -18,7 +18,7 @@ pub enum CompileTimeError
   },
   /// Parse error
   #[error("ParseError: '{0}'")]
-  ParseError(#[from] pest::error::Error<crate::parser::Rule>),
+  ParseError(#[from] pest::error::Error<crate::parser::parser::Rule>),
   /// Variable is not defined
   #[error("UndefinedVariable: Unknown variable '{name}'.")]
   UndefinedVariable
@@ -332,9 +332,9 @@ pub(crate) fn show_backtrace<T>(t: T) -> T
   t
 }
 
-impl From<pest::error::Error<crate::parser::Rule>> for Error
+impl From<pest::error::Error<crate::parser::parser::Rule>> for Error
 {
-  fn from(value: pest::error::Error<crate::parser::Rule>) -> Self
+  fn from(value: pest::error::Error<crate::parser::parser::Rule>) -> Self
   {
     CompileTimeError::from(value).into()
   }

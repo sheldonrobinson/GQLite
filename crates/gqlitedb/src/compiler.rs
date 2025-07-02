@@ -321,7 +321,9 @@ impl Compiler
         .variables_manager
         .get_variable_index_option(&node.variable)?,
     );
-    self.variables_manager.mark_variables_as_set(&node.variable);
+    self
+      .variables_manager
+      .mark_variables_as_set(&node.variable)?;
     self.compile_optional_expression(&node.properties, instructions)?;
     let mut labels = Default::default();
     self.compile_labels_expression(&mut labels, &node.labels)?;
@@ -448,9 +450,10 @@ impl Compiler
         }
         crate::parser::ast::Pattern::Edge(edge) =>
         {
+          // Generate source
           if self
             .variables_manager
-            .is_set_variable(&edge.source.variable)
+            .is_set_variable(&edge.source.variable)?
           {
             instructions.push(Instruction::GetVariable {
               col_id: self
@@ -463,6 +466,7 @@ impl Compiler
             self.compile_create_node(&edge.source, &mut instructions, &mut variables)?;
             instructions.push(Instruction::Duplicate);
           }
+          // Generate destination
           if edge.source.variable.is_some()
             && edge.destination.variable.is_some()
             && edge.source.variable == edge.destination.variable
@@ -471,7 +475,7 @@ impl Compiler
           }
           else if self
             .variables_manager
-            .is_set_variable(&edge.destination.variable)
+            .is_set_variable(&edge.destination.variable)?
           {
             instructions.push(Instruction::GetVariable {
               col_id: self
@@ -490,7 +494,9 @@ impl Compiler
               .variables_manager
               .get_variable_index_option(&edge.variable)?,
           );
-          self.variables_manager.mark_variables_as_set(&edge.variable);
+          self
+            .variables_manager
+            .mark_variables_as_set(&edge.variable)?;
           self.compile_optional_expression(&edge.properties, &mut instructions)?;
           if !edge.labels.is_string()
           {
@@ -513,7 +519,7 @@ impl Compiler
       })
     });
     Ok(Block::Create {
-      actions: actions.collect::<Result<Vec<CreateAction>>>()?,
+      actions: actions.collect::<Result<_>>()?,
       variables_size: self.variables_size(),
     })
   }
@@ -558,7 +564,7 @@ impl Compiler
 
   fn compile_match_edge(
     &mut self,
-    path_variable: Option<String>,
+    path_variable: Option<ast::VariableIdentifier>,
     edge: &crate::parser::ast::EdgePattern,
     single_match: bool,
     previous_edges: &mut Vec<usize>,
@@ -569,7 +575,7 @@ impl Compiler
     let mut filter = Instructions::new();
     if self
       .variables_manager
-      .is_set_variable(&edge.source.variable)
+      .is_set_variable(&edge.source.variable)?
     {
       instructions.push(Instruction::GetVariable {
         col_id: self
@@ -591,7 +597,7 @@ impl Compiler
     let mut destination_variable = None;
     if self
       .variables_manager
-      .is_set_variable(&edge.destination.variable)
+      .is_set_variable(&edge.destination.variable)?
     {
       instructions.push(Instruction::GetVariable {
         col_id: self
@@ -610,7 +616,7 @@ impl Compiler
         Some("get_destination"),
       )?;
     }
-    if self.variables_manager.is_set_variable(&edge.variable)
+    if self.variables_manager.is_set_variable(&edge.variable)?
     {
       instructions.push(Instruction::GetVariable {
         col_id: self
@@ -644,11 +650,13 @@ impl Compiler
     // Mark variables as set once they are compiled
     self
       .variables_manager
-      .mark_variables_as_set(&edge.source.variable);
+      .mark_variables_as_set(&edge.source.variable)?;
     self
       .variables_manager
-      .mark_variables_as_set(&edge.destination.variable);
-    self.variables_manager.mark_variables_as_set(&edge.variable);
+      .mark_variables_as_set(&edge.destination.variable)?;
+    self
+      .variables_manager
+      .mark_variables_as_set(&edge.variable)?;
 
     // Make sure that this edge isn't equal to an already matched edge
     let edge_variable = if single_match
@@ -675,7 +683,9 @@ impl Compiler
       previous_edges.push(edge_variable);
       Some(edge_variable)
     };
-    self.variables_manager.mark_variables_as_set(&path_variable);
+    self
+      .variables_manager
+      .mark_variables_as_set(&path_variable)?;
     // Create block
     Ok(BlockMatch::MatchEdge {
       instructions: instructions,
@@ -707,14 +717,14 @@ impl Compiler
     VariablesSizes,
   )>
   {
-    let mut variables = Vec::<(String, RWExpression)>::new();
+    let mut variables = Vec::<(ast::VariableIdentifier, RWExpression)>::new();
     let mut filter = Default::default();
     if all
     {
-      for (name, var) in self.variables_manager.variables_iter()
+      for (var_id, var) in self.variables_manager.variables_iter()
       {
         variables.push((
-          name.clone(),
+          var_id.clone(),
           instructions::RWExpression {
             col_id: var.col_id(),
             instructions: vec![Instruction::GetVariable {
@@ -734,41 +744,27 @@ impl Compiler
         &mut instructions,
         &mut Some(&mut aggregations),
       )?;
-      if variables.iter().any(|(name, _)| *name == e.name)
+      if variables.iter().any(|(name, _)| *name == e.identifier)
       {
         return Err(
           CompileTimeError::ColumnNameConflict {
-            name: e.name.to_owned(),
+            name: e.identifier.name().to_owned(),
           }
           .into(),
         );
       }
       let col_id = self.variables_manager.analyse_named_expression(&e)?;
       variables.push((
-        e.name.clone(),
+        e.identifier.clone(),
         RWExpression {
           col_id,
           instructions,
           aggregations,
         },
       ));
-      // val_variables.insert(
-      //   e.name.to_owned(),
-      //   expression_analyser::ExpressionInfo::analyse(
-      //     &self.variables_manager,
-      //     &self.function_manager,
-      //     &e.expression,
-      //   )?
-      //   .expression_type
-      //   .into(),
-      // );
     }
-    // // TODO this is ugly, there need to be a better way to have two sets of variables for validation
-    // let mut variables_tmp = self.variables_manager.variables_ref().to_owned();
-    // variables_tmp.extend(val_variables.to_owned().into_iter());
-    // self.variables_manager.set_variables(variables_tmp);
 
-    // // Compile where expression
+    // Compile where expression
     if let Some(where_expression) = where_expression
     {
       let ei = expression_analyser::ExpressionInfo::analyse(
@@ -784,12 +780,15 @@ impl Compiler
     }
 
     let modifiers = self.compile_modifiers(&modifiers)?;
-    // self.variables_manager.set_variables(val_variables);
     let variables_size = self.variables_size();
     self
       .variables_manager
       .keep_variables(variables.iter().map(|(n, _)| n))?;
 
+    let variables = variables
+      .into_iter()
+      .map(|(var_id, e)| (var_id.take_name(), e))
+      .collect();
     Ok((variables, filter, modifiers, variables_size))
   }
 
@@ -809,7 +808,9 @@ impl Compiler
         let mut instructions = Instructions::new();
         let mut filter = Instructions::new();
         self.compile_match_node(node, &mut instructions, &mut filter, None)?;
-        self.variables_manager.mark_variables_as_set(&node.variable);
+        self
+          .variables_manager
+          .mark_variables_as_set(&node.variable)?;
         Ok(BlockMatch::MatchNode {
           instructions: instructions,
           variable: self
@@ -998,7 +999,7 @@ pub(crate) fn compile(
           Ok(Block::Unwind {
             col_id: compiler
               .variables_manager
-              .get_variable_index(&unwind.name)?,
+              .get_variable_index(&unwind.identifier)?,
             instructions,
             variables_size: compiler.variables_size(),
           })

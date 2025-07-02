@@ -1,6 +1,98 @@
 #![allow(unused)]
 
+use std::{
+  cell::RefCell,
+  collections::{hash_map::Entry, HashMap},
+  fmt::format,
+  sync::atomic::AtomicU64,
+};
+
 use crate::graph;
+
+/// Represent a variable name. Some variable are explicitly created by the parser, if a node/edge should be considered equal and appear in different expression.
+/// For instance `()-[]->()-[]->()` needs the creation of a variable.
+#[derive(Debug, Clone, Eq)]
+pub(crate) struct VariableIdentifier
+{
+  /// Name of the variable, only useful for debug purposes
+  name: String,
+  /// Unique identifier of the variable, the uniqueness is only guaranteed within a compilation unit.
+  id: u64,
+}
+
+impl VariableIdentifier
+{
+  pub(crate) fn name(&self) -> &String
+  {
+    &self.name
+  }
+  pub(crate) fn take_name(self) -> String
+  {
+    self.name
+  }
+}
+
+impl PartialEq for VariableIdentifier
+{
+  fn eq(&self, other: &Self) -> bool
+  {
+    self.id == other.id
+  }
+}
+
+impl std::hash::Hash for VariableIdentifier
+{
+  fn hash<H: std::hash::Hasher>(&self, state: &mut H)
+  {
+    self.id.hash(state);
+  }
+}
+
+#[derive(Default)]
+pub(crate) struct VariableIdentifiers
+{
+  next_id: AtomicU64,
+  identifiers: RefCell<HashMap<String, VariableIdentifier>>,
+}
+
+impl VariableIdentifiers
+{
+  fn next_id(&self) -> u64
+  {
+    self
+      .next_id
+      .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+  }
+  pub(crate) fn from_name(&self, name: impl Into<String>) -> VariableIdentifier
+  {
+    let name = name.into();
+    match self.identifiers.borrow_mut().entry(name)
+    {
+      Entry::Occupied(entry) => entry.get().clone(),
+      Entry::Vacant(entry) =>
+      {
+        let vn = VariableIdentifier {
+          name: entry.key().clone(),
+          id: self.next_id(),
+        };
+        entry.insert(vn.clone());
+        vn
+      }
+    }
+  }
+  pub(crate) fn from_name_optional(&self, name: Option<String>) -> Option<VariableIdentifier>
+  {
+    name.map(|name| self.from_name(name))
+  }
+  pub(crate) fn anonymous(&self) -> VariableIdentifier
+  {
+    let id = self.next_id();
+    VariableIdentifier {
+      name: format!("anonymous_{}", id),
+      id,
+    }
+  }
+}
 
 #[derive(Debug)]
 pub(crate) enum Statement
@@ -89,7 +181,7 @@ create_into_statement! {With}
 #[derive(Debug)]
 pub(crate) struct Unwind
 {
-  pub(crate) name: String,
+  pub(crate) identifier: VariableIdentifier,
   pub(crate) expression: Expression,
 }
 
@@ -137,7 +229,7 @@ pub(crate) enum OneUpdate
 #[derive(Debug)]
 pub(crate) struct UpdateProperty
 {
-  pub(crate) target: String,
+  pub(crate) target: VariableIdentifier,
   pub(crate) path: Vec<String>,
   pub(crate) expression: Expression,
 }
@@ -145,14 +237,14 @@ pub(crate) struct UpdateProperty
 #[derive(Debug)]
 pub(crate) struct RemoveProperty
 {
-  pub(crate) target: String,
+  pub(crate) target: VariableIdentifier,
   pub(crate) path: Vec<String>,
 }
 
 #[derive(Debug)]
 pub(crate) struct AddRemoveLabels
 {
-  pub(crate) target: String,
+  pub(crate) target: VariableIdentifier,
   pub(crate) labels: Vec<String>,
 }
 
@@ -233,7 +325,7 @@ pub(crate) enum Pattern
 #[derive(Debug, Clone)]
 pub(crate) struct NodePattern
 {
-  pub(crate) variable: Option<String>,
+  pub(crate) variable: Option<VariableIdentifier>,
   pub(crate) labels: LabelExpression,
   pub(crate) properties: Option<Expression>,
 }
@@ -241,7 +333,7 @@ pub(crate) struct NodePattern
 #[derive(Debug, Clone)]
 pub(crate) struct EdgePattern
 {
-  pub(crate) variable: Option<String>,
+  pub(crate) variable: Option<VariableIdentifier>,
   pub(crate) source: NodePattern,
   pub(crate) destination: NodePattern,
   pub(crate) directivity: graph::EdgeDirectivity,
@@ -252,7 +344,7 @@ pub(crate) struct EdgePattern
 #[derive(Debug, Clone)]
 pub(crate) struct PathPattern
 {
-  pub(crate) variable: String,
+  pub(crate) variable: VariableIdentifier,
   pub(crate) edge: EdgePattern,
 }
 
@@ -397,7 +489,7 @@ macro_rules! create_into_boxed_expr {
 #[derive(Debug)]
 pub(crate) struct NamedExpression
 {
-  pub(crate) name: String,
+  pub(crate) identifier: VariableIdentifier,
   pub(crate) expression: Expression,
 }
 
@@ -410,7 +502,7 @@ pub(crate) struct Parameter
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Variable
 {
-  pub(crate) identifier: String,
+  pub(crate) identifier: VariableIdentifier,
 }
 
 create_into_expr! {Variable}
