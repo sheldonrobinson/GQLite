@@ -323,6 +323,7 @@ IgnoredScenario = [
   "[8] Get node degree via size of pattern comprehension",
   "[9] Get node degree via size of pattern comprehension that specifies a relationship type",
   "[10] Get node degree via size of pattern comprehension that specifies multiple relationship types",
+  "[6] `type()` failing on invalid arguments",
   # type of value stored in array/map is lost
   "[5] `type()` handling Any type",
   # MAX aggregation on list

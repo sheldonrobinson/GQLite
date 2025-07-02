@@ -71,7 +71,7 @@ expressions = [
   # null
   'null/Null1', 'null/Null2', 'null/Null3',
   # graph
-  'graph/Graph1', 'graph/Graph2', 'graph/Graph3', 'graph/Graph5', 'graph/Graph6', 'graph/Graph7', 'graph/Graph9',
+  'graph/Graph1', 'graph/Graph2', 'graph/Graph3', 'graph/Graph4', 'graph/Graph5', 'graph/Graph6', 'graph/Graph7', 'graph/Graph9',
   # list
   'list/List1', 'list/List2', 'list/List3', 'list/List4', 'list/List5', 'list/List6', 'list/List7',  'list/List8', 
   # literals

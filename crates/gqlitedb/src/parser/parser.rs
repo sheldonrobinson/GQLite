@@ -707,12 +707,17 @@ impl AstBuilder
       }
       Rule::edge_pattern =>
       {
-        let mut it = pair.into_inner();
+        let mut it = pair.into_inner().peekable();
         let mut source_node = self.build_node_pattern(it.try_next()?)?;
 
         while let Some(next) = it.next()
         {
-          let destination_node = self.build_node_pattern(it.try_next()?)?;
+          let mut destination_node = self.build_node_pattern(it.try_next()?)?;
+
+          if it.peek().is_some() && destination_node.variable.is_none()
+          {
+            destination_node.variable = Some(self.var_ids.anonymous());
+          }
 
           let edge_pattern = self.build_edge_pattern(
             source_node,
