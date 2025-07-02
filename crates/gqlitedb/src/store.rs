@@ -24,6 +24,17 @@ pub(crate) struct Statistics
   pub properties_count: usize,
 }
 
+pub(crate) trait ReadTransaction
+{
+  fn discard(self) -> Result<()>;
+}
+
+pub(crate) trait WriteTransaction: ReadTransaction
+{
+  // Commit
+  fn commit(self) -> Result<()>;
+}
+
 //  ____  _
 // / ___|| |_ ___  _ __ ___
 // \___ \| __/ _ \| '__/ _ \
@@ -32,7 +43,7 @@ pub(crate) struct Statistics
 
 pub(crate) trait Store
 {
-  type Transaction;
+  type Transaction: WriteTransaction;
   fn create_graph(&mut self, name: impl Into<String>, _ignore_if_exists: bool) -> Result<()>;
   fn begin(&self) -> Result<Self::Transaction>;
   fn commit(&self, transaction: Self::Transaction) -> Result<()>;

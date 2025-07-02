@@ -1,6 +1,7 @@
 mod compiler;
 mod evaluators;
 mod parser;
+mod store;
 mod templates;
 
 pub(crate) fn get_tmp_file() -> Result<std::path::PathBuf, std::io::Error>
