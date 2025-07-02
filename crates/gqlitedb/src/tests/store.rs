@@ -5,7 +5,7 @@ mod redb;
 
 use crate::{
   graph,
-  store::{self, WriteTransaction},
+  store::{self, TransactionBoxable},
 };
 
 fn test_add_nodes<TStore>(store: TStore)
@@ -26,15 +26,15 @@ where
     },
   ];
 
-  let mut tx = store.begin().unwrap();
+  let mut tx = store.begin_write().unwrap();
   store
     .create_nodes(tx.borrow_mut(), &"default".into(), nodes.iter())
     .unwrap();
-  tx.commit().unwrap();
+  tx.close().unwrap();
 
   let selected_nodes = store
     .select_nodes(
-      store.begin().unwrap().borrow_mut(),
+      store.begin_read().unwrap().borrow_mut(),
       &"default".into(),
       store::SelectNodeQuery::select_keys([nodes[0].key]),
     )
@@ -45,7 +45,7 @@ where
   // Add a single node with label
   let selected_nodes = store
     .select_nodes(
-      store.begin().unwrap().borrow_mut(),
+      store.begin_read().unwrap().borrow_mut(),
       &"default".into(),
       store::SelectNodeQuery::select_labels(["not".to_string()]),
     )
@@ -77,7 +77,7 @@ where
     properties: graph::properties!("existence" => true),
   };
 
-  let mut tx = store.begin().unwrap();
+  let mut tx = store.begin_write().unwrap();
   store
     .create_edges(tx.borrow_mut(), &"default".into(), [edge.clone()].iter())
     .expect_err("expect missing node");
@@ -91,11 +91,11 @@ where
   store
     .create_edges(tx.borrow_mut(), &"default".into(), [edge.clone()].iter())
     .unwrap();
-  tx.commit().unwrap();
+  tx.close().unwrap();
 
   let selected_edges = store
     .select_edges(
-      store.begin().unwrap().borrow_mut(),
+      store.begin_read().unwrap().borrow_mut(),
       &"default".into(),
       store::SelectEdgeQuery::select_keys([edge.key]),
       graph::EdgeDirectivity::Directed,
@@ -108,7 +108,7 @@ where
 
   let selected_edges = store
     .select_edges(
-      store.begin().unwrap().borrow_mut(),
+      store.begin_read().unwrap().borrow_mut(),
       &"default".into(),
       store::SelectEdgeQuery::select_source_destination_labels_properties(
         store::SelectNodeQuery::select_all(),
@@ -126,7 +126,7 @@ where
 
   let selected_edges = store
     .select_edges(
-      store.begin().unwrap().borrow_mut(),
+      store.begin_read().unwrap().borrow_mut(),
       &"default".into(),
       store::SelectEdgeQuery::select_source_destination_labels_properties(
         store::SelectNodeQuery::select_labels_properties(vec![], Default::default()),

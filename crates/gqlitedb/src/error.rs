@@ -237,6 +237,8 @@ pub enum InternalError
   },
   #[error("A generic error occured {0}.")]
   GenericStdError(#[from] Box<dyn std::error::Error>),
+  #[error("Not a write transaction")]
+  NotWriteTransaction,
 }
 
 #[derive(thiserror::Error, Debug)]

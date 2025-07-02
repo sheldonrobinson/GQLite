@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 
 use crate::{
-  interpreter::instructions::VariablesSizes,
+  interpreter::instructions::{Block, VariablesSizes},
   prelude::*,
+  store::TransactionBoxable,
   value_table::{MutableRowInterface, Row, RowInterface},
 };
 use interpreter::instructions;
@@ -827,7 +828,7 @@ fn eval_instructions(
 
 pub(crate) fn eval_update_property<TStore: store::Store>(
   store: &TStore,
-  mut tx: &mut TStore::Transaction,
+  mut tx: &mut TStore::TransactionBox,
   graph_name: &String,
   row: &mut value_table::Row,
   target: value_table::ColId,
@@ -1145,6 +1146,19 @@ fn filter_rows(
     .collect()
 }
 
+fn is_write_program(program: &super::Program) -> bool
+{
+  program.iter().any(|b| match b
+  {
+    Block::BlockMatch { .. }
+    | Block::Return { .. }
+    | Block::Unwind { .. }
+    | Block::Call { .. }
+    | Block::With { .. } => false,
+    Block::Create { .. } | Block::Update { .. } | Block::Delete { .. } => true,
+  })
+}
+
 ///
 pub(crate) fn eval_program<TStore: store::Store>(
   store: &TStore,
@@ -1155,7 +1169,14 @@ pub(crate) fn eval_program<TStore: store::Store>(
   let graph_name: String = "default".into();
   let mut input_table = value_table::ValueTable::new(0);
   input_table.add_full_row(value_table::Row::default())?;
-  let mut tx = store.begin()?;
+  let mut tx = if is_write_program(program)
+  {
+    store.begin_write()?
+  }
+  else
+  {
+    store.begin_read()?
+  };
   let mut stack = Default::default();
   for block in program
   {
@@ -1396,7 +1417,7 @@ pub(crate) fn eval_program<TStore: store::Store>(
         {
           r.push(row.into());
         }
-        store.commit(tx)?;
+        tx.close()?;
         return Ok(r.into());
       }
       instructions::Block::With {
@@ -1654,7 +1675,7 @@ pub(crate) fn eval_program<TStore: store::Store>(
       }
     }
   }
-  store.commit(tx)?;
+  tx.close()?;
   Ok(crate::graph::Value::Invalid)
 }
 

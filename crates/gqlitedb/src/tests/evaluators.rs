@@ -1,5 +1,8 @@
 use crate::{
-  graph::array, interpreter::evaluators::eval_program, prelude::*, store::Store,
+  graph::array,
+  interpreter::evaluators::eval_program,
+  prelude::*,
+  store::{Store, TransactionBoxable},
   tests::templates::programs,
 };
 
@@ -11,14 +14,14 @@ fn check_stats(
   properties_count: usize,
 )
 {
-  let mut tx = store.begin().unwrap();
+  let mut tx = store.begin_read().unwrap();
   let stats = store.compute_statistics(&mut tx).unwrap();
 
   assert_eq!(stats.nodes_count, nodes_count);
   assert_eq!(stats.edges_count, edges_count);
   assert_eq!(stats.labels_nodes_count, labels_node_count);
   assert_eq!(stats.properties_count, properties_count);
-  store.commit(tx).unwrap();
+  tx.close().unwrap();
 }
 
 #[test]
@@ -89,7 +92,7 @@ fn test_evaluate_match_loop()
     labels: vec![],
     properties: Default::default(),
   };
-  let mut tx = store.begin().unwrap();
+  let mut tx = store.begin_write().unwrap();
   store
     .create_nodes(&mut tx, &"default".to_string(), vec![&node].into_iter())
     .unwrap();
@@ -107,7 +110,7 @@ fn test_evaluate_match_loop()
       .into_iter(),
     )
     .unwrap();
-  store.commit(tx).unwrap();
+  tx.close().unwrap();
 
   let value = eval_program(&store, &programs::match_loop(), Default::default()).unwrap();
   check_stats(&store, 1, 1, 0, 0);
@@ -145,11 +148,11 @@ fn test_evaluate_match_count()
     labels: vec![],
     properties: Default::default(),
   };
-  let mut tx = store.begin().unwrap();
+  let mut tx = store.begin_write().unwrap();
   store
     .create_nodes(&mut tx, &"default".to_string(), vec![&node].into_iter())
     .unwrap();
-  store.commit(tx).unwrap();
+  tx.close().unwrap();
   check_stats(&store, 1, 0, 0, 0);
 
   let value = eval_program(&store, &program, Default::default()).unwrap();

@@ -8,7 +8,7 @@ pub(crate) mod redb;
 #[cfg(feature = "pgql")]
 pub(crate) use pgql::Store;
 
-use crate::{graph, Result};
+use crate::{error::InternalError, graph, Result};
 
 //  ____  _        _   _     _   _
 // / ___|| |_ __ _| |_(_)___| |_(_) ___ ___
@@ -31,8 +31,68 @@ pub(crate) trait ReadTransaction
 
 pub(crate) trait WriteTransaction: ReadTransaction
 {
-  // Commit
+  // Commit.
   fn commit(self) -> Result<()>;
+}
+
+/// Box that holds a Read or a Write transaction for a store.
+pub(crate) enum TransactionBox<TRead, TWrite>
+where
+  TRead: ReadTransaction,
+  TWrite: WriteTransaction,
+{
+  Read(TRead),
+  Write(TWrite),
+}
+
+impl<TRead, TWrite> TransactionBox<TRead, TWrite>
+where
+  TRead: ReadTransaction,
+  TWrite: WriteTransaction,
+{
+  pub(crate) fn from_read(read: TRead) -> Self
+  {
+    Self::Read(read)
+  }
+  pub(crate) fn from_write(write: TWrite) -> Self
+  {
+    Self::Write(write)
+  }
+  pub(crate) fn try_into_write(&mut self) -> Result<&mut TWrite>
+  {
+    match self
+    {
+      Self::Read(_) => Err(InternalError::NotWriteTransaction.into()),
+      Self::Write(write) => Ok(write),
+    }
+  }
+}
+
+/// Trait that represent a box that can contain a read or write transaction for a store.
+pub(crate) trait TransactionBoxable
+{
+  type ReadTransaction: ReadTransaction;
+  type WriteTransaction: WriteTransaction;
+
+  fn close(self) -> Result<()>;
+}
+
+impl<TRead, TWrite> TransactionBoxable for TransactionBox<TRead, TWrite>
+where
+  TRead: ReadTransaction,
+  TWrite: WriteTransaction,
+{
+  type ReadTransaction = TRead;
+  type WriteTransaction = TWrite;
+
+  fn close(self) -> Result<()>
+  {
+    match self
+    {
+      Self::Read(read) => read.discard(),
+      Self::Write(write) => write.commit(),
+    }
+  }
 }
 
 //  ____  _
@@ -43,28 +103,28 @@ pub(crate) trait WriteTransaction: ReadTransaction
 
 pub(crate) trait Store
 {
-  type Transaction: WriteTransaction;
+  type TransactionBox: TransactionBoxable;
   fn create_graph(&mut self, name: impl Into<String>, _ignore_if_exists: bool) -> Result<()>;
-  fn begin(&self) -> Result<Self::Transaction>;
-  fn commit(&self, transaction: Self::Transaction) -> Result<()>;
+  fn begin_read(&self) -> Result<Self::TransactionBox>;
+  fn begin_write(&self) -> Result<Self::TransactionBox>;
   /// Create nodes and add them to a graph
   fn create_nodes<'a, T: Iterator<Item = &'a crate::graph::Node>>(
     &self,
-    transaction: &mut Self::Transaction,
+    transaction: &mut Self::TransactionBox,
     graph_name: &String,
     nodes_iter: T,
   ) -> Result<()>;
   /// Create nodes and add them to a graph
   fn update_node(
     &self,
-    transaction: &mut Self::Transaction,
+    transaction: &mut Self::TransactionBox,
     graph_name: &String,
     node: &graph::Node,
   ) -> Result<()>;
   /// Delete nodes according to a given query
   fn delete_nodes(
     &self,
-    transaction: &mut Self::Transaction,
+    transaction: &mut Self::TransactionBox,
     graph_name: &String,
     query: SelectNodeQuery,
     detach: bool,
@@ -72,27 +132,27 @@ pub(crate) trait Store
   /// Select nodes according to a given query
   fn select_nodes(
     &self,
-    transaction: &mut Self::Transaction,
+    transaction: &mut Self::TransactionBox,
     graph_name: &String,
     query: SelectNodeQuery,
   ) -> Result<Vec<crate::graph::Node>>;
   /// Add edge
   fn create_edges<'a, T: Iterator<Item = &'a crate::graph::Edge>>(
     &self,
-    transaction: &mut Self::Transaction,
+    transaction: &mut Self::TransactionBox,
     graph_name: &String,
     edges_iter: T,
   ) -> Result<()>;
   fn update_edge(
     &self,
-    transaction: &mut Self::Transaction,
+    transaction: &mut Self::TransactionBox,
     graph_name: &String,
     edge: &graph::Edge,
   ) -> Result<()>;
   /// Delete nodes according to a given query
   fn delete_edges(
     &self,
-    transaction: &mut Self::Transaction,
+    transaction: &mut Self::TransactionBox,
     graph_name: &String,
     query: SelectEdgeQuery,
     directivity: graph::EdgeDirectivity,
@@ -100,13 +160,13 @@ pub(crate) trait Store
   /// Select edges
   fn select_edges(
     &self,
-    transaction: &mut Self::Transaction,
+    transaction: &mut Self::TransactionBox,
     graph_name: &String,
     query: SelectEdgeQuery,
     directivity: graph::EdgeDirectivity,
   ) -> Result<Vec<EdgeResult>>;
   /// Compute store statistics
-  fn compute_statistics(&self, transaction: &mut Self::Transaction) -> Result<Statistics>;
+  fn compute_statistics(&self, transaction: &mut Self::TransactionBox) -> Result<Statistics>;
 }
 
 //  _____    _            ____                 _ _

@@ -190,8 +190,9 @@ where
   ) -> Result<redb::AccessGuard<V>>;
 }
 
-impl<'txn, K, V> TableExtension<K, V> for redb::Table<'txn, K, V>
+impl<'txn, K, V, T> TableExtension<K, V> for T
 where
+  T: ReadableTable<K, V>,
   K: redb::Key + 'static,
   V: redb::Value + 'static,
 {
@@ -267,6 +268,14 @@ impl GraphInfo
 //   | || | | (_| | | | \__ \ (_| | |_| | (_) | | | |
 //   |_||_|  \__,_|_| |_|___/\__,_|\__|_|\___/|_| |_|
 
+impl super::ReadTransaction for redb::ReadTransaction
+{
+  fn discard(self) -> Result<()>
+  {
+    Ok(self.close()?)
+  }
+}
+
 impl super::ReadTransaction for redb::WriteTransaction
 {
   fn discard(self) -> Result<()>
@@ -296,8 +305,6 @@ pub(crate) struct Store
   graphs: HashMap<String, GraphInfo>,
 }
 
-pub(crate) type Transaction = redb::WriteTransaction;
-
 impl Store
 {
   /// Crate a new store, with a default graph
@@ -312,11 +319,13 @@ impl Store
     s.create_graph("default", true)?;
     Ok(s)
   }
-  fn select_nodes_from_table<'txn>(
+  fn select_nodes_from_table<'txn, T>(
     &self,
-    nodes_table: &redb::Table<'txn, graph::Key, graph::Node>,
+    nodes_table: &'txn T,
     query: super::SelectNodeQuery,
   ) -> Result<Vec<crate::graph::Node>>
+  where
+    T: ReadableTable<graph::Key, graph::Node>,
   {
     let r = match query.keys
     {
@@ -384,313 +393,21 @@ impl Store
     };
     r.collect()
   }
-}
 
-impl store::Store for Store
-{
-  type Transaction = redb::WriteTransaction;
-  fn create_graph(&mut self, name: impl Into<String>, _ignore_if_exists: bool) -> Result<()>
-  {
-    let gi = GraphInfo::new(name);
-
-    let tx = self.redb_store.begin_write()?;
-    tx.open_table(gi.nodes_table_definition())?;
-    tx.open_table(gi.edges_table_definition())?;
-    tx.open_table(gi.edges_source_index_definition())?;
-    tx.open_table(gi.edges_destination_index_definition())?;
-    tx.commit()?;
-
-    self.graphs.insert("default".into(), gi);
-
-    Ok(())
-  }
-  fn begin(&self) -> Result<redb::WriteTransaction>
-  {
-    let s = self.redb_store.begin_write()?;
-    Ok(s)
-  }
-  fn commit(&self, transaction: Self::Transaction) -> Result<()>
-  {
-    transaction.commit()?;
-    Ok(())
-  }
-  /// Create nodes and add them to a graph
-  fn create_nodes<'a, T: Iterator<Item = &'a crate::graph::Node>>(
+  fn select_edges_from_tables<TEdges, TNodes, TEdgesIndex>(
     &self,
-    transaction: &mut redb::WriteTransaction,
-    graph_name: &String,
-    nodes_iter: T,
-  ) -> Result<()>
-  {
-    let graph_info = self.graphs.get(graph_name).unwrap();
-    let mut table = transaction.open_table(graph_info.nodes_table_definition())?;
-    let mut table_source = transaction.open_table(graph_info.edges_source_index_definition())?;
-    let mut table_destination =
-      transaction.open_table(graph_info.edges_destination_index_definition())?;
-    for x in nodes_iter
-    {
-      table.insert(x.key, x)?;
-      table_source.insert(x.key, vec![])?;
-      table_destination.insert(x.key, vec![])?;
-    }
-    Ok(())
-  }
-  /// Create nodes and add them to a graph
-  fn update_node(
-    &self,
-    transaction: &mut redb::WriteTransaction,
-    graph_name: &String,
-    node: &graph::Node,
-  ) -> Result<()>
-  {
-    let graph_info = self.graphs.get(graph_name).unwrap();
-    let mut table = transaction.open_table(graph_info.nodes_table_definition())?;
-    table.insert(node.key, node)?;
-    Ok(())
-  }
-  /// Delete nodes according to a given query
-  fn delete_nodes(
-    &self,
-    transaction: &mut redb::WriteTransaction,
-    graph_name: &String,
-    query: super::SelectNodeQuery,
-    detach: bool,
-  ) -> Result<()>
-  {
-    let graph_info = self.graphs.get(graph_name).unwrap();
-
-    if query.is_select_all()
-    {
-      if detach
-      {
-        transaction.delete_table(graph_info.edges_table_definition())?;
-        transaction.delete_table(graph_info.edges_source_index_definition())?;
-        transaction.delete_table(graph_info.edges_destination_index_definition())?;
-        transaction.open_table(graph_info.edges_table_definition())?;
-        transaction.open_table(graph_info.edges_source_index_definition())?;
-        transaction.open_table(graph_info.edges_destination_index_definition())?;
-      }
-      else
-      {
-        let edge_table = transaction.open_table(graph_info.edges_table_definition())?;
-        if edge_table.len()? > 0
-        {
-          return Err(error::RunTimeError::DeleteConnectedNode.into());
-        }
-      }
-      transaction.delete_table(graph_info.nodes_table_definition())?;
-      transaction.open_table(graph_info.nodes_table_definition())?;
-    }
-    else
-    {
-      let node_keys = if query.is_select_only_keys()
-      {
-        query
-          .keys
-          .ok_or_else(|| error::InternalError::Unreachable {
-            context: "persy/store/delete_nodes",
-          })?
-      }
-      else
-      {
-        self
-          .select_nodes(transaction, graph_name, query)?
-          .into_iter()
-          .map(|x| x.key)
-          .collect()
-      };
-
-      if detach
-      {
-        // Delete the edges connected to the nodes
-        self.delete_edges(
-          transaction,
-          graph_name,
-          super::SelectEdgeQuery::select_source_keys(super::SelectNodeQuery::select_keys(
-            node_keys.clone(),
-          )),
-          graph::EdgeDirectivity::Undirected,
-        )?;
-      }
-      else
-      {
-        // Check if the nodes are disconnected
-        let table_source = transaction.open_table(graph_info.edges_source_index_definition())?;
-        let table_destination =
-          transaction.open_table(graph_info.edges_destination_index_definition())?;
-
-        for key in node_keys.iter()
-        {
-          if !table_source
-            .get_required(key, error::Error::UnknownNode)?
-            .value()
-            .is_empty()
-            || !table_destination
-              .get_required(key, error::Error::UnknownNode)?
-              .value()
-              .is_empty()
-          {
-            return Err(error::RunTimeError::DeleteConnectedNode.into());
-          }
-        }
-      }
-      // Delete the nodes
-      let mut table_nodes = transaction.open_table(graph_info.nodes_table_definition())?;
-      let mut table_source = transaction.open_table(graph_info.edges_source_index_definition())?;
-      let mut table_destination =
-        transaction.open_table(graph_info.edges_destination_index_definition())?;
-      for key in node_keys.into_iter()
-      {
-        table_nodes.remove(key)?;
-        table_source.remove(key)?;
-        table_destination.remove(key)?;
-      }
-    }
-    Ok(())
-  }
-  /// Select nodes according to a given query
-  fn select_nodes(
-    &self,
-    transaction: &mut redb::WriteTransaction,
-    graph_name: &String,
-    query: super::SelectNodeQuery,
-  ) -> Result<Vec<crate::graph::Node>>
-  {
-    let graph_info = self.graphs.get(graph_name).unwrap();
-    let nodes_table = transaction.open_table(graph_info.nodes_table_definition())?;
-    self.select_nodes_from_table(&nodes_table, query)
-  }
-  /// Add edge
-  fn create_edges<'a, T: Iterator<Item = &'a crate::graph::Edge>>(
-    &self,
-    transaction: &mut redb::WriteTransaction,
-    graph_name: &String,
-    edges_iter: T,
-  ) -> Result<()>
-  {
-    let graph_info = self.graphs.get(graph_name).unwrap();
-    let mut table = transaction.open_table(graph_info.edges_table_definition())?;
-    let mut table_source = transaction.open_table(graph_info.edges_source_index_definition())?;
-    let mut table_destination =
-      transaction.open_table(graph_info.edges_destination_index_definition())?;
-
-    for x in edges_iter
-    {
-      table.insert(
-        x.key,
-        &PersistentEdge {
-          key: x.key,
-          source: x.source.key,
-          destination: x.destination.key,
-          labels: x.labels.clone(),
-          properties: x.properties.clone(),
-        },
-      )?;
-      let mut keys = table_source
-        .remove(x.source.key)?
-        .ok_or(error::Error::UnknownNode)?
-        .value();
-      keys.push(x.key);
-      table_source.insert(x.source.key, keys)?;
-      let mut keys = table_destination
-        .remove(x.destination.key)?
-        .ok_or(error::Error::UnknownNode)?
-        .value();
-      keys.push(x.key);
-      table_destination.insert(x.destination.key, keys)?;
-    }
-    Ok(())
-  }
-  fn update_edge(
-    &self,
-    transaction: &mut redb::WriteTransaction,
-    graph_name: &String,
-    edge: &graph::Edge,
-  ) -> Result<()>
-  {
-    let graph_info = self.graphs.get(graph_name).unwrap();
-    let mut table = transaction.open_table(graph_info.edges_table_definition())?;
-    table.insert(
-      edge.key,
-      &PersistentEdge {
-        key: edge.key,
-        source: edge.source.key,
-        destination: edge.destination.key,
-        labels: edge.labels.to_owned(),
-        properties: edge.properties.to_owned(),
-      },
-    )?;
-    Ok(())
-  }
-  /// Delete nodes according to a given query
-  fn delete_edges(
-    &self,
-    transaction: &mut redb::WriteTransaction,
-    graph_name: &String,
     query: super::SelectEdgeQuery,
     directivity: graph::EdgeDirectivity,
-  ) -> Result<()>
-  {
-    let graph_info = self.graphs.get(graph_name).unwrap();
-    let edges = self.select_edges(transaction, graph_name, query, directivity)?;
-
-    let mut table = transaction.open_table(graph_info.edges_table_definition())?;
-    let mut table_source = transaction.open_table(graph_info.edges_source_index_definition())?;
-    let mut table_destination =
-      transaction.open_table(graph_info.edges_destination_index_definition())?;
-
-    for e in edges
-    {
-      table.remove(e.edge.key)?;
-      let (sk, dk) = if e.reversed
-      {
-        (e.edge.destination.key, e.edge.source.key)
-      }
-      else
-      {
-        (e.edge.source.key, e.edge.destination.key)
-      };
-
-      let mut v = table_source
-        .remove(sk)?
-        .ok_or_else(|| error::show_backtrace(error::Error::UnknownNode))?
-        .value();
-      v.retain(|x| *x != e.edge.key);
-      table_source.insert(sk, v)?;
-
-      let mut v = table_destination
-        .remove(dk)?
-        .ok_or_else(|| error::show_backtrace(error::Error::UnknownNode))?
-        .value();
-      v.retain(|x| *x != e.edge.key);
-      table_destination.insert(dk, v)?;
-    }
-    Ok(())
-  }
-  /// Select edges
-  fn select_edges(
-    &self,
-    transaction: &mut redb::WriteTransaction,
-    graph_name: &String,
-    query: super::SelectEdgeQuery,
-    directivity: graph::EdgeDirectivity,
+    edges_table: TEdges,
+    nodes_table: TNodes,
+    edges_source_index: Rc<RefCell<TEdgesIndex>>,
+    edges_destination_index: Rc<RefCell<TEdgesIndex>>,
   ) -> Result<Vec<super::EdgeResult>>
+  where
+    TEdges: ReadableTable<graph::Key, PersistentEdge>,
+    TNodes: ReadableTable<graph::Key, graph::Node>,
+    TEdgesIndex: ReadableTable<graph::Key, Vec<graph::Key>>,
   {
-    if query.source.is_select_none() || query.destination.is_select_none()
-    {
-      return Ok(Default::default());
-    }
-    let graph_info = self.graphs.get(graph_name).unwrap();
-    let edges_table = transaction.open_table(graph_info.edges_table_definition())?;
-    let nodes_table = transaction.open_table(graph_info.nodes_table_definition())?;
-
-    let edges_source_index = Rc::new(RefCell::new(
-      transaction.open_table(graph_info.edges_source_index_definition())?,
-    ));
-    let edges_destination_index = Rc::new(RefCell::new(
-      transaction.open_table(graph_info.edges_destination_index_definition())?,
-    ));
-
     let edges_uuid_indices = match directivity
     {
       graph::EdgeDirectivity::Directed => vec![(edges_source_index, edges_destination_index)],
@@ -936,10 +653,375 @@ impl store::Store for Store
       r.collect()
     }
   }
-  fn compute_statistics(
+}
+
+impl store::Store for Store
+{
+  type TransactionBox = store::TransactionBox<redb::ReadTransaction, redb::WriteTransaction>;
+
+  fn create_graph(&mut self, name: impl Into<String>, _ignore_if_exists: bool) -> Result<()>
+  {
+    let gi = GraphInfo::new(name);
+
+    let tx = self.redb_store.begin_write()?;
+    tx.open_table(gi.nodes_table_definition())?;
+    tx.open_table(gi.edges_table_definition())?;
+    tx.open_table(gi.edges_source_index_definition())?;
+    tx.open_table(gi.edges_destination_index_definition())?;
+    tx.commit()?;
+
+    self.graphs.insert("default".into(), gi);
+
+    Ok(())
+  }
+  fn begin_write(&self) -> Result<Self::TransactionBox>
+  {
+    let s = self.redb_store.begin_write()?;
+    Ok(Self::TransactionBox::from_write(s))
+  }
+  fn begin_read(&self) -> Result<Self::TransactionBox>
+  {
+    let s = self.redb_store.begin_read()?;
+    Ok(Self::TransactionBox::from_read(s))
+  }
+  /// Create nodes and add them to a graph
+  fn create_nodes<'a, T: Iterator<Item = &'a crate::graph::Node>>(
     &self,
-    transaction: &mut redb::WriteTransaction,
-  ) -> Result<super::Statistics>
+    transaction: &mut Self::TransactionBox,
+    graph_name: &String,
+    nodes_iter: T,
+  ) -> Result<()>
+  {
+    let graph_info = self.graphs.get(graph_name).unwrap();
+    let transaction = transaction.try_into_write()?;
+    let mut table = transaction.open_table(graph_info.nodes_table_definition())?;
+    let mut table_source = transaction.open_table(graph_info.edges_source_index_definition())?;
+    let mut table_destination =
+      transaction.open_table(graph_info.edges_destination_index_definition())?;
+    for x in nodes_iter
+    {
+      table.insert(x.key, x)?;
+      table_source.insert(x.key, vec![])?;
+      table_destination.insert(x.key, vec![])?;
+    }
+    Ok(())
+  }
+  /// Create nodes and add them to a graph
+  fn update_node(
+    &self,
+    transaction: &mut Self::TransactionBox,
+    graph_name: &String,
+    node: &graph::Node,
+  ) -> Result<()>
+  {
+    let transaction = transaction.try_into_write()?;
+    let graph_info = self.graphs.get(graph_name).unwrap();
+    let mut table = transaction.open_table(graph_info.nodes_table_definition())?;
+    table.insert(node.key, node)?;
+    Ok(())
+  }
+  /// Delete nodes according to a given query
+  fn delete_nodes(
+    &self,
+    transaction: &mut Self::TransactionBox,
+    graph_name: &String,
+    query: super::SelectNodeQuery,
+    detach: bool,
+  ) -> Result<()>
+  {
+    let graph_info = self.graphs.get(graph_name).unwrap();
+
+    if query.is_select_all()
+    {
+      let write_transaction = transaction.try_into_write()?;
+      if detach
+      {
+        write_transaction.delete_table(graph_info.edges_table_definition())?;
+        write_transaction.delete_table(graph_info.edges_source_index_definition())?;
+        write_transaction.delete_table(graph_info.edges_destination_index_definition())?;
+        write_transaction.open_table(graph_info.edges_table_definition())?;
+        write_transaction.open_table(graph_info.edges_source_index_definition())?;
+        write_transaction.open_table(graph_info.edges_destination_index_definition())?;
+      }
+      else
+      {
+        let edge_table = write_transaction.open_table(graph_info.edges_table_definition())?;
+        if edge_table.len()? > 0
+        {
+          return Err(error::RunTimeError::DeleteConnectedNode.into());
+        }
+      }
+      write_transaction.delete_table(graph_info.nodes_table_definition())?;
+      write_transaction.open_table(graph_info.nodes_table_definition())?;
+    }
+    else
+    {
+      let node_keys = if query.is_select_only_keys()
+      {
+        query
+          .keys
+          .ok_or_else(|| error::InternalError::Unreachable {
+            context: "persy/store/delete_nodes",
+          })?
+      }
+      else
+      {
+        self
+          .select_nodes(transaction, graph_name, query)?
+          .into_iter()
+          .map(|x| x.key)
+          .collect()
+      };
+
+      if detach
+      {
+        // Delete the edges connected to the nodes
+        self.delete_edges(
+          transaction,
+          graph_name,
+          super::SelectEdgeQuery::select_source_keys(super::SelectNodeQuery::select_keys(
+            node_keys.clone(),
+          )),
+          graph::EdgeDirectivity::Undirected,
+        )?;
+      }
+      else
+      {
+        let write_transaction = transaction.try_into_write()?;
+        // Check if the nodes are disconnected
+        let table_source =
+          write_transaction.open_table(graph_info.edges_source_index_definition())?;
+        let table_destination =
+          write_transaction.open_table(graph_info.edges_destination_index_definition())?;
+
+        for key in node_keys.iter()
+        {
+          if !table_source
+            .get_required(key, error::Error::UnknownNode)?
+            .value()
+            .is_empty()
+            || !table_destination
+              .get_required(key, error::Error::UnknownNode)?
+              .value()
+              .is_empty()
+          {
+            return Err(error::RunTimeError::DeleteConnectedNode.into());
+          }
+        }
+      }
+      let write_transaction = transaction.try_into_write()?;
+      // Delete the nodes
+      let mut table_nodes = write_transaction.open_table(graph_info.nodes_table_definition())?;
+      let mut table_source =
+        write_transaction.open_table(graph_info.edges_source_index_definition())?;
+      let mut table_destination =
+        write_transaction.open_table(graph_info.edges_destination_index_definition())?;
+      for key in node_keys.into_iter()
+      {
+        table_nodes.remove(key)?;
+        table_source.remove(key)?;
+        table_destination.remove(key)?;
+      }
+    }
+    Ok(())
+  }
+  /// Select nodes according to a given query
+  fn select_nodes(
+    &self,
+    transaction: &mut Self::TransactionBox,
+    graph_name: &String,
+    query: super::SelectNodeQuery,
+  ) -> Result<Vec<crate::graph::Node>>
+  {
+    let graph_info = self.graphs.get(graph_name).unwrap();
+    match transaction
+    {
+      store::TransactionBox::Read(read) =>
+      {
+        let nodes_table = read.open_table(graph_info.nodes_table_definition())?;
+        self.select_nodes_from_table(&nodes_table, query)
+      }
+      store::TransactionBox::Write(write) =>
+      {
+        let nodes_table = write.open_table(graph_info.nodes_table_definition())?;
+        self.select_nodes_from_table(&nodes_table, query)
+      }
+    }
+  }
+  /// Add edge
+  fn create_edges<'a, T: Iterator<Item = &'a crate::graph::Edge>>(
+    &self,
+    transaction: &mut Self::TransactionBox,
+    graph_name: &String,
+    edges_iter: T,
+  ) -> Result<()>
+  {
+    let transaction = transaction.try_into_write()?;
+    let graph_info = self.graphs.get(graph_name).unwrap();
+    let mut table = transaction.open_table(graph_info.edges_table_definition())?;
+    let mut table_source = transaction.open_table(graph_info.edges_source_index_definition())?;
+    let mut table_destination =
+      transaction.open_table(graph_info.edges_destination_index_definition())?;
+
+    for x in edges_iter
+    {
+      table.insert(
+        x.key,
+        &PersistentEdge {
+          key: x.key,
+          source: x.source.key,
+          destination: x.destination.key,
+          labels: x.labels.clone(),
+          properties: x.properties.clone(),
+        },
+      )?;
+      let mut keys = table_source
+        .remove(x.source.key)?
+        .ok_or(error::Error::UnknownNode)?
+        .value();
+      keys.push(x.key);
+      table_source.insert(x.source.key, keys)?;
+      let mut keys = table_destination
+        .remove(x.destination.key)?
+        .ok_or(error::Error::UnknownNode)?
+        .value();
+      keys.push(x.key);
+      table_destination.insert(x.destination.key, keys)?;
+    }
+    Ok(())
+  }
+  fn update_edge(
+    &self,
+    transaction: &mut Self::TransactionBox,
+    graph_name: &String,
+    edge: &graph::Edge,
+  ) -> Result<()>
+  {
+    let transaction = transaction.try_into_write()?;
+    let graph_info = self.graphs.get(graph_name).unwrap();
+    let mut table = transaction.open_table(graph_info.edges_table_definition())?;
+    table.insert(
+      edge.key,
+      &PersistentEdge {
+        key: edge.key,
+        source: edge.source.key,
+        destination: edge.destination.key,
+        labels: edge.labels.to_owned(),
+        properties: edge.properties.to_owned(),
+      },
+    )?;
+    Ok(())
+  }
+  /// Delete nodes according to a given query
+  fn delete_edges(
+    &self,
+    transaction: &mut Self::TransactionBox,
+    graph_name: &String,
+    query: super::SelectEdgeQuery,
+    directivity: graph::EdgeDirectivity,
+  ) -> Result<()>
+  {
+    let graph_info = self.graphs.get(graph_name).unwrap();
+    let edges = self.select_edges(transaction, graph_name, query, directivity)?;
+
+    let transaction = transaction.try_into_write()?;
+
+    let mut table = transaction.open_table(graph_info.edges_table_definition())?;
+    let mut table_source = transaction.open_table(graph_info.edges_source_index_definition())?;
+    let mut table_destination =
+      transaction.open_table(graph_info.edges_destination_index_definition())?;
+
+    for e in edges
+    {
+      table.remove(e.edge.key)?;
+      let (sk, dk) = if e.reversed
+      {
+        (e.edge.destination.key, e.edge.source.key)
+      }
+      else
+      {
+        (e.edge.source.key, e.edge.destination.key)
+      };
+
+      let mut v = table_source
+        .remove(sk)?
+        .ok_or_else(|| error::show_backtrace(error::Error::UnknownNode))?
+        .value();
+      v.retain(|x| *x != e.edge.key);
+      table_source.insert(sk, v)?;
+
+      let mut v = table_destination
+        .remove(dk)?
+        .ok_or_else(|| error::show_backtrace(error::Error::UnknownNode))?
+        .value();
+      v.retain(|x| *x != e.edge.key);
+      table_destination.insert(dk, v)?;
+    }
+    Ok(())
+  }
+  /// Select edges
+  fn select_edges(
+    &self,
+    transaction: &mut Self::TransactionBox,
+    graph_name: &String,
+    query: super::SelectEdgeQuery,
+    directivity: graph::EdgeDirectivity,
+  ) -> Result<Vec<super::EdgeResult>>
+  {
+    if query.source.is_select_none() || query.destination.is_select_none()
+    {
+      return Ok(Default::default());
+    }
+    let graph_info = self.graphs.get(graph_name).unwrap();
+
+    match transaction
+    {
+      store::TransactionBox::Read(read) =>
+      {
+        let edges_table = read.open_table(graph_info.edges_table_definition())?;
+        let nodes_table = read.open_table(graph_info.nodes_table_definition())?;
+
+        let edges_source_index = Rc::new(RefCell::new(
+          read.open_table(graph_info.edges_source_index_definition())?,
+        ));
+        let edges_destination_index = Rc::new(RefCell::new(
+          read.open_table(graph_info.edges_destination_index_definition())?,
+        ));
+
+        self.select_edges_from_tables(
+          query,
+          directivity,
+          edges_table,
+          nodes_table,
+          edges_source_index,
+          edges_destination_index,
+        )
+      }
+      store::TransactionBox::Write(write) =>
+      {
+        let edges_table = write.open_table(graph_info.edges_table_definition())?;
+        let nodes_table = write.open_table(graph_info.nodes_table_definition())?;
+
+        let edges_source_index = Rc::new(RefCell::new(
+          write.open_table(graph_info.edges_source_index_definition())?,
+        ));
+        let edges_destination_index = Rc::new(RefCell::new(
+          write.open_table(graph_info.edges_destination_index_definition())?,
+        ));
+
+        self.select_edges_from_tables(
+          query,
+          directivity,
+          edges_table,
+          nodes_table,
+          edges_source_index,
+          edges_destination_index,
+        )
+      }
+    }
+  }
+  fn compute_statistics(&self, transaction: &mut Self::TransactionBox)
+    -> Result<super::Statistics>
   {
     let mut edges_count = 0;
     let mut nodes_count = 0;
