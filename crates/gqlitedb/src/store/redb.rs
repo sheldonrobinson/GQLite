@@ -2,7 +2,7 @@ use redb::{ReadableTable, ReadableTableMetadata};
 use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::{error, graph, store, Result};
+use crate::prelude::*;
 
 //  ____               _     _             _   _____    _
 // |  _ \ ___ _ __ ___(_)___| |_ ___ _ __ | |_| ____|__| | __ _  ___
@@ -172,9 +172,9 @@ impl<'txn> NodeTableExtension for redb::Table<'txn, graph::Key, &[u8]>
 {
   fn get_node(&self, key: graph::Key) -> Result<graph::Node>
   {
-    let v = self.get_required(key, error::Error::UnknownNode)?;
+    let v = self.get_required(key, || InternalError::UnknownNode)?;
     let c = ciborium::from_reader::<graph::Node, &[u8]>(&mut v.value())?;
-    Ok::<graph::Node, crate::Error>(c)
+    Ok::<graph::Node, crate::prelude::ErrorType>(c)
   }
 }
 
@@ -183,10 +183,10 @@ where
   K: redb::Key + 'static,
   V: redb::Value + 'static,
 {
-  fn get_required<'a>(
+  fn get_required<'a, TError: Into<Error>>(
     &self,
     key: impl std::borrow::Borrow<K::SelfType<'a>>,
-    err: error::Error,
+    f: impl FnOnce() -> TError,
   ) -> Result<redb::AccessGuard<V>>;
 }
 
@@ -196,13 +196,13 @@ where
   K: redb::Key + 'static,
   V: redb::Value + 'static,
 {
-  fn get_required<'a>(
+  fn get_required<'a, TError: Into<ErrorType>>(
     &self,
     key: impl std::borrow::Borrow<K::SelfType<'a>>,
-    err: error::Error,
+    f: impl FnOnce() -> TError,
   ) -> Result<redb::AccessGuard<V>>
   {
-    self.get(key)?.ok_or_else(|| error::show_backtrace(err))
+    self.get(key)?.ok_or_else(|| f().into())
   }
 }
 
@@ -332,7 +332,7 @@ impl Store
       Some(keys) => Box::new(keys.into_iter().map(|key| {
         Ok(
           nodes_table
-            .get_required(key, error::Error::UnknownNode)?
+            .get_required(key, || InternalError::UnknownNode)?
             .value(),
         )
       })) as Box<dyn Iterator<Item = Result<graph::Node>>>,
@@ -429,7 +429,7 @@ impl Store
           edges_raw.push(EdgeIdResult::new(
             edges_table
               .get(key)?
-              .ok_or_else(|| error::show_backtrace(error::Error::UnknownNode))?
+              .ok_or_else(|| InternalError::UnknownNode)?
               .value(),
             Some(false),
             None,
@@ -464,7 +464,7 @@ impl Store
                 .map(|n| {
                   edges_destination_uuid_index
                     .borrow()
-                    .get_required(n.key, error::Error::UnknownNode)
+                    .get_required(n.key, || InternalError::UnknownNode)
                     .map(|x| x.value())
                 })
                 .collect::<Result<Vec<_>>>()?
@@ -477,7 +477,7 @@ impl Store
                 let nkey = n.key;
                 for k in edges_source_uuid_index
                   .borrow()
-                  .get_required(nkey, error::Error::UnknownNode)?
+                  .get_required(nkey, || InternalError::UnknownNode)?
                   .value()
                   .iter()
                 {
@@ -488,7 +488,7 @@ impl Store
                     {
                       edges_raw.push(EdgeIdResult::new(
                         edges_table
-                          .get_required(k, error::Error::UnknownEdge)?
+                          .get_required(k, || InternalError::UnknownEdge)?
                           .value(),
                         None,
                         Some(nkey),
@@ -509,7 +509,7 @@ impl Store
                 let nkey = n.key;
                 for k in edges_source_uuid_index
                   .borrow()
-                  .get_required(nkey, error::Error::UnknownNode)?
+                  .get_required(nkey, || InternalError::UnknownNode)?
                   .value()
                   .iter()
                 {
@@ -518,7 +518,7 @@ impl Store
                   {
                     edges_raw.push(EdgeIdResult::new(
                       edges_table
-                        .get_required(k, error::Error::UnknownEdge)?
+                        .get_required(k, || InternalError::UnknownEdge)?
                         .value(),
                       None,
                       Some(nkey),
@@ -537,7 +537,7 @@ impl Store
                 let nkey = n.key;
                 for k in edges_destination_uuid_index
                   .borrow()
-                  .get_required(nkey, error::Error::UnknownNode)?
+                  .get_required(nkey, || InternalError::UnknownNode)?
                   .value()
                   .iter()
                 {
@@ -546,7 +546,7 @@ impl Store
                   {
                     edges_raw.push(EdgeIdResult::new(
                       edges_table
-                        .get_required(k, error::Error::UnknownEdge)?
+                        .get_required(k, || InternalError::UnknownEdge)?
                         .value(),
                       None,
                       None,
@@ -564,15 +564,15 @@ impl Store
 
     // Get the edges
     let r = edges_raw.into_iter().map(|v| {
-      Ok::<super::EdgeResult, crate::Error>({
+      Ok::<super::EdgeResult, crate::prelude::ErrorType>({
         let reversed = v.is_reversed();
         let edge = v.edge_data;
 
         let source = nodes_table
-          .get_required(edge.source, error::Error::UnknownNode)?
+          .get_required(edge.source, || InternalError::UnknownNode)?
           .value();
         let destination = nodes_table
-          .get_required(edge.destination, error::Error::UnknownNode)?
+          .get_required(edge.destination, || InternalError::UnknownNode)?
           .value();
 
         let edge = graph::Edge {
@@ -797,11 +797,11 @@ impl store::Store for Store
         for key in node_keys.iter()
         {
           if !table_source
-            .get_required(key, error::Error::UnknownNode)?
+            .get_required(key, || InternalError::UnknownNode)?
             .value()
             .is_empty()
             || !table_destination
-              .get_required(key, error::Error::UnknownNode)?
+              .get_required(key, || InternalError::UnknownNode)?
               .value()
               .is_empty()
           {
@@ -877,13 +877,13 @@ impl store::Store for Store
       )?;
       let mut keys = table_source
         .remove(x.source.key)?
-        .ok_or(error::Error::UnknownNode)?
+        .ok_or(InternalError::UnknownNode)?
         .value();
       keys.push(x.key);
       table_source.insert(x.source.key, keys)?;
       let mut keys = table_destination
         .remove(x.destination.key)?
-        .ok_or(error::Error::UnknownNode)?
+        .ok_or(InternalError::UnknownNode)?
         .value();
       keys.push(x.key);
       table_destination.insert(x.destination.key, keys)?;
@@ -945,14 +945,14 @@ impl store::Store for Store
 
       let mut v = table_source
         .remove(sk)?
-        .ok_or_else(|| error::show_backtrace(error::Error::UnknownNode))?
+        .ok_or_else(|| InternalError::UnknownNode)?
         .value();
       v.retain(|x| *x != e.edge.key);
       table_source.insert(sk, v)?;
 
       let mut v = table_destination
         .remove(dk)?
-        .ok_or_else(|| error::show_backtrace(error::Error::UnknownNode))?
+        .ok_or_else(|| InternalError::UnknownNode)?
         .value();
       v.retain(|x| *x != e.edge.key);
       table_destination.insert(dk, v)?;

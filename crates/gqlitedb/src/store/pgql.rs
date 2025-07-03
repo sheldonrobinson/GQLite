@@ -33,7 +33,7 @@ impl Store
   }
   pub(crate) fn create_graph(&self, name: impl Into<String>) -> Result<()>
   {
-    Err(crate::error::Error::Unimplemented("pgql"))
+    Err(InternalError::Unimplemented("pgql"))
   }
   pub(crate) fn begin(&self) -> Result<Transaction>
   {
@@ -46,7 +46,7 @@ impl Store
     nodes_iter: T,
   ) -> Result<()>
   {
-    Err(crate::error::Error::Unimplemented("pgql"))
+    Err(InternalError::Unimplemented("pgql"))
   }
   /// Select nodes according to a given query
   pub(crate) fn select_nodes<'a, TKeys, TLabels, TProperties>(
@@ -60,7 +60,7 @@ impl Store
     TLabels: Iterator<Item = &'a String>,
     TProperties: Iterator<Item = (&'a String, &'a graph::Value)>,
   {
-    Err(crate::error::Error::Unimplemented("pgql"))
+    Err(InternalError::Unimplemented("pgql"))
   }
   /// Add edge
   pub(crate) fn add_edges<'a, T: Iterator<Item = &'a crate::graph::Edge>>(
@@ -70,7 +70,7 @@ impl Store
     edges_iter: T,
   ) -> Result<()>
   {
-    Err(crate::error::Error::Unimplemented("pgql"))
+    Err(InternalError::Unimplemented("pgql"))
   }
   /// Select edges
   pub(crate) fn select_edges<
@@ -112,10 +112,10 @@ impl Store
     TDestinationLabels: Iterator<Item = &'a String>,
     TDestinationProperties: Iterator<Item = (&'a String, &'a graph::Value)>,
   {
-    Err(crate::error::Error::Unimplemented("pgql"))
+    Err(InternalError::Unimplemented("pgql"))
   }
   pub(crate) fn compute_statistics(&self, _: &Transaction) -> Result<super::Statistics>
   {
-    Err(crate::error::Error::Unimplemented("pgql"))
+    Err(InternalError::Unimplemented("pgql"))
   }
 }

@@ -38,32 +38,12 @@ where
   }
 }
 
-// impl<T> TryInto<T> for Value
-// where
-//   T: TryFrom<graph::Value, Error = crate::Error>,
-// {
-//   type Error = crate::Error;
-//   fn try_into(self) -> std::result::Result<T, Self::Error>
-//   {
-//     match self
-//     {
-//       Self::GraphValue(gv) => gv.try_into(),
-//       _ => Err(
-//         InternalError::ExpectedGraphValue {
-//           context: "try_into",
-//         }
-//         .into(),
-//       ),
-//     }
-//   }
-// }
-
 macro_rules! try_into_gv_impl {
   ($vn:ty) => {
     impl TryInto<$vn> for Value
     {
-      type Error = crate::Error;
-      fn try_into(self) -> std::result::Result<$vn, Self::Error>
+      type Error = ErrorType;
+      fn try_into(self) -> crate::Result<$vn>
       {
         let a: graph::Value = self.try_into()?;
         a.try_into()
@@ -71,10 +51,10 @@ macro_rules! try_into_gv_impl {
     }
     impl TryPopInto<$vn> for Stack
     {
-      fn try_pop_into(&mut self) -> Result<$vn>
+      fn try_pop_into(&mut self) -> crate::Result<$vn>
       {
         self.try_pop()?.try_into()
-          .map_err(|e| error::map_error!(e, Error::Internal(InternalError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))
+          .map_err(|e: ErrorType| error::map_error!(e, Error::Internal(InternalError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))
       }
       fn try_drain_into(&mut self, n: usize) -> Result<Vec<$vn>>
       {
@@ -96,7 +76,7 @@ macro_rules! try_into_impl {
   ($typename:tt, $type:ty, $errorname:tt) => {
     impl TryInto<$type> for Value
     {
-      type Error = crate::Error;
+      type Error = ErrorType;
       fn try_into(self) -> std::result::Result<$type, Self::Error>
       {
         match self
@@ -116,7 +96,7 @@ macro_rules! try_into_impl {
       fn try_pop_into(&mut self) -> Result<$type>
       {
         self.try_pop()?.try_into()
-        .map_err(|e| error::map_error!(e, Error::Internal(InternalError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))
+        .map_err(|e: ErrorType| error::map_error!(e, Error::Internal(InternalError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))
 
       }
       fn try_drain_into(&mut self, n: usize) -> Result<Vec<$type>>
@@ -239,12 +219,12 @@ trait TryPopInto<T>
 
 impl<T> TryPopInto<T> for Stack
 where
-  T: TryFrom<Value, Error = Error>,
+  T: TryFrom<Value, Error = ErrorType>,
 {
   fn try_pop_into(&mut self) -> Result<T>
   {
     self.try_pop()?.try_into()
-      .map_err(|e| error::map_error!(e, Error::Internal(InternalError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))
+      .map_err(|e: ErrorType| error::map_error!(e, Error::Internal(InternalError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))
   }
   fn try_drain_into(&mut self, n: usize) -> Result<Vec<T>>
   {
@@ -549,7 +529,7 @@ fn eval_instructions(
             graph::Value::Array(array) =>
             {
               let idx: i64 = index.try_into()
-              .map_err(|e| error::map_error!(e, Error::Internal(InternalError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))?;
+              .map_err(|e: ErrorType| error::map_error!(e, Error::Internal(InternalError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))?;
               stack.push(
                 array
                   .get(idx as usize)
@@ -572,7 +552,7 @@ fn eval_instructions(
             }) =>
             {
               let idx: String = index.try_into()
-                .map_err(|e| error::map_error!(e, Error::Internal(InternalError::InvalidValueCast{..}) => RunTimeError::MapElementAccessByNonString ))?;
+                .map_err(|e: ErrorType| error::map_error!(e, Error::Internal(InternalError::InvalidValueCast{..}) => RunTimeError::MapElementAccessByNonString ))?;
               stack.push(map.get(&idx).unwrap_or(&graph::Value::Invalid).to_owned());
             }
             graph::Value::Invalid => stack.push(graph::Value::Invalid),
@@ -1224,7 +1204,7 @@ pub(crate) fn eval_program<TStore: store::Store>(
                 }
                 _ =>
                 {
-                  return Err(Error::Unimplemented("executor/eval/create"));
+                  return Err(InternalError::Unimplemented("executor/eval/create").into());
                 }
               }
             }
@@ -1670,7 +1650,7 @@ pub(crate) fn eval_program<TStore: store::Store>(
         }
         else
         {
-          return Err(Error::Unimplemented("call for any other function"));
+          return Err(InternalError::Unimplemented("call for any other function").into());
         }
       }
     }

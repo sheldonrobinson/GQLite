@@ -5,10 +5,7 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
-use crate::{
-  error::{InternalError, RunTimeError},
-  serialize_with,
-};
+use crate::prelude::*;
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum EdgeDirectivity
@@ -108,7 +105,7 @@ impl ValueObjectExtension for ValueObject
           }
           None =>
           {}
-          _ => Err(crate::error::Error::Unimplemented(
+          _ => Err(InternalError::Unimplemented(
             "remove_value should get a better error",
           ))?, // TODO
         }
@@ -120,7 +117,7 @@ impl ValueObjectExtension for ValueObject
     }
     else
     {
-      Err(crate::error::Error::Unimplemented(
+      Err(InternalError::Unimplemented(
         "remove_value should get a better error",
       ))? // TODO
     }
@@ -151,7 +148,7 @@ impl ValueObjectExtension for ValueObject
             o.set_value(Some(next_field), path, value.remove_null().into())?;
             self.insert(field.to_owned(), o.into());
           }
-          _ => Err(crate::error::Error::Unimplemented(
+          _ => Err(InternalError::Unimplemented(
             "add_values should get a better error",
           ))?, // TODO
         }
@@ -178,7 +175,7 @@ impl ValueObjectExtension for ValueObject
                   }
                 }
               }
-              _ => Err(crate::error::Error::Unimplemented(
+              _ => Err(InternalError::Unimplemented(
                 "add_values should get a better error",
               ))?, // TODO
             }
@@ -234,7 +231,7 @@ impl ValueObjectExtension for ValueObject
               self.insert(field.to_owned(), o.into());
             }
           }
-          _ => Err(crate::error::Error::Unimplemented(
+          _ => Err(InternalError::Unimplemented(
             "update_value should get a better error",
           ))?, // TODO
         }
@@ -272,9 +269,7 @@ impl ValueObjectExtension for ValueObject
           *self = o;
           Ok(())
         }
-        _ => Err(crate::error::Error::Unimplemented(
-          "set_value should get a better error",
-        )), // TODO
+        _ => Err(InternalError::Unimplemented("set_value should get a better error").into()), // TODO
       }
     }
   }
@@ -669,12 +664,12 @@ impl std::fmt::Display for Value
 
 pub(crate) trait ValueTryIntoRef<T>
 {
-  fn try_into_ref<'a>(&'a self) -> Result<&'a T, crate::error::Error>;
+  fn try_into_ref<'a>(&'a self) -> Result<&'a T, Error>;
 }
 
 impl ValueTryIntoRef<Value> for Value
 {
-  fn try_into_ref<'a>(&'a self) -> Result<&'a Value, crate::error::Error>
+  fn try_into_ref<'a>(&'a self) -> Result<&'a Value, Error>
   {
     Ok(self)
   }
@@ -699,7 +694,7 @@ macro_rules! impl_to_value {
     }
     impl TryInto<$type> for Value
     {
-      type Error = crate::error::Error;
+      type Error = ErrorType;
       fn try_into(self) -> Result<$type, Self::Error>
       {
         match self
@@ -718,7 +713,7 @@ macro_rules! impl_to_value {
 
     impl ValueTryIntoRef<$type> for Value
     {
-      fn try_into_ref<'a>(&'a self) -> Result<&'a $type, crate::error::Error>
+      fn try_into_ref<'a>(&'a self) -> Result<&'a $type, Error>
       {
         match self
         {

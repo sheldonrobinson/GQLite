@@ -1,13 +1,17 @@
 use std::borrow::Borrow;
 
-fn handle_error<T, E: std::borrow::Borrow<E> + ToString>(context: *mut GqliteApiContextT, result: Result<T, E>) -> Result<T, E>
+fn handle_error<T, E: std::borrow::Borrow<E> + ToString>(
+  context: *mut GqliteApiContextT,
+  result: Result<T, E>,
+) -> Result<T, E>
 {
-  match &result {
-    Ok(_) => {},
-    Err(e) => {
-      let mut context = unsafe {
-        Box::from_raw(context)
-      };
+  match &result
+  {
+    Ok(_) =>
+    {}
+    Err(e) =>
+    {
+      let mut context = unsafe { Box::from_raw(context) };
       context.string = std::ffi::CString::new(e.borrow().to_string()).unwrap();
       context.has_error = true;
       let _ = Box::into_raw(context);
@@ -21,10 +25,10 @@ fn get_value(value: *mut GqliteValueT) -> crate::graph::Value
   if value.is_null()
   {
     crate::graph::Value::default()
-  } else {
-    let value = unsafe {
-      Box::from_raw(value)
-    };
+  }
+  else
+  {
+    let value = unsafe { Box::from_raw(value) };
     let v = value.value.clone();
     let _ = Box::into_raw(value);
     v
@@ -50,12 +54,14 @@ pub struct GqliteApiContextT
 }
 
 #[repr(C)]
-pub struct GqliteConnectionT {
-  connection: crate::Connection
+pub struct GqliteConnectionT
+{
+  connection: crate::Connection,
 }
 
 #[repr(C)]
-pub struct GqliteValueT {
+pub struct GqliteValueT
+{
   value: crate::graph::Value,
 }
 
@@ -77,11 +83,11 @@ pub extern "C" fn gqlite_api_context_destroy(context: *mut GqliteApiContextT)
 }
 
 #[no_mangle]
-pub extern "C" fn gqlite_api_context_get_message(context: *mut GqliteApiContextT) -> *const std::ffi::c_char
+pub extern "C" fn gqlite_api_context_get_message(
+  context: *mut GqliteApiContextT,
+) -> *const std::ffi::c_char
 {
-  unsafe {
-    (*context).string.as_ptr()
-  }
+  unsafe { (*context).string.as_ptr() }
 }
 
 #[no_mangle]
@@ -93,54 +99,65 @@ pub extern "C" fn gqlite_api_context_has_error(context: *mut GqliteApiContextT) 
 #[no_mangle]
 pub extern "C" fn gqlite_api_context_clear_error(context: *mut GqliteApiContextT)
 {
-  let mut context = unsafe {
-    Box::from_raw(context)
-  };
+  let mut context = unsafe { Box::from_raw(context) };
   context.has_error = false;
   let _ = Box::into_raw(context);
 }
 
 #[no_mangle]
-pub extern "C" fn gqlite_connection_create_from_file(context: *mut GqliteApiContextT,
-  filename: *const std::ffi::c_char, options: *mut GqliteValueT) -> *mut GqliteConnectionT
+pub extern "C" fn gqlite_connection_create_from_file(
+  context: *mut GqliteApiContextT,
+  filename: *const std::ffi::c_char,
+  options: *mut GqliteValueT,
+) -> *mut GqliteConnectionT
 {
   check_error(context);
   let options = get_value(options);
   let path = unsafe { std::ffi::CStr::from_ptr(filename) };
   if let Ok(path) = handle_error(context, path.to_str())
   {
-    if let Ok(c) = handle_error(context, crate::Connection::open(path, options.to_object_safe()))
+    if let Ok(c) = handle_error(
+      context,
+      crate::Connection::open(path, options.to_object_safe()),
+    )
     {
-      return Box::into_raw(Box::new(GqliteConnectionT {
-        connection: c
-      }))
+      return Box::into_raw(Box::new(GqliteConnectionT { connection: c }));
     }
   }
   std::ptr::null::<GqliteConnectionT>() as *mut GqliteConnectionT
 }
 
 #[no_mangle]
-pub extern "C" fn gqlite_connection_destroy(_context: *mut GqliteApiContextT, connection: *mut GqliteConnectionT)
+pub extern "C" fn gqlite_connection_destroy(
+  _context: *mut GqliteApiContextT,
+  connection: *mut GqliteConnectionT,
+)
 {
-  unsafe { let _ = Box::from_raw(connection); }
+  unsafe {
+    let _ = Box::from_raw(connection);
+  }
 }
 
 #[no_mangle]
-pub extern "C" fn gqlite_connection_query(context: *mut GqliteApiContextT, connection: *mut GqliteConnectionT,
-  query: *const std::ffi::c_char, bindings: *mut GqliteValueT) -> *mut GqliteValueT
+pub extern "C" fn gqlite_connection_query(
+  context: *mut GqliteApiContextT,
+  connection: *mut GqliteConnectionT,
+  query: *const std::ffi::c_char,
+  bindings: *mut GqliteValueT,
+) -> *mut GqliteValueT
 {
   check_error(context);
   let query = unsafe { std::ffi::CStr::from_ptr(query) };
   if let Ok(query) = handle_error(context, query.to_str())
   {
     let conn = unsafe { Box::from_raw(connection) };
-    let result = conn.connection.execute_query(query, get_value(bindings).to_object_safe());
+    let result = conn
+      .connection
+      .execute_query(query, get_value(bindings).to_object_safe());
     let _ = Box::into_raw(conn);
     if let Ok(v) = handle_error(context, result)
     {
-      return Box::into_raw(Box::new(GqliteValueT {
-        value: v
-      }))
+      return Box::into_raw(Box::new(GqliteValueT { value: v }));
     }
   }
   std::ptr::null::<GqliteValueT>() as *mut GqliteValueT
@@ -159,11 +176,16 @@ pub extern "C" fn gqlite_value_create(context: *mut GqliteApiContextT) -> *mut G
 pub extern "C" fn gqlite_value_destroy(context: *mut GqliteApiContextT, value: *mut GqliteValueT)
 {
   check_error(context);
-  unsafe { let _ = Box::from_raw(value); }
+  unsafe {
+    let _ = Box::from_raw(value);
+  }
 }
 
 #[no_mangle]
-pub extern "C" fn gqlite_value_to_json(context: *mut GqliteApiContextT, value: *mut GqliteValueT) -> *const std::ffi::c_char
+pub extern "C" fn gqlite_value_to_json(
+  context: *mut GqliteApiContextT,
+  value: *mut GqliteValueT,
+) -> *const std::ffi::c_char
 {
   check_error(context);
 
@@ -184,7 +206,10 @@ pub extern "C" fn gqlite_value_to_json(context: *mut GqliteApiContextT, value: *
 }
 
 #[no_mangle]
-pub extern "C" fn gqlite_value_from_json(context: *mut GqliteApiContextT, json: *const std::ffi::c_char) -> *mut GqliteValueT
+pub extern "C" fn gqlite_value_from_json(
+  context: *mut GqliteApiContextT,
+  json: *const std::ffi::c_char,
+) -> *mut GqliteValueT
 {
   check_error(context);
 
@@ -193,21 +218,22 @@ pub extern "C" fn gqlite_value_from_json(context: *mut GqliteApiContextT, json: 
   {
     if let Ok(v) = handle_error(context, serde_json::from_str::<crate::graph::Value>(json))
     {
-      return Box::into_raw(Box::new(GqliteValueT {
-        value: v,
-      }))          
-    }  
+      return Box::into_raw(Box::new(GqliteValueT { value: v }));
+    }
   }
   return std::ptr::null::<GqliteValueT>() as *mut GqliteValueT;
 }
 
 #[no_mangle]
-pub extern "C" fn gqlite_value_is_valid(context: *mut GqliteApiContextT, value: *mut GqliteValueT) -> bool
+pub extern "C" fn gqlite_value_is_valid(
+  context: *mut GqliteApiContextT,
+  value: *mut GqliteValueT,
+) -> bool
 {
   check_error(context);
   match unsafe { (*value).value.borrow() }
   {
     crate::graph::Value::Invalid => false,
-    _ => true
+    _ => true,
   }
 }

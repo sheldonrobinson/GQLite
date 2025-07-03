@@ -5,7 +5,7 @@ use crate::prelude::*;
 use compiler::expression_analyser::{self, ExpressionInfo, ExpressionType};
 use parser::ast;
 
-fn unknown_variable_error(name: &ast::VariableIdentifier) -> Error
+fn unknown_variable_error(name: &ast::VariableIdentifier) -> ErrorType
 {
   InternalError::UnknownVariable {
     name: name.name().clone(),

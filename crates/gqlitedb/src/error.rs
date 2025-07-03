@@ -239,6 +239,44 @@ pub enum InternalError
   GenericStdError(#[from] Box<dyn std::error::Error>),
   #[error("Not a write transaction")]
   NotWriteTransaction,
+
+  // Third-party
+  #[error("Missing element in iterator.")]
+  MissingElementIterator,
+
+  #[cfg(feature = "redb")]
+  #[error("redb: {0}")]
+  RedbError(#[from] redb::Error),
+
+  // Following errors need reviews, and most would fall in the internal error category
+  #[error("An error occured while serialization to Cbor: {0}")]
+  CborSerialisationError(#[from] ciborium::ser::Error<std::io::Error>),
+  #[error("An error occured while deserialization from Cbor: {0}")]
+  CborDeserialisationError(#[from] ciborium::de::Error<std::io::Error>),
+
+  // Parser related error
+  #[error("Missing function name")]
+  MissingFunctionName,
+  #[error("Unexpected expression from the parser: {1} in {0}")]
+  UnxpectedExpression(&'static str, String),
+
+  // Technical debt
+  #[error("Parse int error: {0}")]
+  ParseFloatError(#[from] std::num::ParseFloatError),
+  #[error("Parse int error: {0}")]
+  ParseIntError(#[from] std::num::ParseIntError),
+  #[error("Store error: {0}")]
+  StoreError(String),
+  #[error("Unknown node")]
+  UnknownNode,
+  #[error("Unknown edge")]
+  UnknownEdge,
+  #[error("Unknown error at {0}")]
+  Unknown(&'static str),
+  #[error("Unimplemented error at {0}")]
+  Unimplemented(&'static str),
+  #[error("Infallible.")]
+  Infallible(#[from] std::convert::Infallible),
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -277,68 +315,174 @@ pub enum Error
   /// Error that should not occurs and most likely correspond to a bug
   #[error("Internal: {0}")]
   Internal(#[from] InternalError),
-
-  // Errors from redb
-  #[cfg(feature = "redb")]
-  #[error("ReDB: {0}")]
-  ReDBError(#[from] redb::Error),
-  #[cfg(feature = "redb")]
-  #[error("ReDB:Storage: {0}")]
-  ReDBStorageError(#[from] redb::StorageError),
-  #[cfg(feature = "redb")]
-  #[error("ReDB:DatabaseError: {0}")]
-  ReDBDatabaseError(#[from] redb::DatabaseError),
-  #[cfg(feature = "redb")]
-  #[error("ReDB:TransactionError: {0}")]
-  ReDBTransactionError(#[from] redb::TransactionError),
-  #[cfg(feature = "redb")]
-  #[error("ReDB:TableError: {0}")]
-  ReDBTableError(#[from] redb::TableError),
-  #[cfg(feature = "redb")]
-  #[error("ReDB:CommitError: {0}")]
-  ReDBCommitError(#[from] redb::CommitError),
-
-  // Following errors need reviews, and most would fall in the internal error category
-  #[error("An error occured while serialization to Cbor: {0}")]
-  CborSerialisationError(#[from] ciborium::ser::Error<std::io::Error>),
-  #[error("An error occured while deserialization from Cbor: {0}")]
-  CborDeserialisationError(#[from] ciborium::de::Error<std::io::Error>),
-  #[error("Parse int error: {0}")]
-  ParseFloatError(#[from] std::num::ParseFloatError),
-  #[error("Parse int error: {0}")]
-  ParseIntError(#[from] std::num::ParseIntError),
-  #[error("Store error: {0}")]
-  StoreError(String),
-  #[error("Unexpected expression from the parser: {1} in {0}")]
-  UnxpectedExpression(&'static str, String),
-  #[error("Unknown node")]
-  UnknownNode,
-  #[error("Unknown edge")]
-  UnknownEdge,
-  #[error("Empty stack {0}")]
-  EmptyStack(String),
-  #[error("Unknown error at {0}")]
-  Unknown(&'static str),
-  #[error("Internal error at {0}")]
-  InternalError(&'static str),
-  #[error("Unimplemented error at {0}")]
-  Unimplemented(&'static str),
-  #[error("Infallible.")]
-  Infallible(#[from] Infallible),
 }
 
-#[allow(dead_code)]
-pub(crate) fn show_backtrace<T>(t: T) -> T
+impl Error
 {
-  println!("{:#?}", std::backtrace::Backtrace::capture());
-  t
+  /// Return the underlying error (match WithBacktrace API)
+  pub fn error(&self) -> &Error
+  {
+    self
+  }
+  pub(crate) fn change_error(self, error: Error) -> Error
+  {
+    error
+  }
 }
+
+//  _____                   __        ___ _   _     ____             _    _
+// | ____|_ __ _ __ ___  _ _\ \      / (_) |_| |__ | __ )  __ _  ___| | __ |_ _ __ __ _  ___ ___
+// |  _| | '__| '__/ _ \| '__\ \ /\ / /| | __| '_ \|  _ \ / _` |/ __| |/ / __| '__/ _` |/ __/ _ \
+// | |___| |  | | | (_) | |   \ V  V / | | |_| | | | |_) | (_| | (__|   <| |_| | | (_| | (_|  __/
+// |_____|_|  |_|  \___/|_|    \_/\_/  |_|\__|_| |_|____/ \__,_|\___|_|\_\\__|_|  \__,_|\___\___|
+
+#[derive(Debug)]
+pub struct ErrorWithBacktrace
+{
+  error: Error,
+  backtrace: std::backtrace::Backtrace,
+}
+
+impl ErrorWithBacktrace
+{
+  /// Return the underlying error
+  pub fn error(&self) -> &Error
+  {
+    &self.error
+  }
+  pub(crate) fn change_error(self, error: Error) -> Self
+  {
+    Self {
+      error,
+      backtrace: self.backtrace,
+    }
+  }
+}
+
+impl std::fmt::Display for ErrorWithBacktrace
+{
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
+  {
+    self.error.fmt(f)
+  }
+}
+impl<T> From<T> for ErrorWithBacktrace
+where
+  T: Into<Error>,
+{
+  fn from(value: T) -> Self
+  {
+    Self {
+      error: value.into(),
+      backtrace: std::backtrace::Backtrace::capture(),
+    }
+  }
+}
+
+//   ____                              _
+//  / ___|___  _ ____   _____ _ __ ___(_) ___  _ __
+// | |   / _ \| '_ \ \ / / _ \ '__/ __| |/ _ \| '_ \
+// | |__| (_) | | | \ V /  __/ |  \__ \ | (_) | | | |
+//  \____\___/|_| |_|\_/ \___|_|  |___/_|\___/|_| |_|
 
 impl From<pest::error::Error<crate::parser::parser::Rule>> for Error
 {
   fn from(value: pest::error::Error<crate::parser::parser::Rule>) -> Self
   {
     CompileTimeError::from(value).into()
+  }
+}
+
+macro_rules! error_as_internal {
+  ($err_type:ty) => {
+    impl From<$err_type> for crate::prelude::ErrorType
+    {
+      fn from(value: $err_type) -> Self
+      {
+        let err: crate::error::InternalError = value.into();
+        err.into()
+      }
+    }
+  };
+}
+
+error_as_internal! {ciborium::ser::Error<std::io::Error>}
+error_as_internal! {ciborium::de::Error<std::io::Error>}
+error_as_internal! {std::num::ParseFloatError}
+
+pub(crate) use error_as_internal;
+
+#[cfg(feature = "redb")]
+mod _trait_impl
+{
+  super::error_as_internal! {redb::Error}
+  macro_rules! redb_error_as_internal {
+    ($err_type:ty) => {
+      impl From<$err_type> for crate::prelude::ErrorType
+      {
+        fn from(value: $err_type) -> Self
+        {
+          let redb_err: redb::Error = value.into();
+          let err: crate::error::InternalError = redb_err.into();
+          err.into()
+        }
+      }
+    };
+  }
+  redb_error_as_internal! {redb::StorageError}
+  redb_error_as_internal! {redb::DatabaseError}
+  redb_error_as_internal! {redb::TransactionError}
+  redb_error_as_internal! {redb::TableError}
+  redb_error_as_internal! {redb::CommitError}
+}
+
+/// Merge a list of error into a string error message
+pub(crate) fn vec_to_error<E: std::fmt::Display>(errs: &Vec<Error>) -> String
+{
+  let errs: Vec<String> = errs.iter().map(|x| format!("'{}'", x)).collect();
+  errs.join(", ")
+}
+
+pub(crate) fn parse_int_error_to_compile_error<'a>(
+  text: &'a str,
+  e: std::num::ParseIntError,
+) -> crate::prelude::ErrorType
+{
+  use std::num::IntErrorKind;
+  match e.kind()
+  {
+    IntErrorKind::PosOverflow | IntErrorKind::NegOverflow => CompileTimeError::IntegerOverflow {
+      text: text.to_owned(),
+    }
+    .into(),
+    _ => InternalError::ParseIntError(e).into(),
+  }
+}
+
+/// Convenient macro for mapping errors, for instance, from internal error to runtime error:
+///
+/// ```notest
+///   v.try_into()
+///     .map_err(|e| error::map_error!(e, Error::Internal(InternalError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))?;
+/// ```
+macro_rules! map_error {
+  ($err:expr, $source:pat => $destination:expr) => {{
+    use crate::error::*;
+    match $err.error()
+    {
+      $source => $err.change_error($destination.into()),
+      _ => $err,
+    }
+  }};
+}
+
+pub(crate) use map_error;
+
+impl From<std::convert::Infallible> for Error
+{
+  fn from(value: std::convert::Infallible) -> Self
+  {
+    InternalError::Infallible(value).into()
   }
 }
 
@@ -378,46 +522,16 @@ impl GenericErrors for RunTimeError
   }
 }
 
-/// Merge a list of error into a string error message
-pub(crate) fn vec_to_error<E: std::fmt::Display>(errs: &Vec<Error>) -> String
+/// GQLite Result
+#[cfg(not(feature = "_backtrace"))]
+pub(crate) mod export
 {
-  let errs: Vec<String> = errs.iter().map(|x| format!("'{}'", x)).collect();
-  errs.join(", ")
+  pub type Error = super::Error;
 }
 
-pub(crate) fn parse_int_error_to_compile_error<'a>(
-  text: &'a str,
-  e: std::num::ParseIntError,
-) -> crate::Error
+/// GQLite Result
+#[cfg(feature = "_backtrace")]
+pub(crate) mod export
 {
-  use std::num::IntErrorKind;
-  match e.kind()
-  {
-    IntErrorKind::PosOverflow | IntErrorKind::NegOverflow => CompileTimeError::IntegerOverflow {
-      text: text.to_owned(),
-    }
-    .into(),
-    _ => e.into(),
-  }
+  pub type Error = super::ErrorWithBacktrace;
 }
-
-/// Convenient macro for mapping errors, for instance, from internal error to runtime error:
-///
-/// ```notest
-///   v.try_into()
-///     .map_err(|e| error::map_error!(e, Error::Internal(InternalError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))?;
-/// ```
-macro_rules! map_error {
-  ($err:expr, $source:pat => $destination:expr) => {{
-    use crate::error::*;
-    match $err
-    {
-      $source => $destination.into(),
-      o => o,
-    }
-  }};
-}
-
-use std::convert::Infallible;
-
-pub(crate) use map_error;

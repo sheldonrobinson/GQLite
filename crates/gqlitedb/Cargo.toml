@@ -13,6 +13,7 @@ crate-type = ["cdylib", "lib"]
 
 [features]
 default = ["redb", "capi"]
+_backtrace = []
 capi = []
 redb = ["dep:redb"]
 pgql = ["dep:pgrx"]

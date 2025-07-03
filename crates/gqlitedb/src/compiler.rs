@@ -887,7 +887,7 @@ impl Compiler
         self.check_for_constant_integer_expression(x)?;
         let mut instructions = Instructions::new();
         self.compile_expression(&x, &mut instructions, &mut None)?;
-        Ok::<_, error::Error>(instructions)
+        Ok::<_, ErrorType>(instructions)
       })
       .transpose()?;
     let skip = modifiers
@@ -897,7 +897,7 @@ impl Compiler
         self.check_for_constant_integer_expression(x)?;
         let mut instructions = Instructions::new();
         self.compile_expression(&x, &mut instructions, &mut None)?;
-        Ok::<_, error::Error>(instructions)
+        Ok::<_, ErrorType>(instructions)
       })
       .transpose()?;
     let order_by = modifiers.order_by.as_ref().map_or_else(

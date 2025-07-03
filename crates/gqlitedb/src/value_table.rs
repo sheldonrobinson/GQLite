@@ -456,7 +456,7 @@ impl Iterator for IntoRowIter
 fn from_row_iterator<T>(iter: impl IntoIterator<Item = T>) -> Result<ValueTable<usize>>
 where
   T: TryInto<Row>,
-  error::Error: From<<T as TryInto<Row>>::Error>,
+  crate::prelude::ErrorType: From<<T as TryInto<Row>>::Error>,
 {
   let mut data = Vec::new();
   let mut header = None;
@@ -514,8 +514,8 @@ pub(crate) struct RowResult(pub Result<Row>);
 
 impl TryInto<Row> for RowResult
 {
-  type Error = Error;
-  fn try_into(self) -> std::result::Result<Row, Self::Error>
+  type Error = ErrorType;
+  fn try_into(self) -> Result<Row>
   {
     self.0
   }
@@ -531,7 +531,7 @@ impl FromIterator<RowResult> for Result<ValueTable<usize>>
 
 impl TryFrom<Vec<Row>> for ValueTable<usize>
 {
-  type Error = Error;
+  type Error = crate::prelude::ErrorType;
   fn try_from(value: Vec<Row>) -> Result<Self>
   {
     value.into_iter().collect()

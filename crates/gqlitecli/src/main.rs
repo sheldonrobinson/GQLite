@@ -171,7 +171,7 @@ fn main_loop(rl: &mut rustyline::DefaultEditor) -> rustyline::Result<()>
                     {}
                   }
                 }
-                Err(err) => match err
+                Err(err) => match err.error()
                 {
                   gqlitedb::Error::CompileTime(ct) =>
                   {

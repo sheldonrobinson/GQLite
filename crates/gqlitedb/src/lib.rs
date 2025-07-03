@@ -30,7 +30,7 @@ pub(crate) mod tests;
 pub type Error = error::Error;
 
 /// GQLite Result
-pub type Result<T> = std::result::Result<T, Error>;
+pub type Result<T, E = error::export::Error> = std::result::Result<T, E>;
 
 /// GQLite Connection
 pub type Connection = connection::Connection;

@@ -15,7 +15,7 @@ trait TryNext: Iterator
   {
     self
       .next()
-      .ok_or_else(|| crate::Error::InternalError("Missing element in iterator."))
+      .ok_or_else(|| error::InternalError::MissingElementIterator.into())
   }
 }
 
@@ -79,10 +79,13 @@ impl AstBuilder
       {
         Rule::negation => Ok(ast::Negation { value: rhs? }.into()),
         Rule::not => Ok(ast::LogicalNegation { value: rhs? }.into()),
-        unknown_expression => Err(crate::Error::UnxpectedExpression(
-          "build_expression/map_prefix",
-          format!("{unknown_expression:?}"),
-        )),
+        unknown_expression => Err(
+          error::InternalError::UnxpectedExpression(
+            "build_expression/map_prefix",
+            format!("{unknown_expression:?}"),
+          )
+          .into(),
+        ),
       })
       .map_postfix(|lhs, op| match op.as_rule()
       {
@@ -149,10 +152,13 @@ impl AstBuilder
             end,
           })))
         }
-        unknown_expression => Err(crate::Error::UnxpectedExpression(
-          "build_expression/map_postfix",
-          format!("{unknown_expression:?}"),
-        )),
+        unknown_expression => Err(
+          error::InternalError::UnxpectedExpression(
+            "build_expression/map_postfix",
+            format!("{unknown_expression:?}"),
+          )
+          .into(),
+        ),
       })
       .map_infix(|lhs, op, rhs| match op.as_rule()
       {
@@ -268,10 +274,13 @@ impl AstBuilder
           }
           .into(),
         ),
-        unknown_expression => Err(crate::Error::UnxpectedExpression(
-          "build_expression/map_postfix",
-          format!("{unknown_expression:?}"),
-        )),
+        unknown_expression => Err(
+          error::InternalError::UnxpectedExpression(
+            "build_expression/map_postfix",
+            format!("{unknown_expression:?}"),
+          )
+          .into(),
+        ),
       })
       .parse(pairs)
   }
@@ -342,7 +351,7 @@ impl AstBuilder
             let mut it = pair.into_inner();
             let function_name = it
               .next()
-              .ok_or_else(|| crate::Error::InternalError("Missing function name."))?
+              .ok_or_else(|| error::InternalError::MissingFunctionName)?
               .as_str();
             Ok(ast::Expression::FunctionCall(ast::FunctionCall {
               name: function_name.to_string(),
@@ -384,16 +393,22 @@ impl AstBuilder
                 .collect(),
             }))
           }
-          unknown_expression => Err(crate::Error::UnxpectedExpression(
-            "build_expression_term",
-            format!("{unknown_expression:?}"),
-          )),
+          unknown_expression => Err(
+            error::InternalError::UnxpectedExpression(
+              "build_expression_term",
+              format!("{unknown_expression:?}"),
+            )
+            .into(),
+          ),
         }
       }
-      unknown_expression => Err(crate::Error::UnxpectedExpression(
-        "build_expression_term",
-        format!("{unknown_expression:?}"),
-      )),
+      unknown_expression => Err(
+        error::InternalError::UnxpectedExpression(
+          "build_expression_term",
+          format!("{unknown_expression:?}"),
+        )
+        .into(),
+      ),
     }
   }
 
@@ -408,10 +423,10 @@ impl AstBuilder
           .collect::<Result<_>>()?;
         ast::Map { map }
       })),
-      unknown_expression => Err(crate::Error::UnxpectedExpression(
-        "build_map",
-        format!("{unknown_expression:?}"),
-      )),
+      unknown_expression => Err(
+        error::InternalError::UnxpectedExpression("build_map", format!("{unknown_expression:?}"))
+          .into(),
+      ),
     }
   }
 
@@ -455,7 +470,7 @@ impl AstBuilder
                   asc: false,
                   expression: self.build_expression(r.into_inner().try_next()?.into_inner())?,
                 }),
-                _ => Err::<_, crate::Error>(
+                _ => Err::<_, crate::prelude::ErrorType>(
                   InternalError::UnexpectedPair {
                     context: "build_modifiers/order_by",
                     pair: format!("{:#?}", r),
@@ -516,10 +531,13 @@ impl AstBuilder
           }
         }
       }
-      unknown_expression => Err(crate::Error::UnxpectedExpression(
-        "build_named_expressions",
-        format!("{unknown_expression:?}"),
-      )),
+      unknown_expression => Err(
+        error::InternalError::UnxpectedExpression(
+          "build_named_expressions",
+          format!("{unknown_expression:?}"),
+        )
+        .into(),
+      ),
     }
   }
 
@@ -581,10 +599,13 @@ impl AstBuilder
         Rule::map => properties = Some(self.build_map(pair)?),
         unknown_expression =>
         {
-          return Err(crate::Error::UnxpectedExpression(
-            "build_node_pattern",
-            format!("{unknown_expression:?}"),
-          ));
+          return Err(
+            error::InternalError::UnxpectedExpression(
+              "build_node_pattern",
+              format!("{unknown_expression:?}"),
+            )
+            .into(),
+          );
         }
       }
     }
@@ -624,10 +645,13 @@ impl AstBuilder
         Rule::map => properties = Some(self.build_map(pair)?),
         unknown_expression =>
         {
-          return Err(crate::Error::UnxpectedExpression(
-            "build_edge_pattern",
-            format!("{unknown_expression:?}"),
-          ));
+          return Err(
+            error::InternalError::UnxpectedExpression(
+              "build_edge_pattern",
+              format!("{unknown_expression:?}"),
+            )
+            .into(),
+          );
         }
       }
     }
@@ -667,10 +691,13 @@ impl AstBuilder
           properties,
         })
       }
-      unknown_expression => Err(crate::Error::UnxpectedExpression(
-        "build_pattern/edge_pattern",
-        format!("{unknown_expression:?}"),
-      )),
+      unknown_expression => Err(
+        error::InternalError::UnxpectedExpression(
+          "build_pattern/edge_pattern",
+          format!("{unknown_expression:?}"),
+        )
+        .into(),
+      ),
     }
   }
 
@@ -750,10 +777,13 @@ impl AstBuilder
       }
       unknown_expression =>
       {
-        return Err(crate::Error::UnxpectedExpression(
-          "build_node_or_edge_vec",
-          format!("{unknown_expression:?}"),
-        ));
+        return Err(
+          error::InternalError::UnxpectedExpression(
+            "build_node_or_edge_vec",
+            format!("{unknown_expression:?}"),
+          )
+          .into(),
+        );
       }
     };
     Ok(vec)
@@ -949,7 +979,7 @@ impl AstBuilder
                 labels,
               }));
             }
-            unknown_expression => Err(crate::Error::UnxpectedExpression(
+            unknown_expression => Err(error::InternalError::UnxpectedExpression(
               "build_ast_from_statement/set_statement",
               format!("{unknown_expression:?}"),
             ))?,
@@ -984,7 +1014,7 @@ impl AstBuilder
                 labels,
               }));
             }
-            unknown_expression => Err(crate::Error::UnxpectedExpression(
+            unknown_expression => Err(error::InternalError::UnxpectedExpression(
               "build_ast_from_statement/remove_statement",
               format!("{unknown_expression:?}"),
             ))?,
@@ -1005,10 +1035,13 @@ impl AstBuilder
           yield_: Default::default(),
         }))
       }
-      unknown_expression => Err(crate::Error::UnxpectedExpression(
-        "build_ast_from_statement",
-        format!("{unknown_expression:?}"),
-      )),
+      unknown_expression => Err(
+        error::InternalError::UnxpectedExpression(
+          "build_ast_from_statement",
+          format!("{unknown_expression:?}"),
+        )
+        .into(),
+      ),
     }
   }
 }
@@ -1064,7 +1097,7 @@ pub(crate) fn parse(input: &str) -> Result<ast::Statements>
       {}
       unknown_expression =>
       {
-        Err(crate::Error::UnxpectedExpression(
+        Err(error::InternalError::UnxpectedExpression(
           "parse",
           format!("{unknown_expression:?}"),
         ))?;
