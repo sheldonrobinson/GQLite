@@ -239,6 +239,11 @@ pub enum InternalError
   GenericStdError(#[from] Box<dyn std::error::Error>),
   #[error("Not a write transaction")]
   NotWriteTransaction,
+  #[error("Missing metadata {key}")]
+  MissingMetadata
+  {
+    key: String
+  },
 
   // Third-party
   #[error("Missing element in iterator.")]
@@ -280,7 +285,7 @@ pub enum InternalError
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum ConnectionError
+pub enum StoreError
 {
   #[error("UnknownBackend: backend '{backend}' is unknown.")]
   UnknownBackend
@@ -297,6 +302,16 @@ pub enum ConnectionError
   {
     errors: String
   },
+  #[error("DuplicatedGraph: attempt at creating an existing graph: {graph_name}.")]
+  DuplicatedGraph
+  {
+    graph_name: String
+  },
+  #[error("UnknownGraph: {graph_name} is not known.")]
+  UnknownGraph
+  {
+    graph_name: String
+  },
 }
 
 /// GQLite errors
@@ -309,9 +324,9 @@ pub enum Error
   /// Error that occurs during runtime
   #[error("RunTime: {0}")]
   RunTime(#[from] RunTimeError),
-  /// Connection error
-  #[error("ConnectionError")]
-  ConnectionError(#[from] ConnectionError),
+  /// Store error
+  #[error("StoreError: {0}")]
+  StoreError(#[from] StoreError),
   /// Error that should not occurs and most likely correspond to a bug
   #[error("Internal: {0}")]
   Internal(#[from] InternalError),

@@ -1,6 +1,6 @@
 pub(crate) use crate::{
-  aggregators, compiler,
-  error::{self, CompileTimeError, InternalError, RunTimeError},
+  aggregators, compiler, consts,
+  error::{self, CompileTimeError, InternalError, RunTimeError, StoreError},
   functions, graph, interpreter, parser, serialize_with, store, value, value_table, Error, Result,
 };
 

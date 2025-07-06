@@ -2,7 +2,7 @@ use redb::{ReadableTable, ReadableTableMetadata};
 use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::prelude::*;
+use crate::{prelude::*, store::TransactionBoxable};
 
 //  ____               _     _             _   _____    _
 // |  _ \ ___ _ __ ___(_)___| |_ ___ _ __ | |_| ____|__| | __ _  ___
@@ -213,6 +213,7 @@ where
 //  \____|_|  \__,_| .__/|_| |_|___|_| |_|_|  \___/
 //                 |_|
 
+#[derive(Debug)]
 struct GraphInfo
 {
   name: String,
@@ -305,19 +306,111 @@ pub(crate) struct Store
   graphs: HashMap<String, GraphInfo>,
 }
 
+type TransactionBox = store::TransactionBox<redb::ReadTransaction, redb::WriteTransaction>;
+
 impl Store
 {
   /// Crate a new store, with a default graph
   pub(crate) fn new<P: AsRef<std::path::Path>>(path: P) -> Result<Store>
   {
-    let path = path.as_ref();
     let mut s = Self {
-      redb_store: redb::Database::create(path)?,
+      redb_store: redb::Database::create(path.as_ref())?,
       graphs: Default::default(),
     };
     use crate::store::Store;
-    s.create_graph("default", true)?;
+    let mut tx = s.begin_write()?;
+    s.create_graph(&mut tx, &"default".to_string(), true)?;
+    s.set_metadata_value(&mut tx, "version", &consts::GQLITE_VERSION)?;
+    tx.close()?;
     Ok(s)
+  }
+  fn get_metadata_from_table<TTable, TValue>(
+    &self,
+    table: TTable,
+    key: impl Into<String>,
+  ) -> Result<TValue>
+  where
+    TTable: ReadableTable<String, Vec<u8>>,
+    TValue: for<'a> Deserialize<'a>,
+  {
+    let key = key.into();
+    let value = table
+      .get(&key)?
+      .ok_or_else(|| InternalError::MissingMetadata { key: key })?;
+    Ok(ciborium::from_reader(value.value().as_slice())?)
+  }
+  fn get_metadata_value<T: for<'a> Deserialize<'a>>(
+    &self,
+    transaction: &mut TransactionBox,
+    key: impl Into<String>,
+  ) -> Result<T>
+  {
+    let table_def = redb::TableDefinition::new("gqlite_metadata");
+    match transaction
+    {
+      TransactionBox::Read(read) =>
+      {
+        self.get_metadata_from_table(read.open_table(table_def)?, key.into())
+      }
+      TransactionBox::Write(write) =>
+      {
+        self.get_metadata_from_table(write.open_table(table_def)?, key.into())
+      }
+    }
+  }
+  fn get_metadata_value_or_else_from_table<TTable, TValue>(
+    &self,
+    table: TTable,
+    key: impl Into<String>,
+    f: impl FnOnce() -> TValue,
+  ) -> Result<TValue>
+  where
+    TTable: ReadableTable<String, Vec<u8>>,
+    TValue: for<'a> Deserialize<'a>,
+  {
+    let key = key.into();
+    let value = table
+      .get(&key)?
+      .map(|r| Ok::<_, Error>(ciborium::from_reader(r.value().as_slice())?))
+      .unwrap_or_else(|| Ok(f()))?;
+    Ok(value)
+  }
+  fn get_metadata_value_or_else<T: for<'a> Deserialize<'a>>(
+    &self,
+    transaction: &mut TransactionBox,
+    key: impl Into<String>,
+    f: impl FnOnce() -> T,
+  ) -> Result<T>
+  {
+    let table_def = redb::TableDefinition::new("gqlite_metadata");
+    match transaction
+    {
+      TransactionBox::Read(read) =>
+      {
+        self.get_metadata_value_or_else_from_table(read.open_table(table_def)?, key.into(), f)
+      }
+      TransactionBox::Write(write) =>
+      {
+        self.get_metadata_value_or_else_from_table(write.open_table(table_def)?, key.into(), f)
+      }
+    }
+  }
+  fn set_metadata_value<T: Serialize>(
+    &self,
+    transaction: &mut TransactionBox,
+    key: impl Into<String>,
+    value: &T,
+  ) -> Result<()>
+  {
+    let tx = transaction.try_into_write()?;
+    let mut metadata_table = tx.open_table(redb::TableDefinition::<'_, String, Vec<u8>>::new(
+      "gqlite_metadata",
+    ))?;
+    let key = key.into();
+    let mut data = Vec::<u8>::new();
+    ciborium::into_writer(value, &mut data)?;
+    metadata_table.insert(&key, data)?;
+    Ok(())
   }
   fn select_nodes_from_table<'txn, T>(
     &self,
@@ -657,23 +750,8 @@ impl Store
 
 impl store::Store for Store
 {
-  type TransactionBox = store::TransactionBox<redb::ReadTransaction, redb::WriteTransaction>;
+  type TransactionBox = TransactionBox;
 
-  fn create_graph(&mut self, name: impl Into<String>, _ignore_if_exists: bool) -> Result<()>
-  {
-    let gi = GraphInfo::new(name);
-
-    let tx = self.redb_store.begin_write()?;
-    tx.open_table(gi.nodes_table_definition())?;
-    tx.open_table(gi.edges_table_definition())?;
-    tx.open_table(gi.edges_source_index_definition())?;
-    tx.open_table(gi.edges_destination_index_definition())?;
-    tx.commit()?;
-
-    self.graphs.insert("default".into(), gi);
-
-    Ok(())
-  }
   fn begin_write(&self) -> Result<Self::TransactionBox>
   {
     let s = self.redb_store.begin_write()?;
@@ -683,6 +761,80 @@ impl store::Store for Store
   {
     let s = self.redb_store.begin_read()?;
     Ok(Self::TransactionBox::from_read(s))
+  }
+  fn graphs_list(&self, transaction: &mut Self::TransactionBox) -> Result<Vec<String>>
+  {
+    self.get_metadata_value_or_else(transaction, "graphs".to_string(), || vec![])
+  }
+  fn create_graph(
+    &mut self,
+    transaction: &mut Self::TransactionBox,
+    graph_name: &String,
+    ignore_if_exists: bool,
+  ) -> Result<()>
+  {
+    let mut graphs_list = self.graphs_list(transaction)?;
+    if graphs_list.contains(graph_name)
+    {
+      if ignore_if_exists
+      {
+        return Ok(());
+      }
+      else
+      {
+        return Err(
+          StoreError::DuplicatedGraph {
+            graph_name: graph_name.to_owned(),
+          }
+          .into(),
+        );
+      }
+    }
+
+    {
+      let tx = transaction.try_into_write()?;
+
+      let gi = GraphInfo::new(graph_name);
+      tx.open_table(gi.nodes_table_definition())?;
+      tx.open_table(gi.edges_table_definition())?;
+      tx.open_table(gi.edges_source_index_definition())?;
+      tx.open_table(gi.edges_destination_index_definition())?;
+
+      self.graphs.insert(graph_name.to_owned(), gi);
+    }
+    graphs_list.push(graph_name.clone());
+    self.set_metadata_value(transaction, "graphs", &graphs_list)?;
+
+    Ok(())
+  }
+  fn delete_graph(&self, transaction: &mut Self::TransactionBox, graph_name: &String)
+    -> Result<()>
+  {
+    let mut graphs_list = self.graphs_list(transaction)?;
+    if graphs_list.contains(graph_name)
+    {
+      {
+        let tx = transaction.try_into_write()?;
+        let graph_info = self.graphs.get(graph_name).unwrap();
+        tx.delete_table(graph_info.nodes_table_definition())?;
+        tx.delete_table(graph_info.edges_table_definition())?;
+        tx.delete_table(graph_info.edges_source_index_definition())?;
+        tx.delete_table(graph_info.edges_destination_index_definition())?;
+      }
+      graphs_list.retain(|x| x != graph_name);
+      self.set_metadata_value(transaction, "graphs", &graphs_list)?;
+
+      Ok(())
+    }
+    else
+    {
+      Err(
+        StoreError::UnknownGraph {
+          graph_name: graph_name.to_owned(),
+        }
+        .into(),
+      )
+    }
   }
   /// Create nodes and add them to a graph
   fn create_nodes<'a, T: Iterator<Item = &'a crate::graph::Node>>(

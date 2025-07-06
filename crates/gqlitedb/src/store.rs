@@ -104,9 +104,19 @@ where
 pub(crate) trait Store
 {
   type TransactionBox: TransactionBoxable;
-  fn create_graph(&mut self, name: impl Into<String>, _ignore_if_exists: bool) -> Result<()>;
   fn begin_read(&self) -> Result<Self::TransactionBox>;
   fn begin_write(&self) -> Result<Self::TransactionBox>;
+  /// List the graphs
+  fn graphs_list(&self, transaction: &mut Self::TransactionBox) -> Result<Vec<String>>;
+  /// Create a new graph
+  fn create_graph(
+    &mut self,
+    transaction: &mut Self::TransactionBox,
+    name: &String,
+    _ignore_if_exists: bool,
+  ) -> Result<()>;
+  /// Delete a graph
+  fn delete_graph(&self, transaction: &mut Self::TransactionBox, name: &String) -> Result<()>;
   /// Create nodes and add them to a graph
   fn create_nodes<'a, T: Iterator<Item = &'a crate::graph::Node>>(
     &self,

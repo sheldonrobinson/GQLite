@@ -59,7 +59,7 @@ impl Connection
       {
         "redb" => Self::open_redb(path),
         _ => Err(
-          error::ConnectionError::UnknownBackend {
+          StoreError::UnknownBackend {
             backend: backend.to_owned(),
           }
           .into(),
@@ -85,7 +85,7 @@ impl Connection
   #[cfg(not(feature = "redb"))]
   fn open_redb<P: AsRef<std::path::Path>>(_: P) -> crate::Result<Connection>
   {
-    Err(error::ConnectionError::UnavailableBackend { backend: "redb" }.into())
+    Err(error::StoreError::UnavailableBackend { backend: "redb" }.into())
   }
   #[cfg(feature = "pgql")]
   pub fn create() -> crate::Result<Connection>

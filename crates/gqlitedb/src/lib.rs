@@ -20,6 +20,7 @@ mod parser;
 mod prelude;
 mod serialize_with;
 mod store;
+mod utils;
 mod value;
 mod value_table;
 

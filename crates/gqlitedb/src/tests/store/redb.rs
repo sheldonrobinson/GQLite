@@ -1,4 +1,11 @@
 #[test]
+fn test_graphs()
+{
+  let store = crate::store::redb::Store::new(crate::tests::get_tmp_file().unwrap()).unwrap();
+  super::test_graphs(store);
+}
+
+#[test]
 fn test_add_nodes()
 {
   let store = crate::store::redb::Store::new(crate::tests::get_tmp_file().unwrap()).unwrap();

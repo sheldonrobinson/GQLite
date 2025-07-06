@@ -8,6 +8,83 @@ use crate::{
   store::{self, TransactionBoxable},
 };
 
+fn test_graphs<TStore>(mut store: TStore)
+where
+  TStore: store::Store,
+{
+  assert_eq!(
+    store.graphs_list(&mut store.begin_read().unwrap()).unwrap(),
+    vec!["default"]
+  );
+
+  // Create test graph
+  let mut tx = store.begin_write().unwrap();
+  store
+    .create_graph(&mut tx, &"test_graph".to_string(), false)
+    .unwrap();
+  tx.close().unwrap();
+
+  // Check the list of graphs
+  let mut graphs = store.graphs_list(&mut store.begin_read().unwrap()).unwrap();
+  graphs.sort();
+  assert_eq!(
+    graphs,
+    vec!["default".to_string(), "test_graph".to_string()]
+  );
+
+  // Check creating the graph if it already exists
+  let mut tx = store.begin_write().unwrap();
+  store
+    .create_graph(&mut tx, &"test_graph".to_string(), false)
+    .expect_err("graph already exists");
+  store
+    .create_graph(&mut tx, &"test_graph".to_string(), true)
+    .unwrap();
+  tx.close().unwrap();
+
+  // Check that there are still only two graphs
+  let mut graphs = store.graphs_list(&mut store.begin_read().unwrap()).unwrap();
+  graphs.sort();
+  assert_eq!(
+    graphs,
+    vec!["default".to_string(), "test_graph".to_string()]
+  );
+
+  // Delete graph
+  let mut tx = store.begin_write().unwrap();
+  store
+    .delete_graph(&mut tx, &"test_graph".to_string())
+    .unwrap();
+  tx.close().unwrap();
+
+  // And gone from list
+  assert_eq!(
+    store.graphs_list(&mut store.begin_read().unwrap()).unwrap(),
+    vec!["default".to_string()]
+  );
+
+  // Re-create test graph
+  let mut tx = store.begin_write().unwrap();
+  store
+    .create_graph(&mut tx, &"test_graph".to_string(), false)
+    .unwrap();
+  tx.close().unwrap();
+
+  // Check the list of graphs
+  let mut graphs = store.graphs_list(&mut store.begin_read().unwrap()).unwrap();
+  graphs.sort();
+  assert_eq!(
+    graphs,
+    vec!["default".to_string(), "test_graph".to_string()]
+  );
+
+  let mut tx = store.begin_write().unwrap();
+  store
+    .delete_graph(&mut tx, &"unknown".to_string())
+    .expect_err("Attempt at deleting unknown graph.");
+  drop(tx);
+}
+
 fn test_add_nodes<TStore>(store: TStore)
 where
   TStore: store::Store,
