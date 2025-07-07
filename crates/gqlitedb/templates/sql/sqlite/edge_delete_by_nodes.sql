@@ -1,0 +1,2 @@
+WITH source_delete AS NOT MATERIALIZED (SELECT id FROM gqlite_{{ graph_name }}_nodes WHERE hex(node_key) in ('{{ keys | join("', '") }}'))
+DELETE FROM gqlite_{{ graph_name }}_edges WHERE left IN source_delete OR right IN source_delete

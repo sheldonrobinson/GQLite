@@ -1,0 +1,1 @@
+INSERT INTO gqlite_{{ graph_name }}_nodes (node_key, labels, properties) VALUES (?1, ?2, ?3)

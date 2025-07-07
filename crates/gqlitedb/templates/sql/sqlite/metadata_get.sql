@@ -1,0 +1,1 @@
+SELECT value FROM gqlite_metadata WHERE name=:name

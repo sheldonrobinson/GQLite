@@ -1,0 +1,1 @@
+DELETE FROM gqlite_{{ graph_name }}_edges WHERE hex(edge_key) IN ('{{ keys | join("', '") }}')

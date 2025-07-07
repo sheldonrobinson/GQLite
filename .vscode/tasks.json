@@ -73,6 +73,28 @@
       },
       "group": "test",
       "label": "GQLite: cargo test"
+    },
+    {
+      "type": "cargo",
+      "command": "test",
+      "args": [
+        "--package",
+        "gqlitedb",
+        "--lib",
+        "--features",
+        "sqlite,_backtrace",
+        "--",
+        "tests::store::sqlite",
+        "--show-output"
+      ],
+      "env": {
+        "RUST_LIB_BACKTRACE": "1"
+      },
+      "problemMatcher": [
+        "$rustc"
+      ],
+      "group": "build",
+      "label": "rust: test-mod tests::store::sqlite -"
     }
   ]
 }

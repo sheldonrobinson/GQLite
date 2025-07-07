@@ -1,0 +1,1 @@
+UPDATE gqlite_/%= _graph_name %/_edges AS tblu SET properties=json_patch(tblu.properties, json_set('{}', "/%= _path %/", gqlite_jsonify(/%= _expr %/))) /%= _what %/ WHERE tblu.id = /%= _edge_id %/

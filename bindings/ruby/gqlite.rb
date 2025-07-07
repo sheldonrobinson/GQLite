@@ -44,10 +44,17 @@ module GQLite
   end
   class Connection
     attr_reader :dbhandle
-    def initialize(filename: nil)
+    def initialize(filename: nil, backend: nil)
+      options = {}
+      unless backend.nil?
+        options["backend"] = backend
+      end
+      options = CApi.call_function :gqlite_value_from_json, options.to_json
       if filename != nil
-        @dbhandle = CApi.call_function :gqlite_connection_create_from_file, filename, nil
+        @dbhandle = CApi.call_function :gqlite_connection_create_from_file, filename, options
+        CApi.call_function :gqlite_value_destroy, options
       else
+        CApi.call_function :gqlite_value_destroy, options
         raise Error.new "No connection backend was selected."
       end
       ObjectSpace.define_finalizer @dbhandle, proc {|id|

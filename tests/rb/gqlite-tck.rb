@@ -2,6 +2,7 @@
 
 require 'cucumber'
 require 'optparse'
+require_relative 'cucumber/step_definitions/global'
 
 options = {
   :abort_on_first_error => false,
@@ -140,9 +141,13 @@ args = args.concat(%w(--format junit --out)).concat([options[:output_dir]])  if 
 # To st|o| op at first error
 # args = (features + expressions).concat %w(--require cucumber/step_definitions/ --fail-fast)
 
-# begin
-Cucumber::Cli::Main.new(args).execute!
-# rescue SystemExit => se
-#   puts se.status
-#   puts "Cucumber calls @kernel.exit(), killing your script unless you rescue"
-# end
+["sqlite", "redb"].each() do |backend|
+  Global.store_backend = backend
+  begin
+    Cucumber::Cli::Main.new(args).execute!
+  rescue SystemExit => se
+    if se.status != 0
+      sys.exit(se.status)
+    end
+  end
+end

@@ -371,7 +371,7 @@ impl Store
     let key = key.into();
     let value = table
       .get(&key)?
-      .map(|r| Ok::<_, Error>(ciborium::from_reader(r.value().as_slice())?))
+      .map(|r| Ok::<_, ErrorType>(ciborium::from_reader(r.value().as_slice())?))
       .unwrap_or_else(|| Ok(f()))?;
     Ok(value)
   }
@@ -1017,6 +1017,17 @@ impl store::Store for Store
 
     for x in edges_iter
     {
+      let mut keys_source = table_source
+        .remove(x.source.key)?
+        .ok_or(InternalError::UnknownNode)?
+        .value();
+      keys_source.push(x.key);
+      let mut keys_destination = table_destination
+        .remove(x.destination.key)?
+        .ok_or(InternalError::UnknownNode)?
+        .value();
+      keys_destination.push(x.key);
+
       table.insert(
         x.key,
         &PersistentEdge {
@@ -1027,18 +1038,8 @@ impl store::Store for Store
           properties: x.properties.clone(),
         },
       )?;
-      let mut keys = table_source
-        .remove(x.source.key)?
-        .ok_or(InternalError::UnknownNode)?
-        .value();
-      keys.push(x.key);
-      table_source.insert(x.source.key, keys)?;
-      let mut keys = table_destination
-        .remove(x.destination.key)?
-        .ok_or(InternalError::UnknownNode)?
-        .value();
-      keys.push(x.key);
-      table_destination.insert(x.destination.key, keys)?;
+      table_source.insert(x.source.key, keys_source)?;
+      table_destination.insert(x.destination.key, keys_destination)?;
     }
     Ok(())
   }

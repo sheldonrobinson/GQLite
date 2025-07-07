@@ -4,6 +4,7 @@ require 'yaml'
 require 'rspec'
 
 require_relative 'comparison'
+require_relative 'global'
 
 class String
   def is_i?
@@ -358,7 +359,7 @@ Given(/^any graph$/) do
     file = Tempfile.new('testdb')
     path = file.path
     file.unlink
-    @handle = GQLite::Connection.new(filename: path)
+    @handle = GQLite::Connection.new(filename: path, backend: Global.store_backend)
   end
 end
 

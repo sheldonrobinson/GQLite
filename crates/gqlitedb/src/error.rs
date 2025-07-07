@@ -1,5 +1,7 @@
 //! Errors used for gqlite.
 
+use crate::prelude::*;
+
 /// Represent compile time errors.
 #[derive(thiserror::Error, Debug)]
 pub enum CompileTimeError
@@ -253,11 +255,23 @@ pub enum InternalError
   #[error("redb: {0}")]
   RedbError(#[from] redb::Error),
 
-  // Following errors need reviews, and most would fall in the internal error category
+  // Errors from sqlite
+  #[cfg(feature = "sqlite")]
+  #[error("Sqlite: {0}")]
+  SqliteError(#[from] rusqlite::Error),
+
+  // Errors from askama
+  #[cfg(feature = "sqlite")]
+  #[error("Askama: {0}")]
+  AskamaError(#[from] askama::Error),
+
+  // Serialization errors
   #[error("An error occured while serialization to Cbor: {0}")]
   CborSerialisationError(#[from] ciborium::ser::Error<std::io::Error>),
   #[error("An error occured while deserialization from Cbor: {0}")]
   CborDeserialisationError(#[from] ciborium::de::Error<std::io::Error>),
+  #[error("JSon error: {0}")]
+  JsonError(#[from] serde_json::Error),
 
   // Parser related error
   #[error("Missing function name")]
@@ -265,7 +279,7 @@ pub enum InternalError
   #[error("Unexpected expression from the parser: {1} in {0}")]
   UnxpectedExpression(&'static str, String),
 
-  // Technical debt
+  // Technical debt: following errors need to be reviewed
   #[error("Parse int error: {0}")]
   ParseFloatError(#[from] std::num::ParseFloatError),
   #[error("Parse int error: {0}")]
@@ -297,7 +311,7 @@ pub enum StoreError
   {
     backend: &'static str
   },
-  #[error("OpeningError: could not open database, got the following error messages from the backends: {errors}")]
+  #[error("OpeningError: could not open database, got the following error messages from the backends: {errors}.")]
   OpeningError
   {
     errors: String
@@ -311,6 +325,14 @@ pub enum StoreError
   UnknownGraph
   {
     graph_name: String
+  },
+  #[error(
+    "IncompatibleVersion: could not open database, got version {actual} but expected {expected}."
+  )]
+  IncompatibleVersion
+  {
+    actual: utils::Version,
+    expected: utils::Version,
   },
 }
 
@@ -423,12 +445,13 @@ macro_rules! error_as_internal {
 
 error_as_internal! {ciborium::ser::Error<std::io::Error>}
 error_as_internal! {ciborium::de::Error<std::io::Error>}
+error_as_internal! {serde_json::Error}
 error_as_internal! {std::num::ParseFloatError}
 
 pub(crate) use error_as_internal;
 
 #[cfg(feature = "redb")]
-mod _trait_impl
+mod _trait_impl_redb
 {
   super::error_as_internal! {redb::Error}
   macro_rules! redb_error_as_internal {
@@ -450,9 +473,15 @@ mod _trait_impl
   redb_error_as_internal! {redb::TableError}
   redb_error_as_internal! {redb::CommitError}
 }
+#[cfg(feature = "sqlite")]
+mod _trait_impl_sqlite
+{
+  error_as_internal! {rusqlite::Error}
+  error_as_internal! {askama::Error}
+}
 
 /// Merge a list of error into a string error message
-pub(crate) fn vec_to_error<E: std::fmt::Display>(errs: &Vec<Error>) -> String
+pub(crate) fn vec_to_error<E: std::fmt::Display>(errs: &Vec<ErrorType>) -> String
 {
   let errs: Vec<String> = errs.iter().map(|x| format!("'{}'", x)).collect();
   errs.join(", ")
@@ -492,6 +521,8 @@ macro_rules! map_error {
 }
 
 pub(crate) use map_error;
+
+use crate::prelude::ErrorType;
 
 impl From<std::convert::Infallible> for Error
 {
