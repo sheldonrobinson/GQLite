@@ -134,6 +134,7 @@ args = (gql + features + expressions).concat %w(--require cucumber/step_definiti
 
 args = args.concat ['--tags', '~@skipStyleCheck']
 args = args.concat %w(--fail-fast)  if options[:abort_on_first_error]
+args = args.concat %w(--format pretty)
 args = args.concat %w(--format html)  if options[:output_html]
 args = args.concat(%w(--format junit --out)).concat([options[:output_dir]])  if options[:output_junit]
 
