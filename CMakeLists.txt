@@ -159,7 +159,6 @@ set_package_properties(Crystal PROPERTIES
 ## Corrosion (build rust from CMake)
 
 include(FetchContent)
-set(FETCHCONTENT_FULLY_DISCONNECTED CACHE ON "")
 FetchContent_Declare(
     Corrosion
     GIT_REPOSITORY https://github.com/corrosion-rs/corrosion.git
@@ -170,13 +169,25 @@ FetchContent_MakeAvailable(Corrosion)
 corrosion_import_crate(MANIFEST_PATH Cargo.toml)
 
 ########################
+## Build C++ API
+
+set(GQLITE_CXX_SRC
+    bindings/cpp/connection.cpp
+    bindings/cpp/exception.cpp
+    bindings/cpp/value.cpp)
+
+add_library(gqlitecpp SHARED ${GQLITE_CXX_SRC} )
+target_link_libraries(gqlitecpp PUBLIC gqlitedb)
+set_property(TARGET gqlitecpp PROPERTY OUTPUT_NAME gqlite)
+
+########################
 ## Install library
 
 include_directories(BEFORE include ${CMAKE_CURRENT_BINARY_DIR}/src)
 
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libgqlitedb.so DESTINATION ${INSTALL_LIB_DIR} RENAME libgqlite.so)
-# install(TARGETS gqlite EXPORT GQLiteTargets ${INSTALL_TARGETS_DEFAULT_ARGS} )
-install(FILES include/gqlite-c.h DESTINATION ${INSTALL_INCLUDE_DIR}/)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libgqlitedb.so DESTINATION ${INSTALL_LIB_DIR})
+install(TARGETS gqlitecpp EXPORT GQLiteTargets ${INSTALL_TARGETS_DEFAULT_ARGS} )
+install(FILES include/gqlite-c.h  include/gqlite.h DESTINATION ${INSTALL_INCLUDE_DIR}/)
 
 ########################
 ## Install cmd line tool
@@ -194,7 +205,7 @@ if(Python3_FOUND AND PYTHON3_CFFI_FOUND)
   add_custom_target(python3_ffi_lib ALL
       COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/bindings/python/build-ffi.py ${CMAKE_CURRENT_SOURCE_DIR}
       WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-      DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/bindings/python/build-ffi.py cargo-build_gqlitedb
+      DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/bindings/python/build-ffi.py gqlitecpp
   )
   install(FILES ${CMAKE_CURRENT_BINARY_DIR}/__c_gqlite.cpython-${Python3_VERSION_MAJOR}${Python3_VERSION_MINOR}-x86_64-linux-gnu.so DESTINATION ${PYTHON_SITE_PACKAGES_INSTALL_DIR}/)
   install(DIRECTORY bindings/python/gqlite DESTINATION ${PYTHON_SITE_PACKAGES_INSTALL_DIR})
@@ -209,9 +220,9 @@ install(DIRECTORY bindings/ruby DESTINATION ${INSTALL_LIB_DIR})
 ## Build examples
 
 add_executable(gqlite_c_example examples/main.c)
-target_link_libraries(gqlite_c_example PRIVATE gqlitedb)
-# add_executable(gqlite_cpp_example examples/main.cpp)
-# target_link_libraries(gqlite_cpp_example PRIVATE gqlite)
+target_link_libraries(gqlite_c_example PRIVATE gqlitecpp)
+add_executable(gqlite_cpp_example examples/main.cpp)
+target_link_libraries(gqlite_cpp_example PRIVATE gqlitecpp)
 
 ###########################
 ## COPY dists to binary dir
@@ -244,14 +255,14 @@ file(CREATE_LINK ${CMAKE_CURRENT_SOURCE_DIR}/include/gqlite-c.h ${CMAKE_CURRENT_
 ########################
 ## Build tests
 
-# add_executable(gqlite_cpp_tests tests/cpp/catch_amalgamated.cpp tests/cpp/test_value.cpp)
-# target_link_libraries(gqlite_cpp_tests PRIVATE gqlite)
+add_executable(gqlite_cpp_tests tests/cpp/catch_amalgamated.cpp tests/cpp/test_value.cpp)
+target_link_libraries(gqlite_cpp_tests PRIVATE gqlitecpp)
 
 if(Crystal_FOUND)
   add_custom_target(gqlite-cr-spec ALL
   COMMAND ${CMAKE_COMMAND} -E env CRYSTAL_PATH=${CMAKE_CURRENT_SOURCE_DIR}/bindings/crystal/:${Crystal_PATH} ${Crystal_EXECUTABLE} build --link-flags "-L${CMAKE_CURRENT_BINARY_DIR}" ${CMAKE_CURRENT_SOURCE_DIR}/tests/cr/gqlite-spec.cr -o gqlite-cr-spec
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-    DEPENDS cargo-build_gqlitedb ${CMAKE_CURRENT_SOURCE_DIR}/tests/cr/gqlite-spec.cr ${CMAKE_CURRENT_SOURCE_DIR}/bindings/crystal/gqlite.cr
+    DEPENDS gqlitecpp ${CMAKE_CURRENT_SOURCE_DIR}/tests/cr/gqlite-spec.cr ${CMAKE_CURRENT_SOURCE_DIR}/bindings/crystal/gqlite.cr
   )
 endif()
 
@@ -263,13 +274,13 @@ option(GQLITE_TESTS_DISABLE_RUST_TESTS "Disable rust unittest (intended for CI)"
 
 if(GQLITE_TESTS_OUTPUT_JUNIT)
   make_directory(${CMAKE_BINARY_DIR}/Testing/junit)
-  # set(GQLITE_CPP_EXTRA_ARGS -r junit -o ${CMAKE_BINARY_DIR}/Testing/junit/TEST-gqlite-cpp.xml )
+  set(GQLITE_CPP_EXTRA_ARGS -r junit -o ${CMAKE_BINARY_DIR}/Testing/junit/TEST-gqlite-cpp.xml )
   set(GQLITE_RSPEC_EXTRA_ARGS --format RspecJunitFormatter --out ${CMAKE_BINARY_DIR}/Testing/junit/TEST-gqlite-rb-rspec.xml)
   set(GQLITE_TCK_EXTRA_ARGS --output-junit)
   set(GQLITE_PY_EXTRA_ARGS -m pytest --junitxml Testing/junit/TEST-gqlite-py-unittest.xml)
 endif()
 
-# add_test(NAME gqlite-cpp COMMAND ${CMAKE_CURRENT_BINARY_DIR}/gqlite_cpp_tests ${GQLITE_CPP_EXTRA_ARGS})
+add_test(NAME gqlite-cpp COMMAND ${CMAKE_CURRENT_BINARY_DIR}/gqlite_cpp_tests ${GQLITE_CPP_EXTRA_ARGS})
 
 if(NOT GQLITE_TESTS_DISABLE_RUST_TESTS)
   add_test(NAME gqlite-rs COMMAND

@@ -1,0 +1,17 @@
+BreakBeforeBraces: Allman
+NamespaceIndentation: All
+ColumnLimit: 100
+EmptyLineBeforeAccessModifier: Never
+IndentRequiresClause: true
+RequiresClausePosition: OwnLine
+AlwaysBreakTemplateDeclarations: true
+PointerAlignment: Left
+IndentWrappedFunctionNames: true
+SpaceAfterTemplateKeyword: false
+SpaceBeforeParens: Never
+IndentWidth: 2
+ContinuationIndentWidth: 2
+BreakBeforeTernaryOperators: true
+SpaceAfterLogicalNot: false
+SpaceBeforeAssignmentOperators: true
+BreakBeforeBinaryOperators: true
