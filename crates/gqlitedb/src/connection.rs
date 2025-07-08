@@ -111,7 +111,7 @@ impl Connection
   {
     Err(error::StoreError::UnavailableBackend { backend: "redb" }.into())
   }
-  #[cfg(feature = "pgql")]
+  #[cfg(feature = "_pgql")]
   pub fn create() -> crate::Result<Connection>
   {
     Ok(Connection {

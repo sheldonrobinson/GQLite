@@ -1,13 +1,13 @@
 use std::collections::HashMap;
 
-#[cfg(feature = "pgql")]
+#[cfg(feature = "_pgql")]
 pub(crate) mod pgql;
 #[cfg(feature = "redb")]
 pub(crate) mod redb;
 #[cfg(feature = "sqlite")]
 pub(crate) mod sqlite;
 
-#[cfg(feature = "pgql")]
+#[cfg(feature = "_pgql")]
 pub(crate) use pgql::Store;
 
 use crate::prelude::*;
