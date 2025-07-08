@@ -14,23 +14,34 @@ pub(crate) use contains::{contains, ContainResult};
 #[serde(untagged)]
 pub enum Value
 {
+  /// Null value.
   #[default]
   Null,
+  /// Boolean value.
   Boolean(bool),
+  /// Signed integer value.
   Integer(i64),
   #[serde(
     serialize_with = "serialize_with::serialize_float",
     deserialize_with = "serialize_with::deserialize_float"
   )]
+  /// Floating point value.
   Float(f64),
+  /// String value.
   String(String),
+  /// Array of values.
   Array(Vec<Value>),
+  /// Unordered map of values.
   Map(ValueMap),
+  /// A node in the graph.
   Node(graph::Node),
+  /// An edge in the graph.
   Edge(graph::Edge),
+  /// A path in the graph.
   Path(graph::Path),
 }
 
+/// A map of values.
 pub type ValueMap = std::collections::HashMap<String, Value>;
 
 pub(crate) fn value_object_display(
@@ -730,7 +741,15 @@ macro_rules! array {
 #[cfg(test)]
 pub(crate) use array;
 
-#[cfg(test)]
+/// Convenient macro for creating ValueMap.
+///
+/// Example:
+///
+/// ```rust
+/// # use gqlitedb::{ValueMap, map};
+/// let value_map: ValueMap = map!("hello" => 12);
+/// ```
+#[macro_export]
 macro_rules! map {
   // map-like
   ($($k:expr => $v:expr),* $(,)?) => {

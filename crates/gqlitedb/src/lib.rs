@@ -1,6 +1,10 @@
 //! ![GQLite logo](https://gqlite.org/assets/images/logo-88x88.png) GQLite
+//! ======================================================================
 //!
 //! Implementation of GQL (Graph Query Language), embeddable in applications.
+//!
+//! Add to your crate, using `cargo add gqlitedb`. Check-out [Connection]
+//! for an example of use.
 
 #![warn(missing_docs)]
 #![allow(dead_code)]
@@ -27,17 +31,11 @@ mod value_table;
 #[cfg(test)]
 pub(crate) mod tests;
 
-/// GQLite error
-pub type Error = error::Error;
+pub use {
+  connection::Connection,
+  error::{CompileTimeError, Error, RunTimeError, StoreError},
+  value::{Value, ValueMap},
+};
 
-/// GQLite Result
+/// GQLite Result alias. Usable as a standard `Result<T, E>` or default to gqlite::Error with `Result<T>`
 pub type Result<T, E = error::export::Error> = std::result::Result<T, E>;
-
-/// GQLite Connection
-pub type Connection = connection::Connection;
-
-/// GQLite Value
-pub type Value = value::Value;
-
-/// GQLite ValueMap
-pub type ValueMap = value::ValueMap;

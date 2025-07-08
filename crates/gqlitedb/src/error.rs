@@ -1,9 +1,9 @@
 //! Errors used for gqlite.
-
 use crate::prelude::*;
 
 /// Represent compile time errors.
 #[derive(thiserror::Error, Debug)]
+#[allow(missing_docs)]
 pub enum CompileTimeError
 {
   /// Floating point overflow
@@ -81,6 +81,7 @@ pub enum CompileTimeError
 
 /// Runtime errors.
 #[derive(thiserror::Error, Debug)]
+#[allow(missing_docs)]
 pub enum RunTimeError
 {
   /// Parameter is not known
@@ -284,21 +285,19 @@ pub enum InternalError
   ParseFloatError(#[from] std::num::ParseFloatError),
   #[error("Parse int error: {0}")]
   ParseIntError(#[from] std::num::ParseIntError),
-  #[error("Store error: {0}")]
-  StoreError(String),
   #[error("Unknown node")]
   UnknownNode,
   #[error("Unknown edge")]
   UnknownEdge,
-  #[error("Unknown error at {0}")]
-  Unknown(&'static str),
   #[error("Unimplemented error at {0}")]
   Unimplemented(&'static str),
   #[error("Infallible.")]
   Infallible(#[from] std::convert::Infallible),
 }
 
+/// Error in the store backend.
 #[derive(thiserror::Error, Debug)]
+#[allow(missing_docs)]
 pub enum StoreError
 {
   #[error("UnknownBackend: backend '{backend}' is unknown.")]

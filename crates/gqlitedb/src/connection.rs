@@ -39,6 +39,38 @@ impl<TStore: store::Store> ConnectionImpl<TStore>
   }
 }
 
+/// Connection is the interface to the database, and allow to execute new queries.
+/// New connection are created with [Connection::open] and queried with [Connection::execute_query].
+/// As shown in the example bellow:
+///
+/// ```rust
+/// # use gqlitedb::{Connection, Value};
+/// # fn example() -> gqlitedb::Result<()> {
+/// let connection = Connection::open("filename.db", gqlitedb::map!("backend" => "redb"))?;
+/// let value = connection.execute_query("MATCH (a) RETURN a", Default::default())?;
+/// match value
+/// {
+///   Value::Array(arr) =>
+///   {
+///     arr.iter().for_each(|row| match row
+///     {
+///       Value::Array(arr) =>
+///       {
+///         println!("{:?}", arr);
+///       }
+///       _ =>
+///       {
+///         panic!("Unexpected: {}", row);
+///       }
+///     });
+///   },
+///   _ => {
+///     panic!("Query result should be an array, got {}!", value);
+///   }
+/// }
+/// # Ok(()) }
+/// ```
+
 pub struct Connection
 {
   connection: Box<dyn ConnectionTrait>,
@@ -46,6 +78,24 @@ pub struct Connection
 
 impl Connection
 {
+  /// Open a `path` that contains a `GQLite` database. The `options` parameter can
+  /// be used to select the backend, and configure the backend.
+  ///
+  /// Supported parameters:
+  /// - `backend` can be `redb` or `sqlite`
+  ///
+  /// If the `backend` is not specified, the `open` function will attempt to guess it
+  /// for existing databases. For new database, depending on availability, it will
+  /// create a `sqlite` database, or a `redb` database.
+  ///
+  /// Example of use:
+  ///
+  /// ```rust
+  /// # use gqlitedb::Connection;
+  /// # fn example() -> gqlitedb::Result<()> {
+  /// let connection = Connection::open("filename.db", gqlitedb::map!("backend" => "redb"))?;
+  /// # Ok(()) }
+  /// ```  
   #[cfg(any(feature = "redb", feature = "sqlite"))]
   pub fn open<P: AsRef<std::path::Path>>(
     path: P,
@@ -118,6 +168,18 @@ impl Connection
       store: crate::store::Store::new()?,
     })
   }
+  /// Execute the `query` (using OpenCypher), given the query `parameters` (sometimes
+  /// also referred as binding).
+  ///
+  /// Example:
+  ///
+  /// ```rust
+  /// # use gqlitedb::{Connection, Value};
+  /// # fn example() -> gqlitedb::Result<()> {
+  /// # let connection = gqlitedb::Connection::open("filename.db", gqlitedb::map!("backend" => "redb"))?;
+  /// let result = connection.execute_query("MATCH (a { name: $name }) RETURN a", gqlitedb::map!("name" => "Joe"))?;
+  /// # Ok(()) }
+  /// ```
   pub fn execute_query(
     &self,
     query: impl Into<String>,
