@@ -3,6 +3,9 @@
 <!-- next-header -->
 
 ## [Unreleased] - ReleaseDate
+- SQLite backend.
+- Refactored handling of variables in the executor.
+- Improved Rust API.
 
 ## [0.3.4] - 2025-04-18
 - Improve support of comparison and maps.
