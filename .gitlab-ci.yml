@@ -13,6 +13,7 @@ stages: # List of stages for jobs, and their order of execution
   - precheck
   - build
   - test
+  - postcheck
 
 include:
   - project: "cyloncore/cc_ci_templates"
@@ -47,7 +48,6 @@ include:
     - make test
     - popd
     - cargo nextest run
-    - cargo semver-checks --default-features
   artifacts:
     when: always
     expire_in: 30 days
@@ -68,6 +68,34 @@ precheck:
     - echo "Pre-check are running."
   variables:
     CC_CI_REF_BRANCH: "dev/2"
+
+# Extra-tests
+doc:
+  stage: postcheck
+  image: cyloncore/ci:debian
+  script:
+    - cargo doc --no-deps
+  needs:
+    - job: "debian:build"
+      artifacts: true
+
+semver:
+  stage: postcheck
+  image: cyloncore/ci:debian
+  script:
+    - cargo semver-checks --default-features
+  needs:
+    - job: "debian:build"
+      artifacts: true
+
+coverage:
+  stage: postcheck
+  image: cyloncore/ci:debian
+  script:
+    - cargo llvm-cov
+  needs:
+    - job: "debian:build"
+      artifacts: true
 
 # Debian
 debian:build:
