@@ -1,13 +1,13 @@
 use crate::prelude::*;
-use graph::ValueTryIntoRef;
+use value::ValueTryIntoRef;
 
 trait ConnectionTrait
 {
   fn execute_query(
     &self,
     query: String,
-    parameters: crate::graph::ValueObject,
-  ) -> crate::Result<crate::graph::Value>;
+    parameters: crate::value::ValueMap,
+  ) -> crate::Result<crate::value::Value>;
 }
 
 struct ConnectionImpl<TStore: store::Store>
@@ -21,8 +21,8 @@ impl<TStore: store::Store> ConnectionTrait for ConnectionImpl<TStore>
   fn execute_query(
     &self,
     query: String,
-    parameters: crate::graph::ValueObject,
-  ) -> crate::Result<crate::graph::Value>
+    parameters: crate::value::ValueMap,
+  ) -> crate::Result<crate::value::Value>
   {
     let q: String = query.into();
     let q = crate::parser::parse(q.as_str())?;
@@ -49,7 +49,7 @@ impl Connection
   #[cfg(any(feature = "redb", feature = "sqlite"))]
   pub fn open<P: AsRef<std::path::Path>>(
     path: P,
-    options: crate::graph::ValueObject,
+    options: crate::value::ValueMap,
   ) -> crate::Result<Connection>
   {
     if let Some(backend) = options.get("backend")
@@ -121,8 +121,8 @@ impl Connection
   pub fn execute_query(
     &self,
     query: impl Into<String>,
-    parameters: crate::graph::ValueObject,
-  ) -> crate::Result<crate::graph::Value>
+    parameters: crate::value::ValueMap,
+  ) -> crate::Result<crate::value::Value>
   {
     self.connection.execute_query(query.into(), parameters)
   }

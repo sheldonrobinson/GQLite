@@ -1,6 +1,6 @@
 use super::AggregatorState;
 
-use crate::{error::RunTimeError, graph::Value, Result};
+use crate::{error::RunTimeError, value::Value, Result};
 
 #[derive(Debug)]
 struct SumState
@@ -27,9 +27,9 @@ impl AggregatorState for SumState
       | Value::Edge(..)
       | Value::Array(..)
       | Value::String(..)
-      | Value::Object(..)
+      | Value::Map(..)
       | Value::Path(..) => Err(RunTimeError::InvalidBinaryOperands)?,
-      Value::Invalid =>
+      Value::Null =>
       {}
       Value::Float(lhs) => match value
       {
@@ -46,7 +46,7 @@ impl AggregatorState for SumState
     }
     Ok(())
   }
-  fn finalise(self: Box<Self>) -> crate::Result<crate::graph::Value>
+  fn finalise(self: Box<Self>) -> crate::Result<crate::value::Value>
   {
     Ok(self.value)
   }

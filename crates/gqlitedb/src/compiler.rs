@@ -303,7 +303,7 @@ impl Compiler
     else
     {
       instructions.push(Instruction::Push {
-        value: crate::graph::Value::Object(Default::default()),
+        value: crate::value::Value::Map(Default::default()),
       });
     }
     Ok(())

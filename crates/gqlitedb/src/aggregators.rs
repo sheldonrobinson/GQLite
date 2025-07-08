@@ -9,13 +9,13 @@ use compiler::expression_analyser::ExpressionType;
 
 pub(crate) trait AggregatorState: Debug
 {
-  fn next(&mut self, expression: graph::Value) -> Result<()>;
-  fn finalise(self: Box<Self>) -> Result<graph::Value>;
+  fn next(&mut self, expression: value::Value) -> Result<()>;
+  fn finalise(self: Box<Self>) -> Result<value::Value>;
 }
 
 pub(crate) trait AggregatorTrait: Debug
 {
-  fn create(&self, arguments: Vec<graph::Value>) -> Result<Box<dyn AggregatorState>>;
+  fn create(&self, arguments: Vec<value::Value>) -> Result<Box<dyn AggregatorState>>;
   fn validate_arguments(&self, arguments: Vec<ExpressionType>) -> Result<ExpressionType>;
 }
 
@@ -38,7 +38,7 @@ macro_rules! declare_aggregator {
     impl crate::aggregators::AggregatorTrait for $type_name
     {
       #[allow(unused_variables)]
-      fn create(&self, arguments: Vec<crate::graph::Value>) -> Result<Box<dyn AggregatorState>>
+      fn create(&self, arguments: Vec<crate::value::Value>) -> Result<Box<dyn AggregatorState>>
       {
         Ok(Box::new($crate::functions::make_function_call!($function_name, $state_type_name::new, arguments, $( $arg_type,)*)?))
       }

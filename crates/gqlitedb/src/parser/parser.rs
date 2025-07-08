@@ -295,17 +295,17 @@ impl AstBuilder
         match pair.as_rule()
         {
           Rule::null_lit => Ok(ast::Expression::Value(ast::Value {
-            value: graph::Value::Invalid,
+            value: value::Value::Null,
           })),
           Rule::true_lit => Ok(ast::Expression::Value(ast::Value {
-            value: graph::Value::Boolean(true),
+            value: value::Value::Boolean(true),
           })),
           Rule::false_lit => Ok(ast::Expression::Value(ast::Value {
-            value: graph::Value::Boolean(false),
+            value: value::Value::Boolean(false),
           })),
           Rule::int => Ok(ast::Expression::Value(ast::Value {
             value: {
-              graph::Value::Integer(
+              value::Value::Integer(
                 i64::from_str(pair.as_str())
                   .map_err(|e| error::parse_int_error_to_compile_error(pair.as_str(), e))?,
               )
@@ -313,7 +313,7 @@ impl AstBuilder
           })),
           Rule::octa_int => Ok(ast::Expression::Value(ast::Value {
             value: {
-              graph::Value::Integer(
+              value::Value::Integer(
                 i64::from_str_radix(&remove_hex_prefix(pair.as_str()), 8)
                   .map_err(|e| error::parse_int_error_to_compile_error(pair.as_str(), e))?,
               )
@@ -321,14 +321,14 @@ impl AstBuilder
           })),
           Rule::hexa_int => Ok(ast::Expression::Value(ast::Value {
             value: {
-              graph::Value::Integer(
+              value::Value::Integer(
                 i64::from_str_radix(&remove_hex_prefix(pair.as_str()), 16)
                   .map_err(|e| error::parse_int_error_to_compile_error(pair.as_str(), e))?,
               )
             },
           })),
           Rule::num => Ok(ast::Expression::Value(ast::Value {
-            value: graph::Value::Float(validate_float(pair.as_str().parse()?, pair.as_str())?),
+            value: value::Value::Float(validate_float(pair.as_str().parse()?, pair.as_str())?),
           })),
           Rule::ident => Ok(ast::Expression::Variable(ast::Variable {
             identifier: self.var_ids.from_name(pair.as_str()),
@@ -344,7 +344,7 @@ impl AstBuilder
           })),
           Rule::map => self.build_map(pair),
           Rule::string_literal => Ok(ast::Expression::Value(ast::Value {
-            value: graph::Value::String(pair.into_inner().try_next()?.as_str().to_string()),
+            value: value::Value::String(pair.into_inner().try_next()?.as_str().to_string()),
           })),
           Rule::function_call =>
           {
@@ -386,7 +386,7 @@ impl AstBuilder
                   else
                   {
                     ast::Expression::Value(ast::Value {
-                      value: graph::Value::String(pair.as_str().into()),
+                      value: value::Value::String(pair.as_str().into()),
                     })
                   }
                 })

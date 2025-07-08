@@ -18,7 +18,7 @@ fn main_loop(rl: &mut rustyline::DefaultEditor) -> rustyline::Result<()>
   args.next(); // remove program name
   if let Some(filename) = args.next()
   {
-    let connection_res = gqlitedb::Connection::open(filename, gqlitedb::ValueObject::new());
+    let connection_res = gqlitedb::Connection::open(filename, gqlitedb::ValueMap::new());
     match connection_res
     {
       Ok(c) =>
@@ -53,7 +53,7 @@ fn main_loop(rl: &mut rustyline::DefaultEditor) -> rustyline::Result<()>
               println!("Missing argument to .open");
             }
             let connection_res =
-              gqlitedb::Connection::open(splited_line[1], gqlitedb::ValueObject::new());
+              gqlitedb::Connection::open(splited_line[1], gqlitedb::ValueMap::new());
             match connection_res
             {
               Ok(c) =>
@@ -121,7 +121,7 @@ fn main_loop(rl: &mut rustyline::DefaultEditor) -> rustyline::Result<()>
           {
             Some(ref c) =>
             {
-              let qr = c.execute_query(query, gqlitedb::ValueObject::new());
+              let qr = c.execute_query(query, gqlitedb::ValueMap::new());
               match qr
               {
                 Ok(value) =>
@@ -141,7 +141,7 @@ fn main_loop(rl: &mut rustyline::DefaultEditor) -> rustyline::Result<()>
                       // builder.push_record(keys.iter());
                       // it.for_each(|row| {
                       //   match row {
-                      //     gqlitedb::Value::Object(obj) => {
+                      //     gqlitedb::Value::Map(obj) => {
                       //       builder.push_record(keys.iter().map(|k| obj[k].to_string()));
                       //     },
                       //     _ => {

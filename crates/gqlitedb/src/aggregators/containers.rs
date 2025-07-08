@@ -1,6 +1,6 @@
 use super::AggregatorState;
 
-use crate::{graph::Value, Result};
+use crate::{value::Value, Result};
 
 #[derive(Debug)]
 struct CollectState
@@ -24,7 +24,7 @@ impl AggregatorState for CollectState
     self.value.push(value);
     Ok(())
   }
-  fn finalise(self: Box<Self>) -> crate::Result<crate::graph::Value>
+  fn finalise(self: Box<Self>) -> crate::Result<crate::value::Value>
   {
     Ok(self.value.into())
   }

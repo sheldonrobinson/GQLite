@@ -27,7 +27,7 @@ impl From<cmp::Ordering> for Ordering
   }
 }
 
-fn compare_map(lhs: &graph::ValueObject, rhs: &graph::ValueObject) -> Ordering
+fn compare_map(lhs: &value::ValueMap, rhs: &value::ValueMap) -> Ordering
 {
   println!("compare_map({:?}, {:?})", lhs, rhs);
   if lhs.len() == rhs.len()
@@ -85,36 +85,36 @@ fn compare_node(lhs: &graph::Node, rhs: &graph::Node) -> Ordering
   // }
 }
 
-pub(crate) fn compare(lhs: &graph::Value, rhs: &graph::Value) -> Ordering
+pub(crate) fn compare(lhs: &value::Value, rhs: &value::Value) -> Ordering
 {
-  use graph::Value;
+  use value::Value;
   match lhs
   {
-    Value::Invalid => Ordering::ComparedNull,
+    Value::Null => Ordering::ComparedNull,
     Value::Boolean(bl) => match rhs
     {
       Value::Boolean(br) => bl.cmp(br).into(),
-      Value::Invalid => Ordering::ComparedNull,
+      Value::Null => Ordering::ComparedNull,
       _ => Ordering::Null,
     },
     Value::Integer(il) => match rhs
     {
       Value::Integer(ir) => il.cmp(ir).into(),
       Value::Float(fr) => compare_f64(&(*il as f64), fr),
-      Value::Invalid => Ordering::ComparedNull,
+      Value::Null => Ordering::ComparedNull,
       _ => Ordering::Null,
     },
     Value::Float(fl) => match rhs
     {
       Value::Integer(ir) => compare_f64(fl, &(*ir as f64)),
       Value::Float(fr) => compare_f64(fl, fr),
-      Value::Invalid => Ordering::ComparedNull,
+      Value::Null => Ordering::ComparedNull,
       _ => Ordering::Null,
     },
     Value::String(sl) => match rhs
     {
       Value::String(sr) => sl.cmp(sr).into(),
-      Value::Invalid => Ordering::ComparedNull,
+      Value::Null => Ordering::ComparedNull,
       _ => Ordering::Null,
     },
     Value::Array(al) => match rhs
@@ -168,12 +168,12 @@ pub(crate) fn compare(lhs: &graph::Value, rhs: &graph::Value) -> Ordering
           }
         }
       }
-      Value::Invalid => Ordering::ComparedNull,
+      Value::Null => Ordering::ComparedNull,
       _ => Ordering::Null,
     },
-    Value::Object(lhs) => match rhs
+    Value::Map(lhs) => match rhs
     {
-      Value::Object(rhs) => compare_map(lhs, rhs),
+      Value::Map(rhs) => compare_map(lhs, rhs),
       _ => Ordering::Null,
     },
     Value::Node(lhs) => match rhs

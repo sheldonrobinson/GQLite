@@ -58,7 +58,7 @@ impl Store
   where
     TKeys: Iterator<Item = &'a crate::graph::Key>,
     TLabels: Iterator<Item = &'a String>,
-    TProperties: Iterator<Item = (&'a String, &'a graph::Value)>,
+    TProperties: Iterator<Item = (&'a String, &'a value::Value)>,
   {
     Err(InternalError::Unimplemented("pgql"))
   }
@@ -104,13 +104,13 @@ impl Store
   where
     TSourceKeys: Iterator<Item = &'a crate::graph::Key>,
     TSourceLabels: Iterator<Item = &'a String>,
-    TSourceProperties: Iterator<Item = (&'a String, &'a graph::Value)>,
+    TSourceProperties: Iterator<Item = (&'a String, &'a value::Value)>,
     TKeys: Iterator<Item = &'a crate::graph::Key>,
     TLabels: Iterator<Item = &'a String>,
-    TProperties: Iterator<Item = (&'a String, &'a graph::Value)>,
+    TProperties: Iterator<Item = (&'a String, &'a value::Value)>,
     TDestinationKeys: Iterator<Item = &'a crate::graph::Key>,
     TDestinationLabels: Iterator<Item = &'a String>,
-    TDestinationProperties: Iterator<Item = (&'a String, &'a graph::Value)>,
+    TDestinationProperties: Iterator<Item = (&'a String, &'a value::Value)>,
   {
     Err(InternalError::Unimplemented("pgql"))
   }

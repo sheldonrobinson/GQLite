@@ -1,4 +1,4 @@
-use crate::{error::RunTimeError, graph};
+use crate::prelude::*;
 
 use super::{ExpressionType, FResult, FunctionTypeTrait};
 
@@ -7,18 +7,18 @@ pub(super) struct Coalesce {}
 
 impl super::FunctionTrait for Coalesce
 {
-  fn call(&self, arguments: Vec<graph::Value>) -> crate::Result<graph::Value>
+  fn call(&self, arguments: Vec<value::Value>) -> crate::Result<value::Value>
   {
     for arg in arguments
     {
       match arg
       {
-        graph::Value::Invalid =>
+        value::Value::Null =>
         {}
         other => return Ok(other),
       }
     }
-    Ok(graph::Value::Invalid)
+    Ok(value::Value::Null)
   }
   fn validate_arguments(&self, _: Vec<ExpressionType>) -> crate::Result<ExpressionType>
   {
@@ -37,13 +37,13 @@ pub(super) struct ToInteger {}
 
 impl ToInteger
 {
-  fn call_impl(value: &graph::Value) -> FResult<i64>
+  fn call_impl(value: &value::Value) -> FResult<i64>
   {
     match value
     {
-      graph::Value::Integer(i) => Ok(*i),
-      graph::Value::Float(f) => Ok(*f as i64),
-      graph::Value::String(s) => Ok(s.parse().map_err(|_| RunTimeError::InvalidArgument {
+      value::Value::Integer(i) => Ok(*i),
+      value::Value::Float(f) => Ok(*f as i64),
+      value::Value::String(s) => Ok(s.parse().map_err(|_| RunTimeError::InvalidArgument {
         function_name: "toInteger",
         index: 0,
         expected_type: "A string convertible to integer",
@@ -59,20 +59,20 @@ impl ToInteger
   }
 }
 
-super::declare_function!(toInteger, ToInteger, call_impl(crate::graph::Value) -> i64);
+super::declare_function!(toInteger, ToInteger, call_impl(crate::value::Value) -> i64);
 
 #[derive(Debug, Default)]
 pub(super) struct Properties {}
 
 impl Properties
 {
-  fn call_impl(value: &graph::Value) -> FResult<graph::ValueObject>
+  fn call_impl(value: &value::Value) -> FResult<value::ValueMap>
   {
     match value
     {
-      graph::Value::Node(n) => Ok(n.properties.to_owned()),
-      graph::Value::Edge(e) => Ok(e.properties.to_owned()),
-      graph::Value::Object(m) => Ok(m.to_owned()),
+      value::Value::Node(n) => Ok(n.properties.to_owned()),
+      value::Value::Edge(e) => Ok(e.properties.to_owned()),
+      value::Value::Map(m) => Ok(m.to_owned()),
       _ => Err(RunTimeError::InvalidArgument {
         function_name: "properties",
         index: 0,
@@ -83,4 +83,4 @@ impl Properties
   }
 }
 
-super::declare_function!(properties, Properties, call_impl(crate::graph::Value) -> graph::ValueObject, validate_args(ExpressionType::Map | ExpressionType::Node | ExpressionType::Edge | ExpressionType::Null));
+super::declare_function!(properties, Properties, call_impl(crate::value::Value) -> value::ValueMap, validate_args(ExpressionType::Map | ExpressionType::Node | ExpressionType::Edge | ExpressionType::Null));

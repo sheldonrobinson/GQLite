@@ -20,11 +20,11 @@ fn handle_error<T, E: std::borrow::Borrow<E> + ToString>(
   result
 }
 
-fn get_value(value: *mut GqliteValueT) -> crate::graph::Value
+fn get_value(value: *mut GqliteValueT) -> crate::value::Value
 {
   if value.is_null()
   {
-    crate::graph::Value::default()
+    crate::value::Value::default()
   }
   else
   {
@@ -62,7 +62,7 @@ pub struct GqliteConnectionT
 #[repr(C)]
 pub struct GqliteValueT
 {
-  value: crate::graph::Value,
+  value: crate::value::Value,
 }
 
 #[no_mangle]
@@ -116,10 +116,7 @@ pub extern "C" fn gqlite_connection_create_from_file(
   let path = unsafe { std::ffi::CStr::from_ptr(filename) };
   if let Ok(path) = handle_error(context, path.to_str())
   {
-    if let Ok(c) = handle_error(
-      context,
-      crate::Connection::open(path, options.to_object_safe()),
-    )
+    if let Ok(c) = handle_error(context, crate::Connection::open(path, options.into_map()))
     {
       return Box::into_raw(Box::new(GqliteConnectionT { connection: c }));
     }
@@ -153,7 +150,7 @@ pub extern "C" fn gqlite_connection_query(
     let conn = unsafe { Box::from_raw(connection) };
     let result = conn
       .connection
-      .execute_query(query, get_value(bindings).to_object_safe());
+      .execute_query(query, get_value(bindings).into_map());
     let _ = Box::into_raw(conn);
     if let Ok(v) = handle_error(context, result)
     {
@@ -168,7 +165,7 @@ pub extern "C" fn gqlite_value_create(context: *mut GqliteApiContextT) -> *mut G
 {
   check_error(context);
   Box::into_raw(Box::new(GqliteValueT {
-    value: crate::graph::Value::default(),
+    value: crate::value::Value::default(),
   }))
 }
 
@@ -216,7 +213,7 @@ pub extern "C" fn gqlite_value_from_json(
   let json = unsafe { std::ffi::CStr::from_ptr(json) };
   if let Ok(json) = handle_error(context, json.to_str())
   {
-    if let Ok(v) = handle_error(context, serde_json::from_str::<crate::graph::Value>(json))
+    if let Ok(v) = handle_error(context, serde_json::from_str::<crate::value::Value>(json))
     {
       return Box::into_raw(Box::new(GqliteValueT { value: v }));
     }
@@ -233,7 +230,7 @@ pub extern "C" fn gqlite_value_is_valid(
   check_error(context);
   match unsafe { (*value).value.borrow() }
   {
-    crate::graph::Value::Invalid => false,
+    crate::value::Value::Null => false,
     _ => true,
   }
 }

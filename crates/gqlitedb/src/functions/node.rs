@@ -1,4 +1,4 @@
-use crate::{error::RunTimeError, graph};
+use crate::prelude::*;
 
 use super::{FResult, FunctionTypeTrait};
 

@@ -19,7 +19,7 @@ struct PersistentEdge
   pub source: graph::Key,
   pub destination: graph::Key,
   pub labels: Vec<String>,
-  pub properties: graph::ValueObject,
+  pub properties: value::ValueMap,
 }
 
 impl redb::Value for PersistentEdge
@@ -1198,7 +1198,7 @@ impl store::Store for Store
       properties_count += n
         .properties
         .iter()
-        .filter(|(_, v)| **v != graph::Value::Invalid)
+        .filter(|(_, v)| **v != value::Value::Null)
         .count();
     }
     for e in self.select_edges(
@@ -1214,7 +1214,7 @@ impl store::Store for Store
         .edge
         .properties
         .iter()
-        .filter(|(_, v)| **v != graph::Value::Invalid)
+        .filter(|(_, v)| **v != value::Value::Null)
         .count();
     }
 

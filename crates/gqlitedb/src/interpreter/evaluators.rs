@@ -11,7 +11,7 @@ use interpreter::instructions;
 #[derive(Debug, Clone)]
 enum Value
 {
-  GraphValue(graph::Value),
+  GraphValue(value::Value),
   NodeQuery(store::SelectNodeQuery),
   EdgeQuery(store::SelectEdgeQuery),
 }
@@ -30,7 +30,7 @@ impl Value
 
 impl<T> From<T> for Value
 where
-  T: Into<graph::Value>,
+  T: Into<value::Value>,
 {
   fn from(value: T) -> Self
   {
@@ -45,7 +45,7 @@ macro_rules! try_into_gv_impl {
       type Error = ErrorType;
       fn try_into(self) -> crate::Result<$vn>
       {
-        let a: graph::Value = self.try_into()?;
+        let a: value::Value = self.try_into()?;
         a.try_into()
       }
     }
@@ -108,7 +108,7 @@ macro_rules! try_into_impl {
   };
 }
 
-try_into_impl! {GraphValue, graph::Value, ExpectedGraphValue}
+try_into_impl! {GraphValue, value::Value, ExpectedGraphValue}
 try_into_impl! {NodeQuery, store::SelectNodeQuery, ExpectedNodeQuery}
 try_into_impl! {EdgeQuery, store::SelectEdgeQuery, ExpectedEdgeQuery}
 
@@ -132,7 +132,7 @@ impl From<store::SelectEdgeQuery> for Value
 macro_rules! check_for_null {
   ($a: expr) => {
     if $a.is_null() {
-      return Ok(crate::graph::Value::Invalid)
+      return Ok(crate::value::Value::Null)
     }
 };
 ($a: expr, $($b:expr), *) => {
@@ -146,7 +146,7 @@ macro_rules! ordering_to_value {
     match $expression
     {
       $true_pattern => true.into(),
-      value::Ordering::ComparedNull => graph::Value::Invalid,
+      value::Ordering::ComparedNull => value::Value::Null,
       value::Ordering::Null => $null_value,
       _ => false.into(),
     }
@@ -158,7 +158,7 @@ macro_rules! contain_to_value {
     match $expression
     {
       $true_pattern => true.into(),
-      value::ContainResult::ComparedNull => graph::Value::Invalid,
+      value::ContainResult::ComparedNull => value::Value::Null,
       _ => false.into(),
     }
   };
@@ -204,8 +204,10 @@ impl Stack
     let v = self.try_pop()?;
     match v
     {
-      Value::GraphValue(graph::Value::Invalid)
-      | Value::GraphValue(graph::Value::Boolean(false)) => Ok(false),
+      Value::GraphValue(value::Value::Null) | Value::GraphValue(value::Value::Boolean(false)) =>
+      {
+        Ok(false)
+      }
       _ => Ok(true),
     }
   }
@@ -240,17 +242,17 @@ fn execute_boolean_operator(
 {
   let a = stack.try_pop()?;
   let b = stack.try_pop()?;
-  let a: graph::Value = a.try_into()?;
-  let b: graph::Value = b.try_into()?;
+  let a: value::Value = a.try_into()?;
+  let b: value::Value = b.try_into()?;
   match instruction
   {
     &instructions::Instruction::AndBinaryOperator =>
     {
       if a.is_null()
       {
-        if b.is_null() || <graph::Value as TryInto<bool>>::try_into(b)? == true
+        if b.is_null() || <value::Value as TryInto<bool>>::try_into(b)? == true
         {
-          stack.push(graph::Value::Invalid);
+          stack.push(value::Value::Null);
         }
         else
         {
@@ -264,7 +266,7 @@ fn execute_boolean_operator(
         {
           if b.is_null()
           {
-            stack.push(graph::Value::Invalid);
+            stack.push(value::Value::Null);
           }
           else
           {
@@ -281,9 +283,9 @@ fn execute_boolean_operator(
     {
       if a.is_null()
       {
-        if b.is_null() || <graph::Value as TryInto<bool>>::try_into(b)? == false
+        if b.is_null() || <value::Value as TryInto<bool>>::try_into(b)? == false
         {
-          stack.push(graph::Value::Invalid);
+          stack.push(value::Value::Null);
         }
         else
         {
@@ -301,7 +303,7 @@ fn execute_boolean_operator(
         {
           if b.is_null()
           {
-            stack.push(graph::Value::Invalid);
+            stack.push(value::Value::Null);
           }
           else
           {
@@ -314,7 +316,7 @@ fn execute_boolean_operator(
     {
       if a.is_null() || b.is_null()
       {
-        stack.push(graph::Value::Invalid);
+        stack.push(value::Value::Null);
       }
       else
       {
@@ -331,9 +333,9 @@ fn execute_boolean_operator(
   Ok(())
 }
 
-fn execute_binary_operator<T: Into<crate::graph::Value>>(
+fn execute_binary_operator<T: Into<crate::value::Value>>(
   stack: &mut Stack,
-  operand: impl FnOnce(crate::graph::Value, crate::graph::Value) -> Result<T>,
+  operand: impl FnOnce(crate::value::Value, crate::value::Value) -> Result<T>,
 ) -> Result<()>
 {
   let a = stack.try_pop()?;
@@ -346,7 +348,7 @@ fn eval_instructions(
   stack: &mut Stack,
   row: &impl value_table::RowInterface,
   instructions: &instructions::Instructions,
-  parameters: &crate::graph::ValueObject,
+  parameters: &crate::value::ValueMap,
 ) -> Result<()>
 {
   if crate::consts::SHOW_EVALUATOR_STATE
@@ -366,7 +368,7 @@ fn eval_instructions(
     {
       instructions::Instruction::CreateEdgeLiteral { labels } =>
       {
-        let props: graph::Value = stack.try_pop_into()?;
+        let props: value::Value = stack.try_pop_into()?;
         let dst: graph::Node = stack.try_pop_into()?;
         let src: graph::Node = stack.try_pop_into()?;
         stack.push(crate::graph::Edge {
@@ -374,26 +376,26 @@ fn eval_instructions(
           source: src,
           destination: dst,
           labels: labels.to_owned(),
-          properties: props.to_object_safe(),
+          properties: props.into_map(),
         });
       }
       instructions::Instruction::CreateNodeLiteral { labels } =>
       {
-        let props: graph::Value = stack.try_pop_into()?;
+        let props: value::Value = stack.try_pop_into()?;
         stack.push(crate::graph::Node {
           key: crate::graph::Key::default(),
           labels: labels.clone(),
-          properties: props.to_object_safe(),
+          properties: props.into_map(),
         });
       }
       instructions::Instruction::CreateEdgeQuery { labels } =>
       {
-        let props: graph::Value = stack.try_pop_into()?;
+        let props: value::Value = stack.try_pop_into()?;
         let dst: store::SelectNodeQuery = stack.try_pop_into()?;
         let src: store::SelectNodeQuery = stack.try_pop_into()?;
         match props
         {
-          graph::Value::Edge(ed) =>
+          value::Value::Edge(ed) =>
           {
             stack.push(store::SelectEdgeQuery::select_source_destination_keys(
               src,
@@ -401,7 +403,7 @@ fn eval_instructions(
               dst,
             ));
           }
-          graph::Value::Object(ob) =>
+          value::Value::Map(ob) =>
           {
             stack.push(
               store::SelectEdgeQuery::select_source_destination_labels_properties(
@@ -412,7 +414,7 @@ fn eval_instructions(
               ),
             );
           }
-          graph::Value::Invalid =>
+          value::Value::Null =>
           {
             stack.push(store::SelectEdgeQuery::select_none());
           }
@@ -424,21 +426,21 @@ fn eval_instructions(
       }
       instructions::Instruction::CreateNodeQuery { labels } =>
       {
-        let props: graph::Value = stack.try_pop_into()?;
+        let props: value::Value = stack.try_pop_into()?;
         match props
         {
-          graph::Value::Node(no) =>
+          value::Value::Node(no) =>
           {
             stack.push(store::SelectNodeQuery::select_keys([no.key]));
           }
-          graph::Value::Object(ob) =>
+          value::Value::Map(ob) =>
           {
             stack.push(store::SelectNodeQuery::select_labels_properties(
               labels.clone(),
               ob,
             ));
           }
-          graph::Value::Invalid =>
+          value::Value::Null =>
           {
             stack.push(store::SelectNodeQuery::select_none());
           }
@@ -453,7 +455,7 @@ fn eval_instructions(
         arguments_count,
       } =>
       {
-        let args: Vec<graph::Value> = stack.try_drain_into(*arguments_count)?;
+        let args: Vec<value::Value> = stack.try_drain_into(*arguments_count)?;
         if args.len() != *arguments_count
         {
           Err(InternalError::MissingStackValue {
@@ -494,39 +496,39 @@ fn eval_instructions(
           m.push(stack.try_pop_into()?);
         }
         m.reverse();
-        stack.push(graph::Value::Array(m));
+        stack.push(value::Value::Array(m));
       }
       instructions::Instruction::CreateMap { keys } =>
       {
-        let mut m = crate::graph::ValueObject::new();
+        let mut m = crate::value::ValueMap::new();
         for k in keys.iter().rev()
         {
           m.insert(k.to_owned(), stack.try_pop_into()?);
         }
-        stack.push(graph::Value::Object(m));
+        stack.push(value::Value::Map(m));
       }
       instructions::Instruction::MemberAccess { path } =>
       {
-        let v: graph::Value = stack.try_pop_into()?;
+        let v: value::Value = stack.try_pop_into()?;
         stack.push(v.access(path.iter()));
       }
       instructions::Instruction::IndexAccess =>
       {
         // Implement access to array or map (edge/node properties).
         // Get the index
-        let index: graph::Value = stack.try_pop_into()?;
+        let index: value::Value = stack.try_pop_into()?;
         if index.is_null()
         {
           stack.try_drain(1)?;
-          stack.push(graph::Value::Invalid);
+          stack.push(value::Value::Null);
         }
         else
         {
           // Get the array/map
-          let container: graph::Value = stack.try_pop_into()?;
+          let container: value::Value = stack.try_pop_into()?;
           match container
           {
-            graph::Value::Array(array) =>
+            value::Value::Array(array) =>
             {
               let idx: i64 = index.try_into()
               .map_err(|e: ErrorType| error::map_error!(e, Error::Internal(InternalError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))?;
@@ -537,13 +539,13 @@ fn eval_instructions(
                   .to_owned(),
               );
             }
-            graph::Value::Object(map)
-            | graph::Value::Node(graph::Node {
+            value::Value::Map(map)
+            | value::Value::Node(graph::Node {
               key: _,
               labels: _,
               properties: map,
             })
-            | graph::Value::Edge(graph::Edge {
+            | value::Value::Edge(graph::Edge {
               key: _,
               source: _,
               destination: _,
@@ -553,16 +555,16 @@ fn eval_instructions(
             {
               let idx: String = index.try_into()
                 .map_err(|e: ErrorType| error::map_error!(e, Error::Internal(InternalError::InvalidValueCast{..}) => RunTimeError::MapElementAccessByNonString ))?;
-              stack.push(map.get(&idx).unwrap_or(&graph::Value::Invalid).to_owned());
+              stack.push(map.get(&idx).unwrap_or(&value::Value::Null).to_owned());
             }
-            graph::Value::Invalid => stack.push(graph::Value::Invalid),
+            value::Value::Null => stack.push(value::Value::Null),
             _ => Err(error::RunTimeError::InvalidArgumentType)?,
           }
         }
       }
       instructions::Instruction::RangeAccess { start, end } =>
       {
-        let end: Option<graph::Value> = if *end
+        let end: Option<value::Value> = if *end
         {
           Some(stack.try_pop_into()?)
         }
@@ -570,7 +572,7 @@ fn eval_instructions(
         {
           None
         };
-        let start: Option<graph::Value> = if *start
+        let start: Option<value::Value> = if *start
         {
           Some(stack.try_pop_into()?)
         }
@@ -579,18 +581,18 @@ fn eval_instructions(
           None
         };
         // Get the array out of the stack
-        let v: graph::Value = stack.try_pop_into()?;
+        let v: value::Value = stack.try_pop_into()?;
         // if either end or start are null, return null
         if end.as_ref().map_or(false, |e| e.is_null())
           || start.as_ref().map_or(false, |s| s.is_null())
         {
-          stack.push(graph::Value::Invalid);
+          stack.push(value::Value::Null);
         }
         else
         {
           let mut start: Option<i64> = start.map(|x| x.try_into()).transpose()?;
           let mut end: Option<i64> = end.map(|x| x.try_into()).transpose()?;
-          let v: Vec<graph::Value> = v.try_into()?;
+          let v: Vec<value::Value> = v.try_into()?;
           // Compute range length
           let length = match (start, end)
           {
@@ -616,7 +618,7 @@ fn eval_instructions(
               {
                 if end < start
                 {
-                  Vec::<graph::Value>::default()
+                  Vec::<value::Value>::default()
                 }
                 else
                 {
@@ -669,22 +671,22 @@ fn eval_instructions(
       }
       &instructions::Instruction::NotUnaryOperator =>
       {
-        let a: graph::Value = stack.try_pop_into()?;
+        let a: value::Value = stack.try_pop_into()?;
         match a
         {
-          graph::Value::Invalid => stack.push(graph::Value::Invalid),
-          graph::Value::Boolean(b) => stack.push(!b),
+          value::Value::Null => stack.push(value::Value::Null),
+          value::Value::Boolean(b) => stack.push(!b),
           _ => Err(RunTimeError::InvalidArgumentType)?,
         }
       }
       &instructions::Instruction::NegationUnaryOperator =>
       {
-        let a: crate::graph::Value = stack.try_pop_into()?;
+        let a: crate::value::Value = stack.try_pop_into()?;
         stack.push((-a)?);
       }
       &instructions::Instruction::IsNullUnaryOperator =>
       {
-        let a: crate::graph::Value = stack.try_pop_into()?;
+        let a: crate::value::Value = stack.try_pop_into()?;
         stack.push(a.is_null());
       }
       &instructions::Instruction::EqualBinaryOperator =>
@@ -713,7 +715,7 @@ fn eval_instructions(
           Ok(ordering_to_value!(
             a.compare(&b),
             value::Ordering::Less,
-            graph::Value::Invalid
+            value::Value::Null
           ))
         })?;
       }
@@ -723,7 +725,7 @@ fn eval_instructions(
           Ok(ordering_to_value!(
             a.compare(&b),
             value::Ordering::Greater,
-            graph::Value::Invalid
+            value::Value::Null
           ))
         })?;
       }
@@ -733,7 +735,7 @@ fn eval_instructions(
           Ok(ordering_to_value!(
             a.compare(&b),
             value::Ordering::Equal | value::Ordering::Less,
-            graph::Value::Invalid
+            value::Value::Null
           ))
         })?;
       }
@@ -743,20 +745,20 @@ fn eval_instructions(
           Ok(ordering_to_value!(
             a.compare(&b),
             value::Ordering::Equal | value::Ordering::Greater,
-            graph::Value::Invalid
+            value::Value::Null
           ))
         })?;
       }
       &instructions::Instruction::InBinaryOperator =>
       {
-        execute_binary_operator::<graph::Value>(stack, |a, b| {
+        execute_binary_operator::<value::Value>(stack, |a, b| {
           if b.is_null()
           {
-            Ok(graph::Value::Invalid.into())
+            Ok(value::Value::Null.into())
           }
           else
           {
-            let b_arr: Vec<graph::Value> = b.try_into()?;
+            let b_arr: Vec<value::Value> = b.try_into()?;
             Ok(contain_to_value!(
               value::contains(&b_arr, &a),
               value::ContainResult::True
@@ -766,14 +768,14 @@ fn eval_instructions(
       }
       &instructions::Instruction::NotInBinaryOperator =>
       {
-        execute_binary_operator::<graph::Value>(stack, |a, b| {
+        execute_binary_operator::<value::Value>(stack, |a, b| {
           if b.is_null()
           {
-            Ok(graph::Value::Invalid.into())
+            Ok(value::Value::Null.into())
           }
           else
           {
-            let b_arr: Vec<graph::Value> = b.try_into()?;
+            let b_arr: Vec<value::Value> = b.try_into()?;
             Ok(contain_to_value!(
               value::contains(&b_arr, &a),
               value::ContainResult::False
@@ -814,25 +816,25 @@ pub(crate) fn eval_update_property<TStore: store::Store>(
   target: value_table::ColId,
   path: &Vec<String>,
   instructions: &instructions::Instructions,
-  parameters: &crate::graph::ValueObject,
+  parameters: &crate::value::ValueMap,
   set: bool,
 ) -> Result<()>
 {
   let var = row.get(target)?;
   let mut stack = Stack::default();
   eval_instructions(&mut stack, row, &instructions, &parameters)?;
-  let value: graph::Value = stack.try_pop_into()?;
+  let value: value::Value = stack.try_pop_into()?;
   let value = match value
   {
-    graph::Value::Node(n) => n.properties.into(),
-    graph::Value::Edge(e) => e.properties.into(),
+    value::Value::Node(n) => n.properties.into(),
+    value::Value::Edge(e) => e.properties.into(),
     _ => value,
   };
-  use crate::graph::ValueObjectExtension;
+  use crate::value::ValueMapExtension;
   let mut piter = path.iter();
   match var
   {
-    graph::Value::Node(n) =>
+    value::Value::Node(n) =>
     {
       let mut n = n.to_owned();
       if set
@@ -848,7 +850,7 @@ pub(crate) fn eval_update_property<TStore: store::Store>(
       store.update_node(&mut tx, &graph_name, &n)?;
       row.set(target, n.into())?;
     }
-    graph::Value::Edge(e) =>
+    value::Value::Edge(e) =>
     {
       let mut e = e.to_owned();
       if set
@@ -864,7 +866,7 @@ pub(crate) fn eval_update_property<TStore: store::Store>(
       store.update_edge(&mut tx, &graph_name, &e)?;
       row.set(target, e.into())?;
     }
-    graph::Value::Invalid =>
+    value::Value::Null =>
     {}
     _ => Err(InternalError::ExpectedEdge {
       context: "evaluator/eval_program",
@@ -873,7 +875,7 @@ pub(crate) fn eval_update_property<TStore: store::Store>(
   Ok(())
 }
 
-struct OrderByKey(Vec<(graph::Value, bool)>);
+struct OrderByKey(Vec<(value::Value, bool)>);
 
 fn handle_asc(o: std::cmp::Ordering, asc: bool) -> std::cmp::Ordering
 {
@@ -893,8 +895,8 @@ fn handle_asc(o: std::cmp::Ordering, asc: bool) -> std::cmp::Ordering
 }
 
 fn compute_order_by(
-  a: &Vec<(graph::Value, bool)>,
-  b: &Vec<(graph::Value, bool)>,
+  a: &Vec<(value::Value, bool)>,
+  b: &Vec<(value::Value, bool)>,
 ) -> std::cmp::Ordering
 {
   a.iter()
@@ -909,7 +911,7 @@ fn compute_return_with_table(
   filter: &instructions::Instructions,
   modifiers: &instructions::Modifiers,
   input_table: value_table::ValueTable<usize>,
-  parameters: &crate::graph::ValueObject,
+  parameters: &crate::value::ValueMap,
   variables_sizes: &VariablesSizes,
 ) -> Result<value_table::ValueTable<usize>>
 {
@@ -958,7 +960,7 @@ fn compute_return_with_table(
         {
           let mut stack = Stack::default();
           eval_instructions(&mut stack, &row, &agg.argument_instructions, parameters)?;
-          let value: graph::Value = stack.try_pop_into()?;
+          let value: value::Value = stack.try_pop_into()?;
           aggregation_states
             .get_mut(name)
             .ok_or(InternalError::MissingAggregationState)?
@@ -980,7 +982,7 @@ fn compute_return_with_table(
       }
       let mut stack = Stack::default();
       eval_instructions(&mut stack, &in_row, &rw_expr.instructions, &parameters)?;
-      let value: graph::Value = stack.try_pop_into()?;
+      let value: value::Value = stack.try_pop_into()?;
       out_row.set(rw_expr.col_id, value.to_owned())?;
     }
     output_table.add_truncated_row(out_row)?;
@@ -996,7 +998,7 @@ fn compute_return_with_table(
           assert_eq!(rw_expr.aggregations.len(), 0);
           let mut stack = Stack::default();
           eval_instructions(&mut stack, &out_row, &rw_expr.instructions, &parameters)?;
-          let value: graph::Value = stack.try_pop_into()?;
+          let value: value::Value = stack.try_pop_into()?;
           out_row.set(rw_expr.col_id, value.to_owned())?;
         }
         Ok(out_row)
@@ -1015,7 +1017,7 @@ fn compute_return_with_table(
     let mut table_key = output_table
       .into_row_iter()
       .map(|x| {
-        let mut v = Vec::<(graph::Value, bool)>::new();
+        let mut v = Vec::<(value::Value, bool)>::new();
         for info in modifiers.order_by.iter()
         {
           let mut stack = Stack::default();
@@ -1097,7 +1099,7 @@ fn compute_return_with_table(
 fn filter_rows(
   current_rows: impl Iterator<Item = value_table::Row>,
   filter: &instructions::Instructions,
-  parameters: &crate::graph::ValueObject,
+  parameters: &crate::value::ValueMap,
 ) -> Result<Vec<value_table::Row>>
 {
   current_rows
@@ -1143,8 +1145,8 @@ fn is_write_program(program: &super::Program) -> bool
 pub(crate) fn eval_program<TStore: store::Store>(
   store: &TStore,
   program: &super::Program,
-  parameters: crate::graph::ValueObject,
-) -> crate::Result<crate::graph::Value>
+  parameters: crate::value::ValueMap,
+) -> crate::Result<crate::value::Value>
 {
   let graph_name: String = "default".into();
   let mut input_table = value_table::ValueTable::new(0);
@@ -1186,20 +1188,20 @@ pub(crate) fn eval_program<TStore: store::Store>(
             {
               match v
               {
-                crate::graph::Value::Node(n) =>
+                crate::value::Value::Node(n) =>
                 {
                   store.create_nodes(&mut tx, &graph_name, vec![n.to_owned()].iter())?;
                   if let Some(var) = var
                   {
-                    new_row.set_if_unset(*var, crate::graph::Value::Node(n))?;
+                    new_row.set_if_unset(*var, crate::value::Value::Node(n))?;
                   }
                 }
-                crate::graph::Value::Edge(e) =>
+                crate::value::Value::Edge(e) =>
                 {
                   store.create_edges(&mut tx, &graph_name, vec![e.to_owned()].iter())?;
                   if let Some(var) = var
                   {
-                    new_row.set(*var, crate::graph::Value::Edge(e))?;
+                    new_row.set(*var, crate::value::Value::Edge(e))?;
                   }
                 }
                 _ =>
@@ -1328,7 +1330,7 @@ pub(crate) fn eval_program<TStore: store::Store>(
                     {
                       new_row.set(
                         path_variable,
-                        crate::graph::Value::Path(edge.edge.to_owned().into()),
+                        crate::value::Value::Path(edge.edge.to_owned().into()),
                       )?;
                     }
                     let should_add_row = if filter.is_empty()
@@ -1386,11 +1388,11 @@ pub(crate) fn eval_program<TStore: store::Store>(
           &parameters,
           &variables_size,
         )?;
-        let mut r = Vec::<crate::graph::Value>::new();
-        r.push(crate::graph::Value::Array(
+        let mut r = Vec::<crate::value::Value>::new();
+        r.push(crate::value::Value::Array(
           names
             .into_iter()
-            .map(|name| crate::graph::Value::String(name.to_owned()))
+            .map(|name| crate::value::Value::String(name.to_owned()))
             .collect(),
         ));
         for row in output_table.into_row_iter()
@@ -1430,7 +1432,7 @@ pub(crate) fn eval_program<TStore: store::Store>(
           let value = stack.try_pop_into()?;
           match value
           {
-            graph::Value::Array(arr) =>
+            value::Value::Array(arr) =>
             {
               for v in arr.into_iter()
               {
@@ -1439,7 +1441,7 @@ pub(crate) fn eval_program<TStore: store::Store>(
                 output_table.add_truncated_row(out_row)?;
               }
             }
-            graph::Value::Invalid =>
+            value::Value::Null =>
             {}
             _ =>
             {
@@ -1464,12 +1466,12 @@ pub(crate) fn eval_program<TStore: store::Store>(
           {
             let mut stack = Stack::default();
             eval_instructions(&mut stack, &row, &instructions, &parameters)?;
-            let value: graph::Value = stack.try_pop_into()?;
+            let value: value::Value = stack.try_pop_into()?;
             match value
             {
-              graph::Value::Node(node) => nodes_keys.push(node.key),
-              graph::Value::Edge(edge) => edges_keys.push(edge.key),
-              graph::Value::Invalid =>
+              value::Value::Node(node) => nodes_keys.push(node.key),
+              value::Value::Edge(edge) => edges_keys.push(edge.key),
+              value::Value::Null =>
               {}
               _ => return Err(RunTimeError::InvalidDelete.into()),
             }
@@ -1541,25 +1543,25 @@ pub(crate) fn eval_program<TStore: store::Store>(
               instructions::UpdateOne::RemoveProperty { target, path } =>
               {
                 let var = out_row.get(*target)?;
-                use crate::graph::ValueObjectExtension;
+                use crate::value::ValueMapExtension;
                 let mut piter = path.iter();
                 match var
                 {
-                  graph::Value::Node(n) =>
+                  value::Value::Node(n) =>
                   {
                     let mut n = n.to_owned();
                     n.properties.remove_value(piter.next(), piter)?;
                     store.update_node(&mut tx, &graph_name, &n)?;
                     out_row.set(*target, n.into())?;
                   }
-                  graph::Value::Edge(e) =>
+                  value::Value::Edge(e) =>
                   {
                     let mut e = e.to_owned();
                     e.properties.remove_value(piter.next(), piter)?;
                     store.update_edge(&mut tx, &graph_name, &e)?;
                     out_row.set(*target, e.into())?;
                   }
-                  graph::Value::Invalid =>
+                  value::Value::Null =>
                   {}
                   _ => Err(InternalError::ExpectedEdge {
                     context: "evaluator/eval_program",
@@ -1581,7 +1583,7 @@ pub(crate) fn eval_program<TStore: store::Store>(
                 let var = out_row.get(*target)?;
                 match var
                 {
-                  graph::Value::Node(n) =>
+                  value::Value::Node(n) =>
                   {
                     let mut n = n.to_owned();
                     if add_labels
@@ -1599,7 +1601,7 @@ pub(crate) fn eval_program<TStore: store::Store>(
                     store.update_node(&mut tx, &graph_name, &n)?;
                     out_row.set(*target, n.into())?;
                   }
-                  graph::Value::Edge(e) =>
+                  value::Value::Edge(e) =>
                   {
                     let mut e = e.to_owned();
                     if add_labels
@@ -1617,7 +1619,7 @@ pub(crate) fn eval_program<TStore: store::Store>(
                     store.update_edge(&mut tx, &graph_name, &e)?;
                     out_row.set(*target, e.into())?;
                   }
-                  graph::Value::Invalid =>
+                  value::Value::Null =>
                   {}
                   _ => Err(InternalError::ExpectedEdge {
                     context: "evaluator/eval_program",
@@ -1635,7 +1637,7 @@ pub(crate) fn eval_program<TStore: store::Store>(
         if name == "gqlite.internal.stats"
         {
           let stats = store.compute_statistics(&mut tx)?;
-          let mut res = graph::ValueObject::new();
+          let mut res = value::ValueMap::new();
           res.insert("nodes_count".into(), (stats.nodes_count as i64).into());
           res.insert("edges_count".into(), (stats.edges_count as i64).into());
           res.insert(
@@ -1646,7 +1648,7 @@ pub(crate) fn eval_program<TStore: store::Store>(
             "properties_count".into(),
             (stats.properties_count as i64).into(),
           );
-          return Ok(crate::graph::Value::Object(res));
+          return Ok(crate::value::Value::Map(res));
         }
         else
         {
@@ -1656,18 +1658,15 @@ pub(crate) fn eval_program<TStore: store::Store>(
     }
   }
   tx.close()?;
-  Ok(crate::graph::Value::Invalid)
+  Ok(crate::value::Value::Null)
 }
 
 #[cfg(test)]
 mod tests
 {
   use crate::{
-    graph,
-    interpreter::{
-      self,
-      instructions::Instruction::{AndBinaryOperator, OrBinaryOperator},
-    },
+    interpreter::instructions::Instruction::{AndBinaryOperator, OrBinaryOperator},
+    prelude::*,
   };
 
   use super::{execute_boolean_operator, TryPopInto};
@@ -1676,14 +1675,14 @@ mod tests
     instruction: &interpreter::instructions::Instruction,
     a: impl Into<super::Value>,
     b: impl Into<super::Value>,
-    g: impl Into<graph::Value>,
+    g: impl Into<value::Value>,
   )
   {
     let mut stack = super::Stack::default();
     stack.push(b.into());
     stack.push(a.into());
     execute_boolean_operator(&mut stack, instruction).unwrap();
-    let r: graph::Value = stack.try_pop_into().unwrap();
+    let r: value::Value = stack.try_pop_into().unwrap();
     assert_eq!(r, g.into());
   }
 
@@ -1693,12 +1692,12 @@ mod tests
     test_execute_boolean_operator_(&AndBinaryOperator, true, true, true);
     test_execute_boolean_operator_(&AndBinaryOperator, true, false, false);
     test_execute_boolean_operator_(&AndBinaryOperator, false, true, false);
-    test_execute_boolean_operator_(&AndBinaryOperator, false, graph::Value::Invalid, false);
+    test_execute_boolean_operator_(&AndBinaryOperator, false, value::Value::Null, false);
     test_execute_boolean_operator_(
       &OrBinaryOperator,
-      graph::Value::Invalid,
+      value::Value::Null,
       false,
-      graph::Value::Invalid,
+      value::Value::Null,
     );
   }
 }

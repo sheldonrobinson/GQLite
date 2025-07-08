@@ -75,7 +75,7 @@ impl<T> FunctionTypeTrait for HashMap<String, T>
 
 pub(crate) trait FunctionTrait: Debug
 {
-  fn call(&self, arguments: Vec<graph::Value>) -> Result<graph::Value>;
+  fn call(&self, arguments: Vec<crate::value::Value>) -> Result<crate::value::Value>;
   fn validate_arguments(&self, arguments: Vec<ExpressionType>) -> Result<ExpressionType>;
   fn is_deterministic(&self) -> bool;
 }
@@ -313,20 +313,20 @@ macro_rules! declare_function_ {
     }
     impl crate::functions::FunctionTrait for $type_name
     {
-      fn call(&self, arguments: Vec<crate::graph::Value>) -> crate::Result<crate::graph::Value>
+      fn call(&self, arguments: Vec<crate::value::Value>) -> crate::Result<crate::value::Value>
       {
         const ARG_COUNT: usize = $crate::functions::count_arguments!($( $arg_type,)*);
         if arguments.len() == ARG_COUNT
         {
           if !$allow_null && ARG_COUNT > 0 && arguments.iter().all(|x| x.is_null())
           {
-            return Ok(crate::graph::Value::Invalid)
+            return Ok(crate::value::Value::Null)
           }
           #[allow(unused_imports)]
-          use crate::graph::ValueTryIntoRef;
+          use crate::value::ValueTryIntoRef;
           Ok(
             $crate::functions::make_function_call!($function_name, Self::$f_name, arguments, $( $arg_type,)*)
-            .map(|r| -> graph::Value { r.into() })?,
+            .map(|r| -> crate::value::Value { r.into() })?,
           )
         }
         else

@@ -1,18 +1,18 @@
 use super::{ExpressionType, FResult, FunctionTypeTrait};
-use crate::{error::RunTimeError, graph};
+use crate::prelude::*;
 
 #[derive(Debug, Default)]
 pub(super) struct Keys {}
 
 impl Keys
 {
-  fn call_impl(container: &graph::Value) -> crate::Result<Vec<crate::graph::Value>>
+  fn call_impl(container: &value::Value) -> Result<Vec<value::Value>>
   {
     match container
     {
-      graph::Value::Object(obj) => Ok(obj.keys().map(|x| x.to_owned().into()).collect()),
-      graph::Value::Node(n) => Ok(n.properties.keys().map(|x| x.to_owned().into()).collect()),
-      graph::Value::Edge(e) => Ok(e.properties.keys().map(|x| x.to_owned().into()).collect()),
+      value::Value::Map(obj) => Ok(obj.keys().map(|x| x.to_owned().into()).collect()),
+      value::Value::Node(n) => Ok(n.properties.keys().map(|x| x.to_owned().into()).collect()),
+      value::Value::Edge(e) => Ok(e.properties.keys().map(|x| x.to_owned().into()).collect()),
       _ =>
       {
         return Err(
@@ -29,7 +29,7 @@ impl Keys
   }
 }
 
-super::declare_function!(keys, Keys, call_impl(crate::graph::Value) -> Vec<crate::graph::Value>, validate_args(ExpressionType::Map | ExpressionType::Node | ExpressionType::Edge | ExpressionType::Null));
+super::declare_function!(keys, Keys, call_impl(crate::value::Value) -> Vec<crate::value::Value>, validate_args(ExpressionType::Map | ExpressionType::Node | ExpressionType::Edge | ExpressionType::Null));
 
 #[derive(Debug, Default)]
 pub(super) struct Range {}
@@ -49,7 +49,7 @@ pub(super) struct Size {}
 
 impl super::FunctionTrait for Size
 {
-  fn call(&self, arguments: Vec<graph::Value>) -> crate::Result<graph::Value>
+  fn call(&self, arguments: Vec<value::Value>) -> Result<value::Value>
   {
     let container = arguments
       .first()
@@ -61,10 +61,10 @@ impl super::FunctionTrait for Size
 
     match container
     {
-      graph::Value::Invalid => Ok(graph::Value::Invalid),
-      graph::Value::Array(arr) => Ok((arr.len() as i64).into()),
-      graph::Value::Object(obj) => Ok((obj.len() as i64).into()),
-      graph::Value::Path(..) => Ok(1.into()),
+      value::Value::Null => Ok(value::Value::Null),
+      value::Value::Array(arr) => Ok((arr.len() as i64).into()),
+      value::Value::Map(obj) => Ok((obj.len() as i64).into()),
+      value::Value::Path(..) => Ok(1.into()),
       _ =>
       {
         return Err(
@@ -79,7 +79,7 @@ impl super::FunctionTrait for Size
       }
     }
   }
-  fn validate_arguments(&self, _: Vec<ExpressionType>) -> crate::Result<ExpressionType>
+  fn validate_arguments(&self, _: Vec<ExpressionType>) -> Result<ExpressionType>
   {
     Ok(ExpressionType::Variant)
   }

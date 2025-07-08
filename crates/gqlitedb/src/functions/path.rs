@@ -1,12 +1,12 @@
 use super::ExpressionType;
-use crate::{error::RunTimeError, graph};
+use crate::prelude::*;
 
 #[derive(Debug, Default)]
 pub(super) struct Length {}
 
 impl super::FunctionTrait for Length
 {
-  fn call(&self, arguments: Vec<graph::Value>) -> crate::Result<graph::Value>
+  fn call(&self, arguments: Vec<value::Value>) -> crate::Result<value::Value>
   {
     let container = arguments
       .first()
@@ -18,9 +18,9 @@ impl super::FunctionTrait for Length
 
     match container
     {
-      graph::Value::Array(arr) => Ok((arr.len() as i64).into()),
-      graph::Value::Object(obj) => Ok((obj.len() as i64).into()),
-      graph::Value::Path(..) => Ok(1.into()),
+      value::Value::Array(arr) => Ok((arr.len() as i64).into()),
+      value::Value::Map(obj) => Ok((obj.len() as i64).into()),
+      value::Value::Path(..) => Ok(1.into()),
       _ =>
       {
         return Err(

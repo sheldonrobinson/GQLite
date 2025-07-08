@@ -10,7 +10,7 @@ pub(crate) mod sqlite;
 #[cfg(feature = "pgql")]
 pub(crate) use pgql::Store;
 
-use crate::{error::InternalError, graph, Result};
+use crate::prelude::*;
 
 //  ____  _        _   _     _   _
 // / ___|| |_ __ _| |_(_)___| |_(_) ___ ___
@@ -206,7 +206,7 @@ pub(crate) struct SelectNodeQuery
 {
   keys: Option<Vec<graph::Key>>,
   labels: Option<Vec<String>>,
-  properties: Option<HashMap<String, graph::Value>>,
+  properties: Option<HashMap<String, value::Value>>,
   select_all: bool,
 }
 
@@ -263,7 +263,7 @@ impl SelectNodeQuery
   }
   pub(crate) fn select_labels_properties(
     labels: impl Into<Vec<String>>,
-    properties: HashMap<String, graph::Value>,
+    properties: HashMap<String, value::Value>,
   ) -> Self
   {
     Self {
@@ -318,7 +318,7 @@ pub(crate) struct SelectEdgeQuery
 {
   keys: Option<Vec<graph::Key>>,
   labels: Option<Vec<String>>,
-  properties: Option<HashMap<String, graph::Value>>,
+  properties: Option<HashMap<String, value::Value>>,
   source: SelectNodeQuery,
   destination: SelectNodeQuery,
 }
@@ -392,7 +392,7 @@ impl SelectEdgeQuery
   pub(crate) fn select_source_destination_labels_properties(
     source_query: SelectNodeQuery,
     labels: impl Into<Vec<String>>,
-    properties: HashMap<String, graph::Value>,
+    properties: HashMap<String, value::Value>,
     destination_query: SelectNodeQuery,
   ) -> Self
   {

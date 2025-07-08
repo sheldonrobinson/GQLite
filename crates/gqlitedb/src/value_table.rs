@@ -6,8 +6,8 @@ pub(crate) type ColId = usize;
 
 pub(crate) trait RowInterface: Debug
 {
-  fn get(&self, index: usize) -> Result<&graph::Value>;
-  fn get_owned(&self, index: usize) -> Result<graph::Value>
+  fn get(&self, index: usize) -> Result<&value::Value>;
+  fn get_owned(&self, index: usize) -> Result<value::Value>
   {
     Ok(self.get(index)?.to_owned())
   }
@@ -17,22 +17,22 @@ pub(crate) trait RowInterface: Debug
 pub(crate) trait MutableRowInterface: RowInterface
 {
   /// Set the value.
-  fn set(&mut self, index: usize, value: graph::Value) -> Result<()>;
+  fn set(&mut self, index: usize, value: value::Value) -> Result<()>;
   /// Set the value, if it is not set.
-  fn set_if_unset(&mut self, index: usize, value: graph::Value) -> Result<()>;
+  fn set_if_unset(&mut self, index: usize, value: value::Value) -> Result<()>;
 }
 
 #[derive(Debug, Default, Clone)]
 pub(crate) struct Row
 {
-  values: Vec<graph::Value>,
+  values: Vec<value::Value>,
 }
 
 impl Row
 {
   /// Creates a new Row from an initial vector and a total size.
   /// If `extra_size` > initial.len(), it will fill with default values.
-  pub(crate) fn new(mut values: Vec<graph::Value>, extra_size: usize) -> Self
+  pub(crate) fn new(mut values: Vec<value::Value>, extra_size: usize) -> Self
   {
     values.resize(extra_size + values.len(), Default::default());
     Row { values }
@@ -42,11 +42,11 @@ impl Row
     self.values.len()
   }
   /// Take the value at the given index, and replace it in the current row with an invalid value.
-  pub(crate) fn take(&mut self, index: usize) -> Result<graph::Value>
+  pub(crate) fn take(&mut self, index: usize) -> Result<value::Value>
   {
     if index < self.values.len()
     {
-      Ok(mem::replace(&mut self.values[index], graph::Value::Invalid))
+      Ok(mem::replace(&mut self.values[index], value::Value::Null))
     }
     else
     {
@@ -87,7 +87,7 @@ impl Row
 // Implement the RowInterface trait for Row
 impl RowInterface for Row
 {
-  fn get(&self, index: usize) -> Result<&graph::Value>
+  fn get(&self, index: usize) -> Result<&value::Value>
   {
     self.values.get(index).ok_or_else(|| {
       InternalError::InvalidIndex {
@@ -105,7 +105,7 @@ impl RowInterface for Row
 
 impl MutableRowInterface for Row
 {
-  fn set(&mut self, index: usize, value: graph::Value) -> Result<()>
+  fn set(&mut self, index: usize, value: value::Value) -> Result<()>
   {
     let values_length = self.values.len();
     let elem = self
@@ -118,7 +118,7 @@ impl MutableRowInterface for Row
     *elem = value;
     Ok(())
   }
-  fn set_if_unset(&mut self, index: usize, value: graph::Value) -> Result<()>
+  fn set_if_unset(&mut self, index: usize, value: value::Value) -> Result<()>
   {
     let values_length = self.values.len();
     let elem = self
@@ -136,11 +136,11 @@ impl MutableRowInterface for Row
   }
 }
 
-impl Into<graph::Value> for Row
+impl Into<value::Value> for Row
 {
-  fn into(self) -> graph::Value
+  fn into(self) -> value::Value
   {
-    graph::Value::Array(self.values)
+    value::Value::Array(self.values)
   }
 }
 
@@ -181,7 +181,7 @@ where
 {
   header: HeaderType,
   row_count: usize,
-  data: Vec<graph::Value>,
+  data: Vec<value::Value>,
 }
 
 impl<HeaderType> ValueTable<HeaderType>
@@ -321,7 +321,7 @@ where
 #[derive(Debug)]
 pub(crate) struct RowView<'a>
 {
-  row: &'a [graph::Value], // length = columns.len()
+  row: &'a [value::Value], // length = columns.len()
 }
 
 impl<'a> RowView<'a>
@@ -345,7 +345,7 @@ impl<'a> RowView<'a>
 
 impl<'a> RowInterface for RowView<'a>
 {
-  fn get(&self, index: usize) -> Result<&graph::Value>
+  fn get(&self, index: usize) -> Result<&value::Value>
   {
     self.row.get(index).ok_or_else(|| {
       InternalError::InvalidIndex {
@@ -364,7 +364,7 @@ impl<'a> RowInterface for RowView<'a>
 /// Iterator over the row of the value table that yields RowViews
 pub(crate) struct RowIter<'a>
 {
-  data: &'a Vec<graph::Value>,
+  data: &'a Vec<value::Value>,
   columns: usize,
   index: usize,
   row_count: usize,
@@ -413,7 +413,7 @@ impl<'a> Iterator for RowIter<'a>
 
 pub(crate) struct IntoRowIter
 {
-  data: std::vec::IntoIter<graph::Value>,
+  data: std::vec::IntoIter<value::Value>,
   columns: usize,
   /// index used to output empty rows, when columns is 0
   index: usize,

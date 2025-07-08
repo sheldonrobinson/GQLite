@@ -1,4 +1,4 @@
-use crate::{compiler::variables_manager::VariablesManager, functions, graph, parser::ast, Result};
+use crate::{compiler::variables_manager::VariablesManager, parser::ast, prelude::*};
 
 // __     __         _       _     _     _____
 // \ \   / /_ _ _ __(_) __ _| |__ | | __|_   _|   _ _ __   ___
@@ -504,16 +504,16 @@ impl ExpressionInfo
       ast::Expression::Value(val) => Ok(Self::new(
         match val.value
         {
-          graph::Value::Array(_) => ExpressionType::Array,
-          graph::Value::Boolean(_) => ExpressionType::Boolean,
-          graph::Value::Edge(_) => ExpressionType::Edge,
-          graph::Value::Node(_) => ExpressionType::Node,
-          graph::Value::Float(_) => ExpressionType::Float,
-          graph::Value::Integer(_) => ExpressionType::Integer,
-          graph::Value::Invalid => ExpressionType::Null,
-          graph::Value::Object(_) => ExpressionType::Map,
-          graph::Value::Path(_) => ExpressionType::Path,
-          graph::Value::String(_) => ExpressionType::String,
+          value::Value::Array(_) => ExpressionType::Array,
+          value::Value::Boolean(_) => ExpressionType::Boolean,
+          value::Value::Edge(_) => ExpressionType::Edge,
+          value::Value::Node(_) => ExpressionType::Node,
+          value::Value::Float(_) => ExpressionType::Float,
+          value::Value::Integer(_) => ExpressionType::Integer,
+          value::Value::Null => ExpressionType::Null,
+          value::Value::Map(_) => ExpressionType::Map,
+          value::Value::Path(_) => ExpressionType::Path,
+          value::Value::String(_) => ExpressionType::String,
         },
         true,
         false,

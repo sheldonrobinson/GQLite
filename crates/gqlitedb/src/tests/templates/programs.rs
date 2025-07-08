@@ -2,7 +2,7 @@ use crate::{
   error, functions,
   graph::EdgeDirectivity,
   interpreter::{instructions::*, Program},
-  ValueObject,
+  ValueMap,
 };
 
 fn create_variable_size(persistent_variables: usize, temporary_variables: usize) -> VariablesSizes
@@ -19,7 +19,7 @@ pub(crate) fn simple_create() -> Program
     actions: vec![CreateAction {
       instructions: vec![
         Instruction::Push {
-          value: ValueObject::default().into(),
+          value: ValueMap::default().into(),
         },
         Instruction::CreateNodeLiteral {
           labels: Default::default(),
@@ -247,15 +247,15 @@ pub(crate) fn match_loop() -> Program
       blocks: vec![BlockMatch::MatchEdge {
         instructions: vec![
           Instruction::Push {
-            value: ValueObject::default().into(),
+            value: ValueMap::default().into(),
           },
           Instruction::CreateNodeQuery { labels: vec![] },
           Instruction::Push {
-            value: ValueObject::default().into(),
+            value: ValueMap::default().into(),
           },
           Instruction::CreateNodeQuery { labels: vec![] },
           Instruction::Push {
-            value: ValueObject::default().into(),
+            value: ValueMap::default().into(),
           },
           Instruction::CreateEdgeQuery { labels: vec![] },
         ],
@@ -301,7 +301,7 @@ pub(crate) fn optional_match() -> Program
       blocks: vec![BlockMatch::MatchNode {
         instructions: vec![
           Instruction::Push {
-            value: ValueObject::default().into(),
+            value: ValueMap::default().into(),
           },
           Instruction::CreateNodeQuery { labels: vec![] },
         ],
@@ -340,7 +340,7 @@ pub(crate) fn match_count(function_manager: &functions::Manager) -> Program
       blocks: vec![BlockMatch::MatchNode {
         instructions: vec![
           Instruction::Push {
-            value: ValueObject::default().into(),
+            value: ValueMap::default().into(),
           },
           Instruction::CreateNodeQuery { labels: vec![] },
         ],

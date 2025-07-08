@@ -1,5 +1,4 @@
 use crate::{
-  graph::array,
   interpreter::evaluators::eval_program,
   prelude::*,
   store::{Store, TransactionBoxable},
@@ -23,7 +22,10 @@ fn test_evaluate_create_named_node()
   let value = eval_program(&store, &programs::create_named_node(), Default::default()).unwrap();
   check_stats(&store, None, 1, 0, 0, 1);
 
-  assert_eq!(value, array![array!["p"], array!["foo"]]);
+  assert_eq!(
+    value,
+    value::array![value::array!["p"], value::array!["foo"]]
+  );
 }
 
 #[test]
@@ -39,7 +41,10 @@ fn test_evaluate_create_named_node_double_return()
   .unwrap();
   check_stats(&store, None, 1, 0, 0, 2);
 
-  assert_eq!(value, array![array!["id", "p"], array![12, "foo"]]);
+  assert_eq!(
+    value,
+    value::array![value::array!["id", "p"], value::array![12, "foo"]]
+  );
 }
 
 #[test]
@@ -50,7 +55,7 @@ fn test_evaluate_double_with_return()
   let value = eval_program(&store, &programs::double_with_return(), Default::default()).unwrap();
   check_stats(&store, None, 0, 0, 0, 0);
 
-  assert_eq!(value, array![array!["a"], array![1]]);
+  assert_eq!(value, value::array![value::array!["a"], value::array![1]]);
 }
 
 #[test]
@@ -61,7 +66,7 @@ fn test_evaluate_unwind()
   let value = eval_program(&store, &programs::unwind(), Default::default()).unwrap();
   check_stats(&store, None, 0, 0, 0, 0);
 
-  assert_eq!(value, array![array!["i"], array![0]]);
+  assert_eq!(value, value::array![value::array!["i"], value::array![0]]);
 }
 
 #[test]
@@ -97,7 +102,10 @@ fn test_evaluate_match_loop()
   let value = eval_program(&store, &programs::match_loop(), Default::default()).unwrap();
   check_stats(&store, None, 1, 1, 0, 0);
 
-  assert_eq!(value, array![array!["n"], array![node]]);
+  assert_eq!(
+    value,
+    value::array![value::array!["n"], value::array![node]]
+  );
 }
 
 #[test]
@@ -108,7 +116,10 @@ fn test_evaluate_optional_match()
   let value = eval_program(&store, &programs::optional_match(), Default::default()).unwrap();
   check_stats(&store, None, 0, 0, 0, 0);
 
-  assert_eq!(value, array![array!["a"], array![graph::Value::Invalid]]);
+  assert_eq!(
+    value,
+    value::array![value::array!["a"], value::array![value::Value::Null]]
+  );
 }
 
 #[test]
@@ -122,7 +133,10 @@ fn test_evaluate_match_count()
   let value = eval_program(&store, &program, Default::default()).unwrap();
   check_stats(&store, None, 0, 0, 0, 0);
 
-  assert_eq!(value, array![array!["count(*)"], array![0]]);
+  assert_eq!(
+    value,
+    value::array![value::array!["count(*)"], value::array![0]]
+  );
 
   // Count 1
   let node = graph::Node {
@@ -140,5 +154,8 @@ fn test_evaluate_match_count()
   let value = eval_program(&store, &program, Default::default()).unwrap();
   check_stats(&store, None, 1, 0, 0, 0);
 
-  assert_eq!(value, array![array!["count(*)"], array![1]]);
+  assert_eq!(
+    value,
+    value::array![value::array!["count(*)"], value::array![1]]
+  );
 }

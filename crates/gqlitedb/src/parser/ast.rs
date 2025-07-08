@@ -605,7 +605,7 @@ pub(crate) struct EndOfList {}
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Value
 {
-  pub(crate) value: crate::graph::Value,
+  pub(crate) value: crate::value::Value,
 }
 
 create_into_expr! {Value}

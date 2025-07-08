@@ -37,7 +37,7 @@ pub type Result<T, E = error::export::Error> = std::result::Result<T, E>;
 pub type Connection = connection::Connection;
 
 /// GQLite Value
-pub type Value = graph::Value;
+pub type Value = value::Value;
 
-/// GQLite ValueObject
-pub type ValueObject = graph::ValueObject;
+/// GQLite ValueMap
+pub type ValueMap = value::ValueMap;

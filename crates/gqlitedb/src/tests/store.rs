@@ -96,7 +96,7 @@ where
   let nodes = [
     graph::Node {
       labels: graph::labels!("hello", "world"),
-      properties: graph::properties!("key" => 42i64),
+      properties: value::map!("key" => 42i64),
       key: graph::Key::default(),
     },
     graph::Node {
@@ -146,7 +146,7 @@ where
   // Add a node
   let node = graph::Node {
     labels: graph::labels!("hello", "world"),
-    properties: graph::properties!("key" => 42i64),
+    properties: value::map!("key" => 42i64),
     key: graph::Key::default(),
   };
 
@@ -167,7 +167,7 @@ where
   // Modify node
   let modified_node = graph::Node {
     labels: graph::labels!("world"),
-    properties: graph::properties!("key" => 12i64),
+    properties: value::map!("key" => 12i64),
     key: node.key.clone(),
   };
 
@@ -209,12 +209,12 @@ where
 {
   let source_node = graph::Node {
     labels: graph::labels!("hello"),
-    properties: graph::properties!("key" => 42i64),
+    properties: value::map!("key" => 42i64),
     key: graph::Key::default(),
   };
   let destination_node = graph::Node {
     labels: graph::labels!("world"),
-    properties: graph::properties!("key" => 12i64),
+    properties: value::map!("key" => 12i64),
     key: graph::Key::default(),
   };
   let edge = graph::Edge {
@@ -222,7 +222,7 @@ where
     destination: destination_node.clone(),
     key: graph::Key::default(),
     labels: vec!["!".into()],
-    properties: graph::properties!("existence" => true),
+    properties: value::map!("existence" => true),
   };
 
   check_stats(&store, None, 0, 0, 0, 0);
@@ -336,12 +336,12 @@ where
 {
   let source_node = graph::Node {
     labels: graph::labels!("hello"),
-    properties: graph::properties!("key" => 42i64),
+    properties: value::map!("key" => 42i64),
     key: graph::Key::default(),
   };
   let destination_node = graph::Node {
     labels: graph::labels!("world"),
-    properties: graph::properties!("key" => 12i64),
+    properties: value::map!("key" => 12i64),
     key: graph::Key::default(),
   };
   let edge = graph::Edge {
@@ -349,7 +349,7 @@ where
     destination: destination_node.clone(),
     key: graph::Key::default(),
     labels: vec!["!".into()],
-    properties: graph::properties!("existence" => true),
+    properties: value::map!("existence" => true),
   };
 
   check_stats(&store, None, 0, 0, 0, 0);
@@ -380,7 +380,7 @@ where
     source: edge.source.clone(),
     destination: edge.destination.clone(),
     labels: vec!["?".into()],
-    properties: graph::properties!("existence" => false),
+    properties: value::map!("existence" => false),
   };
 
   let mut tx = store.begin_write().unwrap();

@@ -26,7 +26,7 @@ pub(crate) enum Instruction
   },
   Push
   {
-    value: graph::Value,
+    value: value::Value,
   },
   GetVariable
   {
