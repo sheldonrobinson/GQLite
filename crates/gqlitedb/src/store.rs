@@ -112,7 +112,7 @@ pub(crate) trait Store
   fn graphs_list(&self, transaction: &mut Self::TransactionBox) -> Result<Vec<String>>;
   /// Create a new graph
   fn create_graph(
-    &mut self,
+    &self,
     transaction: &mut Self::TransactionBox,
     name: &String,
     _ignore_if_exists: bool,

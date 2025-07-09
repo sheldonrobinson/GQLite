@@ -1132,12 +1132,16 @@ fn is_write_program(program: &super::Program) -> bool
 {
   program.iter().any(|b| match b
   {
-    Block::BlockMatch { .. }
+    Block::UseGraph { .. }
+    | Block::BlockMatch { .. }
     | Block::Return { .. }
     | Block::Unwind { .. }
     | Block::Call { .. }
     | Block::With { .. } => false,
-    Block::Create { .. } | Block::Update { .. } | Block::Delete { .. } => true,
+    Block::CreateGraph { .. }
+    | Block::Create { .. }
+    | Block::Update { .. }
+    | Block::Delete { .. } => true,
   })
 }
 
@@ -1148,7 +1152,7 @@ pub(crate) fn eval_program<TStore: store::Store>(
   parameters: crate::value::ValueMap,
 ) -> crate::Result<crate::value::Value>
 {
-  let graph_name: String = "default".into();
+  let mut graph_name: String = "default".into();
   let mut input_table = value_table::ValueTable::new(0);
   input_table.add_full_row(value_table::Row::default())?;
   let mut tx = if is_write_program(program)
@@ -1169,6 +1173,30 @@ pub(crate) fn eval_program<TStore: store::Store>(
     }
     match block
     {
+      instructions::Block::CreateGraph { name } =>
+      {
+        store
+          .create_graph(&mut tx, name, false)
+          .map_err(|e| match e
+          {
+            Error::StoreError(StoreError::DuplicatedGraph { graph_name }) =>
+            {
+              RunTimeError::DuplicatedGraph { graph_name }.into()
+            }
+            o => o,
+          })?;
+        graph_name = name.to_owned();
+      }
+      instructions::Block::UseGraph { name } =>
+      {
+        graph_name = name.to_owned();
+        if !store.graphs_list(&mut tx)?.contains(&graph_name)
+        {
+          Err(RunTimeError::UnknownGraph {
+            graph_name: graph_name.to_owned(),
+          })?;
+        }
+      }
       instructions::Block::Create {
         actions,
         variables_size,

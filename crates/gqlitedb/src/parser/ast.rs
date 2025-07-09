@@ -1,9 +1,6 @@
-#![allow(unused)]
-
 use std::{
   cell::RefCell,
   collections::{hash_map::Entry, HashMap},
-  fmt::format,
   sync::atomic::AtomicU64,
 };
 
@@ -97,8 +94,8 @@ impl VariableIdentifiers
 #[derive(Debug)]
 pub(crate) enum Statement
 {
-  // CreateGraph(CreateGraph),
-  // UseGraph(UseGraph),
+  CreateGraph(CreateGraph),
+  UseGraph(UseGraph),
   Create(Create),
   Match(Match),
   Return(Return),

@@ -634,14 +634,14 @@ Then(/^an Error should be raised at any time: \*$/) do
   expect(@exception).not_to be_nil
 end
 
-Then(/^an Error should be raised at run time: DuplicateGraphName$/) do
+Then(/^an Error should be raised at run time: DuplicatedGraph$/) do
   expect(@exception).not_to be_nil
-  expect(@exception.message).to match(/^RunTime: DuplicateGraphName: .*\.$/)
+  expect(@exception.message).to match(/^RunTime: DuplicatedGraph: .*\.$/)
 end
 
-Then(/^an Error should be raised at run time: InexistingGraph$/) do
+Then(/^an Error should be raised at run time: UnknownGraph$/) do
   expect(@exception).not_to be_nil
-  expect(@exception.message).to match(/^RunTime: InexistingGraph: .*\.$/)
+  expect(@exception.message).to match(/^RunTime: UnknownGraph: .*\.$/)
 end
 
 Then(/^a SyntaxError should be raised at compile time: InvalidUnicodeLiteral$/) do

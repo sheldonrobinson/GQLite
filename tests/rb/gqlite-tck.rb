@@ -33,7 +33,11 @@ end
 
 # GQLite 2.x
 
-gql = []
+gql = [
+  # Graph
+  'Graph1'
+  ]
+
 features = [
   # Create
   'create/Create1', 'create/Create2', 'create/Create3',
@@ -147,7 +151,7 @@ args = args.concat(%w(--format junit --out)).concat([options[:output_dir]])  if 
     Cucumber::Cli::Main.new(args).execute!
   rescue SystemExit => se
     if se.status != 0
-      sys.exit(se.status)
+      exit(se.status)
     end
   end
 end

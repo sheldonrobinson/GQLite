@@ -303,7 +303,7 @@ impl super::WriteTransaction for redb::WriteTransaction
 pub(crate) struct Store
 {
   redb_store: redb::Database,
-  graphs: HashMap<String, GraphInfo>,
+  graphs: RefCell<HashMap<String, GraphInfo>>,
 }
 
 type TransactionBox = store::TransactionBox<redb::ReadTransaction, redb::WriteTransaction>;
@@ -313,7 +313,7 @@ impl Store
   /// Crate a new store, with a default graph
   pub(crate) fn new<P: AsRef<std::path::Path>>(path: P) -> Result<Store>
   {
-    let mut s = Self {
+    let s = Self {
       redb_store: redb::Database::create(path.as_ref())?,
       graphs: Default::default(),
     };
@@ -767,7 +767,7 @@ impl store::Store for Store
     self.get_metadata_value_or_else(transaction, "graphs".to_string(), || vec![])
   }
   fn create_graph(
-    &mut self,
+    &self,
     transaction: &mut Self::TransactionBox,
     graph_name: &String,
     ignore_if_exists: bool,
@@ -800,7 +800,7 @@ impl store::Store for Store
       tx.open_table(gi.edges_source_index_definition())?;
       tx.open_table(gi.edges_destination_index_definition())?;
 
-      self.graphs.insert(graph_name.to_owned(), gi);
+      self.graphs.borrow_mut().insert(graph_name.to_owned(), gi);
     }
     graphs_list.push(graph_name.clone());
     self.set_metadata_value(transaction, "graphs", &graphs_list)?;
@@ -815,7 +815,8 @@ impl store::Store for Store
     {
       {
         let tx = transaction.try_into_write()?;
-        let graph_info = self.graphs.get(graph_name).unwrap();
+        let graphs = self.graphs.borrow();
+        let graph_info = graphs.get(graph_name).unwrap();
         tx.delete_table(graph_info.nodes_table_definition())?;
         tx.delete_table(graph_info.edges_table_definition())?;
         tx.delete_table(graph_info.edges_source_index_definition())?;
@@ -844,7 +845,8 @@ impl store::Store for Store
     nodes_iter: T,
   ) -> Result<()>
   {
-    let graph_info = self.graphs.get(graph_name).unwrap();
+    let graphs = self.graphs.borrow();
+    let graph_info = graphs.get(graph_name).unwrap();
     let transaction = transaction.try_into_write()?;
     let mut table = transaction.open_table(graph_info.nodes_table_definition())?;
     let mut table_source = transaction.open_table(graph_info.edges_source_index_definition())?;
@@ -867,7 +869,8 @@ impl store::Store for Store
   ) -> Result<()>
   {
     let transaction = transaction.try_into_write()?;
-    let graph_info = self.graphs.get(graph_name).unwrap();
+    let graphs = self.graphs.borrow();
+    let graph_info = graphs.get(graph_name).unwrap();
     let mut table = transaction.open_table(graph_info.nodes_table_definition())?;
     table.insert(node.key, node)?;
     Ok(())
@@ -881,7 +884,8 @@ impl store::Store for Store
     detach: bool,
   ) -> Result<()>
   {
-    let graph_info = self.graphs.get(graph_name).unwrap();
+    let graphs = self.graphs.borrow();
+    let graph_info = graphs.get(graph_name).unwrap();
 
     if query.is_select_all()
     {
@@ -985,7 +989,8 @@ impl store::Store for Store
     query: super::SelectNodeQuery,
   ) -> Result<Vec<crate::graph::Node>>
   {
-    let graph_info = self.graphs.get(graph_name).unwrap();
+    let graphs = self.graphs.borrow();
+    let graph_info = graphs.get(graph_name).unwrap();
     match transaction
     {
       store::TransactionBox::Read(read) =>
@@ -1009,7 +1014,8 @@ impl store::Store for Store
   ) -> Result<()>
   {
     let transaction = transaction.try_into_write()?;
-    let graph_info = self.graphs.get(graph_name).unwrap();
+    let graphs = self.graphs.borrow();
+    let graph_info = graphs.get(graph_name).unwrap();
     let mut table = transaction.open_table(graph_info.edges_table_definition())?;
     let mut table_source = transaction.open_table(graph_info.edges_source_index_definition())?;
     let mut table_destination =
@@ -1051,7 +1057,8 @@ impl store::Store for Store
   ) -> Result<()>
   {
     let transaction = transaction.try_into_write()?;
-    let graph_info = self.graphs.get(graph_name).unwrap();
+    let graphs = self.graphs.borrow();
+    let graph_info = graphs.get(graph_name).unwrap();
     let mut table = transaction.open_table(graph_info.edges_table_definition())?;
     table.insert(
       edge.key,
@@ -1074,7 +1081,8 @@ impl store::Store for Store
     directivity: graph::EdgeDirectivity,
   ) -> Result<()>
   {
-    let graph_info = self.graphs.get(graph_name).unwrap();
+    let graphs = self.graphs.borrow();
+    let graph_info = graphs.get(graph_name).unwrap();
     let edges = self.select_edges(transaction, graph_name, query, directivity)?;
 
     let transaction = transaction.try_into_write()?;
@@ -1125,7 +1133,8 @@ impl store::Store for Store
     {
       return Ok(Default::default());
     }
-    let graph_info = self.graphs.get(graph_name).unwrap();
+    let graphs = self.graphs.borrow();
+    let graph_info = graphs.get(graph_name).unwrap();
 
     match transaction
     {

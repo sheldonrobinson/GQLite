@@ -944,6 +944,12 @@ pub(crate) fn compile(
       compiler.variables_manager.analyse(stmt)?;
       let inst = match stmt
       {
+        ast::Statement::CreateGraph(create_graph) => Ok(Block::CreateGraph {
+          name: create_graph.name.to_owned(),
+        }),
+        ast::Statement::UseGraph(use_graph) => Ok(Block::UseGraph {
+          name: use_graph.name.to_owned(),
+        }),
         ast::Statement::Create(create) => compiler.compile_create_patterns(&create.patterns),
         ast::Statement::Match(match_statement) => compiler.compile_match_patterns(
           &match_statement.patterns,

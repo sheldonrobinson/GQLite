@@ -3,6 +3,7 @@
 <!-- next-header -->
 
 ## [Unreleased] - ReleaseDate
+- Support for USING and multiple graphs.
 
 ## [0.4.0] - 2025-07-09
 - SQLite backend.

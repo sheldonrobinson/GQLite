@@ -11,7 +11,7 @@ use crate::{
   tests::check_stats,
 };
 
-fn test_graphs<TStore>(mut store: TStore)
+fn test_graphs<TStore>(store: TStore)
 where
   TStore: store::Store,
 {

@@ -61,7 +61,9 @@ where_modifier = { "WHERE" ~ expression }
 
 // Statements
 statement = {
-    create_statement
+    create_graph_statement
+  | use_graph_statement
+  | create_statement
   | optional_match_statement
   | match_statement
   | return_statement
@@ -75,6 +77,9 @@ statement = {
 }
 
 star = { "*" }
+
+create_graph_statement   = { "CREATE" ~ "GRAPH" ~ ident }
+use_graph_statement      = { "USE" ~ ident }
 
 create_statement         = { "CREATE" ~ node_or_edge_pattern ~ ("," ~ node_or_edge_pattern)* }
 match_statement          = { "MATCH" ~ node_or_edge_or_path_pattern ~ ("," ~ node_or_edge_or_path_pattern)* ~ where_modifier? }

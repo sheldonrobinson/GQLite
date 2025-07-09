@@ -564,6 +564,10 @@ impl VariablesManager
     #[allow(unused_variables)]
     match statement
     {
+      ast::Statement::CreateGraph(create_graph) =>
+      {}
+      ast::Statement::UseGraph(use_graph) =>
+      {}
       ast::Statement::Create(create) =>
       {
         for pattern in create.patterns.iter()

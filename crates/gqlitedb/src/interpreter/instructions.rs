@@ -204,6 +204,14 @@ impl VariablesSizes
 #[derive(Debug)]
 pub(crate) enum Block
 {
+  CreateGraph
+  {
+    name: String
+  },
+  UseGraph
+  {
+    name: String
+  },
   Create
   {
     actions: Vec<CreateAction>,

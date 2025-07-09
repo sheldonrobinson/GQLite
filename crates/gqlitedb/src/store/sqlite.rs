@@ -258,7 +258,7 @@ impl Store
     use store::Store;
     let connection = Rc::new(rusqlite::Connection::open(path)?);
 
-    let mut s = Self { connection };
+    let s = Self { connection };
 
     let mut tx = s.begin_write()?;
     if s.check_if_table_exists(&mut tx, "gqlite_metadata")?
@@ -420,7 +420,7 @@ impl store::Store for Store
     self.get_metadata_value_json(transaction, "graphs")
   }
   fn create_graph(
-    &mut self,
+    &self,
     transaction: &mut Self::TransactionBox,
     graph_name: &String,
     ignore_if_exists: bool,

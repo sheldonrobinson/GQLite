@@ -850,11 +850,33 @@ impl AstBuilder
     }
     Ok((all, expressions, modifiers, where_expression))
   }
-
+  fn build_ident(&self, iterator: &mut pest::iterators::Pairs<Rule>) -> Result<String>
+  {
+    let pair = iterator.next().ok_or_else(|| InternalError::MissingPair {
+      context: "build_ident",
+    })?;
+    match pair.as_rule()
+    {
+      Rule::ident => Ok(pair.as_str().to_string()),
+      _ => Err(
+        InternalError::UnexpectedPair {
+          context: "build_ident",
+          pair: pair.to_string(),
+        }
+        .into(),
+      ),
+    }
+  }
   fn build_ast_from_statement(&self, pair: pest::iterators::Pair<Rule>) -> Result<ast::Statement>
   {
     match pair.as_rule()
     {
+      Rule::create_graph_statement => Ok(ast::Statement::CreateGraph(ast::CreateGraph {
+        name: self.build_ident(&mut pair.into_inner())?,
+      })),
+      Rule::use_graph_statement => Ok(ast::Statement::UseGraph(ast::UseGraph {
+        name: self.build_ident(&mut pair.into_inner())?,
+      })),
       Rule::create_statement => Ok(ast::Statement::Create(ast::Create {
         patterns: self.build_patterns(&mut pair.into_inner(), false)?,
       })),

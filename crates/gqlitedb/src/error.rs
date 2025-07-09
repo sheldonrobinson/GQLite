@@ -137,6 +137,16 @@ pub enum RunTimeError
   InvalidArgumentType,
   #[error("OutOfBound: index is out of bound for array.")]
   OutOfBound,
+  #[error("DuplicatedGraph: {graph_name} already exists.")]
+  DuplicatedGraph
+  {
+    graph_name: String
+  },
+  #[error("UnknownGraph: {graph_name} does not exists.")]
+  UnknownGraph
+  {
+    graph_name: String
+  },
 }
 
 /// Internal errors, should be treated as bugs.
