@@ -7,4 +7,4 @@ pre-release-replacements = [
 ]
 
 tag-name = "gqlitedb-v{{version}}"
-pre-release-commit-message = "Release {{crate_name}} version {{version}}.\n\nThis release version {{version}} of {{crate_name}}.\n\nIssues: None"
+pre-release-commit-message = "Release gqlitedb/cli version {{version}}.\n\nThis release version {{version}} of gqlitedb/cli.\n\nIssues: None"

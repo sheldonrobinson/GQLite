@@ -3,6 +3,8 @@
 <!-- next-header -->
 
 ## [Unreleased] - ReleaseDate
+
+## [0.4.0] - 2025-07-09
 - SQLite backend.
 - Refactored handling of variables in the executor.
 - Improved Rust API.
@@ -53,7 +55,8 @@
 - `persy` backend.
 
 <!-- next-url -->
-[Unreleased]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.3.4...dev/2
+[Unreleased]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.4.0...dev/2
+[0.4.0]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.3.4...gqlitedb-v0.4.0
 [0.3.4]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.3.3...gqlitedb-v0.3.4
 [0.3.3]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.3.2...gqlitedb-v0.3.3
 [0.3.2]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.3.1...gqlitedb-v0.3.2
