@@ -4,6 +4,7 @@ use crate::prelude::*;
 /// Represent compile time errors.
 #[derive(thiserror::Error, Debug)]
 #[allow(missing_docs)]
+#[non_exhaustive]
 pub enum CompileTimeError
 {
   /// Floating point overflow
@@ -82,6 +83,7 @@ pub enum CompileTimeError
 /// Runtime errors.
 #[derive(thiserror::Error, Debug)]
 #[allow(missing_docs)]
+#[non_exhaustive]
 pub enum RunTimeError
 {
   /// Parameter is not known
@@ -151,6 +153,7 @@ pub enum RunTimeError
 
 /// Internal errors, should be treated as bugs.
 #[derive(thiserror::Error, Debug)]
+#[non_exhaustive]
 pub enum InternalError
 {
   #[error("Aggregation state is missing.")]
@@ -308,6 +311,7 @@ pub enum InternalError
 /// Error in the store backend.
 #[derive(thiserror::Error, Debug)]
 #[allow(missing_docs)]
+#[non_exhaustive]
 pub enum StoreError
 {
   #[error("UnknownBackend: backend '{backend}' is unknown.")]
@@ -347,6 +351,7 @@ pub enum StoreError
 
 /// GQLite errors
 #[derive(thiserror::Error, Debug)]
+#[non_exhaustive]
 pub enum Error
 {
   /// Error that occurs during compilation
