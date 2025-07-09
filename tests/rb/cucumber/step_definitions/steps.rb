@@ -252,8 +252,6 @@ IgnoredScenario = [
   # is not the case according to the test case)
   "[19] Two bound nodes pointing to the same node",
   # OPTIONAL MATCH is not supported yet
-  "[3] `type()` on null relationship",
-  "[4] `type()` on mixed null and non-null relationships",
   "[5] Label expression on null",
   # TODO edge isomorphism
   "[29] Fail when re-using a relationship in the same pattern",
