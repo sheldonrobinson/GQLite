@@ -251,8 +251,6 @@ IgnoredScenario = [
   # to me it should indicate that there are two edges between the node, in each direction, but
   # is not the case according to the test case)
   "[19] Two bound nodes pointing to the same node",
-  # OPTIONAL MATCH is not supported yet
-  "[5] Label expression on null",
   # TODO edge isomorphism
   "[29] Fail when re-using a relationship in the same pattern",
   # Unreported error

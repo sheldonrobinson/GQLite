@@ -50,6 +50,7 @@ impl super::FunctionTrait for HasLabels
       {
         value::Value::Edge(e) => e.labels,
         value::Value::Node(n) => n.labels,
+        value::Value::Null => return Ok(value::Value::Null),
         _ => Err(RunTimeError::InvalidArgument {
           function_name: "has_labels",
           index: 0,
