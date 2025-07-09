@@ -4,9 +4,35 @@
 #include <variant>
 
 #include "exception.h"
+#include "format.h"
 #include "value.h"
 
 using namespace gqlite;
+
+const char* gqlite::to_string(gqlite::value_type _type)
+{
+  switch(_type)
+  {
+    using enum gqlite::value_type;
+  case invalid:
+    return "invalid";
+  case boolean:
+    return "boolean";
+  case integer:
+    return "integer";
+  case floating_point:
+    return "number";
+  case string:
+    return "string";
+  case map:
+    return "map";
+  case vector:
+    return "vector";
+  }
+  return "unknown value type";
+}
+
+std::string gqlite::to_string(const gqlite::value& p) { return p.to_string(); }
 
 struct value::data
 {
