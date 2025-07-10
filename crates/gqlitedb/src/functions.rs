@@ -67,6 +67,14 @@ impl<T> FunctionTypeTrait for HashMap<String, T>
   }
 }
 
+impl FunctionTypeTrait for crate::value::ValueMap
+{
+  fn result_type() -> ExpressionType
+  {
+    ExpressionType::Map
+  }
+}
+
 //  _____                 _   _           _____          _ _
 // |  ___|   _ _ __   ___| |_(_) ___  _ _|_   _| __ __ _(_) |_
 // | |_ | | | | '_ \ / __| __| |/ _ \| '_ \| || '__/ _` | | __|

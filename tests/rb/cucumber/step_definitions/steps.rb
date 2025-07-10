@@ -323,10 +323,6 @@ IgnoredScenario = [
   "[6] `type()` failing on invalid arguments",
   # type of value stored in array/map is lost
   "[5] `type()` handling Any type",
-  # MAX aggregation on list
-  "[9] `max()` over list values", # Needs a custom max/min aggregator see https://gitlab.com/GQLite/GQLite/-/issues/12
-  "[11] `max()` over mixed values",
-  "[12] `min()` over mixed values",
   # Correctly fail, but with different error message:
   "[25] Fail on sorting by an aggregation",
   "[19] Fail if not projected variables are used inside an order by item which contains an aggregation expression",

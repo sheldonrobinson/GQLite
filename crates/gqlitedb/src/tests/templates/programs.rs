@@ -382,3 +382,74 @@ pub(crate) fn match_count(function_manager: &functions::Manager) -> Program
     },
   ]
 }
+
+/// Program for `MATCH (n) RETURN n.name, count(n.num)`
+pub(crate) fn aggregation(function_manager: &functions::Manager) -> Program
+{
+  vec![
+    Block::BlockMatch {
+      blocks: vec![BlockMatch::MatchNode {
+        instructions: vec![
+          Instruction::Push {
+            value: ValueMap::default().into(),
+          },
+          Instruction::CreateNodeQuery { labels: vec![] },
+        ],
+        variable: Some(0),
+        filter: vec![],
+      }],
+      filter: vec![],
+      optional: false,
+      variables_size: VariablesSizes {
+        persistent_variables: 1,
+        temporary_variables: 0,
+      },
+    },
+    Block::Return {
+      variables: vec![
+        (
+          "n.name".into(),
+          RWExpression {
+            col_id: 1,
+            instructions: vec![
+              Instruction::GetVariable { col_id: 0 },
+              Instruction::MemberAccess {
+                path: vec!["name".into()],
+              },
+            ],
+            aggregations: Default::default(),
+          },
+        ),
+        (
+          "count(n.num)".into(),
+          RWExpression {
+            col_id: 2,
+            instructions: vec![Instruction::GetVariable { col_id: 2 }],
+            aggregations: vec![(
+              2,
+              RWAggregation {
+                init_instructions: vec![],
+                argument_instructions: vec![
+                  Instruction::GetVariable { col_id: 0 },
+                  Instruction::MemberAccess {
+                    path: vec!["num".into()],
+                  },
+                ],
+                aggregator: function_manager
+                  .get_aggregator::<error::CompileTimeError>("count")
+                  .unwrap(),
+              },
+            )],
+          },
+        ),
+      ],
+      filter: vec![],
+      modifiers: Modifiers {
+        limit: None,
+        skip: None,
+        order_by: vec![],
+      },
+      variables_size: create_variable_size(3, 1),
+    },
+  ]
+}

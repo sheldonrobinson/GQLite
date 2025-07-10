@@ -1,6 +1,7 @@
 mod arithmetic;
 mod containers;
 mod count;
+mod minmax;
 
 use std::fmt::Debug;
 
@@ -22,7 +23,7 @@ pub(crate) trait AggregatorTrait: Debug
 pub(crate) type Aggregator = std::rc::Rc<Box<dyn AggregatorTrait>>;
 
 macro_rules! declare_aggregator {
-  ($function_name: ident, $type_name: tt, $state_type_name: tt, (  $( $arg_type: ty $(,)? )* ) -> $ret_type: ident) => {
+  ($function_name: ident, $type_name: ident, $state_type_name: tt, (  $( $arg_type: ty $(,)? )* ) -> $ret_type: ty) => {
     #[derive(Debug)]
     pub(super) struct $type_name {}
     impl $type_name
@@ -50,7 +51,7 @@ macro_rules! declare_aggregator {
       {
         use crate::functions::FunctionTypeTrait;
         // TODO
-        Ok($ret_type::result_type())
+        Ok(<$ret_type>::result_type())
       }
 
     }
@@ -65,6 +66,8 @@ pub(crate) fn init_aggregators() -> std::collections::HashMap<String, Aggregator
     count::Count::new(),
     arithmetic::Sum::new(),
     containers::Collect::new(),
+    minmax::Min::new(),
+    minmax::Max::new(),
   ]
   .into()
 }

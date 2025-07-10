@@ -64,7 +64,7 @@ impl From<Key> for u128
   }
 }
 
-#[derive(Serialize, Deserialize, Debug, Default, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq, Clone, Hash)]
 #[serde(tag = "type", rename = "node")]
 pub struct Node
 {
@@ -85,12 +85,12 @@ impl std::fmt::Display for Node
     {
       write!(f, "(:{} ", self.labels.join(":"))?;
     }
-    value::value_object_display(self.properties.borrow(), f)?;
+    write!(f, "{}", self.properties.borrow())?;
     write!(f, ")")
   }
 }
 
-#[derive(Serialize, Deserialize, Debug, Default, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq, Clone, Hash)]
 #[serde(tag = "type", rename = "edge")]
 pub struct Edge
 {
@@ -108,7 +108,7 @@ impl std::fmt::Display for Edge
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
   {
     write!(f, "[:{} ", self.labels.join(":"))?;
-    value::value_object_display(self.properties.borrow(), f)?;
+    write!(f, "{}", self.properties.borrow())?;
     write!(f, "])")
   }
 }
@@ -127,7 +127,7 @@ impl Into<Path> for Edge
   }
 }
 
-#[derive(Serialize, Deserialize, Debug, Default, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq, Clone, Hash)]
 #[serde(tag = "type", rename = "path")]
 pub struct Path
 {
@@ -143,7 +143,7 @@ impl std::fmt::Display for Path
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
   {
     write!(f, "{}-[:{} ", self.source, self.labels.join(":"))?;
-    value::value_object_display(self.properties.borrow(), f)?;
+    write!(f, "{}", self.properties.borrow())?;
     write!(f, "])->{}", self.destination)
   }
 }

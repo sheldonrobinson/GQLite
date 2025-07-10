@@ -1,13 +1,18 @@
 use serde::{Deserialize, Serialize};
-use std::ops::{Add, Div, Mul, Neg, Rem, Sub};
+use std::{
+  hash::Hash,
+  ops::{Add, Div, Mul, Neg, Rem, Sub},
+};
 
 use crate::prelude::*;
 
 mod compare;
 mod contains;
+mod value_map;
 
 pub(crate) use compare::{compare, Ordering};
 pub(crate) use contains::{contains, ContainResult};
+pub use value_map::ValueMap;
 
 /// Represent a value in a properties for a Node or an Edge.
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, Clone)]
@@ -39,249 +44,6 @@ pub enum Value
   Edge(graph::Edge),
   /// A path in the graph.
   Path(graph::Path),
-}
-
-/// A map of values.
-pub type ValueMap = std::collections::HashMap<String, Value>;
-
-pub(crate) fn value_object_display(
-  obj: &ValueMap,
-  f: &mut std::fmt::Formatter<'_>,
-) -> std::fmt::Result
-{
-  write!(f, "{{")?;
-  obj.iter().enumerate().for_each(|(n, (k, v))| {
-    if n == 0
-    {
-      write!(f, "{}: {}", k, v).unwrap();
-    }
-    else
-    {
-      write!(f, ", {}: {}", k, v).unwrap();
-    }
-  });
-  write!(f, "}}")
-}
-
-pub(crate) trait ValueMapExtension
-{
-  fn remove_null(self) -> Self;
-  fn remove_value<'a>(
-    &mut self,
-    field: Option<&'a String>,
-    path: impl Iterator<Item = &'a String>,
-  ) -> crate::Result<()>;
-  fn add_values<'a>(
-    &mut self,
-    field: Option<&'a String>,
-    path: impl Iterator<Item = &'a String>,
-    value: ValueMap,
-  ) -> crate::Result<()>;
-  fn set_value<'a>(
-    &mut self,
-    field: Option<&'a String>,
-    path: impl Iterator<Item = &'a String>,
-    value: Value,
-  ) -> crate::Result<()>;
-}
-
-impl ValueMapExtension for ValueMap
-{
-  fn remove_null(self) -> Self
-  {
-    self
-      .into_iter()
-      .filter(|(_, v)| !v.is_null())
-      .map(|(k, v)| (k, v.remove_null()))
-      .collect()
-  }
-  fn remove_value<'a>(
-    &mut self,
-    field: Option<&'a String>,
-    mut path: impl Iterator<Item = &'a String>,
-  ) -> crate::Result<()>
-  {
-    if let Some(field) = field
-    {
-      if let Some(next_field) = path.next()
-      {
-        let v = self.get_mut(field);
-        match v
-        {
-          Some(Value::Map(o)) =>
-          {
-            o.remove_value(Some(next_field), path)?;
-          }
-          None =>
-          {}
-          _ => Err(InternalError::Unimplemented(
-            "remove_value should get a better error",
-          ))?, // TODO
-        }
-      }
-      else
-      {
-        self.remove(field);
-      }
-    }
-    else
-    {
-      Err(InternalError::Unimplemented(
-        "remove_value should get a better error",
-      ))? // TODO
-    }
-    Ok(())
-  }
-  fn add_values<'a>(
-    &mut self,
-    field: Option<&'a String>,
-    mut path: impl Iterator<Item = &'a String>,
-    value: ValueMap,
-  ) -> crate::Result<()>
-  {
-    if let Some(field) = field
-    {
-      let v = self.get_mut(field);
-
-      if let Some(next_field) = path.next()
-      {
-        match v
-        {
-          Some(Value::Map(o)) =>
-          {
-            o.add_values(Some(next_field), path, value)?;
-          }
-          None =>
-          {
-            let mut o = ValueMap::new();
-            o.set_value(Some(next_field), path, value.remove_null().into())?;
-            self.insert(field.to_owned(), o.into());
-          }
-          _ => Err(InternalError::Unimplemented(
-            "add_values should get a better error",
-          ))?, // TODO
-        }
-      }
-      else
-      {
-        match v
-        {
-          Some(v) =>
-          {
-            match v
-            {
-              Value::Map(object) =>
-              {
-                for (k, v) in value.into_iter()
-                {
-                  if v.is_null()
-                  {
-                    object.remove(&k);
-                  }
-                  else
-                  {
-                    object.insert(k, v);
-                  }
-                }
-              }
-              _ => Err(InternalError::Unimplemented(
-                "add_values should get a better error",
-              ))?, // TODO
-            }
-          }
-          None =>
-          {
-            self.insert(field.to_owned(), value.remove_null().into());
-          }
-        }
-      }
-    }
-    else
-    {
-      for (k, v) in value.into_iter()
-      {
-        if v.is_null()
-        {
-          self.remove(&k);
-        }
-        else
-        {
-          self.insert(k, v);
-        }
-      }
-    }
-    Ok(())
-  }
-  fn set_value<'a>(
-    &mut self,
-    field: Option<&'a String>,
-    mut path: impl Iterator<Item = &'a String>,
-    value: Value,
-  ) -> crate::Result<()>
-  {
-    if let Some(field) = field
-    {
-      let v = self.get_mut(field);
-
-      if let Some(next_field) = path.next()
-      {
-        match v
-        {
-          Some(Value::Map(o)) =>
-          {
-            o.set_value(Some(next_field), path, value)?;
-          }
-          None =>
-          {
-            if !value.is_null()
-            {
-              let mut o = ValueMap::new();
-              o.set_value(Some(next_field), path, value)?;
-              self.insert(field.to_owned(), o.into());
-            }
-          }
-          _ => Err(InternalError::Unimplemented(
-            "update_value should get a better error",
-          ))?, // TODO
-        }
-      }
-      else
-      {
-        if value.is_null()
-        {
-          self.remove(field);
-        }
-        else
-        {
-          match v
-          {
-            Some(v) =>
-            {
-              *v = value;
-            }
-            None =>
-            {
-              self.insert(field.to_owned(), value);
-            }
-          }
-        }
-      }
-
-      Ok(())
-    }
-    else
-    {
-      match value
-      {
-        Value::Map(o) =>
-        {
-          *self = o;
-          Ok(())
-        }
-        _ => Err(InternalError::Unimplemented("set_value should get a better error").into()), // TODO
-      }
-    }
-  }
 }
 
 impl Value
@@ -504,6 +266,38 @@ impl Value
   }
 }
 
+impl Hash for Value
+{
+  fn hash<H: std::hash::Hasher>(&self, state: &mut H)
+  {
+    match self
+    {
+      Value::Null =>
+      {}
+      Value::Boolean(b) => b.hash(state),
+      Value::Integer(i) => i.hash(state),
+      Value::Float(f) =>
+      {
+        let bits = if f.is_nan()
+        {
+          0x7ff8000000000000
+        }
+        else
+        {
+          f.to_bits()
+        };
+        bits.hash(state);
+      }
+      Value::String(s) => s.hash(state),
+      Value::Array(a) => a.hash(state),
+      Value::Map(m) => m.hash(state),
+      Value::Node(n) => n.hash(state),
+      Value::Edge(e) => e.hash(state),
+      Value::Path(p) => p.hash(state),
+    }
+  }
+}
+
 impl Add for Value
 {
   type Output = crate::Result<Value>;
@@ -632,7 +426,7 @@ impl std::fmt::Display for Value
           .collect::<Vec<String>>()
           .join(", ")
       ),
-      Value::Map(o) => value_object_display(o, f),
+      Value::Map(o) => write!(f, "{}", o),
       Value::Node(n) => write!(f, "{}", n),
       Value::Edge(e) => write!(f, "{}", e),
       Value::Path(p) => write!(f, "{}", p),

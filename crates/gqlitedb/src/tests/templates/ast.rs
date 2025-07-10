@@ -298,3 +298,59 @@ pub(crate) fn match_count() -> Statements
     .into(),
   ]
 }
+
+/// AST for `MATCH (n) RETURN n.name, count(n.num)`
+pub(crate) fn aggregation() -> Statements
+{
+  let var_ids = VariableIdentifiers::default();
+  vec![
+    Match {
+      patterns: vec![Pattern::Node(NodePattern {
+        variable: Some(var_ids.from_name("n")),
+        labels: LabelExpression::None,
+        properties: None,
+      })],
+      where_expression: None,
+      optional: false,
+    }
+    .into(),
+    Return {
+      all: false,
+      expressions: vec![
+        NamedExpression {
+          identifier: var_ids.from_name("n.name"),
+          expression: MemberAccess {
+            left: Variable {
+              identifier: var_ids.from_name("n"),
+            }
+            .into(),
+            path: vec!["name".into()],
+          }
+          .into(),
+        },
+        NamedExpression {
+          identifier: var_ids.from_name("count(n.num)"),
+          expression: FunctionCall {
+            name: "count".into(),
+            arguments: vec![MemberAccess {
+              left: Variable {
+                identifier: var_ids.from_name("n"),
+              }
+              .into(),
+              path: vec!["num".into()],
+            }
+            .into()],
+          }
+          .into(),
+        },
+      ],
+      modifiers: Modifiers {
+        skip: None,
+        limit: None,
+        order_by: None,
+      },
+      where_expression: None,
+    }
+    .into(),
+  ]
+}

@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 #[cfg(feature = "_pgql")]
 pub(crate) mod pgql;
 #[cfg(feature = "redb")]
@@ -206,7 +204,7 @@ pub(crate) struct SelectNodeQuery
 {
   keys: Option<Vec<graph::Key>>,
   labels: Option<Vec<String>>,
-  properties: Option<HashMap<String, value::Value>>,
+  properties: Option<value::ValueMap>,
   select_all: bool,
 }
 
@@ -263,7 +261,7 @@ impl SelectNodeQuery
   }
   pub(crate) fn select_labels_properties(
     labels: impl Into<Vec<String>>,
-    properties: HashMap<String, value::Value>,
+    properties: value::ValueMap,
   ) -> Self
   {
     Self {
@@ -318,7 +316,7 @@ pub(crate) struct SelectEdgeQuery
 {
   keys: Option<Vec<graph::Key>>,
   labels: Option<Vec<String>>,
-  properties: Option<HashMap<String, value::Value>>,
+  properties: Option<value::ValueMap>,
   source: SelectNodeQuery,
   destination: SelectNodeQuery,
 }
@@ -392,7 +390,7 @@ impl SelectEdgeQuery
   pub(crate) fn select_source_destination_labels_properties(
     source_query: SelectNodeQuery,
     labels: impl Into<Vec<String>>,
-    properties: HashMap<String, value::Value>,
+    properties: value::ValueMap,
     destination_query: SelectNodeQuery,
   ) -> Self
   {

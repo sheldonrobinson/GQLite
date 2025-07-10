@@ -375,7 +375,11 @@ impl Error
   {
     self
   }
-  pub(crate) fn change_error(self, error: Error) -> Error
+  pub(crate) fn split_error(self) -> (Error, ())
+  {
+    (self, ())
+  }
+  pub(crate) fn make_error(error: Error, _: ()) -> Error
   {
     error
   }
@@ -401,12 +405,13 @@ impl ErrorWithBacktrace
   {
     &self.error
   }
-  pub(crate) fn change_error(self, error: Error) -> Self
+  pub(crate) fn split_error(self) -> (Error, std::backtrace::Backtrace)
   {
-    Self {
-      error,
-      backtrace: self.backtrace,
-    }
+    (self.error, self.backtrace)
+  }
+  pub(crate) fn make_error(error: Error, backtrace: std::backtrace::Backtrace) -> Self
+  {
+    Self { error, backtrace }
   }
 }
 
@@ -526,10 +531,11 @@ pub(crate) fn parse_int_error_to_compile_error<'a>(
 macro_rules! map_error {
   ($err:expr, $source:pat => $destination:expr) => {{
     use crate::error::*;
-    match $err.error()
+    let (error, meta) = $err.split_error();
+    match error
     {
-      $source => $err.change_error($destination.into()),
-      _ => $err,
+      $source => ErrorType::make_error($destination.into(), meta),
+      o => ErrorType::make_error(o, meta),
     }
   }};
 }

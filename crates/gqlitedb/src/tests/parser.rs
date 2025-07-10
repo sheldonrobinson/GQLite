@@ -63,3 +63,10 @@ fn test_parse_match_count()
   let ast = parse("MATCH (a) RETURN count(*)").unwrap();
   compare_ast(ast, ast::match_count());
 }
+
+#[test]
+fn test_parse_aggregation()
+{
+  let ast = parse("MATCH (n) RETURN n.name, count(n.num)").unwrap();
+  compare_ast(ast, ast::aggregation());
+}

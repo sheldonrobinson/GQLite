@@ -830,7 +830,6 @@ pub(crate) fn eval_update_property<TStore: store::Store>(
     value::Value::Edge(e) => e.properties.into(),
     _ => value,
   };
-  use crate::value::ValueMapExtension;
   let mut piter = path.iter();
   match var
   {
@@ -906,6 +905,46 @@ fn compute_order_by(
     .unwrap_or(std::cmp::Ordering::Equal)
 }
 
+#[derive(Debug, Default, Clone, Hash, PartialEq)]
+struct RowKey(value_table::Row);
+
+impl Eq for RowKey {}
+
+fn create_aggregations_states(
+  variables: &Vec<&instructions::RWExpression>,
+  parameters: &crate::value::ValueMap,
+) -> Result<Vec<HashMap<usize, Box<dyn aggregators::AggregatorState>>>>
+{
+  variables
+    .iter()
+    .map(|rw_expr| {
+      rw_expr
+        .aggregations
+        .iter()
+        .map(|(name, agg)| {
+          let mut stack = Stack::default();
+
+          eval_instructions(
+            &mut stack,
+            &value_table::Row::default(),
+            &agg.init_instructions,
+            parameters,
+          )?;
+          let state = agg.aggregator.create(
+            stack
+              .to_vec()
+              .into_iter()
+              .map(|v| v.try_into())
+              .collect::<Result<_>>()?,
+          )?;
+
+          Ok((name.to_owned(), state))
+        })
+        .collect::<Result<HashMap<_, _>>>()
+    })
+    .collect::<Result<Vec<_>>>()
+}
+
 fn compute_return_with_table(
   variables: Vec<&instructions::RWExpression>,
   filter: &instructions::Instructions,
@@ -919,41 +958,45 @@ fn compute_return_with_table(
   // Compute table
   if variables.iter().any(|v| v.aggregations.len() > 0)
   {
-    // Initialise aggregation states
-    let mut aggregations_states: Vec<HashMap<usize, Box<dyn aggregators::AggregatorState>>> =
-      variables
+    // 1) For each row, compute non-aggregated columns, based on those columns, select a vector of aggregator states. and update them
+
+    let mut aggregation_table =
+      HashMap::<RowKey, Vec<HashMap<usize, Box<dyn aggregators::AggregatorState>>>>::default();
+
+    for row in input_table.into_row_iter()
+    {
+      // a) compute non-aggregated columns
+      let mut row = row.extended(variables_sizes.total_size())?;
+      let out_row = variables
         .iter()
         .map(|rw_expr| {
-          rw_expr
-            .aggregations
-            .iter()
-            .map(|(name, agg)| {
-              let mut stack = Stack::default();
-
-              eval_instructions(
-                &mut stack,
-                &value_table::Row::default(),
-                &agg.init_instructions,
-                parameters,
-              )?;
-              let state = agg.aggregator.create(
-                stack
-                  .to_vec()
-                  .into_iter()
-                  .map(|v| v.try_into())
-                  .collect::<Result<_>>()?,
-              )?;
-
-              Ok((name.to_owned(), state))
-            })
-            .collect::<Result<HashMap<_, _>>>()
+          if rw_expr.aggregations.len() > 0
+          {
+            Ok(value::Value::Null)
+          }
+          else
+          {
+            assert_eq!(rw_expr.aggregations.len(), 0);
+            let mut stack = Stack::default();
+            eval_instructions(&mut stack, &row, &rw_expr.instructions, &parameters)?;
+            let value: value::Value = stack.try_pop_into()?;
+            row.set(rw_expr.col_id, value.to_owned())?;
+            Ok(value)
+          }
         })
-        .collect::<Result<Vec<_>>>()?;
-
-    // Compute aggregations
-    for row in input_table.row_iter()
-    {
-      let row = row.to_extended_row(variables_sizes.total_size())?;
+        .collect::<Result<Row>>()?;
+      // b) initialise aggregations
+      use std::collections::hash_map::Entry;
+      let aggregations_states = match aggregation_table.entry(RowKey(out_row.clone()))
+      {
+        Entry::Occupied(entry) => entry.into_mut(),
+        Entry::Vacant(entry) =>
+        {
+          let aggregations_states = create_aggregations_states(&variables, parameters)?;
+          entry.insert(aggregations_states)
+        }
+      };
+      // c) update aggregations states
       for (rw_expr, aggregation_states) in variables.iter().zip(aggregations_states.iter_mut())
       {
         for (name, agg) in rw_expr.aggregations.iter()
@@ -968,24 +1011,43 @@ fn compute_return_with_table(
         }
       }
     }
-    // Export the end result
-    let mut out_row = value_table::Row::new(Default::default(), variables_sizes.total_size());
-    for (rw_expr, aggregation_states) in variables.iter().zip(aggregations_states.into_iter())
+
+    // Aggregation always return at least once
+    if aggregation_table.is_empty()
     {
-      let mut in_row = input_table.first_row().map_or_else(
-        || Ok(Row::new(Default::default(), variables_sizes.total_size())),
-        |m| m.to_row().extended(variables_sizes.total_size()),
-      )?;
-      for (name, s) in aggregation_states.into_iter()
-      {
-        in_row.set(name, s.finalise()?)?;
-      }
-      let mut stack = Stack::default();
-      eval_instructions(&mut stack, &in_row, &rw_expr.instructions, &parameters)?;
-      let value: value::Value = stack.try_pop_into()?;
-      out_row.set(rw_expr.col_id, value.to_owned())?;
+      let row = Row::new(Default::default(), variables_sizes.total_size());
+      let aggregations_states = create_aggregations_states(&variables, parameters)?;
+      aggregation_table.insert(RowKey(row), aggregations_states);
     }
-    output_table.add_truncated_row(out_row)?;
+
+    // 2) For each vector of aggregator states, compute the final result
+
+    for (row, aggregations_states) in aggregation_table
+    {
+      let mut out_row = value_table::Row::new(Default::default(), variables_sizes.total_size());
+      for (idx, (rw_expr, aggregation_states)) in variables
+        .iter()
+        .zip(aggregations_states.into_iter())
+        .enumerate()
+      {
+        if rw_expr.aggregations.len() == 0
+        {
+          out_row.set(rw_expr.col_id, row.0.get(idx)?.to_owned())?;
+        }
+        else
+        {
+          for (name, s) in aggregation_states.into_iter()
+          {
+            out_row.set(name, s.finalise()?)?;
+          }
+          let mut stack = Stack::default();
+          eval_instructions(&mut stack, &out_row, &rw_expr.instructions, &parameters)?;
+          let value: value::Value = stack.try_pop_into()?;
+          out_row.set(rw_expr.col_id, value.to_owned())?;
+        }
+      }
+      output_table.add_truncated_row(out_row)?;
+    }
   }
   else
   {
@@ -1177,14 +1239,10 @@ pub(crate) fn eval_program<TStore: store::Store>(
       {
         store
           .create_graph(&mut tx, name, false)
-          .map_err(|e| match e
-          {
-            Error::StoreError(StoreError::DuplicatedGraph { graph_name }) =>
-            {
-              RunTimeError::DuplicatedGraph { graph_name }.into()
-            }
-            o => o,
-          })?;
+          .map_err(|e|
+            error::map_error!(e, Error::StoreError(StoreError::DuplicatedGraph { graph_name }) => RunTimeError::DuplicatedGraph {
+              graph_name: graph_name.clone(),
+            } ))?;
         graph_name = name.to_owned();
       }
       instructions::Block::UseGraph { name } =>
@@ -1571,7 +1629,6 @@ pub(crate) fn eval_program<TStore: store::Store>(
               instructions::UpdateOne::RemoveProperty { target, path } =>
               {
                 let var = out_row.get(*target)?;
-                use crate::value::ValueMapExtension;
                 let mut piter = path.iter();
                 match var
                 {

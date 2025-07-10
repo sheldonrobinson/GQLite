@@ -18,9 +18,12 @@ impl CountState
 
 impl AggregatorState for CountState
 {
-  fn next(&mut self, _: crate::value::Value) -> crate::Result<()>
+  fn next(&mut self, value: crate::value::Value) -> crate::Result<()>
   {
-    self.count += 1;
+    if !value.is_null()
+    {
+      self.count += 1;
+    }
     Ok(())
   }
   fn finalise(self: Box<Self>) -> crate::Result<crate::value::Value>

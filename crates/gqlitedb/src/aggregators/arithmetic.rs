@@ -1,22 +1,40 @@
+use std::fmt::Debug;
+
 use super::AggregatorState;
 
 use crate::{error::RunTimeError, value::Value, Result};
 
-#[derive(Debug)]
-struct SumState
+trait Op
 {
-  value: Value,
+  fn op_i64(a: i64, b: i64) -> i64;
+  fn op_f64(a: f64, b: f64) -> f64;
 }
 
-impl SumState
+#[derive(Debug)]
+struct OpState<T>
+where
+  T: Op + Debug,
+{
+  value: Value,
+  _marker: std::marker::PhantomData<T>,
+}
+
+impl<T> OpState<T>
+where
+  T: Op + Debug,
 {
   fn new() -> Result<Self>
   {
-    Ok(Self { value: 0.into() })
+    Ok(Self {
+      value: Value::Null,
+      _marker: Default::default(),
+    })
   }
 }
 
-impl AggregatorState for SumState
+impl<T> AggregatorState for OpState<T>
+where
+  T: Op + Debug,
 {
   fn next(&mut self, value: Value) -> crate::Result<()>
   {
@@ -30,17 +48,23 @@ impl AggregatorState for SumState
       | Value::Map(..)
       | Value::Path(..) => Err(RunTimeError::InvalidBinaryOperands)?,
       Value::Null =>
-      {}
-      Value::Float(lhs) => match value
       {
-        Value::Float(rhs) => self.value = (lhs + rhs).into(),
-        Value::Integer(rhs) => self.value = (lhs + rhs as f64).into(),
+        self.value = value;
+      }
+      Value::Float(state) => match value
+      {
+        Value::Null =>
+        {}
+        Value::Float(new_value) => self.value = T::op_f64(state, new_value).into(),
+        Value::Integer(new_value) => self.value = T::op_f64(state, new_value as f64).into(),
         _ => Err(RunTimeError::InvalidBinaryOperands)?,
       },
-      Value::Integer(lhs) => match value
+      Value::Integer(state) => match value
       {
-        Value::Float(rhs) => self.value = (lhs as f64 + rhs).into(),
-        Value::Integer(rhs) => self.value = (lhs + rhs).into(),
+        Value::Null =>
+        {}
+        Value::Float(new_value) => self.value = T::op_f64(state as f64, new_value).into(),
+        Value::Integer(new_value) => self.value = T::op_i64(state, new_value).into(),
         _ => Err(RunTimeError::InvalidBinaryOperands)?,
       },
     }
@@ -51,5 +75,22 @@ impl AggregatorState for SumState
     Ok(self.value)
   }
 }
+
+#[derive(Debug)]
+struct SumOp;
+
+impl Op for SumOp
+{
+  fn op_f64(a: f64, b: f64) -> f64
+  {
+    a + b
+  }
+  fn op_i64(a: i64, b: i64) -> i64
+  {
+    a + b
+  }
+}
+
+type SumState = OpState<SumOp>;
 
 super::declare_aggregator!(sum, Sum, SumState, () -> i64);

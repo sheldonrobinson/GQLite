@@ -29,7 +29,6 @@ impl From<cmp::Ordering> for Ordering
 
 fn compare_map(lhs: &value::ValueMap, rhs: &value::ValueMap) -> Ordering
 {
-  println!("compare_map({:?}, {:?})", lhs, rhs);
   if lhs.len() == rhs.len()
   {
     lhs
@@ -76,13 +75,6 @@ fn compare_f64(lhs: &f64, rhs: &f64) -> Ordering
 fn compare_node(lhs: &graph::Node, rhs: &graph::Node) -> Ordering
 {
   lhs.key.uuid.cmp(&rhs.key.uuid).into()
-  // println!("compare_node({:?}, {:?})", lhs, rhs);
-  // let labels_cmp = lhs.labels.cmp(&rhs.labels);
-  // match labels_cmp
-  // {
-  //   std::cmp::Ordering::Equal => compare_map(&lhs.properties, &rhs.properties),
-  //   o => o.into(),
-  // }
 }
 
 pub(crate) fn compare(lhs: &value::Value, rhs: &value::Value) -> Ordering

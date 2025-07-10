@@ -81,3 +81,12 @@ fn test_compile_match_count()
   let program = compile(&function_manager, ast::match_count()).unwrap();
   compare_program(program, programs::match_count(&function_manager))
 }
+
+#[test]
+fn test_compile_aggregation()
+{
+  let function_manager = functions::Manager::new();
+
+  let program = compile(&function_manager, ast::aggregation()).unwrap();
+  compare_program(program, programs::aggregation(&function_manager))
+}

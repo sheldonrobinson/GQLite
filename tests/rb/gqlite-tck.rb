@@ -67,23 +67,24 @@ features = [
 ]
 
 expressions = [
-  # boolean
+  # Aggregations
+  'aggregation/Aggregation1', 'aggregation/Aggregation2', 'aggregation/Aggregation3', 'aggregation/Aggregation4', 'aggregation/Aggregation7',
+  # Boolean
   'boolean/Boolean1', 'boolean/Boolean2', 'boolean/Boolean3', 'boolean/Boolean4', 'boolean/Boolean5',
-  # comparison
+  # Comparison
   'comparison/Comparison1', 'comparison/Comparison2',
-  # conditonal
+  # Conditonal
   'conditional/Conditional1', 'conditional/Conditional2',
-  # null
+  # Null
   'null/Null1', 'null/Null2', 'null/Null3',
-  # graph
+  # Graph
   'graph/Graph1', 'graph/Graph2', 'graph/Graph3', 'graph/Graph4', 'graph/Graph5', 'graph/Graph6', 'graph/Graph7', 'graph/Graph9',
-  # list
+  # List
   'list/List1', 'list/List2', 'list/List3', 'list/List4', 'list/List5', 'list/List6', 'list/List7',  'list/List8', 
-  # literals
+  # Literals
   'literals/Literals1', 'literals/Literals2', 'literals/Literals3', 'literals/Literals4', 'literals/Literals5', 'literals/Literals6', 'literals/Literals7', 'literals/Literals8', 
-  # map
+  # Map
   'map/Map1', 'map/Map2', 'map/Map3', 
-
 ]
 
 # In progress
@@ -92,14 +93,16 @@ expressions = [
 # ]
 # expressions = [
 # ]
-# Current dev
+# # Current dev
 # gql = []
 # features = [ ]
 # expressions = [
 # ]
 
 # In progress
-# features = ['create/Create4', 'create/Create6']
+# gql = []
+# features = ['create/Create4', 'create/Create6', 'create/Create5', 'match/Match6', 'remove/Remove3', ]
+# expressions = [ 'aggregation/Aggregation8']
 
 # Regressions 1.1 -> 1.2
 
@@ -107,27 +110,6 @@ expressions = [
 #   # graph, those are parser problems, and will wait for the new nom parser
 #  'comparison/Comparison3' 'comparison/Comparison4',
 # ]
-
-# GQLite 1.x
-
-# Validated
-# gql = ['Graph1']
-
-# expressions = [
-#   # Aggregations
-#   'aggregation/Aggregation1', 'aggregation/Aggregation2', 'aggregation/Aggregation3', 'aggregation/Aggregation4', 'aggregation/Aggregation7',
-#   # graph
-#   'graph/Graph4',
-# ]
-
-# In progress
-# gql = []
-# features = ['create/Create5', 'match/Match6', 'remove/Remove3', ]
-# expressions = [ 'aggregation/Aggregation8']
-# Current dev
-# gql = []
-# features = []
-# expressions = []
 
 # Build arguments
 

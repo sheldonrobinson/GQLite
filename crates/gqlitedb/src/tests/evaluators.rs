@@ -159,3 +159,60 @@ fn test_evaluate_match_count()
     value::array![value::array!["count(*)"], value::array![1]]
   );
 }
+
+#[test]
+fn test_evaluate_aggregation()
+{
+  let store = crate::store::redb::Store::new(crate::tests::get_tmp_file().unwrap()).unwrap();
+  let function_manager = functions::Manager::new();
+  let program = programs::aggregation(&function_manager);
+
+  let nodes = vec![
+    graph::Node {
+      key: graph::Key { uuid: 1 },
+      labels: vec![],
+      properties: value::map!("name" => "a", "num" => 33),
+    },
+    graph::Node {
+      key: graph::Key { uuid: 2 },
+      labels: vec![],
+      properties: value::map!("name" => "a"),
+    },
+    graph::Node {
+      key: graph::Key { uuid: 3 },
+      labels: vec![],
+      properties: value::map!("name" => "b", "num" => 42),
+    },
+  ];
+  let mut tx = store.begin_write().unwrap();
+  store
+    .create_nodes(&mut tx, &"default".to_string(), nodes.iter())
+    .unwrap();
+  tx.close().unwrap();
+  check_stats(&store, None, 3, 0, 0, 5);
+
+  let value = eval_program(&store, &program, Default::default()).unwrap();
+  check_stats(&store, None, 3, 0, 0, 5);
+
+  assert!(
+    value
+      == value::array![
+        value::array!["n.name", "count(n.num)"],
+        value::array!["a", 1],
+        value::array!["b", 1]
+      ]
+      || value
+        == value::array![
+          value::array!["n.name", "count(n.num)"],
+          value::array!["b", 1],
+          value::array!["a", 1]
+        ],
+    "left ({}) == right ({} in any order) failed",
+    value,
+    value::array![
+      value::array!["n.name", "count(n.num)"],
+      value::array!["a", 1],
+      value::array!["b", 1]
+    ],
+  );
+}

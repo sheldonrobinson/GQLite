@@ -22,7 +22,7 @@ pub(crate) trait MutableRowInterface: RowInterface
   fn set_if_unset(&mut self, index: usize, value: value::Value) -> Result<()>;
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Hash, PartialEq)]
 pub(crate) struct Row
 {
   values: Vec<value::Value>,
@@ -141,6 +141,14 @@ impl Into<value::Value> for Row
   fn into(self) -> value::Value
   {
     value::Value::Array(self.values)
+  }
+}
+
+impl FromIterator<value::Value> for Row
+{
+  fn from_iter<I: IntoIterator<Item = value::Value>>(iter: I) -> Self
+  {
+    Row::new(iter.into_iter().collect(), 0)
   }
 }
 
