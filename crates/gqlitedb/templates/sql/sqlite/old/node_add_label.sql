@@ -1,1 +1,0 @@
-INSERT INTO gqlite_/%= _graph_name %/_labels(label, node_id)  SELECT label.value, node.value FROM json_each(?001) label  JOIN json_each(?002) node WHERE node.value IS NOT NULL

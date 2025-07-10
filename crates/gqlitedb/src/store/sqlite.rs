@@ -133,6 +133,12 @@ mod templates
 
   // Graph related templates
   #[derive(Template)]
+  #[template(path = "sql/sqlite/upgrade_graph_from_1_01.sql", escape = "none")]
+  pub(super) struct UpgradeGraphFrom1_01<'a>
+  {
+    pub graph_name: &'a String,
+  }
+  #[derive(Template)]
   #[template(path = "sql/sqlite/graph_create.sql", escape = "none")]
   pub(super) struct GraphCreate<'a>
   {
@@ -257,24 +263,34 @@ impl Store
   {
     use store::Store;
     let connection = Rc::new(rusqlite::Connection::open(path)?);
-
     let s = Self { connection };
 
     let mut tx = s.begin_write()?;
     if s.check_if_table_exists(&mut tx, "gqlite_metadata")?
     {
-      let version: utils::Version = s.get_metadata_value_json(&mut tx, "version")?;
+      // gqlite version 1.1 incorrectly use ' instead of " in the version number
+      let version_raw = s
+        .get_metadata_value::<String>(&mut tx, "version")?
+        .replace("'", "\"");
+      let version: utils::Version = serde_json::from_str(&version_raw)?;
       if version.major != consts::GQLITE_VERSION.major
-        && version.minor != consts::GQLITE_VERSION.minor
+        || version.minor != consts::GQLITE_VERSION.minor
       {
-        return Err(
-          StoreError::IncompatibleVersion {
-            expected: consts::GQLITE_VERSION,
-            actual: version,
-          }
-          .into(),
-        );
+        s.upgrade_database(&mut tx, version)?;
       }
+    }
+    else if !s.check_if_table_exists(&mut tx, "gqlite_metadata")?
+      && s.check_if_table_exists(&mut tx, "gqlite_default_nodes")?
+    {
+      // 1.0 didn't have the metadata table
+      s.upgrade_database(
+        &mut tx,
+        utils::Version {
+          major: 1,
+          minor: 0,
+          patch: 0,
+        },
+      )?;
     }
     else
     {
@@ -288,6 +304,61 @@ impl Store
     s.set_metadata_value_json(&mut tx, "version", &consts::GQLITE_VERSION)?;
     tx.close()?;
     Ok(s)
+  }
+  fn upgrade_database(&self, transaction: &mut TransactionBox, from: utils::Version) -> Result<()>
+  {
+    use crate::store::Store;
+    match (from.major, from.minor)
+    {
+      (1, 0) =>
+      {
+        // Create a metadata table and add the default graph.
+        transaction.get_connection().execute(
+          include_str!("../../templates/sql/sqlite/metadata_create_table.sql"),
+          (),
+        )?;
+        self.set_metadata_value_json(transaction, "graphs", &vec!["default".to_string()])?;
+      }
+      _ =>
+      {}
+    }
+    match (from.major, from.minor)
+    {
+      (1, 0) | (1, 1) =>
+      {
+        // uuid function is needed for upgrade
+        transaction.get_connection().create_scalar_function(
+          "uuid",
+          0,
+          rusqlite::functions::FunctionFlags::SQLITE_UTF8,
+          |_| {
+            let uuid = uuid::Uuid::new_v4();
+            let bytes = uuid.as_bytes(); // [u8; 16]
+            Ok(rusqlite::types::Value::Blob(bytes.to_vec()))
+          },
+        )?;
+
+        for graph in self.graphs_list(transaction)?
+        {
+          transaction.get_connection().execute_batch(
+            templates::UpgradeGraphFrom1_01 { graph_name: &graph }
+              .render()?
+              .as_str(),
+          )?;
+        }
+        transaction.get_connection().execute_batch(include_str!(
+          "../../templates/sql/sqlite/upgrade_from_1_01.sql"
+        ))?;
+        Ok(())
+      }
+      _ => Err(
+        StoreError::IncompatibleVersion {
+          expected: consts::GQLITE_VERSION,
+          actual: from,
+        }
+        .into(),
+      ),
+    }
   }
   /// Check if table exists
   pub(crate) fn check_if_table_exists(
@@ -896,7 +967,7 @@ mod tests
     let version: utils::Version = store.get_metadata_value_json(&mut tx, "version").unwrap();
     assert_eq!(version.major, consts::GQLITE_VERSION.major);
     assert_eq!(version.minor, consts::GQLITE_VERSION.minor);
-    assert_eq!(version.revision, consts::GQLITE_VERSION.revision);
+    assert_eq!(version.patch, consts::GQLITE_VERSION.patch);
     tx.close().unwrap();
     drop(store);
 
@@ -906,7 +977,7 @@ mod tests
     let version: utils::Version = store.get_metadata_value_json(&mut tx, "version").unwrap();
     assert_eq!(version.major, consts::GQLITE_VERSION.major);
     assert_eq!(version.minor, consts::GQLITE_VERSION.minor);
-    assert_eq!(version.revision, consts::GQLITE_VERSION.revision);
+    assert_eq!(version.patch, consts::GQLITE_VERSION.patch);
     tx.close().unwrap();
     drop(store);
   }

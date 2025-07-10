@@ -245,41 +245,41 @@ RSpec.describe "compare tables" do
   end
 end
 
-# module OlderDatabaseHelper
-#   def validate_db(version)
-#     file = get_temp_file()
-#     `cp #{__dir__}/data/test-#{version}.db.xz #{file}.xz; xz -d #{file}.xz`
-#     db = GQLite::Connection.new(filename: file)
-#     nodes = db.execute_oc_query "MATCH (a) RETURN a"
-#     edges = db.execute_oc_query "MATCH ()-[a]->() RETURN a"
+module OlderDatabaseHelper
+  def validate_db(version, backend)
+    file = get_temp_file()
+    `cp #{__dir__}/data/test-#{version}.db.xz #{file}.xz; xz -d #{file}.xz`
+    db = GQLite::Connection.new(filename: file, backend: backend)
+    nodes = db.execute_oc_query "MATCH (a) RETURN a"
+    edges = db.execute_oc_query "MATCH ()-[a]->() RETURN a"
 
-#     nodes_exp = [ ["a"],
-#       [create_node(1, ["A", "E"], {"index"=>0, "name"=>"A"})],
-#       [create_node(2, ["B"], {"index"=>1, "name"=>"B"})],
-#       [create_node(3, ["C", "F"], {"index"=>2, "name"=>"C"})],
-#       [create_node(4, ["D"], {"index"=>3, "name"=>"D"})] ]
-#     edges_exp = [ ["a"],
-#       [create_edge(1, "AB", {"sum"=>1, "name"=>"AB"})],
-#       [create_edge(2, "BC", {"sum"=>3, "name"=>"BC"})],
-#       [create_edge(3, "CD", {"sum"=>5, "name"=>"CD"})],
-#       [create_edge(4, "DA", {"sum"=>3, "name"=>"DA"})] ]
-#     expect(compare_table_in_any_order(nodes_exp, nodes)).to be true
-#     expect(compare_table_in_any_order(edges_exp, edges)).to be true
+    nodes_exp = [ ["a"],
+      [create_node(["A", "E"], {"index"=>0, "name"=>"A"})],
+      [create_node(["B"], {"index"=>1, "name"=>"B"})],
+      [create_node(["C", "F"], {"index"=>2, "name"=>"C"})],
+      [create_node(["D"], {"index"=>3, "name"=>"D"})] ]
+    edges_exp = [ ["a"],
+      [create_edge(["AB"], {"sum"=>1, "name"=>"AB"})],
+      [create_edge(["BC"], {"sum"=>3, "name"=>"BC"})],
+      [create_edge(["CD"], {"sum"=>5, "name"=>"CD"})],
+      [create_edge(["DA"], {"sum"=>3, "name"=>"DA"})] ]
+    expect(compare_table_in_any_order(nodes_exp, nodes, false)).to be true
+    expect(compare_table_in_any_order(edges_exp, edges, false)).to be true
 
-#     nodes_optional = db.execute_oc_query "OPTIONAL MATCH (a:NOT_EXISTING) RETURN a"
+    nodes_optional = db.execute_oc_query "OPTIONAL MATCH (a:NOT_EXISTING) RETURN a"
 
-#     nodes_optional_exp = [ ["a"], [nil]]
+    nodes_optional_exp = [ ["a"], [nil]]
 
-#     expect(compare_table_in_any_order(nodes_optional_exp, nodes_optional)).to be true
-#   end
-# end
+    expect(compare_table_in_any_order(nodes_optional_exp, nodes_optional, false)).to be true
+  end
+end
 
-# RSpec.describe "test opening older database" do
-#   include OlderDatabaseHelper
-#   it "can open 1.0 database" do
-#     validate_db("1.0")
-#   end
-#   it "can open 1.1 database" do
-#     validate_db("1.1")
-#   end
-# end
+RSpec.describe "test opening older database" do
+  include OlderDatabaseHelper
+  it "can open 1.0 (sqlite) database" do
+    validate_db("1.0", "sqlite")
+  end
+  it "can open 1.1 (sqlite) database" do
+    validate_db("1.1", "sqlite")
+  end
+end

@@ -4,15 +4,16 @@
 # This script is used to create a test database to use for testing version to version stability.
 #
 
-if ARGV.size != 1
-  puts "gqlite-create-test-db [version]"
+if ARGV.size != 2
+  puts "gqlite-create-test-db [backend] [version]"
   exit -1
 end
 
 require 'gqlite'
 
-file = "data/test-#{ARGV[0]}.db"
-connection = GQLite::Connection.new(filename: file)
+backend = ARGV[0]
+file = "data/test-#{backend}-#{ARGV[1]}.db"
+connection = GQLite::Connection.new(filename: file, backend: backend)
 
 connection.execute_oc_query <<-QUERY
 

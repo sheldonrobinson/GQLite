@@ -1,1 +1,0 @@
-SELECT label FROM gqlite_/%= _graph_name %/_labels WHERE node_id = ?001

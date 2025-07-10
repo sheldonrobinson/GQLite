@@ -1,1 +1,0 @@
-SELECT properties FROM gqlite_/%= _graph_name %/_nodes WHERE id = ?001
