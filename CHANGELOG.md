@@ -4,6 +4,9 @@
 
 ## [Unreleased] - ReleaseDate
 - Support for USING and multiple graphs.
+- Fix aggregation, with grouping.
+- Add max/min aggregations.
+- Add upgrade from 1.0/1.1.
 
 ## [0.4.0] - 2025-07-09
 - SQLite backend.

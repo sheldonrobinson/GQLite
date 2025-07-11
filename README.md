@@ -25,10 +25,23 @@ To build from source, GQLite requires the [cmake](https://cmake.org/) build syst
 
 Specific installation instructions can be found in the [installation](docs/installation.md) section of the documentation.
 
+Compatibilities
+---------------
+
+This table summarizes the versions used by GQLite. The database version refers to the schema version, with the version in parentheses indicating which version can be opened. The crate version corresponds to the GQLite release that supports that database schema.
+
+| Database Version | GQLite Version | Crate Version |
+|------------------|----------------|---------------|
+| 1.2 (1.1-1.0)    | 1.2            | 0.5.x         |
+| 1.2              | -              | 0.4.x         |
+| -                | -              | 0.1.x-0.3.x   |
+| 1.1 (1.0)        | 1.1            | -             |
+| 1.0              | 1.0            | -             |
+
 Documentation
 -------------
 
-* [GQLite official documentation](docs/main.md)
+* [GQLite official documentation](https://auksys.org/documentation/5/libraries/gqlite/)
 
 Storage Backends
 ----------------
