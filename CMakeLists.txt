@@ -179,6 +179,7 @@ set(GQLITE_CXX_SRC
 add_library(gqlitecpp SHARED ${GQLITE_CXX_SRC} )
 target_link_libraries(gqlitecpp PUBLIC gqlitedb)
 set_property(TARGET gqlitecpp PROPERTY OUTPUT_NAME gqlite)
+set_target_properties(gqlitecpp PROPERTIES VERSION ${GQLITE_VERSION} SOVERSION ${GQLITE_MAJOR_VERSION})
 
 ########################
 ## Install library
@@ -192,7 +193,7 @@ install(FILES include/gqlite-c.h  include/gqlite.h DESTINATION ${INSTALL_INCLUDE
 ########################
 ## Install cmd line tool
 
-INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/gqlite DESTINATION ${INSTALL_BIN_DIR} PERMISSIONS OWNER_EXECUTE GROUP_EXECUTE WORLD_EXECUTE)
+INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/gqlite DESTINATION ${INSTALL_BIN_DIR} PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
 
 ########################
 ## Build python
