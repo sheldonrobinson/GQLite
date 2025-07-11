@@ -7,7 +7,8 @@ require_relative 'cucumber/step_definitions/global'
 options = {
   :abort_on_first_error => false,
   :output_html => false,
-  :output_junit => false
+  :output_junit => false,
+  :backend => "sqlite"
 }
 
 OptionParser.new do |opt|
@@ -15,6 +16,7 @@ OptionParser.new do |opt|
   opt.on('--output-html') { options[:output_html] = true }
   opt.on('--output-junit') { options[:output_junit] = true }
   opt.on('--output-dir OUT') { |o| options[:output_dir] = o}
+  opt.on('--backend BACKEND') { |o| options[:backend] = o}
 end.parse!
 
 if File.directory?('openCypher')
@@ -127,13 +129,11 @@ args = args.concat(%w(--format junit --out)).concat([options[:output_dir]])  if 
 # To st|o| op at first error
 # args = (features + expressions).concat %w(--require cucumber/step_definitions/ --fail-fast)
 
-["sqlite", "redb"].each() do |backend|
-  Global.store_backend = backend
-  begin
-    Cucumber::Cli::Main.new(args).execute!
-  rescue SystemExit => se
-    if se.status != 0
-      exit(se.status)
-    end
+Global.store_backend = options[:backend]
+begin
+  Cucumber::Cli::Main.new(args).execute!
+rescue SystemExit => se
+  if se.status != 0
+    exit(se.status)
   end
 end

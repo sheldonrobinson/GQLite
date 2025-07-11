@@ -296,7 +296,8 @@ if(RSPEC_FOUND)
 endif()
 
 if(CUCUMBER_FOUND)
-  add_test(NAME gqlite-rb-tck COMMAND ${Ruby_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/rb/gqlite-tck.rb ${GQLITE_TCK_EXTRA_ARGS} --output-dir ${CMAKE_BINARY_DIR}/Testing/junit WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests/rb/)
+  add_test(NAME gqlite-rb-tck-sqlite  COMMAND ${Ruby_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/rb/gqlite-tck.rb --backend sqlite ${GQLITE_TCK_EXTRA_ARGS} --output-dir ${CMAKE_BINARY_DIR}/Testing/junit/sqlite WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests/rb/)
+  add_test(NAME gqlite-rb-tck-redb    COMMAND ${Ruby_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/rb/gqlite-tck.rb --backend redb   ${GQLITE_TCK_EXTRA_ARGS} --output-dir ${CMAKE_BINARY_DIR}/Testing/junit/redb WORKING_DIRECTORY   ${CMAKE_CURRENT_SOURCE_DIR}/tests/rb/)
 endif()
 
 if(Python3_FOUND AND PYTHON3_CFFI_FOUND)
