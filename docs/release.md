@@ -16,7 +16,20 @@ How to release gqlite
 
   Test gem:
 ```bash
+docker run -it -v `pwd`/pkg:/pkg cyloncore/ci:ruby bash
+gem install /pkg/gqlite-*gem
+irb
+require 'gqlite'
+c = GQLite::Connection.new filename: "testdb"
+c.execute_oc_query "CREATE (n) RETURN n"
+``````
+
+Alternatively, using any ruby image:
+
+```bash
 docker run -it -v `pwd`/pkg:/pkg ruby:3.1 bash
+apt update
+apt install libclang-dev
 gem install /pkg/gqlite-*gem
 irb
 require 'gqlite'

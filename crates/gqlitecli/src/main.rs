@@ -13,12 +13,12 @@ To execute a query, write the query and end it with a ';'"
 
 fn main_loop(rl: &mut rustyline::DefaultEditor) -> rustyline::Result<()>
 {
-  let mut connection: Option<gqlitedb::Connection> = None;
+  let mut connection: Option<gqlitedb::ConnectionServer> = None;
   let mut args = std::env::args();
   args.next(); // remove program name
   if let Some(filename) = args.next()
   {
-    let connection_res = gqlitedb::Connection::open(filename, gqlitedb::ValueMap::new());
+    let connection_res = gqlitedb::ConnectionServer::open(filename, gqlitedb::ValueMap::new());
     match connection_res
     {
       Ok(c) =>
@@ -53,7 +53,7 @@ fn main_loop(rl: &mut rustyline::DefaultEditor) -> rustyline::Result<()>
               println!("Missing argument to .open");
             }
             let connection_res =
-              gqlitedb::Connection::open(splited_line[1], gqlitedb::ValueMap::new());
+              gqlitedb::ConnectionServer::open(splited_line[1], gqlitedb::ValueMap::new());
             match connection_res
             {
               Ok(c) =>

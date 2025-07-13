@@ -1,0 +1,21 @@
+[package]
+name = "gqliterb"
+description = "Crate with the Ruby bindings for GQLite."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+gqlitedb = { workspace = true, features = ["_connection_server", "_backtrace"] }
+magnus = "0.7"
+
+[build-dependencies]
+rb-sys-env = "0.2"
+
+[package.metadata.release]
+release = false

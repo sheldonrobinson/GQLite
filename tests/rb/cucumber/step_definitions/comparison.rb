@@ -57,6 +57,13 @@ def compare(a,b, ignore_list_order)
       else
         return false
       end
+    elsif a.class == Float
+      case b
+      when String
+        return a.nan? && b == "NaN"
+      else
+        return false
+      end
     else
       return false
     end
@@ -90,7 +97,6 @@ def compare_table_in_any_order(actual, expected, ignore_list_order)
       end
     end
     if !match
-      puts("Mo match for #{actual[i]}")
       return false
     end
   end

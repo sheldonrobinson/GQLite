@@ -13,10 +13,12 @@ require 'rubygems/package_task'
 
 GEMSPEC = Gem::Specification.new do |s|
   s.name = "gqlite"
-  s.version = "1.1.0"
+  s.version = "1.2.0"
   s.summary = "Ruby bindings for GQLite, a Graph Query library."
   s.description = <<-DESC
-GQLite is a C++-language library, with a C interface, that implements a small, fast, self-contained, high-reliability, full-featured, Graph Query database engine. The data is stored in a Redb or sqlite database, which the fasted and most used SQL database. This enable to achieve high performance and for application to combine Graph queries with traditional SQL queries.
+GQLite is a Rust-language library, with a C interface, that implements a small, fast, self-contained, high-reliability, full-featured, Graph Query database engine.
+GQLite support multiple database backends, such as SQLite and redb.
+This enable to achieve high performance and for application to combine Graph queries with traditional SQL queries.
 
 GQLite source code is license under the [MIT License](LICENSE) and is free to everyone to use for any purpose. 
 
@@ -50,25 +52,30 @@ end
 
 ```
 
-The documentation for the GQL query language can found in [GQL](https://gitlab.com/gqlite/GQLite/-/blob/docs/gql.md) and for the [API](https://gitlab.com/gqlite/GQLite/-/blob/docs/api.md).
+The documentation for the GQL query language can found in [OpenCypher](https://auksys.org/documentation/5/libraries/gqlite/opencypher/) and for the [API](https://auksys.org/documentation/5/libraries/gqlite/api/).
 
 DESC
   s.authors     = ["Cyrille Berger"]
-  s.files       = %w[lib/gqlite.rb ext/gqlite/gqlite.h ext/gqlite/gqlite-c.h ext/gqlite/gqlite-amalgamate.cpp]
-  s.homepage    = "https://gitlab.com/gqlite/gqlite"
+  s.homepage    = "https://gitlab.com/auksys/gqlite"
   s.license     = "MIT"
-  s.add_dependency "ffi", "~> 1.15"
-  s.extensions = %w[ext/gqlite/extconf.rb]
+  
+  s.files = Dir["lib/**/*.rb", "ext/**/*.{rs,toml,lock,rb}"]
+  s.require_paths = ["lib"]  
+  s.extensions = %w[ext/gqliterb/extconf.rb]
+
+  # needed until rubygems supports Rust support is out of beta
+  s.add_dependency "rb_sys", "~> 0.9.39"
+
+  # only needed when developing or packaging your gem
+  s.add_development_dependency "rake-compiler", "~> 1.2.0"
 end
 
 # Tasks
 
-Rake::ExtensionTask.new "gqlite" do |ext|
-  ext.lib_dir = "lib/gqlite"
-end
-
-task prepare: [] do |t|
-  
+Rake::ExtensionTask.new "gqliterb" do |ext|
+  ext.ext_dir = 'ext/gqliterb'
+  ext.lib_dir = 'lib/gqliterb'
+  ext.name    = 'gqliterb'
 end
 
 Gem::PackageTask.new(GEMSPEC) do |pkg|

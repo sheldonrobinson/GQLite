@@ -3,6 +3,7 @@
 <!-- next-header -->
 
 ## [Unreleased] - ReleaseDate
+- New Ruby bindings.
 
 ## [0.5.1] - 2025-07-15
 - Add experimental connection server, for use in multi-threaded environment.

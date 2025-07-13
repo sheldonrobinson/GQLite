@@ -13,7 +13,7 @@ name = "gqlite"
 path = "src/main.rs"
 
 [dependencies]
-gqlitedb = { workspace = true }
+gqlitedb = { workspace = true, features = ["_connection_server"] }
 rustyline = "16"
 standard_paths = "2.1.0"
 tabled = "0.20"

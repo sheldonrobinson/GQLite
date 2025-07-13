@@ -10,11 +10,12 @@
 ![GQLite logo](logo.png) GQLite
 ===============================
 
-GQLite is a Rust-language library, with a C interface, that implements a small, fast, self-contained, high-reliability, full-featured, Graph Query database engine. The `dev/2` branch contains the new implementation for `GQLite 2.x`, currently released as `gqlitedb 0.x` on (crates.io)[https://crates.io/crates/gqlitedb]. This crate is currently *experimental* and it is recommended to stick with the `GQLite 1.x` branch until further notice.
+GQLite is a Rust-language library, with a C interface, that implements a small, fast, self-contained, high-reliability, full-featured, Graph Query database engine.
+GQLite support multiple database backends, such as SQLite and redb.
 
 GQLite source code is license under the [MIT License](LICENSE) and is free to everyone to use for any purpose. 
 
-The official repositories contains bindings/APIs for C, Python and Ruby.
+The official repositories contains bindings/APIs for C, C++, Python, Ruby and Crystal.
 
 The library is still in its early stage, but it is now fully functional. Development effort has now slowed down and new features are added on a by-need basis. It supports a subset of ISO GQL.
 

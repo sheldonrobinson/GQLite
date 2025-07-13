@@ -12,7 +12,7 @@ repository.workspace = true
 crate-type = ["cdylib", "lib"]
 
 [features]
-default = ["redb", "capi", "sqlite"]
+default = ["redb", "capi", "sqlite", "_connection_server"]
 _backtrace = []
 _connection_server = ["dep:ccutils"]
 capi = []
