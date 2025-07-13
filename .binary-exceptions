@@ -1,3 +1,5 @@
 logo.png
-tests/rb/data/test-1.0.db.xz
-tests/rb/data/test-1.1.db.xz
+tests/rb/data/test-redb-1.2.db.xz
+tests/rb/data/test-sqlite-1.0.db.xz
+tests/rb/data/test-sqlite-1.1.db.xz
+tests/rb/data/test-sqlite-1.2.db.xz

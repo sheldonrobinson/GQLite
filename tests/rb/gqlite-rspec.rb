@@ -248,7 +248,8 @@ end
 module OlderDatabaseHelper
   def validate_db(version, backend)
     file = get_temp_file()
-    `cp #{__dir__}/data/test-#{version}.db.xz #{file}.xz; xz -d #{file}.xz`
+    `cp #{__dir__}/data/test-#{backend}-#{version}.db.xz #{file}.xz; xz -d #{file}.xz`
+    `chmod u+w #{file}`
     db = GQLite::Connection.new(filename: file, backend: backend)
     nodes = db.execute_oc_query "MATCH (a) RETURN a"
     edges = db.execute_oc_query "MATCH ()-[a]->() RETURN a"
@@ -281,5 +282,11 @@ RSpec.describe "test opening older database" do
   end
   it "can open 1.1 (sqlite) database" do
     validate_db("1.1", "sqlite")
+  end
+  it "can open 1.2 (sqlite) database" do
+    validate_db("1.2", "sqlite")
+  end
+  it "can open 1.2 (redb) database" do
+    validate_db("1.2", "redb")
   end
 end

@@ -24,4 +24,6 @@ CREATE (a:A:E {name: 'A', index: 0}), (b:B {name: 'B', index: 1}), (c:C:F {name:
        (d)-[:DA { name: 'DA', sum: 3 }]->(a)
 QUERY
 
+connection.close()
+
 `xz -z #{file}; chmod a-w #{file}.xz`

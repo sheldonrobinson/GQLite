@@ -58,7 +58,9 @@ module GQLite
         raise Error.new "No connection backend was selected."
       end
       ObjectSpace.define_finalizer @dbhandle, proc {|id|
-        CApi.call_function :gqlite_connection_destroy, @dbhandle
+        unless @dbhandle.nil?
+          CApi.call_function :gqlite_connection_destroy, @dbhandle
+        end
       }
     end
     def execute_oc_query(query, bindings: nil)
@@ -77,6 +79,10 @@ module GQLite
       end
       CApi.call_function :gqlite_value_destroy, ret
       return val
+    end
+    def close()
+      CApi.call_function :gqlite_connection_destroy, @dbhandle
+      @dbhandle = nil
     end
   end
 end
