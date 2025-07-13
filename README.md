@@ -38,6 +38,21 @@ This table summarizes the versions used by GQLite. The database version refers t
 | 1.1 (1.0)        | 1.1            | -             |
 | 1.0              | 1.0            | -             |
 
+Project Guarantees
+------------------
+
+- **Forward-Compatible Database Format**  
+  Databases created with older versions of GQLite can be opened by newer versions without requiring manual migration. This guarantee applies strictly to the on-disk format managed by GQLite. Compatibility is maintained across patch releases within the same minor version.
+
+- **Query Language Stability**  
+  Valid queries are expected to remain functional across minor releases. Specifically, OpenCypher queries will be supported throughout the entire 1.x series. If the introduction of GQL-specific features results in breaking changes, these will be deferred to the 2.x series or later.
+
+- **Semantic Versioning Compliance**  
+  The `gqlitedb` crate follows [Semantic Versioning](https://semver.org/), and its public API stability is checked using the [`cargo-semver-checks`](https://github.com/obi1kenobi/cargo-semver-checks) tool, subject to its limitations. Note that `gqlitedb` has its own versioning and release cycle, independent of the main `GQLite` binary. 
+
+  For maximum compatibility across `GQLite` versions, the recommended interface is the C API. The Ruby and Python APIs are also designed to remain stable across GQLite versions.
+
+
 Documentation
 -------------
 
