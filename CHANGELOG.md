@@ -3,6 +3,8 @@
 <!-- next-header -->
 
 ## [Unreleased] - ReleaseDate
+
+## [0.5.0] - 2025-07-13
 - Support for USING and multiple graphs.
 - Fix aggregation, with grouping.
 - Add max/min aggregations.
@@ -59,7 +61,8 @@
 - `persy` backend.
 
 <!-- next-url -->
-[Unreleased]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.4.0...dev/2
+[Unreleased]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.5.0...dev/2
+[0.5.0]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.4.0...gqlitedb-v0.5.0
 [0.4.0]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.3.4...gqlitedb-v0.4.0
 [0.3.4]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.3.3...gqlitedb-v0.3.4
 [0.3.3]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.3.2...gqlitedb-v0.3.3
