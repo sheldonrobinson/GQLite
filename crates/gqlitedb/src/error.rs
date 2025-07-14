@@ -252,7 +252,7 @@ pub enum InternalError
     all_variables: Vec<String>,
   },
   #[error("A generic error occured {0}.")]
-  GenericStdError(#[from] Box<dyn std::error::Error>),
+  GenericStdError(#[from] Box<dyn std::error::Error + Sync + Send>),
   #[error("Not a write transaction")]
   NotWriteTransaction,
   #[error("Missing metadata {key}")]
@@ -366,6 +366,12 @@ pub enum Error
   /// Error that should not occurs and most likely correspond to a bug
   #[error("Internal: {0}")]
   Internal(#[from] InternalError),
+}
+
+fn assert_send_sync<T: Send + Sync>() {}
+fn _check_error_send_sync()
+{
+  assert_send_sync::<Error>();
 }
 
 impl Error

@@ -3,6 +3,7 @@
 <!-- next-header -->
 
 ## [Unreleased] - ReleaseDate
+- Add experimental connection server, for use in multi-threaded environment.
 - Export Node/Edge/Path.
 
 ## [0.5.0] - 2025-07-13

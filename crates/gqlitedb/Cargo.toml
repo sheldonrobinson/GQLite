@@ -14,6 +14,7 @@ crate-type = ["cdylib", "lib"]
 [features]
 default = ["redb", "capi", "sqlite"]
 _backtrace = []
+_connection_server = ["dep:ccutils"]
 capi = []
 redb = ["dep:redb"]
 _pgql = ["dep:pgrx"]
@@ -26,6 +27,7 @@ sqlite = ["dep:rusqlite", "dep:askama"]
 
 [dependencies]
 askama = { version = "0.14", optional = true }
+ccutils = { version = "0.3", features = ["servers"], optional = true }
 ciborium = "0.2"
 itertools = "0.14"
 pgrx = { version = "0.15", optional = true }

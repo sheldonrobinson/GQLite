@@ -15,6 +15,8 @@ mod aggregators;
 mod capi;
 mod compiler;
 mod connection;
+#[cfg(feature = "_connection_server")]
+mod connection_server;
 mod consts;
 mod error;
 mod functions;
