@@ -34,6 +34,7 @@ pub(crate) mod tests;
 pub use {
   connection::Connection,
   error::{CompileTimeError, Error, RunTimeError, StoreError},
+  graph::{Edge, Node, Path},
   value::{Value, ValueMap},
 };
 

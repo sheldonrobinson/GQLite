@@ -64,13 +64,41 @@ impl From<Key> for u128
   }
 }
 
+/// Represent a Node in the graph
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, Clone, Hash)]
 #[serde(tag = "type", rename = "node")]
 pub struct Node
 {
-  pub key: Key,
-  pub labels: Vec<String>,
-  pub properties: value::ValueMap,
+  /// uuid for the Node.
+  pub(crate) key: Key,
+  /// Vector of labels.
+  pub(crate) labels: Vec<String>,
+  /// Properties.
+  pub(crate) properties: value::ValueMap,
+}
+
+impl Node
+{
+  /// uuid for the Node.
+  pub fn key(&self) -> Key
+  {
+    self.key
+  }
+  /// Vector of labels.
+  pub fn labels(&self) -> &Vec<String>
+  {
+    &self.labels
+  }
+  /// Properties.
+  pub fn properties(&self) -> &value::ValueMap
+  {
+    &self.properties
+  }
+  /// Unpack Node in key, labels and properties.
+  pub fn unpack(self) -> (Key, Vec<String>, value::ValueMap)
+  {
+    (self.key, self.labels, self.properties)
+  }
 }
 
 impl std::fmt::Display for Node
@@ -90,17 +118,47 @@ impl std::fmt::Display for Node
   }
 }
 
+/// Directed edge of the graph.
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, Clone, Hash)]
 #[serde(tag = "type", rename = "edge")]
 pub struct Edge
 {
-  pub key: Key,
+  /// uuid for the Edge.
+  pub(crate) key: Key,
   #[serde(skip_serializing)]
-  pub source: Node,
+  /// source node for the Edge, this property is used internally by the engine, but is not exported in query results, and not part of the public API.
+  pub(crate) source: Node,
+  /// destination node for the Edge, this property is used internally by the engine, but is not exported in query results, and not part of the public API.
   #[serde(skip_serializing)]
-  pub destination: Node,
-  pub labels: Vec<String>,
-  pub properties: value::ValueMap,
+  pub(crate) destination: Node,
+  /// Labels for the Edge.
+  pub(crate) labels: Vec<String>,
+  /// Properties for the Edge.
+  pub(crate) properties: value::ValueMap,
+}
+
+impl Edge
+{
+  /// uuid for the Node.
+  pub fn key(&self) -> Key
+  {
+    self.key
+  }
+  /// Vector of labels.
+  pub fn labels(&self) -> &Vec<String>
+  {
+    &self.labels
+  }
+  /// Properties.
+  pub fn properties(&self) -> &value::ValueMap
+  {
+    &self.properties
+  }
+  /// Unpack Edge in key, labels and properties.
+  pub fn unpack(self) -> (Key, Vec<String>, value::ValueMap)
+  {
+    (self.key, self.labels, self.properties)
+  }
 }
 
 impl std::fmt::Display for Edge
@@ -127,15 +185,61 @@ impl Into<Path> for Edge
   }
 }
 
+/// Path in the graph.
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, Clone, Hash)]
 #[serde(tag = "type", rename = "path")]
 pub struct Path
 {
-  pub key: Key,
-  pub source: Node,
-  pub destination: Node,
-  pub labels: Vec<String>,
-  pub properties: value::ValueMap,
+  /// uuid for the path.
+  pub(crate) key: Key,
+  /// source node for the path.
+  pub(crate) source: Node,
+  /// destination node for the path.
+  pub(crate) destination: Node,
+  /// Labels for the path.
+  pub(crate) labels: Vec<String>,
+  /// Properties for the path.
+  pub(crate) properties: value::ValueMap,
+}
+
+impl Path
+{
+  /// uuid for the Node.
+  pub fn key(&self) -> Key
+  {
+    self.key
+  }
+  /// uuid for the Node.
+  pub fn source(&self) -> &Node
+  {
+    &self.source
+  }
+  /// uuid for the Node.
+  pub fn destination(&self) -> &Node
+  {
+    &self.destination
+  }
+  /// Vector of labels.
+  pub fn labels(&self) -> &Vec<String>
+  {
+    &self.labels
+  }
+  /// Properties.
+  pub fn properties(&self) -> &value::ValueMap
+  {
+    &self.properties
+  }
+  /// Unpack Node in key, labels and properties.
+  pub fn unpack(self) -> (Key, Node, Vec<String>, value::ValueMap, Node)
+  {
+    (
+      self.key,
+      self.source,
+      self.labels,
+      self.properties,
+      self.destination,
+    )
+  }
 }
 
 impl std::fmt::Display for Path

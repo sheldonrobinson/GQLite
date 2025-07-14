@@ -3,6 +3,7 @@
 <!-- next-header -->
 
 ## [Unreleased] - ReleaseDate
+- Export Node/Edge/Path.
 
 ## [0.5.0] - 2025-07-13
 - Support for USING and multiple graphs.

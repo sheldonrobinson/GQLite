@@ -434,8 +434,10 @@ impl std::fmt::Display for Value
   }
 }
 
+/// Trait to return a reference to the underlying type
 pub(crate) trait ValueTryIntoRef<T>
 {
+  /// Return a reference to T
   fn try_into_ref<'a>(&'a self) -> Result<&'a T, Error>;
 }
 
