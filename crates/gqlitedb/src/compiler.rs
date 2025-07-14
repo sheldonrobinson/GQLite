@@ -51,11 +51,8 @@ impl Compiler
     aggregations: &mut Option<&mut Vec<(value_table::ColId, RWAggregation)>>,
   ) -> Result<()>
   {
-    expression_analyser::ExpressionInfo::analyse(
-      &self.variables_manager,
-      &self.function_manager,
-      &expression,
-    )?;
+    expression_analyser::Analyser::new(&self.variables_manager, &self.function_manager)
+      .analyse(&expression)?;
 
     let expr = match expression
     {
@@ -767,11 +764,8 @@ impl Compiler
     // Compile where expression
     if let Some(where_expression) = where_expression
     {
-      let ei = expression_analyser::ExpressionInfo::analyse(
-        &self.variables_manager,
-        &self.function_manager,
-        where_expression,
-      )?;
+      let ei = expression_analyser::Analyser::new(&self.variables_manager, &self.function_manager)
+        .analyse(where_expression)?;
       if ei.aggregation_result
       {
         return Err(CompileTimeError::InvalidAggregation.into());
@@ -834,11 +828,8 @@ impl Compiler
     let mut filter = Instructions::new();
     if let Some(where_expression) = where_expression
     {
-      let ei = expression_analyser::ExpressionInfo::analyse(
-        &self.variables_manager,
-        &self.function_manager,
-        where_expression,
-      )?;
+      let ei = expression_analyser::Analyser::new(&self.variables_manager, &self.function_manager)
+        .analyse(where_expression)?;
       if ei.aggregation_result
       {
         return Err(CompileTimeError::InvalidAggregation.into());
@@ -855,11 +846,8 @@ impl Compiler
 
   fn check_for_constant_integer_expression(&mut self, x: &ast::Expression) -> Result<()>
   {
-    let ei = expression_analyser::ExpressionInfo::analyse(
-      &self.variables_manager,
-      &self.function_manager,
-      &x,
-    )?;
+    let ei = expression_analyser::Analyser::new(&self.variables_manager, &self.function_manager)
+      .analyse(&x)?;
     if !ei.constant
     {
       Err(error::CompileTimeError::NonConstantExpression.into())
@@ -1017,11 +1005,9 @@ pub(crate) fn compile(
             .iter()
             .map(|expr| {
               let mut instructions = Instructions::new();
-              let ei = expression_analyser::ExpressionInfo::analyse(
-                &compiler.variables_manager,
-                function_manager,
-                expr,
-              )?;
+              let ei =
+                expression_analyser::Analyser::new(&compiler.variables_manager, function_manager)
+                  .analyse(expr)?;
               match ei.expression_type
               {
                 expression_analyser::ExpressionType::Node

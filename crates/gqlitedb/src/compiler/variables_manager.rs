@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::prelude::*;
 
-use compiler::expression_analyser::{self, ExpressionInfo, ExpressionType};
+use compiler::expression_analyser::{self, ExpressionType};
 use parser::ast;
 
 fn unknown_variable_error(name: &ast::VariableIdentifier) -> ErrorType
@@ -271,7 +271,7 @@ impl VariablesManager
       {
         if let Some(props) = &node.properties
         {
-          ExpressionInfo::analyse(&self, &self.function_manager, &props)?;
+          expression_analyser::Analyser::new(&self, &self.function_manager).analyse(&props)?;
         }
         self.variables.insert(
           var_id.clone(),
@@ -313,7 +313,7 @@ impl VariablesManager
       {
         if let Some(props) = &edge.properties
         {
-          ExpressionInfo::analyse(self, &self.function_manager, &props)?;
+          expression_analyser::Analyser::new(&self, &self.function_manager).analyse(&props)?;
         }
         self.variables.insert(
           var_id.clone(),
@@ -507,11 +507,8 @@ impl VariablesManager
     named_expression: &ast::NamedExpression,
   ) -> Result<usize>
   {
-    let expression_info = expression_analyser::ExpressionInfo::analyse(
-      self,
-      &self.function_manager,
-      &named_expression.expression,
-    )?;
+    let expression_info = expression_analyser::Analyser::new(&self, &self.function_manager)
+      .analyse(&named_expression.expression)?;
     let col_id = self
       .variables
       .get(&named_expression.identifier)
