@@ -1,0 +1,15 @@
+[package]
+name = "gqlitepy"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+[lib]
+name = "gqlitepy"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.25", features = ["extension-module"] }
+gqlitedb = { workspace = true, features = ["_connection_server"] }

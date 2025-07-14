@@ -125,28 +125,6 @@ set_package_properties(Cucumber PROPERTIES
     PURPOSE "Used for running the conformance test suite.")
 
 ########################
-## Find cffi
-
-if(Python3_FOUND)
-  execute_process(
-    COMMAND
-      ${Python3_EXECUTABLE} "-c" "import cffi"
-    RESULT_VARIABLE PYTHON3_CFFI_STATUS
-    ERROR_QUIET
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-    )
-endif()
-
-if(NOT PYTHON3_CFFI_STATUS)
-  set(PYTHON3_CFFI_FOUND TRUE)
-endif()
-
-set_package_properties(PYTHON3_CFFI PROPERTIES
-    DESCRIPTION "Python3's cffi package"
-    TYPE OPTIONAL
-    PURPOSE "Used for python3 bindings.")
-
-########################
 ## Find Crystal
 
 find_package(Crystal)
@@ -198,18 +176,12 @@ INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/gqlite DESTINATION ${INSTALL_BIN_DIR} 
 ########################
 ## Build python
 
-if(Python3_FOUND AND PYTHON3_CFFI_FOUND)
+if(Python3_FOUND)
   set(Python3_SHORT_VERSION "${Python3_VERSION_MAJOR}.${Python3_VERSION_MINOR}")
 
   set(PYTHON_SITE_PACKAGES_INSTALL_DIR ${INSTALL_LIB_DIR}/python${Python3_SHORT_VERSION}/dist-packages/)
-
-  add_custom_target(python3_ffi_lib ALL
-      COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/bindings/python/build-ffi.py ${CMAKE_CURRENT_SOURCE_DIR}
-      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-      DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/bindings/python/build-ffi.py gqlitecpp
-  )
-  install(FILES ${CMAKE_CURRENT_BINARY_DIR}/__c_gqlite.cpython-${Python3_VERSION_MAJOR}${Python3_VERSION_MINOR}-x86_64-linux-gnu.so DESTINATION ${PYTHON_SITE_PACKAGES_INSTALL_DIR}/)
-  install(DIRECTORY bindings/python/gqlite DESTINATION ${PYTHON_SITE_PACKAGES_INSTALL_DIR})
+  install(DIRECTORY bindings/python/gqlitepy/gqlite DESTINATION ${PYTHON_SITE_PACKAGES_INSTALL_DIR})
+  install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libgqlitepy.so DESTINATION ${PYTHON_SITE_PACKAGES_INSTALL_DIR}/gqlite RENAME gqlite.so)
 endif()
 
 ########################
@@ -268,11 +240,11 @@ add_custom_target(cargo_package_gqliterb
 
 # For Python
 
-file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/dists/python/gqlite)
-file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/dists/python/src)
-file(CREATE_LINK ${CMAKE_CURRENT_SOURCE_DIR}/bindings/python/gqlite/__init__.py ${CMAKE_CURRENT_BINARY_DIR}/dists/python/gqlite/__init__.py)
-file(CREATE_LINK ${CMAKE_CURRENT_SOURCE_DIR}/bindings/python/build-ffi.py ${CMAKE_CURRENT_BINARY_DIR}/dists/python/build-ffi.py)
-file(CREATE_LINK ${CMAKE_CURRENT_SOURCE_DIR}/include/gqlite-c.h ${CMAKE_CURRENT_BINARY_DIR}/dists/python/src/gqlite-c.h)
+# file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/dists/python/gqlite)
+# file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/dists/python/src)
+# file(CREATE_LINK ${CMAKE_CURRENT_SOURCE_DIR}/bindings/python/gqlite/__init__.py ${CMAKE_CURRENT_BINARY_DIR}/dists/python/gqlite/__init__.py)
+# file(CREATE_LINK ${CMAKE_CURRENT_SOURCE_DIR}/bindings/python/build-ffi.py ${CMAKE_CURRENT_BINARY_DIR}/dists/python/build-ffi.py)
+# file(CREATE_LINK ${CMAKE_CURRENT_SOURCE_DIR}/include/gqlite-c.h ${CMAKE_CURRENT_BINARY_DIR}/dists/python/src/gqlite-c.h)
 
 # Dist target
 

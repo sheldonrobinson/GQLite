@@ -83,7 +83,7 @@ semver:
   stage: postcheck
   image: cyloncore/ci:debian
   script:
-    - cargo semver-checks --exclude gqliterb
+    - cargo semver-checks --exclude gqliterb --exclude gqlitepy
   needs:
     - job: "debian:build"
       artifacts: true
@@ -107,6 +107,8 @@ dists:
     - rake gem
     - popd
     - popd
+    - pushd bindings/python/gqlitepy
+    - CARGO_TARGET_DIR=`pwd` maturin sdist
   needs:
     - job: "debian:build"
       artifacts: true
@@ -115,6 +117,7 @@ dists:
     expire_in: 30 days
     paths:
       - build/dists/ruby/pkg/gqlite-*.gem
+      - bindings/python/gqlitepy/wheels/gqlitedb-*.tar.gz
 
 test_ruby_gem:
   stage: postcheck
@@ -122,6 +125,16 @@ test_ruby_gem:
   script:
     - gem install build/dists/ruby/pkg/gqlite-*.gem
     - rspec tests/rb/gqlite-rspec.rb
+  needs:
+    - job: "dists"
+      artifacts: true
+
+test_python_src_wheels:
+  stage: postcheck
+  image: python:3.9
+  script:
+    - pip3 install bindings/python/gqlitepy/wheels/gqlitedb-*.tar.gz
+    - python3 tests/py/python-unittest.py
   needs:
     - job: "dists"
       artifacts: true

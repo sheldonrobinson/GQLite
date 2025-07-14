@@ -1,0 +1,25 @@
+[build-system]
+requires = ["maturin>=1.9,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "gqlitedb"
+version = "1.2.0"
+requires-python = ">=3.9"
+authors = [{ name = "Cyrille Berger" }]
+description = "Python bindings for GQLite, a Graph Query library"
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dynamic = ["version"]
+[tool.maturin]
+features = ["pyo3/extension-module"]
+module-name = "gqlite"
+
+[project.urls]
+"Homepage" = "https://gitlab.com/auksys/gqlite"
+"Bug Tracker" = "https://github.com/auksys/gqlite/issues"

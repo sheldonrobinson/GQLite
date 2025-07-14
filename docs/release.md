@@ -45,17 +45,16 @@ c.execute_oc_query "CREATE (n) RETURN n"
 - Python 
 
 ```bash
-  cd dists/python
-  python3 setup.py check
-  python3 setup.py sdist
+  cd bindings/python/gqlitepy
+  CARGO_TARGET_DIR=`pwd` maturin sdist
 ```
   Usefull documentation:
    - https://betterscientificsoftware.github.io/python-for-hpc/tutorials/python-pypi-packaging/
 
   Testing:
 ```
-docker run -it -v `pwd`/dist:/dist python:3.7 bash
-pip3 install /dist/gqlite...
+docker run -it -v `pwd`/wheels:/wheels python:3.8 bash
+pip3 install /wheels/gqlite*
 
 python3
 import gqlite

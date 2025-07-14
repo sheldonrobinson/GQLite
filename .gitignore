@@ -1,3 +1,4 @@
 testdb
 tests/rb/openCypher*
 target
+bindings/python/gqlitepy/wheels
