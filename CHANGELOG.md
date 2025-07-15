@@ -3,6 +3,8 @@
 <!-- next-header -->
 
 ## [Unreleased] - ReleaseDate
+
+## [0.5.1] - 2025-07-15
 - Add experimental connection server, for use in multi-threaded environment.
 - Export Node/Edge/Path.
 
@@ -63,7 +65,8 @@
 - `persy` backend.
 
 <!-- next-url -->
-[Unreleased]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.5.0...dev/2
+[Unreleased]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.5.1...dev/2
+[0.5.1]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.5.0...gqlitedb-v0.5.1
 [0.5.0]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.4.0...gqlitedb-v0.5.0
 [0.4.0]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.3.4...gqlitedb-v0.4.0
 [0.3.4]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.3.3...gqlitedb-v0.3.4
