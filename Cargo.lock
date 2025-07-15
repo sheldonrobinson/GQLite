@@ -222,13 +222,14 @@ dependencies = [
 
 [[package]]
 name = "ccutils"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9a836a2b54e4f28e81eeafae709c3212aad617c3db7ce935ae0fbc0e1be23df3"
+checksum = "2db0c6275ea2bc76400d552e7974ec58b8ae58b76f3e64defbb82ae6c2acffdb"
 dependencies = [
  "better_default",
  "futures",
  "log",
+ "rand",
 ]
 
 [[package]]

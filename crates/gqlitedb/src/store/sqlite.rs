@@ -962,7 +962,8 @@ mod tests
   #[test]
   fn test_sqlite_metadata()
   {
-    let store = super::Store::new(crate::tests::get_tmp_file().unwrap()).unwrap();
+    let temp_file = crate::tests::create_tmp_file();
+    let store = super::Store::new(temp_file.path()).unwrap();
     let mut tx = store.begin_read().unwrap();
     let version: utils::Version = store.get_metadata_value_json(&mut tx, "version").unwrap();
     assert_eq!(version.major, consts::GQLITE_VERSION.major);
@@ -972,7 +973,7 @@ mod tests
     drop(store);
 
     // Try to reopen
-    let store = super::Store::new(crate::tests::get_tmp_file().unwrap()).unwrap();
+    let store = super::Store::new(temp_file.path()).unwrap();
     let mut tx = store.begin_read().unwrap();
     let version: utils::Version = store.get_metadata_value_json(&mut tx, "version").unwrap();
     assert_eq!(version.major, consts::GQLITE_VERSION.major);

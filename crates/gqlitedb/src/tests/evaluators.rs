@@ -8,7 +8,8 @@ use crate::{
 #[test]
 fn test_evaluate_simple_create_node()
 {
-  let store = crate::store::redb::Store::new(crate::tests::get_tmp_file().unwrap()).unwrap();
+  let temp_file = crate::tests::create_tmp_file();
+  let store = crate::store::redb::Store::new(temp_file.path()).unwrap();
 
   eval_program(&store, &programs::simple_create(), Default::default()).unwrap();
   check_stats(&store, None, 1, 0, 0, 0);
@@ -17,7 +18,8 @@ fn test_evaluate_simple_create_node()
 #[test]
 fn test_evaluate_create_named_node()
 {
-  let store = crate::store::redb::Store::new(crate::tests::get_tmp_file().unwrap()).unwrap();
+  let temp_file = crate::tests::create_tmp_file();
+  let store = crate::store::redb::Store::new(temp_file.path()).unwrap();
 
   let value = eval_program(&store, &programs::create_named_node(), Default::default()).unwrap();
   check_stats(&store, None, 1, 0, 0, 1);
@@ -31,7 +33,8 @@ fn test_evaluate_create_named_node()
 #[test]
 fn test_evaluate_create_named_node_double_return()
 {
-  let store = crate::store::redb::Store::new(crate::tests::get_tmp_file().unwrap()).unwrap();
+  let temp_file = crate::tests::create_tmp_file();
+  let store = crate::store::redb::Store::new(temp_file.path()).unwrap();
 
   let value = eval_program(
     &store,
@@ -50,7 +53,8 @@ fn test_evaluate_create_named_node_double_return()
 #[test]
 fn test_evaluate_double_with_return()
 {
-  let store = crate::store::redb::Store::new(crate::tests::get_tmp_file().unwrap()).unwrap();
+  let temp_file = crate::tests::create_tmp_file();
+  let store = crate::store::redb::Store::new(temp_file.path()).unwrap();
 
   let value = eval_program(&store, &programs::double_with_return(), Default::default()).unwrap();
   check_stats(&store, None, 0, 0, 0, 0);
@@ -61,7 +65,8 @@ fn test_evaluate_double_with_return()
 #[test]
 fn test_evaluate_unwind()
 {
-  let store = crate::store::redb::Store::new(crate::tests::get_tmp_file().unwrap()).unwrap();
+  let temp_file = crate::tests::create_tmp_file();
+  let store = crate::store::redb::Store::new(temp_file.path()).unwrap();
 
   let value = eval_program(&store, &programs::unwind(), Default::default()).unwrap();
   check_stats(&store, None, 0, 0, 0, 0);
@@ -72,7 +77,8 @@ fn test_evaluate_unwind()
 #[test]
 fn test_evaluate_match_loop()
 {
-  let store = crate::store::redb::Store::new(crate::tests::get_tmp_file().unwrap()).unwrap();
+  let temp_file = crate::tests::create_tmp_file();
+  let store = crate::store::redb::Store::new(temp_file.path()).unwrap();
 
   let node = graph::Node {
     key: graph::Key { uuid: 1 },
@@ -111,7 +117,8 @@ fn test_evaluate_match_loop()
 #[test]
 fn test_evaluate_optional_match()
 {
-  let store = crate::store::redb::Store::new(crate::tests::get_tmp_file().unwrap()).unwrap();
+  let temp_file = crate::tests::create_tmp_file();
+  let store = crate::store::redb::Store::new(temp_file.path()).unwrap();
 
   let value = eval_program(&store, &programs::optional_match(), Default::default()).unwrap();
   check_stats(&store, None, 0, 0, 0, 0);
@@ -125,7 +132,8 @@ fn test_evaluate_optional_match()
 #[test]
 fn test_evaluate_match_count()
 {
-  let store = crate::store::redb::Store::new(crate::tests::get_tmp_file().unwrap()).unwrap();
+  let temp_file = crate::tests::create_tmp_file();
+  let store = crate::store::redb::Store::new(temp_file.path()).unwrap();
   let function_manager = functions::Manager::new();
   let program = programs::match_count(&function_manager);
 
@@ -163,7 +171,8 @@ fn test_evaluate_match_count()
 #[test]
 fn test_evaluate_aggregation()
 {
-  let store = crate::store::redb::Store::new(crate::tests::get_tmp_file().unwrap()).unwrap();
+  let temp_file = crate::tests::create_tmp_file();
+  let store = crate::store::redb::Store::new(temp_file.path()).unwrap();
   let function_manager = functions::Manager::new();
   let program = programs::aggregation(&function_manager);
 

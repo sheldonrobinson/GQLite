@@ -43,3 +43,6 @@ rusqlite = { version = "0.37", optional = true, features = [
 ] }
 thiserror = "2"
 uuid = { version = "1", features = ["v4"] }
+
+[dev-dependencies]
+ccutils = { version = "0.3", features = ["temporary"] }

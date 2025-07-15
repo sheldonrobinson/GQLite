@@ -4,24 +4,12 @@ mod parser;
 mod store;
 mod templates;
 
-pub(crate) fn get_tmp_file() -> Result<std::path::PathBuf, std::io::Error>
+pub(crate) fn create_tmp_file() -> ccutils::temporary::TemporaryFile
 {
-  use rand::Rng;
-  let mut rng = rand::rng();
-  loop
-  {
-    let rand: u32 = rng.random();
-    let path = std::path::PathBuf::from(format!(
-      "{}/tmp_gqlite_{}",
-      std::env::temp_dir().to_str().unwrap(),
-      rand
-    ));
-    if !path.exists()
-    {
-      println!("{:?}", path);
-      return Ok(path);
-    }
-  }
+  ccutils::temporary::TemporaryFile::builder()
+    .should_create_file(false)
+    .label("gqlite")
+    .create()
 }
 
 fn check_stats<TStore: crate::store::Store>(
