@@ -24,7 +24,7 @@ GQLite source code is license under the [MIT License](LICENSE) and is free to ev
 
 The official repositories contains bindings/APIs for C, C++, Python, Ruby and Crystal.
 
-The library is still in its early stage, but it is now fully functional. Development effort has now slowed down and new features are added on a by-need basis. It supports a subset of ISO GQL.
+The library is still in its early stage, but it is now fully functional. Development effort has now slowed down and new features are added on a by-need basis. It supports a subset of OpenCypher, with some ISO GQL extensions.
   
 Example of use
 --------------

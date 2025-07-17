@@ -8,8 +8,10 @@ How to release gqlite
   - dists/ruby/Rakefile
 - Make sure there is a test database in test/rb/data for the new version, and that it is called used in gqlite-rspec
 
-- Ruby
+- Ruby, in build directory
+
 ```bash
+  make dist
   cd dists/ruby;
   rake package
 ```
@@ -42,7 +44,7 @@ c.execute_oc_query "CREATE (n) RETURN n"
   gem push gqlite-1.x.x.gem
 ```
 
-- Python 
+- Python, from source directory:
 
 ```bash
   cd bindings/python/gqlitepy
@@ -53,7 +55,7 @@ c.execute_oc_query "CREATE (n) RETURN n"
 
   Testing:
 ```
-docker run -it -v `pwd`/wheels:/wheels python:3.8 bash
+docker run -it -v `pwd`/wheels:/wheels python:3.9 bash
 pip3 install /wheels/gqlite*
 
 python3

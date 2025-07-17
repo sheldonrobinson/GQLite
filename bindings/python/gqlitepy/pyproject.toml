@@ -8,6 +8,7 @@ version = "1.2.0"
 requires-python = ">=3.9"
 authors = [{ name = "Cyrille Berger" }]
 description = "Python bindings for GQLite, a Graph Query library"
+readme = "README.md"
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
@@ -15,7 +16,7 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
-dynamic = ["version"]
+
 [tool.maturin]
 features = ["pyo3/extension-module"]
 module-name = "gqlite"
