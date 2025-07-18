@@ -2,6 +2,29 @@ use super::{ExpressionType, FResult, FunctionTypeTrait};
 use crate::prelude::*;
 
 #[derive(Debug, Default)]
+pub(super) struct Head {}
+
+impl Head
+{
+  fn call_impl(array: &Vec<value::Value>) -> FResult<value::Value>
+  {
+    Ok(
+      array
+        .first()
+        .map(|x| x.to_owned())
+        .unwrap_or(value::Value::Null),
+    )
+  }
+}
+
+super::declare_function!(
+  head,
+  Head,
+  call_impl(Vec<crate::value::Value>) -> crate::value::Value,
+  accept_null
+);
+
+#[derive(Debug, Default)]
 pub(super) struct Keys {}
 
 impl Keys

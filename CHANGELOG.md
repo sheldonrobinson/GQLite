@@ -3,7 +3,8 @@
 <!-- next-header -->
 
 ## [Unreleased] - ReleaseDate
-- New Ruby bindings.
+- New Ruby/Python bindings.
+- Add `head` function.
 
 ## [0.5.1] - 2025-07-15
 - Add experimental connection server, for use in multi-threaded environment.

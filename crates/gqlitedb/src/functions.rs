@@ -19,6 +19,13 @@ pub(crate) trait FunctionTypeTrait
   fn result_type() -> ExpressionType;
 }
 
+impl FunctionTypeTrait for crate::value::Value
+{
+  fn result_type() -> ExpressionType
+  {
+    ExpressionType::Variant
+  }
+}
 impl FunctionTypeTrait for bool
 {
   fn result_type() -> ExpressionType
@@ -123,6 +130,7 @@ impl Manager
     Self {
       inner: std::rc::Rc::new(ManagerInner {
         functions: HashMap::from([
+          containers::Head::new(),
           containers::Keys::new(),
           containers::Range::new(),
           containers::Size::new(),

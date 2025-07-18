@@ -255,13 +255,12 @@ IgnoredScenario = [
   "[29] Fail when re-using a relationship in the same pattern",
   # Unreported error
   "[5] Fail when not aliasing expressions in WITH",
-  # aggregation (or function call) fail to access a variable when used in a WITH statement (such as ´count(you.age)´) https://gitlab.com/GQLite/GQLite/-/issues/16
+  # # aggregation (or function call) fail to access a variable when used in a WITH statement (such as ´count(you.age)´) https://gitlab.com/GQLite/GQLite/-/issues/16
   "[11] Sort by an aggregate projection",
   "[12] Sort by an aliased aggregate projection",
   "[16] Handle constants and parameters inside an order by item which contains an aggregation expression",
   "[17] Handle projected variables inside an order by item which contains an aggregation expression",
   "[18]  Handle projected property accesses inside an order by item which contains an aggregation expression",
-  "[6] Reusing variable names in WITH",
   "[22] Sort by an expression that is only partially orderable on a non-distinct binding table, but used as a grouping key",
   "[23] Sort by an expression that is only partially orderable on a non-distinct binding table, but used in parts as a grouping key",
   "[15] Sort by an aliased aggregate projection does allow subsequent matching",
