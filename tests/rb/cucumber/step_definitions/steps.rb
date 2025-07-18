@@ -255,24 +255,18 @@ IgnoredScenario = [
   "[29] Fail when re-using a relationship in the same pattern",
   # Unreported error
   "[5] Fail when not aliasing expressions in WITH",
-  # aggregation expression cannot be used in ORDER BY, unless referred to by name https://gitlab.com/auksys/GQLite/-/issues/16
+  # aggregation expression cannot be used in ORDER BY, unless referred to by name, https://gitlab.com/auksys/GQLite/-/issues/16
+  "[8] Limit to more rows than actual results 2",
   "[11] Sort by an aggregate projection",
   "[16] Handle constants and parameters inside an order by item which contains an aggregation expression",
   "[17] Handle projected variables inside an order by item which contains an aggregation expression",
   "[18]  Handle projected property accesses inside an order by item which contains an aggregation expression",
+  "[21] Sort by an expression that is only partially orderable on a non-distinct binding table",
   "[22] Sort by an expression that is only partially orderable on a non-distinct binding table, but used as a grouping key",
   "[23] Sort by an expression that is only partially orderable on a non-distinct binding table, but used in parts as a grouping key",
   "[15] Sort by an aliased aggregate projection does allow subsequent matching",
   # Missing RANGE function
   "[4] Unwinding a collected unwound expression",
-  # GROUP BY fails with WITH statement https://gitlab.com/GQLite/GQLite/-/issues/17
-  "[2] Ordering and skipping on aggregate",
-  # Aggregation grouping is not implemented
-  "[1] ORDER BY of a column introduced in RETURN should return salient results in ascending order",
-  # collect(nodes) returns an array with the node internal id as an integer (aka it loses the information that it is a ref)
-  "[5] Unwinding a collected expression",
-  # Missing variables should be handled by the parser
-  "[9] Failing when using undefined variable in SET",
   # Lists are not supported in expressions
   "[5] Adding a list property",
   "[10] Failing when setting a list of maps as a property",
@@ -284,14 +278,6 @@ IgnoredScenario = [
   "[13] Fail when sorting on variable removed by DISTINCT",
   "[24] Sort by an expression that is only partially orderable on a non-distinct binding table, but made distinct",
   "[1] Handle dependencies across WITH with SKIP",
-  # return modifiers (e.g. order by) must be done after computing expressions https://gitlab.com/gqlite/GQLite/-/issues/2
-  "[8] Limit to more rows than actual results 2",
-  # non-projected variable are not accessible
-  "[21] Sort by an expression that is only partially orderable on a non-distinct binding table",
-  "[8] Sort by non-projected existing variable",
-  # Array aren't really supported yet
-  "[9] Sort by a list expression in ascending order",
-  "[10] Sort by a list expression in descending order",
   # Time not supported
   "[11] Sort by a date expression in ascending order",
   "[12] Sort by a date expression in descending order",
