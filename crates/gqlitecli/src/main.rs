@@ -95,7 +95,7 @@ impl<'de> CliIterator<rustyline::error::ReadlineError> for ReadLineIterator<'de>
 
 struct Cli
 {
-  connection: Option<gqlitedb::ConnectionServer>,
+  connection: Option<gqlitedb::Connection>,
 }
 
 impl Cli
@@ -135,7 +135,7 @@ impl Cli
               else
               {
                 let connection_res =
-                  gqlitedb::ConnectionServer::open(splited_line[1], gqlitedb::ValueMap::new());
+                  gqlitedb::Connection::open(splited_line[1], gqlitedb::ValueMap::new());
                 match connection_res
                 {
                   Ok(c) =>
@@ -303,7 +303,7 @@ fn main_loop(rl: &mut rustyline::DefaultEditor) -> rustyline::Result<()>
   args.next(); // remove program name
   if let Some(filename) = args.next()
   {
-    let connection_res = gqlitedb::ConnectionServer::open(filename, gqlitedb::ValueMap::new());
+    let connection_res = gqlitedb::Connection::open(filename, gqlitedb::ValueMap::new());
     match connection_res
     {
       Ok(c) =>

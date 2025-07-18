@@ -12,4 +12,4 @@ crate-type = ["cdylib"]
 
 [dependencies]
 pyo3 = { version = "0.25", features = ["extension-module"] }
-gqlitedb = { workspace = true, features = ["_connection_server"] }
+gqlitedb = { workspace = true }

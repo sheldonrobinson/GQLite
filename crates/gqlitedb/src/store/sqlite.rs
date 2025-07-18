@@ -1,7 +1,9 @@
+use std::{cell::RefCell, collections::HashSet, path::PathBuf};
+
 use askama::Template;
+use ccutils::pool::{self, Pool};
 use rusqlite::{named_params, types::FromSql, OptionalExtension, ToSql};
 use serde::{Deserialize, Serialize};
-use std::{cell::RefCell, collections::HashSet, rc::Rc};
 
 use crate::{
   prelude::*,
@@ -43,7 +45,7 @@ impl rusqlite::types::FromSql for graph::Key
 
 struct TransactionBase
 {
-  connection: Rc<rusqlite::Connection>,
+  connection: pool::Handle<rusqlite::Connection>,
   active: RefCell<bool>,
 }
 
@@ -112,10 +114,11 @@ impl GetConnection for super::TransactionBox<ReadTransaction, WriteTransaction>
 {
   fn get_connection(&self) -> &rusqlite::Connection
   {
+    use std::ops::Deref;
     match self
     {
-      super::TransactionBox::Read(read) => read.transaction_base.connection.as_ref(),
-      super::TransactionBox::Write(write) => write.transaction_base.connection.as_ref(),
+      super::TransactionBox::Read(read) => read.transaction_base.connection.deref(),
+      super::TransactionBox::Write(write) => write.transaction_base.connection.deref(),
     }
   }
 }
@@ -253,8 +256,10 @@ fn hex(key: &graph::Key) -> String
 
 pub(crate) struct Store
 {
-  connection: Rc<rusqlite::Connection>,
+  connection: Pool<rusqlite::Connection, Error>,
 }
+
+ccutils::assert_impl_all!(Store: Sync, Send);
 
 impl Store
 {
@@ -262,7 +267,11 @@ impl Store
   pub(crate) fn new<P: AsRef<std::path::Path>>(path: P) -> Result<Store>
   {
     use store::Store;
-    let connection = Rc::new(rusqlite::Connection::open(path)?);
+    let path: PathBuf = path.as_ref().into();
+    let connection = Pool::new(
+      move || Ok(rusqlite::Connection::open(&path)?),
+      pool::Options::default().minimum_pool_size(1).pool_size(3),
+    )?;
     let s = Self { connection };
 
     let mut tx = s.begin_write()?;
@@ -294,7 +303,7 @@ impl Store
     }
     else
     {
-      s.connection.execute(
+      tx.get_connection().execute(
         include_str!("../../templates/sql/sqlite/metadata_create_table.sql"),
         (),
       )?;
@@ -466,7 +475,7 @@ impl store::Store for Store
   type TransactionBox = TransactionBox;
   fn begin_read(&self) -> Result<Self::TransactionBox>
   {
-    let connection = self.connection.clone();
+    let connection = self.connection.get()?;
     connection.execute("BEGIN", ())?;
     Ok(Self::TransactionBox::from_read(ReadTransaction {
       transaction_base: TransactionBase {
@@ -477,7 +486,7 @@ impl store::Store for Store
   }
   fn begin_write(&self) -> Result<Self::TransactionBox>
   {
-    let connection = self.connection.clone();
+    let connection = self.connection.get()?;
     connection.execute("BEGIN", ())?;
     Ok(Self::TransactionBox::from_write(WriteTransaction {
       transaction_base: TransactionBase {

@@ -1,6 +1,7 @@
+use ccutils::sync::ArcRwLock;
 use redb::{ReadableTable, ReadableTableMetadata};
 use serde::{Deserialize, Serialize};
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc, sync::Arc};
 
 use crate::{prelude::*, store::TransactionBoxable};
 
@@ -303,8 +304,10 @@ impl super::WriteTransaction for redb::WriteTransaction
 pub(crate) struct Store
 {
   redb_store: redb::Database,
-  graphs: RefCell<HashMap<String, Rc<GraphInfo>>>,
+  graphs: ArcRwLock<HashMap<String, Arc<GraphInfo>>>,
 }
+
+ccutils::assert_impl_all!(Store: Sync, Send);
 
 type TransactionBox = store::TransactionBox<redb::ReadTransaction, redb::WriteTransaction>;
 
@@ -412,9 +415,9 @@ impl Store
     metadata_table.insert(&key, data)?;
     Ok(())
   }
-  fn get_graph_info(&self, graph_name: &String) -> Result<Rc<GraphInfo>>
+  fn get_graph_info(&self, graph_name: &String) -> Result<Arc<GraphInfo>>
   {
-    let graphs = self.graphs.borrow();
+    let graphs = self.graphs.read()?;
     let graph_info = graphs.get(graph_name);
     match graph_info
     {
@@ -422,10 +425,10 @@ impl Store
       None =>
       {
         drop(graphs);
-        let graph_info = Rc::new(GraphInfo::new(graph_name));
+        let graph_info = Arc::new(GraphInfo::new(graph_name));
         self
           .graphs
-          .borrow_mut()
+          .write()?
           .insert(graph_name.to_owned(), graph_info.clone());
         Ok(graph_info)
       }
@@ -813,13 +816,13 @@ impl store::Store for Store
     {
       let tx = transaction.try_into_write()?;
 
-      let gi = Rc::new(GraphInfo::new(graph_name));
+      let gi = Arc::new(GraphInfo::new(graph_name));
       tx.open_table(gi.nodes_table_definition())?;
       tx.open_table(gi.edges_table_definition())?;
       tx.open_table(gi.edges_source_index_definition())?;
       tx.open_table(gi.edges_destination_index_definition())?;
 
-      self.graphs.borrow_mut().insert(graph_name.to_owned(), gi);
+      self.graphs.write()?.insert(graph_name.to_owned(), gi);
     }
     graphs_list.push(graph_name.clone());
     self.set_metadata_value(transaction, "graphs", &graphs_list)?;

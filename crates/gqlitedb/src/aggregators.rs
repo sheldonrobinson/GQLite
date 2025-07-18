@@ -3,7 +3,7 @@ mod containers;
 mod count;
 mod stats;
 
-use std::fmt::Debug;
+use std::{fmt::Debug, sync::Arc};
 
 use crate::prelude::*;
 use compiler::expression_analyser::ExpressionType;
@@ -14,13 +14,13 @@ pub(crate) trait AggregatorState: Debug
   fn finalise(self: Box<Self>) -> Result<value::Value>;
 }
 
-pub(crate) trait AggregatorTrait: Debug
+pub(crate) trait AggregatorTrait: Debug + Sync + Send
 {
   fn create(&self, arguments: Vec<value::Value>) -> Result<Box<dyn AggregatorState>>;
   fn validate_arguments(&self, arguments: Vec<ExpressionType>) -> Result<ExpressionType>;
 }
 
-pub(crate) type Aggregator = std::rc::Rc<Box<dyn AggregatorTrait>>;
+pub(crate) type Aggregator = Arc<Box<dyn AggregatorTrait>>;
 
 macro_rules! declare_aggregator {
   ($function_name: ident, $type_name: ident, $state_type_name: tt, (  $( $arg_type: ty $(,)? )* ) -> $ret_type: ty) => {
@@ -32,7 +32,7 @@ macro_rules! declare_aggregator {
       {
         (
           stringify!($function_name).to_string(),
-          std::rc::Rc::new(Box::new(Self {})),
+          std::sync::Arc::new(Box::new(Self {})),
         )
       }
     }

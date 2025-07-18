@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Debug};
+use std::{collections::HashMap, fmt::Debug, sync::Arc};
 
 mod containers;
 mod edge;
@@ -12,6 +12,7 @@ mod value;
 pub(crate) type FResult<T> = std::result::Result<T, error::RunTimeError>;
 
 use crate::prelude::*;
+use ccutils::sync::ArcRwLock;
 use compiler::expression_analyser::ExpressionType;
 
 pub(crate) trait FunctionTypeTrait
@@ -88,7 +89,7 @@ impl FunctionTypeTrait for crate::value::ValueMap
 // |  _|| |_| | | | | (__| |_| | (_) | | | | || | | (_| | | |_
 // |_|   \__,_|_| |_|\___|\__|_|\___/|_| |_|_||_|  \__,_|_|\__|
 
-pub(crate) trait FunctionTrait: Debug
+pub(crate) trait FunctionTrait: Debug + Sync + Send
 {
   fn call(&self, arguments: Vec<crate::value::Value>) -> Result<crate::value::Value>;
   fn validate_arguments(&self, arguments: Vec<ExpressionType>) -> Result<ExpressionType>;
@@ -101,7 +102,7 @@ pub(crate) trait FunctionTrait: Debug
 // |  _|| |_| | | | | (__| |_| | (_) | | | |
 // |_|   \__,_|_| |_|\___|\__|_|\___/|_| |_|
 
-pub(crate) type Function = std::rc::Rc<Box<dyn FunctionTrait>>;
+pub(crate) type Function = Arc<Box<dyn FunctionTrait>>;
 
 //  __  __
 // |  \/  | __ _ _ __   __ _  __ _  ___ _ __
@@ -120,15 +121,17 @@ struct ManagerInner
 #[derive(Debug, Clone)]
 pub(crate) struct Manager
 {
-  inner: std::rc::Rc<ManagerInner>,
+  inner: ArcRwLock<ManagerInner>,
 }
+
+ccutils::assert_impl_all!(Manager: Sync, Send);
 
 impl Manager
 {
   pub(crate) fn new() -> Self
   {
     Self {
-      inner: std::rc::Rc::new(ManagerInner {
+      inner: ManagerInner {
         functions: HashMap::from([
           containers::Head::new(),
           containers::Keys::new(),
@@ -148,7 +151,8 @@ impl Manager
           value::HasLabels::new(),
         ]),
         aggregators: aggregators::init_aggregators(),
-      }),
+      }
+      .into(),
     }
   }
   pub(crate) fn get_function<E: error::GenericErrors>(
@@ -160,6 +164,7 @@ impl Manager
     Ok(
       self
         .inner
+        .read()?
         .functions
         .get(&name)
         .ok_or_else(|| E::unknown_function(name).into())?
@@ -175,6 +180,7 @@ impl Manager
     Ok(
       self
         .inner
+        .read()?
         .aggregators
         .get(&name)
         .ok_or_else(|| E::unknown_function(name).into())?
@@ -195,9 +201,9 @@ impl Manager
       }
     }
   }
-  pub(crate) fn is_aggregate(&self, name: &String) -> bool
+  pub(crate) fn is_aggregate(&self, name: &String) -> Result<bool>
   {
-    self.inner.aggregators.contains_key(name)
+    Ok(self.inner.read()?.aggregators.contains_key(name))
   }
 
   pub(crate) fn validate_arguments(
@@ -323,7 +329,7 @@ macro_rules! declare_function_ {
       {
         (
           stringify!($function_name).to_string(),
-          std::rc::Rc::new(Box::new(Self {})),
+          std::sync::Arc::new(Box::new(Self {})),
         )
       }
     }
@@ -389,7 +395,7 @@ macro_rules! declare_function {
       {
         (
           stringify!($function_name).to_string(),
-          std::rc::Rc::new(Box::new(Self {})),
+          std::sync::Arc::new(Box::new(Self {})),
         )
       }
     }

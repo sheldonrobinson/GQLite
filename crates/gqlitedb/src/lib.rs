@@ -15,8 +15,6 @@ mod aggregators;
 mod capi;
 mod compiler;
 mod connection;
-#[cfg(feature = "_connection_server")]
-mod connection_server;
 mod consts;
 mod error;
 mod functions;
@@ -42,6 +40,3 @@ pub use {
 
 /// GQLite Result alias. Usable as a standard `Result<T, E>` or default to gqlite::Error with `Result<T>`
 pub type Result<T, E = error::export::Error> = std::result::Result<T, E>;
-
-#[cfg(feature = "_connection_server")]
-pub use connection_server::ConnectionServer;

@@ -308,6 +308,8 @@ pub enum InternalError
   Unimplemented(&'static str),
   #[error("Infallible.")]
   Infallible(#[from] std::convert::Infallible),
+  #[error("Poison error {0}.")]
+  Poison(String),
 }
 
 /// Error in the store backend.
@@ -448,6 +450,14 @@ where
 // | |   / _ \| '_ \ \ / / _ \ '__/ __| |/ _ \| '_ \
 // | |__| (_) | | | \ V /  __/ |  \__ \ | (_) | | | |
 //  \____\___/|_| |_|\_/ \___|_|  |___/_|\___/|_| |_|
+
+impl<T> From<std::sync::PoisonError<T>> for Error
+{
+  fn from(value: std::sync::PoisonError<T>) -> Self
+  {
+    InternalError::Poison(format!("{:?}", value)).into()
+  }
+}
 
 impl From<pest::error::Error<crate::parser::parser::Rule>> for Error
 {

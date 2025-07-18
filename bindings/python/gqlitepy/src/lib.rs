@@ -168,7 +168,7 @@ fn to_plist<'py>(py: Python<'py>, arr: Vec<gqlitedb::Value>) -> PyResult<Bound<'
 #[pyclass(frozen)]
 struct Connection
 {
-  dbhandle: gqlitedb::ConnectionServer,
+  dbhandle: gqlitedb::Connection,
 }
 
 #[pymethods]
@@ -183,7 +183,7 @@ impl Connection
     {
       options.insert("backend".into(), backend.into());
     }
-    let dbhandle = map_err(py, gqlitedb::ConnectionServer::open(filename, options))?;
+    let dbhandle = map_err(py, gqlitedb::Connection::open(filename, options))?;
     Ok(Self { dbhandle })
   }
   #[pyo3(signature = (query, bindings=None))]

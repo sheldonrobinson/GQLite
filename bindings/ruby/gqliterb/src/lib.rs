@@ -187,7 +187,7 @@ fn map_err<T>(ruby: &Ruby, result: gqlitedb::Result<T>) -> Result<T, Error>
 #[magnus::wrap(class = "GQLite::Connection")]
 struct Connection
 {
-  dbhandle: gqlitedb::ConnectionServer,
+  dbhandle: gqlitedb::Connection,
 }
 
 impl Connection
@@ -206,7 +206,7 @@ impl Connection
         .to_owned()
         .try_into(),
     )?;
-    let dbhandle = map_err(ruby, gqlitedb::ConnectionServer::open(filename, options))?;
+    let dbhandle = map_err(ruby, gqlitedb::Connection::open(filename, options))?;
     Ok(Self { dbhandle })
   }
   fn execute_oc_query(

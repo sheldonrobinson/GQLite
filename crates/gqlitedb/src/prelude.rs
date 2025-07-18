@@ -5,7 +5,4 @@ pub(crate) use crate::{
   Result,
 };
 
-#[cfg(feature = "_connection_server")]
-pub(crate) use crate::connection;
-
 pub(crate) use error::export::Error as ErrorType;

@@ -88,6 +88,11 @@ precheck:
   variables:
     CC_CI_REF_BRANCH: "dev/2"
 
+check-default-features:
+  stage: precheck
+  script:
+    - grep -q 'default = \["redb", "capi", "sqlite"\]' crates/gqlitedb/Cargo.toml
+
 # Extra-tests
 doc:
   stage: postcheck

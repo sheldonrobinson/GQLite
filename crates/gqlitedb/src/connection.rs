@@ -1,18 +1,22 @@
 use crate::prelude::*;
 use value::ValueTryIntoRef;
 
-trait ConnectionTrait
+trait ConnectionTrait: Sync + Send
 {
   fn execute_query(&self, query: String, parameters: value::ValueMap) -> Result<value::Value>;
 }
 
-struct ConnectionImpl<TStore: store::Store>
+struct ConnectionImpl<TStore>
+where
+  TStore: store::Store + Sync + Send,
 {
   store: TStore,
   function_manager: functions::Manager,
 }
 
-impl<TStore: store::Store> ConnectionTrait for ConnectionImpl<TStore>
+impl<TStore> ConnectionTrait for ConnectionImpl<TStore>
+where
+  TStore: store::Store + Sync + Send,
 {
   fn execute_query(&self, query: String, parameters: value::ValueMap) -> Result<value::Value>
   {
@@ -44,6 +48,8 @@ impl<TStore: store::Store> ConnectionTrait for ConnectionImpl<TStore>
 }
 
 impl<TStore: store::Store> ConnectionImpl<TStore>
+where
+  TStore: store::Store + Sync + Send,
 {
   fn boxed(self) -> Box<Self>
   {
@@ -87,6 +93,8 @@ pub struct Connection
 {
   connection: Box<dyn ConnectionTrait>,
 }
+
+ccutils::assert_impl_all!(Connection: Sync, Send);
 
 impl Connection
 {

@@ -254,7 +254,7 @@ impl<'b> Analyser<'b>
           )?,
           self.functions_manager.is_deterministic(&call.name)?
             && arguments.iter().all(|x| x.constant == true),
-          self.functions_manager.is_aggregate(&call.name),
+          self.functions_manager.is_aggregate(&call.name)?,
         ))
       }
       ast::Expression::IsNull(isn) => Ok(ExpressionInfo::new_type(
