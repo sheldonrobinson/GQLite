@@ -6,6 +6,8 @@
 - New Ruby/Python bindings.
 - Add `head` function.
 - Add support for executing multiple independent queries separated by a ';'.
+- Add execution of multiple independent queries separated by a ';'.
+- Add reading file as input in the CLI.
 
 ## [0.5.1] - 2025-07-15
 - Add experimental connection server, for use in multi-threaded environment.
