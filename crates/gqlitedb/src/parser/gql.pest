@@ -20,7 +20,9 @@ char_tick      =  {
 nothing_ident  = @{ "###"+ }
 
 // Query
-query = _{ SOI ~ statement* ~ ";"? ~ EOI }
+queries = _{ SOI ~ query ~ (";" ~ query)* ~ ";"? ~ EOI }
+
+query = { statement* }
 
 nothing = { nothing_ident? }
 

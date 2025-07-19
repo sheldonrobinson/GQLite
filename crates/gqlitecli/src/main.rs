@@ -11,6 +11,25 @@ To execute a query, write the query and end it with a ';'"
   );
 }
 
+fn print_results(arr: &Vec<gqlitedb::Value>)
+{
+  let mut builder = tabled::builder::Builder::new();
+  arr.iter().for_each(|row| match row
+  {
+    gqlitedb::Value::Array(arr) => builder.push_record(arr.iter().map(|x| x.to_string())),
+    _ =>
+    {
+      println!("Unexpected: {}", row);
+    }
+  });
+
+  let table = builder
+    .build()
+    .with(tabled::settings::Style::ascii_rounded())
+    .to_string();
+  println!("{}", table);
+}
+
 fn main_loop(rl: &mut rustyline::DefaultEditor) -> rustyline::Result<()>
 {
   let mut connection: Option<gqlitedb::ConnectionServer> = None;
@@ -124,53 +143,41 @@ fn main_loop(rl: &mut rustyline::DefaultEditor) -> rustyline::Result<()>
               let qr = c.execute_query(query, gqlitedb::ValueMap::new());
               match qr
               {
-                Ok(value) =>
+                Ok(value) => match value
                 {
-                  match value
+                  gqlitedb::Value::Array(arr) =>
                   {
-                    gqlitedb::Value::Array(arr) =>
+                    print_results(&arr);
+                  }
+                  gqlitedb::Value::Map(map) =>
+                  {
+                    if matches!(map.get("type"), Some(gqlitedb::Value::String(s)) if s == "results")
                     {
-                      let mut builder = tabled::builder::Builder::new();
-                      // let mut it = arr.iter();
-                      // let keys = it.next().map_or(Vec::<String>::new(), |v| {
-                      //   match v {
-                      //     gqlitedb::Value::Array(arr) => arr.iter().map(|x| x.to_string()).collect(),
-                      //     _ => vec![]
-                      //   }
-                      // });
-                      // builder.push_record(keys.iter());
-                      // it.for_each(|row| {
-                      //   match row {
-                      //     gqlitedb::Value::Map(obj) => {
-                      //       builder.push_record(keys.iter().map(|k| obj[k].to_string()));
-                      //     },
-                      //     _ => {
-                      //       println!("Unexpected: {}", row);
-                      //     }
-                      //   }
-                      // });
-                      arr.iter().for_each(|row| match row
+                      map.get("results").map(|results| match results
                       {
                         gqlitedb::Value::Array(arr) =>
                         {
-                          builder.push_record(arr.iter().map(|x| x.to_string()))
+                          for val in arr
+                          {
+                            match val
+                            {
+                              gqlitedb::Value::Array(arr) =>
+                              {
+                                print_results(arr);
+                              }
+                              _ =>
+                              {}
+                            }
+                          }
                         }
                         _ =>
-                        {
-                          println!("Unexpected: {}", row);
-                        }
+                        {}
                       });
-
-                      let table = builder
-                        .build()
-                        .with(tabled::settings::Style::ascii_rounded())
-                        .to_string();
-                      println!("{}", table);
                     }
-                    _ =>
-                    {}
                   }
-                }
+                  _ =>
+                  {}
+                },
                 Err(err) => match err.error()
                 {
                   gqlitedb::Error::CompileTime(ct) =>

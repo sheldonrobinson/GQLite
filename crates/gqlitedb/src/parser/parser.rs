@@ -1068,7 +1068,7 @@ impl AstBuilder
   }
 }
 
-pub(crate) fn parse(input: &str) -> Result<ast::Statements>
+pub(crate) fn parse(input: &str) -> Result<ast::Queries>
 {
   let pratt = PrattParser::new()
     .op(Op::infix(Rule::xor, Assoc::Left))
@@ -1101,19 +1101,38 @@ pub(crate) fn parse(input: &str) -> Result<ast::Statements>
     pratt,
     var_ids: Default::default(),
   };
-  let pairs = GQLParser::parse(Rule::query, input)?;
-  let mut stmts = ast::Statements::new();
+  let pairs = GQLParser::parse(Rule::queries, input)?;
+  let mut queries = Vec::<ast::Statements>::new();
   if crate::consts::SHOW_PARSE_TREE
   {
     println!("pairs = {:#?}", pairs);
   }
-  for pair in pairs
+  for q_pair in pairs
   {
-    match pair.as_rule()
+    match q_pair.as_rule()
     {
-      Rule::statement =>
+      Rule::query =>
       {
-        stmts.push(ast_builder.build_ast_from_statement(pair.into_inner().try_next()?)?);
+        let mut stmts = ast::Statements::new();
+
+        for pair in q_pair.into_inner()
+        {
+          match pair.as_rule()
+          {
+            Rule::statement =>
+            {
+              stmts.push(ast_builder.build_ast_from_statement(pair.into_inner().try_next()?)?);
+            }
+            unknown_expression =>
+            {
+              Err(error::InternalError::UnxpectedExpression(
+                "parse",
+                format!("{unknown_expression:?}"),
+              ))?;
+            }
+          }
+        }
+        queries.push(stmts);
       }
       Rule::EOI =>
       {}
@@ -1128,7 +1147,7 @@ pub(crate) fn parse(input: &str) -> Result<ast::Statements>
   }
   if crate::consts::SHOW_AST
   {
-    println!("statements = {:#?}", &stmts);
+    println!("ast = {:#?}", &queries);
   }
-  Ok(stmts)
+  Ok(queries)
 }

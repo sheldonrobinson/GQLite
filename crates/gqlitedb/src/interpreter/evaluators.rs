@@ -1211,7 +1211,7 @@ fn is_write_program(program: &super::Program) -> bool
 pub(crate) fn eval_program<TStore: store::Store>(
   store: &TStore,
   program: &super::Program,
-  parameters: crate::value::ValueMap,
+  parameters: &crate::value::ValueMap,
 ) -> crate::Result<crate::value::Value>
 {
   let mut graph_name: String = "default".into();

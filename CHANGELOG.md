@@ -5,6 +5,7 @@
 ## [Unreleased] - ReleaseDate
 - New Ruby/Python bindings.
 - Add `head` function.
+- Add support for executing multiple independent queries separated by a ';'.
 
 ## [0.5.1] - 2025-07-15
 - Add experimental connection server, for use in multi-threaded environment.

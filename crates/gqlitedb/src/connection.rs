@@ -3,31 +3,43 @@ use value::ValueTryIntoRef;
 
 trait ConnectionTrait
 {
-  fn execute_query(
-    &self,
-    query: String,
-    parameters: crate::value::ValueMap,
-  ) -> crate::Result<crate::value::Value>;
+  fn execute_query(&self, query: String, parameters: value::ValueMap) -> Result<value::Value>;
 }
 
 struct ConnectionImpl<TStore: store::Store>
 {
   store: TStore,
-  function_manager: crate::functions::Manager,
+  function_manager: functions::Manager,
 }
 
 impl<TStore: store::Store> ConnectionTrait for ConnectionImpl<TStore>
 {
-  fn execute_query(
-    &self,
-    query: String,
-    parameters: crate::value::ValueMap,
-  ) -> crate::Result<crate::value::Value>
+  fn execute_query(&self, query: String, parameters: value::ValueMap) -> Result<value::Value>
   {
-    let q: String = query.into();
-    let q = crate::parser::parse(q.as_str())?;
-    let q = compiler::compile(&self.function_manager, q)?;
-    return interpreter::evaluators::eval_program(&self.store, &q, parameters);
+    let query_txt: String = query.into();
+    let queries = parser::parse(query_txt.as_str())?;
+    let mut results = Vec::<value::Value>::default();
+    for query in queries
+    {
+      let program = compiler::compile(&self.function_manager, query)?;
+      let v = interpreter::evaluators::eval_program(&self.store, &program, &parameters)?;
+      if !v.is_null()
+      {
+        results.push(v);
+      }
+    }
+    match results.len()
+    {
+      0 => Ok(value::Value::Null),
+      1 => Ok(results.into_iter().next().unwrap()),
+      _ =>
+      {
+        let mut map = value::ValueMap::new();
+        map.insert("type".into(), "results".into());
+        map.insert("results".into(), results.into());
+        Ok(map.into())
+      }
+    }
   }
 }
 
@@ -97,10 +109,7 @@ impl Connection
   /// # Ok(()) }
   /// ```  
   #[cfg(any(feature = "redb", feature = "sqlite"))]
-  pub fn open<P: AsRef<std::path::Path>>(
-    path: P,
-    options: crate::value::ValueMap,
-  ) -> crate::Result<Connection>
+  pub fn open<P: AsRef<std::path::Path>>(path: P, options: value::ValueMap) -> Result<Connection>
   {
     if let Some(backend) = options.get("backend")
     {
@@ -130,42 +139,42 @@ impl Connection
     }
   }
   #[cfg(feature = "sqlite")]
-  fn open_sqlite<P: AsRef<std::path::Path>>(path: P) -> crate::Result<Connection>
+  fn open_sqlite<P: AsRef<std::path::Path>>(path: P) -> Result<Connection>
   {
     Ok(Connection {
       connection: ConnectionImpl {
-        store: crate::store::sqlite::Store::new(path)?,
-        function_manager: crate::functions::Manager::new(),
+        store: store::sqlite::Store::new(path)?,
+        function_manager: functions::Manager::new(),
       }
       .boxed(),
     })
   }
   #[cfg(not(feature = "sqlite"))]
-  fn open_sqlite<P: AsRef<std::path::Path>>(_: P) -> crate::Result<Connection>
+  fn open_sqlite<P: AsRef<std::path::Path>>(_: P) -> Result<Connection>
   {
     Err(error::ConnectionError::UnavailableBackend { backend: "sqlite" }.into())
   }
   #[cfg(feature = "redb")]
-  fn open_redb<P: AsRef<std::path::Path>>(path: P) -> crate::Result<Connection>
+  fn open_redb<P: AsRef<std::path::Path>>(path: P) -> Result<Connection>
   {
     Ok(Connection {
       connection: ConnectionImpl {
-        store: crate::store::redb::Store::new(path)?,
-        function_manager: crate::functions::Manager::new(),
+        store: store::redb::Store::new(path)?,
+        function_manager: functions::Manager::new(),
       }
       .boxed(),
     })
   }
   #[cfg(not(feature = "redb"))]
-  fn open_redb<P: AsRef<std::path::Path>>(_: P) -> crate::Result<Connection>
+  fn open_redb<P: AsRef<std::path::Path>>(_: P) -> Result<Connection>
   {
     Err(error::StoreError::UnavailableBackend { backend: "redb" }.into())
   }
   #[cfg(feature = "_pgql")]
-  pub fn create() -> crate::Result<Connection>
+  pub fn create() -> Result<Connection>
   {
     Ok(Connection {
-      store: crate::store::Store::new()?,
+      store: store::Store::new()?,
     })
   }
   /// Execute the `query` (using OpenCypher), given the query `parameters` (sometimes
@@ -183,8 +192,8 @@ impl Connection
   pub fn execute_query(
     &self,
     query: impl Into<String>,
-    parameters: crate::value::ValueMap,
-  ) -> crate::Result<crate::value::Value>
+    parameters: value::ValueMap,
+  ) -> Result<value::Value>
   {
     self.connection.execute_query(query.into(), parameters)
   }

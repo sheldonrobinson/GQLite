@@ -119,6 +119,7 @@ macro_rules! create_into_statement {
 }
 
 pub(crate) type Statements = Vec<Statement>;
+pub(crate) type Queries = Vec<Statements>;
 
 #[derive(Debug)]
 pub(crate) enum Node {}

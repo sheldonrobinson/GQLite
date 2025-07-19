@@ -11,7 +11,7 @@ fn test_evaluate_simple_create_node()
   let temp_file = crate::tests::create_tmp_file();
   let store = crate::store::redb::Store::new(temp_file.path()).unwrap();
 
-  eval_program(&store, &programs::simple_create(), Default::default()).unwrap();
+  eval_program(&store, &programs::simple_create(), &Default::default()).unwrap();
   check_stats(&store, None, 1, 0, 0, 0);
 }
 
@@ -21,7 +21,7 @@ fn test_evaluate_create_named_node()
   let temp_file = crate::tests::create_tmp_file();
   let store = crate::store::redb::Store::new(temp_file.path()).unwrap();
 
-  let value = eval_program(&store, &programs::create_named_node(), Default::default()).unwrap();
+  let value = eval_program(&store, &programs::create_named_node(), &Default::default()).unwrap();
   check_stats(&store, None, 1, 0, 0, 1);
 
   assert_eq!(
@@ -39,7 +39,7 @@ fn test_evaluate_create_named_node_double_return()
   let value = eval_program(
     &store,
     &programs::create_named_node_double_return(),
-    Default::default(),
+    &Default::default(),
   )
   .unwrap();
   check_stats(&store, None, 1, 0, 0, 2);
@@ -56,7 +56,7 @@ fn test_evaluate_double_with_return()
   let temp_file = crate::tests::create_tmp_file();
   let store = crate::store::redb::Store::new(temp_file.path()).unwrap();
 
-  let value = eval_program(&store, &programs::double_with_return(), Default::default()).unwrap();
+  let value = eval_program(&store, &programs::double_with_return(), &Default::default()).unwrap();
   check_stats(&store, None, 0, 0, 0, 0);
 
   assert_eq!(value, value::array![value::array!["a"], value::array![1]]);
@@ -68,7 +68,7 @@ fn test_evaluate_unwind()
   let temp_file = crate::tests::create_tmp_file();
   let store = crate::store::redb::Store::new(temp_file.path()).unwrap();
 
-  let value = eval_program(&store, &programs::unwind(), Default::default()).unwrap();
+  let value = eval_program(&store, &programs::unwind(), &Default::default()).unwrap();
   check_stats(&store, None, 0, 0, 0, 0);
 
   assert_eq!(value, value::array![value::array!["i"], value::array![0]]);
@@ -105,7 +105,7 @@ fn test_evaluate_match_loop()
     .unwrap();
   tx.close().unwrap();
 
-  let value = eval_program(&store, &programs::match_loop(), Default::default()).unwrap();
+  let value = eval_program(&store, &programs::match_loop(), &Default::default()).unwrap();
   check_stats(&store, None, 1, 1, 0, 0);
 
   assert_eq!(
@@ -120,7 +120,7 @@ fn test_evaluate_optional_match()
   let temp_file = crate::tests::create_tmp_file();
   let store = crate::store::redb::Store::new(temp_file.path()).unwrap();
 
-  let value = eval_program(&store, &programs::optional_match(), Default::default()).unwrap();
+  let value = eval_program(&store, &programs::optional_match(), &Default::default()).unwrap();
   check_stats(&store, None, 0, 0, 0, 0);
 
   assert_eq!(
@@ -138,7 +138,7 @@ fn test_evaluate_match_count()
   let program = programs::match_count(&function_manager);
 
   // Count 0
-  let value = eval_program(&store, &program, Default::default()).unwrap();
+  let value = eval_program(&store, &program, &Default::default()).unwrap();
   check_stats(&store, None, 0, 0, 0, 0);
 
   assert_eq!(
@@ -159,7 +159,7 @@ fn test_evaluate_match_count()
   tx.close().unwrap();
   check_stats(&store, None, 1, 0, 0, 0);
 
-  let value = eval_program(&store, &program, Default::default()).unwrap();
+  let value = eval_program(&store, &program, &Default::default()).unwrap();
   check_stats(&store, None, 1, 0, 0, 0);
 
   assert_eq!(
@@ -200,7 +200,7 @@ fn test_evaluate_aggregation()
   tx.close().unwrap();
   check_stats(&store, None, 3, 0, 0, 5);
 
-  let value = eval_program(&store, &program, Default::default()).unwrap();
+  let value = eval_program(&store, &program, &Default::default()).unwrap();
   check_stats(&store, None, 3, 0, 0, 5);
 
   assert!(
