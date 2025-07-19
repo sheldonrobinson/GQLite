@@ -5,3 +5,4 @@ bindings/python/gqlitepy/wheels
 bindings/ruby/ext/
 bindings/ruby/pkg/
 bindings/ruby/tmp/
+gqlite_bench_data
