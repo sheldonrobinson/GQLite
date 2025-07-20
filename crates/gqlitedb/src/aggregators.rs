@@ -1,7 +1,7 @@
 mod arithmetic;
 mod containers;
 mod count;
-mod minmax;
+mod stats;
 
 use std::fmt::Debug;
 
@@ -66,8 +66,9 @@ pub(crate) fn init_aggregators() -> std::collections::HashMap<String, Aggregator
     count::Count::new(),
     arithmetic::Sum::new(),
     containers::Collect::new(),
-    minmax::Min::new(),
-    minmax::Max::new(),
+    stats::Avg::new(),
+    stats::Min::new(),
+    stats::Max::new(),
   ]
   .into()
 }

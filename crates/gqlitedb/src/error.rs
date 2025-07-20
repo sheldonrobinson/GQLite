@@ -260,6 +260,8 @@ pub enum InternalError
   {
     key: String
   },
+  #[error("Invalid aggregation state")]
+  InvalidAggregationState,
 
   // Third-party
   #[error("Missing element in iterator.")]
