@@ -13,6 +13,7 @@ stages: # List of stages for jobs, and their order of execution
   - precheck
   - build
   - test
+  - benchmark
   - postcheck
 
 include:
@@ -138,6 +139,51 @@ test_python_src_wheels:
   needs:
     - job: "dists"
       artifacts: true
+
+benchmarks:
+  stage: benchmark
+  image: cyloncore/ci:debian-arm64
+  variables:
+    TMP_BENCH_FILE: bench_output.tmp
+    TARGET_REPO: git@gitlab.com:GQLite/benchmark-results.git
+  before_script:
+    # Prepare SSH key
+    - mkdir -p ~/.ssh
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+
+    # Add known hosts (GitLab.com or your Git host)
+    - ssh-keyscan gitlab.com >> ~/.ssh/known_hosts
+
+    # Optional: check ssh works
+    - ssh -T git@gitlab.com || true
+  script:
+    - echo "🚀 Run benchmarks..."
+    - cargo bench -p gqlitedb | tee $TMP_BENCH_FILE
+
+    - echo "🧬 Clone $TARGET_REPO"
+    - git clone $TARGET_REPO results_repo
+    - mkdir -p results_repo/${CI_COMMIT_SHA}
+    - pushd results_repo
+    - git config user.email "ci-bot@auksys.org"
+    - git config user.name "CI Bot"
+    - popd
+
+    - echo "💾 Export results to $TARGET_REPO"
+    - cat $TMP_BENCH_FILE | ruby scripts/export_divan.rb "results_repo/$CI_COMMIT_SHA/$CI_PIPELINE_ID"
+
+    - echo "📤 Commit and push results to $TARGET_REPO"
+    - pushd results_repo
+    - git add ${CI_COMMIT_SHA}/${CI_PIPELINE_ID}.txt ${CI_COMMIT_SHA}/${CI_PIPELINE_ID}.csv
+    - git commit -m "Add benchmark results for commit $CI_COMMIT_SHA pipeline $CI_PIPELINE_ID"
+    - git push origin main
+    - popd
+
+  needs:
+    - job: precheck
+  tags:
+    - bench
+  dependencies: []
 
 # Debian
 debian:build:
