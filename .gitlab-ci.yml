@@ -102,14 +102,13 @@ dists:
   stage: postcheck
   image: cyloncore/ci:debian
   script:
-    - pushd build
-    - make dist
-    - pushd dists/ruby
+    - pushd bindings/ruby
+    - rake prepare:ext
     - rake gem
-    - popd
     - popd
     - pushd bindings/python/gqlitepy
     - CARGO_TARGET_DIR=`pwd` maturin sdist
+    - popd
   needs:
     - job: "debian:build"
       artifacts: true
@@ -117,14 +116,14 @@ dists:
     when: always
     expire_in: 30 days
     paths:
-      - build/dists/ruby/pkg/gqlite-*.gem
+      - bindings/ruby/pkg/gqlite-*.gem
       - bindings/python/gqlitepy/wheels/gqlitedb-*.tar.gz
 
 test_ruby_gem:
   stage: postcheck
   image: cyloncore/ci:ruby
   script:
-    - gem install build/dists/ruby/pkg/gqlite-*.gem
+    - gem install bindings/ruby/pkg/gqlite-*.gem
     - rspec tests/rb/gqlite-rspec.rb
   needs:
     - job: "dists"

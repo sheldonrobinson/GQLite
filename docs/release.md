@@ -11,9 +11,9 @@ How to release gqlite
 - Ruby, in build directory
 
 ```bash
-  make dist
-  cd dists/ruby;
-  rake package
+  cd bindings/ruby;
+  rake prepare:ext
+  rake gem
 ```
 
   Test gem:

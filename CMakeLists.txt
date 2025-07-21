@@ -187,7 +187,7 @@ endif()
 ########################
 ## Build ruby
 
-install(FILES bindings/ruby/gqlite.rb DESTINATION ${INSTALL_LIB_DIR}/ruby)
+install(FILES bindings/ruby/lib/gqlite.rb DESTINATION ${INSTALL_LIB_DIR}/ruby)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libgqliterb.so DESTINATION ${INSTALL_LIB_DIR}/ruby RENAME gqliterb.so)
 
 ########################
@@ -197,58 +197,6 @@ add_executable(gqlite_c_example examples/main.c)
 target_link_libraries(gqlite_c_example PRIVATE gqlitecpp)
 add_executable(gqlite_cpp_example examples/main.cpp)
 target_link_libraries(gqlite_cpp_example PRIVATE gqlitecpp)
-
-###########################
-## COPY dists to binary dir
-
-file(GLOB_RECURSE DISTS_FILES dists/*)
-list(APPEND FOUND_FILES ${DISTS_FILES})
-foreach(DF ${FOUND_FILES})
-  cmake_path(GET DF RELATIVE_PART TRUNCF)
-  file(RELATIVE_PATH RELATIVEF ${CMAKE_CURRENT_SOURCE_DIR} ${DF})
-  cmake_path(GET RELATIVEF PARENT_PATH RELATIVEF_DIR)
-  file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/${RELATIVEF_DIR})
-  file(CREATE_LINK ${DF} ${CMAKE_CURRENT_BINARY_DIR}/${RELATIVEF})
-endforeach()
-
-# For Ruby
-
-set(RUST_CARGO ${Rust_CARGO_CACHED})
-set(CARGO_TARGET_DIR ${CMAKE_BINARY_DIR}/cargo/build)
-set(GQLITERB_DIST_DIR ${CMAKE_CURRENT_BINARY_DIR}/dists/ruby/)
-set(GQLITERB_DIST_EXT_GQLITERB_DIR ${CMAKE_CURRENT_BINARY_DIR}/dists/ruby/ext/gqliterb)
-set(GQLITERB_CRATE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/bindings/ruby/gqliterb)
-set(GQLITERB_EXPORTED_CRATE "${CARGO_TARGET_DIR}/package/gqliterb-*.crate")
-
-# Collect source files from the crate directory
-file(GLOB_RECURSE GQLITERB_SRC_FILES "${GQLITERB_CRATE_DIR}/**/*" ${CMAKE_CURRENT_SOURCE_DIR}/bindings/ruby/extconf.rb)
-
-file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/dists/ruby/lib)
-file(CREATE_LINK ${CMAKE_CURRENT_SOURCE_DIR}/bindings/ruby/gqlite.rb ${CMAKE_CURRENT_BINARY_DIR}/dists/ruby/lib/gqlite.rb)
-
-add_custom_target(cargo_package_gqliterb
-  COMMAND ${CMAKE_COMMAND} -E echo "📦 Packaging 'gqliterb' crate..."
-  COMMAND ${RUST_CARGO} package --package gqliterb --target-dir=${CARGO_TARGET_DIR} --allow-dirty --no-verify
-  COMMAND ${CMAKE_COMMAND} -E remove_directory "${GQLITERB_DIST_EXT_GQLITERB_DIR}"
-  COMMAND ${CMAKE_COMMAND} -E make_directory "${GQLITERB_DIST_EXT_GQLITERB_DIR}"
-  COMMAND tar -xzf ${GQLITERB_EXPORTED_CRATE} --strip-components=1 -C ${GQLITERB_DIST_EXT_GQLITERB_DIR}
-  COMMAND ${CMAKE_COMMAND} -E rm -f ${GQLITERB_EXPORTED_CRATE}
-  COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/dists/ruby/extconf.rb ${GQLITERB_DIST_EXT_GQLITERB_DIR}
-  DEPENDS ${GQLITERB_SRC_FILES}
-  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-)
-
-# For Python
-
-# file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/dists/python/gqlite)
-# file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/dists/python/src)
-# file(CREATE_LINK ${CMAKE_CURRENT_SOURCE_DIR}/bindings/python/gqlite/__init__.py ${CMAKE_CURRENT_BINARY_DIR}/dists/python/gqlite/__init__.py)
-# file(CREATE_LINK ${CMAKE_CURRENT_SOURCE_DIR}/bindings/python/build-ffi.py ${CMAKE_CURRENT_BINARY_DIR}/dists/python/build-ffi.py)
-# file(CREATE_LINK ${CMAKE_CURRENT_SOURCE_DIR}/include/gqlite-c.h ${CMAKE_CURRENT_BINARY_DIR}/dists/python/src/gqlite-c.h)
-
-# Dist target
-
-add_custom_target(dist DEPENDS cargo_package_gqliterb)
 
 ########################
 ## Build tests

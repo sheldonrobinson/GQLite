@@ -1,4 +1,5 @@
 require 'rake'
+require 'fileutils'
 
 # extconf
 require "rake/extensiontask"
@@ -59,7 +60,10 @@ DESC
   s.homepage    = "https://gitlab.com/auksys/gqlite"
   s.license     = "MIT"
   
-  s.files = Dir["lib/**/*.rb", "ext/**/*.{rs,toml,lock,rb}"]
+  s.files = Dir[
+    "lib/**/*.rb",
+    "ext/**/*.{rs,toml,lock,rb}"
+  ]
   s.require_paths = ["lib"]  
   s.extensions = %w[ext/gqliterb/extconf.rb]
 
@@ -79,11 +83,76 @@ Rake::ExtensionTask.new "gqliterb" do |ext|
 end
 
 Gem::PackageTask.new(GEMSPEC) do |pkg|
-  # Hack to trick GEM into following the symlinks while packaging instead of adding symlink to tarfile
-  class File
-    def File.lstat fn
-      return File.stat fn
-    end
+end
+
+task :gem => 'check_ext'
+
+desc "Check for ext directory"
+task :check_ext do |t|
+  unless Dir.exist?('ext')
+    abort "❌ ERROR: 'ext' directory not found. Run 'rake prepare:ext' first."
   end
 end
 
+namespace :prepare do
+  desc "Package the ext directory with gqliterb"
+  task :ext do |t|
+
+    tmp_dir = "tmp/"
+    ext_dir = "ext"
+    gqliterb_dir = File.join(ext_dir, "gqliterb")
+    gqliterb_dot_cargo_dir = File.join(gqliterb_dir, ".cargo")
+    gqlitedb_dir = File.join(gqliterb_dir, "vendor/gqlitedb")
+    extconf_source = "extconf.rb"
+    config_toml_source = "config.toml"
+
+
+    puts "🧹 Cleaning directories"
+    FileUtils.rm_rf(tmp_dir)
+    FileUtils.mkdir_p(tmp_dir)
+    FileUtils.rm_rf(ext_dir)
+    FileUtils.mkdir_p(gqliterb_dir)
+    FileUtils.mkdir_p(gqlitedb_dir)
+
+    # Helper function to package and find crate
+    def export_crate(crate_name, tmp_dir, dst_dir)
+      puts "📦 Packaging '#{crate_name}' crate..."
+      system("cargo", "package", "--package", crate_name, "--target-dir=#{tmp_dir}", "--allow-dirty", "--no-verify") or
+        raise "❌ Failed to package #{crate_name}"
+      crate_path = Dir[File.join(tmp_dir, "package", "#{crate_name}-*.crate")].first
+      raise "❌ Could not find packaged crate for #{crate_name}" unless crate_path
+
+      puts "📦 Unpacking #{crate_path} to #{dst_dir}"
+      system("tar", "-xzf", crate_path, "--strip-components=1", "-C", dst_dir) or
+        raise "❌ Failed to unpack #{crate_path}"
+
+      puts "🧼 Removing .crate archive"
+      FileUtils.rm_f(crate_path)
+    
+      puts "✅ Done: #{crate_name} crate unpacked to #{dst_dir}"
+    end
+
+    export_crate("gqliterb", tmp_dir, gqliterb_dir)
+    export_crate("gqlitedb", tmp_dir, gqlitedb_dir)
+
+    puts "📄 Copying extconf.rb"
+    FileUtils.cp(extconf_source, gqliterb_dir)
+
+    puts "📄 Copying config.toml"
+    FileUtils.mkdir_p(gqliterb_dot_cargo_dir)
+    FileUtils.cp(config_toml_source, gqliterb_dot_cargo_dir)
+
+    puts "🧹 Cleaning temporary directory"
+    FileUtils.rm_rf(tmp_dir)
+
+    puts "✅ Done: preparing `gqliterb`"
+  end
+end
+
+
+task :clean do
+  desc "Clean artefacts"
+  FileUtils.rm_rf("tmp/")
+  FileUtils.rm_rf("ext/")
+  FileUtils.rm_rf("pkg/")
+end
