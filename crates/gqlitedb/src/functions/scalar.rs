@@ -59,7 +59,7 @@ impl ToInteger
   }
 }
 
-super::declare_function!(toInteger, ToInteger, call_impl(crate::value::Value) -> i64);
+super::declare_function!(tointeger, ToInteger, call_impl(crate::value::Value) -> i64);
 
 #[derive(Debug, Default)]
 pub(super) struct Properties {}

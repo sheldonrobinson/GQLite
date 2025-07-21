@@ -57,10 +57,14 @@ features = [
   'remove/Remove1', 'remove/Remove2', 'remove/Remove3',
   # UNWIND
   'unwind/Unwind1',
+  # RETURN
+  'return/Return1', 'return/Return2', 'return/Return3', 'return/Return4', 'return/Return6', 'return/Return7',  'return/Return8',
   # RETURN ORDER BY
   'return-orderby/ReturnOrderBy1', 'return-orderby/ReturnOrderBy2', 'return-orderby/ReturnOrderBy3', 'return-orderby/ReturnOrderBy4', 'return-orderby/ReturnOrderBy5',
   # RETURN SKIP LIMIT
   'return-skip-limit/ReturnSkipLimit1', 'return-skip-limit/ReturnSkipLimit2', 'return-skip-limit/ReturnSkipLimit3',
+  # WITH
+  'with/With1', 'with/With2', 'with/With3', 'with/With4', 'with/With6', 'with/With7',
   # WITH ORDER BY
   'with-orderBy/WithOrderBy1', 'with-orderBy/WithOrderBy2', 'with-orderBy/WithOrderBy3', 'with-orderBy/WithOrderBy4',
   'with/With3', 
@@ -103,7 +107,7 @@ expressions = [
 
 # In progress
 # gql = []
-# features = ['create/Create4', 'create/Create6', 'create/Create5', 'match/Match6', 'remove/Remove3', ]
+# features = ['create/Create4', 'create/Create6', 'create/Create5', 'match/Match6', 'remove/Remove3', 'return/Return5', 'with/With5', ]
 # expressions = [ 'aggregation/Aggregation8']
 
 # Regressions 1.1 -> 1.2

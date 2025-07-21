@@ -986,8 +986,8 @@ fn compute_return_with_table(
       }
     }
 
-    // Aggregation always return at least once
-    if aggregation_table.is_empty()
+    // Aggregation always return at least once, unless there is a non-aggregated value
+    if aggregation_table.is_empty() && variables.iter().all(|v| v.aggregations.len() > 0)
     {
       let row = Row::new(Default::default(), variables_sizes.total_size());
       let aggregations_states = create_aggregations_states(&variables, parameters)?;
@@ -998,6 +998,7 @@ fn compute_return_with_table(
 
     for (row, aggregations_states) in aggregation_table
     {
+      let mut non_null_aggregation = false;
       let mut out_row = value_table::Row::new(Default::default(), variables_sizes.total_size());
       for (idx, (rw_expr, aggregation_states)) in variables
         .iter()
@@ -1012,7 +1013,9 @@ fn compute_return_with_table(
         {
           for (name, s) in aggregation_states.into_iter()
           {
-            out_row.set(name, s.finalise()?)?;
+            let value = s.finalise()?;
+            non_null_aggregation = non_null_aggregation | !value.is_null();
+            out_row.set(name, value)?;
           }
           let mut stack = Stack::default();
           eval_instructions(&mut stack, &out_row, &rw_expr.instructions, &parameters)?;

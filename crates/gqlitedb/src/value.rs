@@ -552,6 +552,7 @@ impl_to_value!(f64, Float);
 impl_to_value!(String, String);
 impl_to_value!(graph::Node, Node);
 impl_to_value!(graph::Edge, Edge);
+impl_to_value!(graph::Path, Path);
 impl_to_value!(Vec<Value>, Array);
 impl_to_value!(ValueMap, Map);
 

@@ -52,7 +52,7 @@ pub enum CompileTimeError
   NoSingleRelationshipType,
   #[error("NotComparable: values are not comparable.")]
   NotComparable,
-  #[error("UnknownFunction: {name}")]
+  #[error("UnknownFunction: {name}.")]
   UnknownFunction
   {
     name: String
@@ -120,7 +120,7 @@ pub enum RunTimeError
   /// Edge has no label
   #[error("MissingEdgeLabel")]
   MissingEdgeLabel,
-  #[error("UnknownFunction: {name}")]
+  #[error("UnknownFunction: {name}.")]
   UnknownFunction
   {
     name: String

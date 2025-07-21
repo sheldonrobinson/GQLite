@@ -367,10 +367,25 @@ impl AstBuilder
                 .collect::<Result<_>>()?,
             }))
           }
-          Rule::count_star => Ok(ast::Expression::FunctionCall(ast::FunctionCall {
-            name: "count".into(),
-            arguments: vec![ast::Expression::Value(ast::Value { value: 0.into() })],
-          })),
+          Rule::function_star =>
+          {
+            let mut it = pair.into_inner();
+            let function_name = it
+              .next()
+              .ok_or_else(|| error::InternalError::MissingFunctionName)?
+              .as_str();
+            if function_name.to_lowercase() != "count"
+            {
+              Err(error::CompileTimeError::UnknownFunction {
+                name: function_name.to_owned(),
+              })?;
+            }
+
+            Ok(ast::Expression::FunctionCall(ast::FunctionCall {
+              name: "count".into(),
+              arguments: vec![ast::Expression::Value(ast::Value { value: 0.into() })],
+            }))
+          }
           Rule::parenthesised_expression =>
           {
             let mut it = pair.into_inner();

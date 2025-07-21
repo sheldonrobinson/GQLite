@@ -91,6 +91,22 @@ module GQLiteTest
         c.map do |v|
           if v == "[{}]"
             YAML.load v
+          elsif v == "[(:A), [:T], (:B)]"
+            [
+              { "type"=>"node", "properties" => {}, "labels" => ["A"] },
+              { "type"=>"edge", "properties" => {}, "labels" => ["T"] },
+              { "type"=>"node", "properties" => {}, "labels" => ["B"] }
+            ]
+          elsif v == "{node1: (:A), rel: [:T], node2: (:B)}"
+            {
+              "node1"=> { "type"=>"node", "properties" => {}, "labels" => ["A"] },
+              "rel" => { "type"=>"edge", "properties" => {}, "labels" => ["T"] },
+              "node2" => { "type"=>"node", "properties" => {}, "labels" => ["B"] }
+            }
+          elsif v == "[()]"
+            [
+              { "type"=>"node", "properties" => {}, "labels" => [] },
+            ]
           elsif (v.scan r_float).size > 0
             v.to_f
           elsif (arr = v.scan r_node).size > 0
@@ -242,6 +258,9 @@ IgnoredScenario = [
   "[19] Optionally matching named paths with single and variable length patterns",
   "[20] Variable length optional relationships with bound nodes, no matches",
   "[5] Fail for `size()` on paths",
+  "[8] Handle aggregation on functions",
+  "[13] Returning the minimum length of paths",
+  "[4] Implicit grouping with single path variable as grouping key and single aggregation",
   # WITH not eliminating conflicts
   "[7] Matching twice with conflicting relationship types on same relationship",
   "[24] Matching twice with duplicate relationship types on same relationship",
@@ -265,6 +284,8 @@ IgnoredScenario = [
   "[22] Sort by an expression that is only partially orderable on a non-distinct binding table, but used as a grouping key",
   "[23] Sort by an expression that is only partially orderable on a non-distinct binding table, but used in parts as a grouping key",
   "[15] Sort by an aliased aggregate projection does allow subsequent matching",
+  # Aliasing (https://gitlab.com/auksys/GQLite/-/issues/63)
+  "[3] Aliasing expressions",
   # Missing RANGE function
   "[4] Unwinding a collected unwound expression",
   # Lists are not supported in expressions
@@ -278,6 +299,8 @@ IgnoredScenario = [
   "[13] Fail when sorting on variable removed by DISTINCT",
   "[24] Sort by an expression that is only partially orderable on a non-distinct binding table, but made distinct",
   "[1] Handle dependencies across WITH with SKIP",
+  "[6] Keeping used expression 3",
+  "[16] Aggregation on complex expressions",
   # Time not supported
   "[11] Sort by a date expression in ascending order",
   "[12] Sort by a date expression in descending order",
@@ -318,6 +341,21 @@ IgnoredScenario = [
   # String Unicode literal not supported
   "[10] Accept valid Unicode literal",
   "[13] Failing on incorrect unicode literal",
+  # Should fails when no variables is in scope https://gitlab.com/auksys/GQLite/-/issues/64
+  "[2] Fail when using RETURN * without variables in scope",
+  # Non-constant expression https://gitlab.com/auksys/GQLite/-/issues/65
+  "[15] Using `rand()` in aggregations",
+  # Aggregates in aggregates https://gitlab.com/auksys/GQLite/-/issues/66
+  "[14] Aggregates in aggregates",
+  # Should fail when using a non-aggregated variable https://gitlab.com/auksys/GQLite/-/issues/67
+  "[8] Fail if not projected variables are used inside an expression which contains an aggregation expression",
+  "[9] Fail if more complex expression, even if projected, are used inside expression which contains an aggregation expression",
+  "[20] Fail if not returned variables are used inside an expression which contains an aggregation expression",
+  "[21] Fail if more complex expressions, even if returned, are used inside expression which contains an aggregation expression",
+  # WONTFIX: why type(n) works? but n.num should fail...
+  "[15] Fail when returning properties of deleted nodes",
+  "[16] Fail when returning labels of deleted nodes",
+  "[17] Fail when returning properties of deleted relationships"
 ]
 
 Before do |scenario|
@@ -642,4 +680,19 @@ Then(/^a TypeError should be raised at runtime: InvalidArgumentType$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
   expect(@exception.message).to match(/^RunTime: InvalidArgumentType: .*\.$/)
+end
+
+Then(/^a SyntaxError should be raised at compile time: UnknownFunction$/) do
+  expect(@exception).not_to be_nil
+  expect(@exception.message).to match(/^CompileTime: UnknownFunction: .*\.$/)
+end
+
+Then(/^a SyntaxError should be raised at compile time: NestedAggregation$/) do
+  expect(@exception).not_to be_nil
+  expect(@exception.message).to match(/^CompileTime: NestedAggregation: .*\.$/)
+end
+
+Then(/^a SyntaxError should be raised at compile time: NoVariablesInScope$/) do
+  expect(@exception).not_to be_nil
+  expect(@exception.message).to match(/^CompileTime: NoVariablesInScope: .*\.$/)
 end

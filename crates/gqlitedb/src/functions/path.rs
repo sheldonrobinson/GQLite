@@ -1,5 +1,5 @@
 use super::ExpressionType;
-use crate::prelude::*;
+use crate::{functions::FResult, prelude::*};
 
 #[derive(Debug, Default)]
 pub(super) struct Length {}
@@ -46,3 +46,35 @@ impl super::FunctionTrait for Length
 }
 
 super::declare_function!(length, Length, custom_trait);
+
+#[derive(Debug, Default)]
+pub(super) struct Nodes {}
+
+impl Nodes
+{
+  fn call_impl(path: &graph::Path) -> FResult<Vec<graph::Node>>
+  {
+    Ok(vec![path.source.clone(), path.destination.clone()])
+  }
+}
+
+super::declare_function!(nodes, Nodes, call_impl(crate::graph::Path) -> Vec<graph::Node>);
+
+#[derive(Debug, Default)]
+pub(super) struct Edges {}
+
+impl Edges
+{
+  fn call_impl(path: &graph::Path) -> FResult<Vec<graph::Edge>>
+  {
+    Ok(vec![graph::Edge {
+      key: path.key.clone(),
+      source: path.source.clone(),
+      destination: path.destination.clone(),
+      properties: path.properties.clone(),
+      labels: path.labels.clone(),
+    }])
+  }
+}
+
+super::declare_function!(edges, Edges, call_impl(crate::graph::Path) -> Vec<graph::Edge>);

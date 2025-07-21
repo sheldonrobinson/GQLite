@@ -153,12 +153,22 @@ impl GqliteBrowser
   {
     true
   }
+  #[cfg(not(target_arch = "wasm32"))]
+  fn support_quitting() -> bool
+  {
+    true
+  }
   #[cfg(target_arch = "wasm32")]
   fn new_database(&mut self, _backend: impl Into<String>) {}
   #[cfg(target_arch = "wasm32")]
   fn open_database(&mut self) {}
   #[cfg(target_arch = "wasm32")]
   fn support_opening() -> bool
+  {
+    false
+  }
+  #[cfg(target_arch = "wasm32")]
+  fn support_quitting() -> bool
   {
     false
   }
@@ -206,6 +216,13 @@ brisk_eframe::brisk_it! {
                       visible: gqlitedb::Connection::available_backends().contains(&"sqlite".to_string()) && Self::support_opening(),
                       on_clicked: self.open_database()
                     },
+                    Button {
+                        text: "Quit",
+                        visible: Self::support_quitting(),
+                        on_clicked: {
+                            ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
+                        }
+                    }
                   }
               },
           },

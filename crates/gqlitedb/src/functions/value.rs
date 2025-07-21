@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-use super::{ExpressionType, FResult, FunctionTypeTrait};
+use super::{ExpressionType, FResult};
 
 #[derive(Debug, Default)]
 pub(super) struct HasLabel {}

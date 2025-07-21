@@ -143,6 +143,8 @@ impl Manager
           math::Rand::new(),
           node::Labels::new(),
           path::Length::new(),
+          path::Nodes::new(),
+          path::Edges::new(),
           scalar::Coalesce::new(),
           scalar::Properties::new(),
           scalar::ToInteger::new(),
@@ -155,34 +157,29 @@ impl Manager
       .into(),
     }
   }
-  pub(crate) fn get_function<E: error::GenericErrors>(
-    &self,
-    name: impl Into<String>,
-  ) -> Result<Function>
+  pub(crate) fn get_function<E: error::GenericErrors>(&self, name: &str) -> Result<Function>
   {
-    let name = name.into();
     Ok(
       self
         .inner
         .read()?
         .functions
-        .get(&name)
+        .get(&name.to_lowercase())
         .ok_or_else(|| E::unknown_function(name).into())?
         .clone(),
     )
   }
   pub(crate) fn get_aggregator<E: error::GenericErrors>(
     &self,
-    name: impl Into<String>,
+    name: &str,
   ) -> Result<aggregators::Aggregator>
   {
-    let name = name.into();
     Ok(
       self
         .inner
         .read()?
         .aggregators
-        .get(&name)
+        .get(&name.to_lowercase())
         .ok_or_else(|| E::unknown_function(name).into())?
         .clone(),
     )
@@ -190,13 +187,13 @@ impl Manager
   pub(crate) fn is_deterministic(&self, name: impl Into<String>) -> Result<bool>
   {
     let name = name.into();
-    let fun = self.get_function::<crate::error::CompileTimeError>(name.clone());
+    let fun = self.get_function::<crate::error::CompileTimeError>(&name);
     match fun
     {
       Ok(fun) => Ok(fun.is_deterministic()),
       Err(_) =>
       {
-        self.get_aggregator::<crate::error::CompileTimeError>(name)?;
+        self.get_aggregator::<crate::error::CompileTimeError>(&name)?;
         Ok(false)
       }
     }
@@ -213,12 +210,12 @@ impl Manager
   ) -> Result<ExpressionType>
   {
     let name = name.into();
-    let fun = self.get_function::<crate::error::CompileTimeError>(name.clone());
+    let fun = self.get_function::<crate::error::CompileTimeError>(&name);
     match fun
     {
       Ok(fun) => fun.validate_arguments(arguments),
       Err(_) => self
-        .get_aggregator::<crate::error::CompileTimeError>(name)?
+        .get_aggregator::<crate::error::CompileTimeError>(&name)?
         .validate_arguments(arguments),
     }
   }
@@ -288,6 +285,7 @@ macro_rules! default_validate_ {
       -> crate::Result<$crate::compiler::expression_analyser::ExpressionType>
     {
       // TODO
+      use $crate::functions::FunctionTypeTrait;
       Ok(<$ret_type>::result_type())
     }
   };
