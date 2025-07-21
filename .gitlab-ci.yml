@@ -56,7 +56,8 @@ include:
     reports:
       junit:
         - build/Testing/junit/*.xml
-        - target/nextest/default/junit
+        - build/Testing/junit/*/*.xml
+        - target/nextest/default/junit.xml
 
 precheck:
   stage: precheck
