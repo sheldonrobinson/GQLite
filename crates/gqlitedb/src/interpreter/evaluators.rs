@@ -787,6 +787,10 @@ fn eval_instructions(
       {
         execute_binary_operator(stack, |a, b| a % b)?;
       }
+      &instructions::Instruction::ExponentBinaryOperator =>
+      {
+        execute_binary_operator(stack, |a, b| a.pow(b))?;
+      }
     }
   }
   Ok(())

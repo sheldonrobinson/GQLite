@@ -197,6 +197,13 @@ impl AstBuilder
           }
           .into(),
         ),
+        Rule::exponent => Ok(
+          ast::Exponent {
+            left: lhs?,
+            right: rhs?,
+          }
+          .into(),
+        ),
         Rule::or => Ok(
           ast::LogicalOr {
             left: lhs?,
@@ -1093,7 +1100,8 @@ pub(crate) fn parse(input: &str) -> Result<ast::Queries>
     .op(
       Op::infix(Rule::multiplication, Assoc::Left)
         | Op::infix(Rule::division, Assoc::Left)
-        | Op::infix(Rule::modulo, Assoc::Left),
+        | Op::infix(Rule::modulo, Assoc::Left)
+        | Op::infix(Rule::exponent, Assoc::Left),
     )
     .op(Op::prefix(Rule::not) | Op::prefix(Rule::negation))
     .op(

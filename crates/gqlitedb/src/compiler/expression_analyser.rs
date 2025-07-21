@@ -349,6 +349,10 @@ impl<'b> Analyser<'b>
         ExpressionType::Variant,
         ([&ri.left, &ri.right].into_iter(), validators::any).analyse(self)?,
       )),
+      ast::Expression::Exponent(ri) => Ok(ExpressionInfo::new_type(
+        ExpressionType::Variant,
+        ([&ri.left, &ri.right].into_iter(), validators::any).analyse(self)?,
+      )),
       ast::Expression::Map(map) => Ok(ExpressionInfo::new_type(
         ExpressionType::Map,
         (map.map.iter().map(|(_, v)| v), validators::any).analyse(self)?,

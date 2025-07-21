@@ -77,6 +77,7 @@ pub(crate) enum Instruction
   MultiplicationBinaryOperator,
   DivisionBinaryOperator,
   ModuloBinaryOperator,
+  ExponentBinaryOperator,
 }
 
 pub(crate) type Instructions = Vec<Instruction>;

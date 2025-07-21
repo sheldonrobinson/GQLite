@@ -261,6 +261,11 @@ impl Compiler
         compile_binary_op!(self, modulo, instructions, aggregations);
         Instruction::ModuloBinaryOperator
       }
+      ast::Expression::Exponent(exponent) =>
+      {
+        compile_binary_op!(self, exponent, instructions, aggregations);
+        Instruction::ExponentBinaryOperator
+      }
       ast::Expression::Negation(logical_negation) =>
       {
         self.compile_expression(&logical_negation.value, instructions, aggregations)?;

@@ -125,7 +125,7 @@ remove_member_access =  { (("(" ~ ident ~ ")") | ident) ~ ("." ~ ident)+ }
 
 expression = { prefix* ~ expression_term ~ postfix* ~ (infix ~ prefix? ~ expression_term ~ postfix*)* }
 
-infix   = _{ addition | subtraction | multiplication | division | modulo | or | and | xor | equal | different | in_ | not_in | superior_equal | inferior_equal | superior | inferior }
+infix   = _{ addition | subtraction | multiplication | division | modulo | exponent | or | and | xor | equal | different | in_ | not_in | superior_equal | inferior_equal | superior | inferior }
 postfix = _{ is_null | is_not_null | member_access | range_access | range_access_to | index_access }
 prefix  = _{ negation | not }
 
@@ -134,6 +134,7 @@ subtraction    = { "-" }
 multiplication = { "*" }
 division       = { "/" }
 modulo         = { "%" }
+exponent       = { "^" }
 
 xor_kw         = @{ "XOR" ~ !ASCII_ALPHA }
 xor            =  { xor_kw }

@@ -292,6 +292,7 @@ pub(crate) enum Expression
   Multiplication(Box<Multiplication>),
   Division(Box<Division>),
   Modulo(Box<Modulo>),
+  Exponent(Box<Exponent>),
 
   Negation(Box<Negation>),
   LogicalNegation(Box<LogicalNegation>),
@@ -565,6 +566,7 @@ create_binary_op! {Subtraction}
 create_binary_op! {Multiplication}
 create_binary_op! {Division}
 create_binary_op! {Modulo}
+create_binary_op! {Exponent}
 
 macro_rules! create_unary_op {
   ( $x:tt ) => {

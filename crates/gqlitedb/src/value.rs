@@ -329,17 +329,20 @@ impl Add for Value
       {
         Self::Float(rhs) => Ok((lhs + rhs).into()),
         Self::Integer(rhs) => Ok((lhs + rhs as f64).into()),
+        Self::Null => Ok(Self::Null),
         _ => Err(RunTimeError::InvalidBinaryOperands.into()),
       },
       Self::Integer(lhs) => match rhs
       {
         Self::Float(rhs) => Ok((lhs as f64 + rhs).into()),
         Self::Integer(rhs) => Ok((lhs + rhs).into()),
+        Self::Null => Ok(Self::Null),
         _ => Err(RunTimeError::InvalidBinaryOperands.into()),
       },
       Self::String(lhs) => match rhs
       {
         Self::String(rhs) => Ok((lhs + &rhs).into()),
+        Self::Null => Ok(Self::Null),
         _ => Err(RunTimeError::InvalidBinaryOperands.into()),
       },
     }
@@ -367,12 +370,14 @@ macro_rules! impl_mdsr {
           {
             Self::Float(rhs) => Ok(lhs.$op(rhs).into()),
             Self::Integer(rhs) => Ok(lhs.$op(rhs as f64).into()),
+            Self::Null => Ok(Self::Null),
             _ => Err(RunTimeError::InvalidBinaryOperands.into()),
           },
           Self::Integer(lhs) => match rhs
           {
             Self::Float(rhs) => Ok((lhs as f64).$op(rhs).into()),
             Self::Integer(rhs) => Ok(lhs.$op(rhs).into()),
+            Self::Null => Ok(Self::Null),
             _ => Err(RunTimeError::InvalidBinaryOperands.into()),
           },
         }
@@ -385,6 +390,42 @@ impl_mdsr!(Mul, mul);
 impl_mdsr!(Sub, sub);
 impl_mdsr!(Div, div);
 impl_mdsr!(Rem, rem);
+
+impl Value
+{
+  pub(crate) fn pow(self, rhs: Value) -> Result<Value>
+  {
+    match self
+    {
+      Value::Boolean(..)
+      | Value::String(..)
+      | Value::Node(..)
+      | Value::Edge(..)
+      | Value::Array(..)
+      | Value::Map(..)
+      | Value::Path(..) => Err(RunTimeError::InvalidBinaryOperands.into()),
+      Value::Null => Ok(Value::Null),
+      Self::Float(lhs) => match rhs
+      {
+        Self::Float(rhs) => Ok(lhs.powf(rhs).into()),
+        Self::Integer(rhs) => Ok(lhs.powf(rhs as f64).into()),
+        Self::Null => Ok(Self::Null),
+        _ => Err(RunTimeError::InvalidBinaryOperands.into()),
+      },
+      Self::Integer(lhs) => match rhs
+      {
+        Self::Float(rhs) => Ok((lhs as f64).powf(rhs).into()),
+        Self::Integer(rhs) => match rhs.try_into()
+        {
+          Ok(rhs) => Ok(lhs.pow(rhs).into()),
+          Err(_) => Ok((lhs as f64).powf(rhs as f64).into()),
+        },
+        Self::Null => Ok(Self::Null),
+        _ => Err(RunTimeError::InvalidBinaryOperands.into()),
+      },
+    }
+  }
+}
 
 impl Neg for Value
 {
