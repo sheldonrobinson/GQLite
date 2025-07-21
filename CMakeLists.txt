@@ -297,7 +297,7 @@ if(CUCUMBER_FOUND)
   add_test(NAME gqlite-rb-tck-redb    COMMAND ${Ruby_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/rb/gqlite-tck.rb --backend redb   ${GQLITE_TCK_EXTRA_ARGS} --output-dir ${CMAKE_BINARY_DIR}/Testing/junit/redb WORKING_DIRECTORY   ${CMAKE_CURRENT_SOURCE_DIR}/tests/rb/)
 endif()
 
-if(Python3_FOUND AND PYTHON3_CFFI_FOUND)
+if(Python3_FOUND)
   add_test(NAME gqlite-py COMMAND ${Python3_EXECUTABLE} ${GQLITE_PY_EXTRA_ARGS} ${CMAKE_CURRENT_SOURCE_DIR}/tests/py/python-unittest.py)
 endif()
 
