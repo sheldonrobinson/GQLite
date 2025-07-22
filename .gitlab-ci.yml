@@ -60,6 +60,23 @@ include:
         - build/Testing/junit/*/*.xml
         - target/nextest/default/junit.xml
 
+.benchmark_template: &benchmark_definition
+  before_script:
+    # Prepare SSH key
+    - mkdir -p ~/.ssh
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+
+    # Add known hosts (GitLab.com or your Git host)
+    - ssh-keyscan gitlab.com >> ~/.ssh/known_hosts
+
+    - echo "🧬 Clone $TARGET_REPO"
+    - git clone $TARGET_REPO results_repo
+    - pushd results_repo
+    - git config user.email "ci-bot@auksys.org"
+    - git config user.name "CI Bot"
+    - popd
+
 precheck:
   stage: precheck
   extends:
@@ -140,42 +157,52 @@ test_python_src_wheels:
     - job: "dists"
       artifacts: true
 
-benchmarks:
+benchmarks_iai:
+  stage: benchmark
+  image: cyloncore/ci:debian
+  variables:
+    TARGET_REPO: git@gitlab.com:GQLite/benchmark-results.git
+    TARGET_SUB_DIR: $CI_COMMIT_SHA/pokec_iai
+    TARGET_DIR: results_repo/$TARGET_SUB_DIR
+  script:
+    - mkdir -p ${TARGET_DIR}
+
+    - echo "🚀 Run 'iai' benchmarks..."
+    - export PATH=`pwd`/scripts/workaround/iai_callgrind/:$PATH
+    - cargo bench -p gqlitedb --bench pokec_iai -- --save-summary=json --home=pokec_iai | tee ${TARGET_DIR}/${CI_PIPELINE_ID}.log
+
+    - echo "💾 Export results to $TARGET_REPO"
+    - bash scripts/move_pokec_iai_files.sh ${TARGET_DIR} ${CI_PIPELINE_ID}
+    - ruby scripts/iai_json_to_csv.rb ${TARGET_DIR}/${CI_PIPELINE_ID}.*.json > ${TARGET_DIR}/${CI_PIPELINE_ID}.csv
+
+    - echo "📤 Commit and push results to $TARGET_REPO"
+    - pushd results_repo
+    - git add ${TARGET_SUB_DIR}/${CI_PIPELINE_ID}.log ${TARGET_SUB_DIR}/${CI_PIPELINE_ID}.*.json ${TARGET_SUB_DIR}/${CI_PIPELINE_ID}.csv
+    - git commit -m "Add iai-callgrind benchmark results for commit $CI_COMMIT_SHA pipeline $CI_PIPELINE_ID"
+    - git push origin main
+    - popd
+  <<: *benchmark_definition
+
+benchmarks_divan:
   stage: benchmark
   image: cyloncore/ci:debian-arm64
   variables:
     TMP_BENCH_FILE: bench_output.tmp
     TARGET_REPO: git@gitlab.com:GQLite/benchmark-results.git
-  before_script:
-    # Prepare SSH key
-    - mkdir -p ~/.ssh
-    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_rsa
-    - chmod 600 ~/.ssh/id_rsa
-
-    # Add known hosts (GitLab.com or your Git host)
-    - ssh-keyscan gitlab.com >> ~/.ssh/known_hosts
-
-    # Optional: check ssh works
-    - ssh -T git@gitlab.com || true
+    TARGET_SUB_DIR: $CI_COMMIT_SHA/pokec_divan
+    TARGET_DIR: results_repo/$TARGET_SUB_DIR
   script:
-    - echo "🚀 Run benchmarks..."
-    - cargo bench -p gqlitedb | tee $TMP_BENCH_FILE
-
-    - echo "🧬 Clone $TARGET_REPO"
-    - git clone $TARGET_REPO results_repo
-    - mkdir -p results_repo/${CI_COMMIT_SHA}
-    - pushd results_repo
-    - git config user.email "ci-bot@auksys.org"
-    - git config user.name "CI Bot"
-    - popd
+    - echo "🚀 Run 'divan' benchmarks..."
+    - cargo bench -p gqlitedb --bench pokec_divan | tee $TMP_BENCH_FILE
 
     - echo "💾 Export results to $TARGET_REPO"
-    - cat $TMP_BENCH_FILE | ruby scripts/export_divan.rb "results_repo/$CI_COMMIT_SHA/$CI_PIPELINE_ID"
+    - mkdir -p ${TARGET_DIR}
+    - cat $TMP_BENCH_FILE | ruby scripts/export_divan.rb "${TARGET_DIR}/$CI_PIPELINE_ID"
 
     - echo "📤 Commit and push results to $TARGET_REPO"
     - pushd results_repo
-    - git add ${CI_COMMIT_SHA}/${CI_PIPELINE_ID}.txt ${CI_COMMIT_SHA}/${CI_PIPELINE_ID}.csv
-    - git commit -m "Add benchmark results for commit $CI_COMMIT_SHA pipeline $CI_PIPELINE_ID"
+    - git add ${TARGET_SUB_DIR}/${CI_PIPELINE_ID}.txt ${TARGET_SUB_DIR}/${CI_PIPELINE_ID}.csv
+    - git commit -m "Add divan benchmark results for commit $CI_COMMIT_SHA pipeline $CI_PIPELINE_ID"
     - git push origin main
     - popd
 
@@ -184,6 +211,7 @@ benchmarks:
   tags:
     - bench
   dependencies: []
+  <<: *benchmark_definition
 
 # Debian
 debian:build:

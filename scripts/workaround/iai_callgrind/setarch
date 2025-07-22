@@ -1,0 +1,23 @@
+#!/usr/bin/bash
+
+# Running iai_callgrind in CI trigger the following error:
+#
+#  setarch: failed to set personality to x86_64: Operation not permitted
+#  iai_callgrind_runner: Error: Error running 'callgrind': Exit code was: '1'
+#
+# This script disable setarch.
+
+# Skip all arguments until we hit a command (non-option)
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        -* | x86_64 | i386 | linux32 | linux64)
+            shift
+            ;;
+        *)
+            break
+            ;;
+    esac
+done
+
+# Run the rest as the intended command
+exec "$@"

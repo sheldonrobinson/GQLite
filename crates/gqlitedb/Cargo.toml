@@ -47,8 +47,13 @@ uuid = { version = "1", features = ["v4"] }
 [dev-dependencies]
 ccutils = { version = "0.3", features = ["temporary"] }
 divan = "0.1"
+iai-callgrind = { version = "0.16" }
 regex = "1"
 
 [[bench]]
-name = "pokec"
+name = "pokec_divan"
+harness = false
+
+[[bench]]
+name = "pokec_iai"
 harness = false
