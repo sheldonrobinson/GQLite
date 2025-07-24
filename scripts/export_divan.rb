@@ -30,7 +30,7 @@ regex = /
   │?\s*                            # optional pipe and leading whitespace
   [├╰]                              # box drawing character
   \s*─\s*                           # optional dashes and spacing
-  \w+                               # backend name
+  (\w+)                               # backend name
   \s+
   ([\d.]+\s*(?:ms|s))\s*│\s*        # fastest
   ([\d.]+\s*(?:ms|s))\s*│\s*        # slowest
