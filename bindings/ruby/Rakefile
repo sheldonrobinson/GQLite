@@ -62,7 +62,8 @@ DESC
   
   s.files = Dir[
     "lib/**/*.rb",
-    "ext/**/*.{rs,toml,lock,rb}"
+    "ext/**/.cargo/config.toml",
+    "ext/**/*.{rs,toml,lock,rb,pest,sql}"
   ]
   s.require_paths = ["lib"]  
   s.extensions = %w[ext/gqliterb/extconf.rb]
