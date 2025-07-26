@@ -4,10 +4,11 @@
 
 ## [Unreleased] - ReleaseDate
 - New Ruby/Python bindings.
-- Add `head` function.
+- Add `head` function, and `avg` aggregator.
 - Add support for executing multiple independent queries separated by a ';'.
 - Add execution of multiple independent queries separated by a ';'.
 - Add reading file as input in the CLI.
+- Add support for using connection in multi-threaded environment.
 
 ## [0.5.1] - 2025-07-15
 - Add experimental connection server, for use in multi-threaded environment.
