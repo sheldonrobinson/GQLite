@@ -76,6 +76,12 @@ include:
     - git config user.email "ci-bot@auksys.org"
     - git config user.name "CI Bot"
     - popd
+  after_script:
+    - echo "📤 Push results to $TARGET_REPO"
+    - pushd results_repo
+    - git pull --rebase
+    - git push
+    - popd
 
 precheck:
   stage: precheck
@@ -180,11 +186,10 @@ benchmarks_iai:
     - bash scripts/move_pokec_iai_files.sh ${TARGET_DIR} ${CI_PIPELINE_ID}
     - ruby scripts/iai_json_to_csv.rb ${TARGET_DIR}/${CI_PIPELINE_ID}.*.json > ${TARGET_DIR}/${CI_PIPELINE_ID}.csv
 
-    - echo "📤 Commit and push results to $TARGET_REPO"
+    - echo "📝 Commit results to $TARGET_REPO"
     - pushd results_repo
     - git add ${TARGET_SUB_DIR}/${CI_PIPELINE_ID}.log ${TARGET_SUB_DIR}/${CI_PIPELINE_ID}.*.json ${TARGET_SUB_DIR}/${CI_PIPELINE_ID}.csv
     - git commit -m "Add iai-callgrind benchmark results for commit $CI_COMMIT_SHA pipeline $CI_PIPELINE_ID"
-    - git push origin main
     - popd
   <<: *benchmark_definition
 
@@ -204,11 +209,10 @@ benchmarks_divan:
     - mkdir -p ${TARGET_DIR}
     - cat $TMP_BENCH_FILE | ruby scripts/export_divan.rb "${TARGET_DIR}/$CI_PIPELINE_ID"
 
-    - echo "📤 Commit and push results to $TARGET_REPO"
+    - echo "📝 Commit results to $TARGET_REPO"
     - pushd results_repo
     - git add ${TARGET_SUB_DIR}/${CI_PIPELINE_ID}.txt ${TARGET_SUB_DIR}/${CI_PIPELINE_ID}.csv
     - git commit -m "Add divan benchmark results for commit $CI_COMMIT_SHA pipeline $CI_PIPELINE_ID"
-    - git push origin main
     - popd
 
   needs:
