@@ -625,7 +625,7 @@ checksum = "a8d1add55171497b4705a648c6b583acafb01d58050a51727785f0b2c8e0a2b2"
 
 [[package]]
 name = "gqlitecli"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "gqlitedb",
  "rustyline",
@@ -635,7 +635,7 @@ dependencies = [
 
 [[package]]
 name = "gqlitedb"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "askama",
  "ccutils",
@@ -658,7 +658,7 @@ dependencies = [
 
 [[package]]
 name = "gqlitepy"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "gqlitedb",
  "pyo3",
@@ -666,7 +666,7 @@ dependencies = [
 
 [[package]]
 name = "gqliterb"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "gqlitedb",
  "magnus",

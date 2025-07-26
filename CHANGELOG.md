@@ -3,6 +3,8 @@
 <!-- next-header -->
 
 ## [Unreleased] - ReleaseDate
+
+## [0.5.2] - 2025-07-26
 - New Ruby/Python bindings.
 - Add `head` function, and `avg` aggregator.
 - Add support for executing multiple independent queries separated by a ';'.
@@ -71,7 +73,8 @@
 - `persy` backend.
 
 <!-- next-url -->
-[Unreleased]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.5.1...dev/2
+[Unreleased]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.5.2...dev/2
+[0.5.2]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.5.1...gqlitedb-v0.5.2
 [0.5.1]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.5.0...gqlitedb-v0.5.1
 [0.5.0]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.4.0...gqlitedb-v0.5.0
 [0.4.0]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.3.4...gqlitedb-v0.4.0
