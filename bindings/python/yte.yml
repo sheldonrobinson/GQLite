@@ -1,0 +1,5 @@
+# Full documentation is available at https://gitlab.com/cyloncore/yte/-/blob/stable/docs/yte_yml.md
+tasks:
+  build_wheel:
+    depends:
+      - gqlitepy/build_wheel

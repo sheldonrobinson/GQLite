@@ -126,13 +126,8 @@ dists:
   stage: postcheck
   image: cyloncore/ci:debian
   script:
-    - pushd bindings/ruby
-    - rake prepare:ext
-    - rake gem
-    - popd
-    - pushd bindings/python/gqlitepy
-    - CARGO_TARGET_DIR=`pwd` maturin sdist
-    - popd
+    - yte bindings/ruby/build_gem
+    - yte bindings/python/build_wheel
   needs:
     - job: "debian:build"
       artifacts: true

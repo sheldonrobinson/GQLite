@@ -17,8 +17,7 @@ cargo release
 
 ```bash
   cd bindings/ruby;
-  rake prepare:ext
-  rake gem
+  yte build_gem
 ```
 
   Test gem:
@@ -53,7 +52,7 @@ c.execute_oc_query "CREATE (n) RETURN n"
 
 ```bash
   cd bindings/python/gqlitepy
-  CARGO_TARGET_DIR=`pwd` maturin sdist
+  yte build_wheel
 ```
   Usefull documentation:
    - https://betterscientificsoftware.github.io/python-for-hpc/tutorials/python-pypi-packaging/

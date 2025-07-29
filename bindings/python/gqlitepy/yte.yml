@@ -1,0 +1,7 @@
+# Full documentation is available at https://gitlab.com/cyloncore/yte/-/blob/stable/docs/yte_yml.md
+tasks:
+  build_wheel:
+    description: "Build python wheel"
+    command: !script |
+      env.set_env("CARGO_TARGET_DIR", env.cwd());
+      env.execute("maturin sdist")

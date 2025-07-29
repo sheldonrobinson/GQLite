@@ -1,0 +1,6 @@
+tasks:
+  hello:
+    description: "Say hello"
+    arguments: ["who"]
+    command: !commands
+      - env.execute(format!("echo hello {who}"))
