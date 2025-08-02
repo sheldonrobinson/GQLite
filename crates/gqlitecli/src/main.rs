@@ -1,3 +1,5 @@
+#![deny(warnings)]
+
 use std::{
   fs,
   io::{self, BufRead},
@@ -44,7 +46,10 @@ fn print_results(arr: &Vec<gqlitedb::Value>)
 
 trait CliIterator<E>: Iterator<Item = Result<String, E>>
 {
-  fn add_history_entry(&mut self, _: &String) {}
+  fn add_history_entry(&mut self, _: &String) -> Result<(), E>
+  {
+    Ok(())
+  }
 }
 
 impl CliIterator<std::io::Error> for io::Lines<io::BufReader<fs::File>> {}
@@ -81,9 +86,9 @@ impl<'de> Iterator for ReadLineIterator<'de>
 
 impl<'de> CliIterator<rustyline::error::ReadlineError> for ReadLineIterator<'de>
 {
-  fn add_history_entry(&mut self, h: &String)
+  fn add_history_entry(&mut self, h: &String) -> Result<(), rustyline::error::ReadlineError>
   {
-    self.rl.add_history_entry(h);
+    self.rl.add_history_entry(h).map(|_| ())
   }
 }
 
@@ -118,7 +123,7 @@ impl Cli
       {
         if line.starts_with(".")
         {
-          it.add_history_entry(&line);
+          it.add_history_entry(&line)?;
           let splited_line: Vec<_> = line.split(" ").collect();
           match splited_line[0]
           {
@@ -223,7 +228,7 @@ impl Cli
           }
           if query.len() > 0
           {
-            it.add_history_entry(&query);
+            it.add_history_entry(&query)?;
             match self.connection
             {
               Some(ref c) =>
