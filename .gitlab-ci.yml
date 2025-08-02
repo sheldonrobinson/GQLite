@@ -85,14 +85,9 @@ include:
 
 precheck:
   stage: precheck
-  extends:
-    - .cc_retrieve_scripts
-    - .cc_check_binary_files
-    - .cc_check_commit_message
-  script:
-    - echo "Pre-check are running."
+  extends: .cc_all_checks
   variables:
-    CC_CI_REF_BRANCH: "dev/2"
+    CC_CI_REF_BRANCH: "dev/1"
 
 check-default-features:
   stage: precheck
