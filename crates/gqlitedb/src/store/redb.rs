@@ -314,18 +314,34 @@ type TransactionBox = store::TransactionBox<redb::ReadTransaction, redb::WriteTr
 impl Store
 {
   /// Crate a new store, with a default graph
-  pub(crate) fn new<P: AsRef<std::path::Path>>(path: P) -> Result<Store>
+  pub(crate) fn open<P: AsRef<std::path::Path>>(path: P) -> Result<Store>
   {
     let s = Self {
       redb_store: redb::Database::create(path.as_ref())?,
       graphs: Default::default(),
     };
-    use crate::store::Store;
-    let mut tx = s.begin_write()?;
-    s.create_graph(&mut tx, &"default".to_string(), true)?;
-    s.set_metadata_value(&mut tx, "version", &consts::GQLITE_VERSION)?;
-    tx.close()?;
+    s.initialise()?;
     Ok(s)
+  }
+  /// Crate a new store, with a default graph, in memory
+  pub(crate) fn in_memory() -> Result<Store>
+  {
+    let s = Self {
+      redb_store: redb::Database::builder()
+        .create_with_backend(redb::backends::InMemoryBackend::new())?,
+      graphs: Default::default(),
+    };
+    s.initialise()?;
+    Ok(s)
+  }
+  fn initialise(&self) -> Result<()>
+  {
+    use crate::store::Store;
+    let mut tx = self.begin_write()?;
+    self.create_graph(&mut tx, &"default".to_string(), true)?;
+    self.set_metadata_value(&mut tx, "version", &consts::GQLITE_VERSION)?;
+    tx.close()?;
+    Ok(())
   }
   fn get_metadata_from_table<TTable, TValue>(
     &self,

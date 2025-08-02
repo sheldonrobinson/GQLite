@@ -206,7 +206,13 @@ impl Connection
         .to_owned()
         .try_into(),
     )?;
-    let dbhandle = map_err(ruby, gqlitedb::Connection::open(filename, options))?;
+    let dbhandle = map_err(
+      ruby,
+      gqlitedb::Connection::builder()
+        .options(options)
+        .path(filename)
+        .create(),
+    )?;
     Ok(Self { dbhandle })
   }
   fn execute_oc_query(

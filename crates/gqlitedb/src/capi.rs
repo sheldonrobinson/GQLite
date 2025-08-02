@@ -114,12 +114,35 @@ pub extern "C" fn gqlite_connection_create_from_file(
   check_error(context);
   let options = get_value(options);
   let path = unsafe { std::ffi::CStr::from_ptr(filename) };
+
   if let Ok(path) = handle_error(context, path.to_str())
   {
-    if let Ok(c) = handle_error(context, crate::Connection::open(path, options.into_map()))
+    if let Ok(c) = handle_error(
+      context,
+      crate::Connection::builder()
+        .options(options.into_map())
+        .path(path)
+        .create(),
+    )
     {
       return Box::into_raw(Box::new(GqliteConnectionT { connection: c }));
     }
+  }
+  std::ptr::null::<GqliteConnectionT>() as *mut GqliteConnectionT
+}
+
+#[no_mangle]
+pub extern "C" fn gqlite_connection_create(
+  context: *mut GqliteApiContextT,
+  options: *mut GqliteValueT,
+) -> *mut GqliteConnectionT
+{
+  check_error(context);
+  let options = get_value(options);
+
+  if let Ok(c) = handle_error(context, crate::Connection::create(options.into_map()))
+  {
+    return Box::into_raw(Box::new(GqliteConnectionT { connection: c }));
   }
   std::ptr::null::<GqliteConnectionT>() as *mut GqliteConnectionT
 }

@@ -183,7 +183,13 @@ impl Connection
     {
       options.insert("backend".into(), backend.into());
     }
-    let dbhandle = map_err(py, gqlitedb::Connection::open(filename, options))?;
+    let dbhandle = map_err(
+      py,
+      gqlitedb::Connection::builder()
+        .options(options)
+        .path(filename)
+        .create(),
+    )?;
     Ok(Self { dbhandle })
   }
   #[pyo3(signature = (query, bindings=None))]

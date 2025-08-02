@@ -1,5 +1,74 @@
+use std::path::Path;
+
 use crate::prelude::*;
 use value::ValueTryIntoRef;
+
+/// Backend
+pub enum Backend
+{
+  /// Select the first available backend.
+  Automatic,
+  /// SQLite backend.
+  #[cfg(feature = "sqlite")]
+  SQLite,
+  /// Redb backend.
+  #[cfg(feature = "redb")]
+  Redb,
+}
+
+/// Builder with high-level API for creating connection.
+pub struct ConnectionBuilder
+{
+  map: value::ValueMap,
+}
+
+impl ConnectionBuilder
+{
+  /// Merge options. This might overwrite value from the builder
+  pub fn options(mut self, options: value::ValueMap) -> Self
+  {
+    for (k, v) in options.into_iter()
+    {
+      self.map.insert(k, v);
+    }
+    self
+  }
+  /// Set path
+  pub fn path<P: AsRef<Path>>(mut self, p: P) -> Self
+  {
+    self.map.insert(
+      "path".to_string(),
+      p.as_ref().to_string_lossy().as_ref().into(),
+    );
+    self
+  }
+  /// Set backend
+  pub fn backend(mut self, backend: Backend) -> Self
+  {
+    let key = "backend".into();
+    match backend
+    {
+      Backend::Automatic =>
+      {
+        self.map.insert(key, "automatic".into());
+      }
+      Backend::SQLite =>
+      {
+        self.map.insert(key, "sqlite".into());
+      }
+      Backend::Redb =>
+      {
+        self.map.insert(key, "redb".into());
+      }
+    }
+    self
+  }
+  /// Create the connection
+  pub fn create(self) -> Result<Connection>
+  {
+    Connection::create(self.map)
+  }
+}
 
 trait ConnectionTrait: Sync + Send
 {
@@ -98,6 +167,132 @@ ccutils::assert_impl_all!(Connection: Sync, Send);
 
 impl Connection
 {
+  /// Create a new connection to a `GQLite` database. The `options` parameter can
+  /// be used to select the backend, and configure the backend.
+  ///
+  /// Supported parameters:
+  /// - `path` a path to a file, if not present, an in-memory database is created
+  /// - `backend` for instance `redb` or `sqlite` (the [Self::available_backends] function contains the list of compiled backends)
+  ///
+  /// If the `backend` is not specified, the `open` function will attempt to guess it
+  /// for existing databases. For new database, depending on availability, it will
+  /// create a `sqlite` database, or a `redb` database.
+  ///
+  /// Example of use, this will create an in-memory database:
+  ///
+  /// ```rust
+  /// # use gqlitedb::Connection;
+  /// # fn example() -> gqlitedb::Result<()> {
+  /// let connection = Connection::create(gqlitedb::map!("backend" => "redb"))?;
+  /// # Ok(()) }
+  /// ```  
+  pub fn create(options: value::ValueMap) -> Result<Connection>
+  {
+    let backend = options.get("backend").map_or_else(
+      || Ok("automatic".to_string()),
+      |x| x.try_into_ref().map(|x: &String| x.to_owned()),
+    )?;
+    match backend.as_str()
+    {
+      "automatic" =>
+      {
+        #[cfg(feature = "sqlite")]
+        let sq_e = {
+          let mut options = options.clone();
+          options.insert("backend".into(), "sqlite".into());
+          Self::create(options)
+        };
+        #[cfg(not(feature = "sqlite"))]
+        let sq_e = error::ConnectionError::UnavailableBackend { backend: "sqlite" }.into();
+        let sq_r = match sq_e
+        {
+          Ok(sq) => Ok(sq),
+          Err(sq_e) =>
+          {
+            #[cfg(feature = "redb")]
+            let sq_r = {
+              let mut options = options;
+              options.insert("backend".into(), "redb".into());
+              Self::create(options)
+            };
+            #[cfg(not(feature = "redb"))]
+            let sq_r = error::ConnectionError::UnavailableBackend { backend: "redb" }.into();
+
+            sq_r.map_err(|rb_e| {
+              StoreError::OpeningError {
+                errors: error::vec_to_error::<ErrorType>(&vec![sq_e, rb_e]),
+              }
+              .into()
+            })
+          }
+        };
+        sq_r
+      }
+      #[cfg(feature = "sqlite")]
+      "sqlite" =>
+      {
+        let store = if let Some(path) = options.get("path")
+        {
+          let path: &String = path.try_into_ref()?;
+          store::sqlite::Store::open(path)?
+        }
+        else
+        {
+          store::sqlite::Store::in_memory()?
+        };
+        Ok(Connection {
+          connection: ConnectionImpl {
+            store,
+            function_manager: functions::Manager::new(),
+          }
+          .boxed(),
+        })
+      }
+      #[cfg(feature = "redb")]
+      "redb" =>
+      {
+        let store = if let Some(path) = options.get("path")
+        {
+          let path: &String = path.try_into_ref()?;
+          store::redb::Store::open(path)?
+        }
+        else
+        {
+          store::redb::Store::in_memory()?
+        };
+        Ok(Connection {
+          connection: ConnectionImpl {
+            store,
+            function_manager: functions::Manager::new(),
+          }
+          .boxed(),
+        })
+      }
+      _ => Err(StoreError::UnknownBackend { backend }.into()),
+    }
+  }
+  /// Create a builder, with a high-level API to set the options.
+  /// Example of use:
+  /// ```
+  /// let connection = Connection::builder().path("path/to/file").backend(Backend::SQLite).create()?;
+  /// ```
+  pub fn builder() -> ConnectionBuilder
+  {
+    ConnectionBuilder {
+      map: Default::default(),
+    }
+  }
+  /// List of available backends
+  pub fn available_backends() -> Vec<String>
+  {
+    let mut backends = vec![];
+    #[cfg(feature = "sqlite")]
+    backends.push("sqlite".to_string());
+    #[cfg(feature = "redb")]
+    backends.push("redb".to_string());
+    backends
+  }
+
   /// Open a `path` that contains a `GQLite` database. The `options` parameter can
   /// be used to select the backend, and configure the backend.
   ///
@@ -117,73 +312,10 @@ impl Connection
   /// # Ok(()) }
   /// ```  
   #[cfg(any(feature = "redb", feature = "sqlite"))]
+  #[deprecated = "Use create or builder instead."]
   pub fn open<P: AsRef<std::path::Path>>(path: P, options: value::ValueMap) -> Result<Connection>
   {
-    if let Some(backend) = options.get("backend")
-    {
-      let backend: &String = backend.try_into_ref()?;
-      match backend.as_str()
-      {
-        "sqlite" => Self::open_sqlite(path),
-        "redb" => Self::open_redb(path),
-        _ => Err(
-          StoreError::UnknownBackend {
-            backend: backend.to_owned(),
-          }
-          .into(),
-        ),
-      }
-    }
-    else
-    {
-      Self::open_sqlite(path.as_ref().to_owned()).or_else(|sq_e| {
-        Self::open_redb(path).map_err(|rb_e| {
-          StoreError::OpeningError {
-            errors: error::vec_to_error::<ErrorType>(&vec![sq_e, rb_e]),
-          }
-          .into()
-        })
-      })
-    }
-  }
-  #[cfg(feature = "sqlite")]
-  fn open_sqlite<P: AsRef<std::path::Path>>(path: P) -> Result<Connection>
-  {
-    Ok(Connection {
-      connection: ConnectionImpl {
-        store: store::sqlite::Store::new(path)?,
-        function_manager: functions::Manager::new(),
-      }
-      .boxed(),
-    })
-  }
-  #[cfg(not(feature = "sqlite"))]
-  fn open_sqlite<P: AsRef<std::path::Path>>(_: P) -> Result<Connection>
-  {
-    Err(error::ConnectionError::UnavailableBackend { backend: "sqlite" }.into())
-  }
-  #[cfg(feature = "redb")]
-  fn open_redb<P: AsRef<std::path::Path>>(path: P) -> Result<Connection>
-  {
-    Ok(Connection {
-      connection: ConnectionImpl {
-        store: store::redb::Store::new(path)?,
-        function_manager: functions::Manager::new(),
-      }
-      .boxed(),
-    })
-  }
-  #[cfg(not(feature = "redb"))]
-  fn open_redb<P: AsRef<std::path::Path>>(_: P) -> Result<Connection>
-  {
-    Err(error::StoreError::UnavailableBackend { backend: "redb" }.into())
-  }
-  #[cfg(feature = "_pgql")]
-  pub fn create() -> Result<Connection>
-  {
-    Ok(Connection {
-      store: store::Store::new()?,
-    })
+    Self::builder().options(options).path(path).create()
   }
   /// Execute the `query` (using OpenCypher), given the query `parameters` (sometimes
   /// also referred as binding).

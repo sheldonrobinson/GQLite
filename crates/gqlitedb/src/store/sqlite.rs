@@ -1,5 +1,7 @@
 use std::{cell::RefCell, collections::HashSet, path::PathBuf};
 
+use rusqlite;
+
 use askama::Template;
 use ccutils::pool::{self, Pool};
 use rusqlite::{named_params, types::FromSql, OptionalExtension, ToSql};
@@ -264,35 +266,55 @@ ccutils::assert_impl_all!(Store: Sync, Send);
 impl Store
 {
   /// Crate a new store, with a default graph
-  pub(crate) fn new<P: AsRef<std::path::Path>>(path: P) -> Result<Store>
+  pub(crate) fn open<P: AsRef<std::path::Path>>(path: P) -> Result<Store>
   {
-    use store::Store;
     let path: PathBuf = path.as_ref().into();
     let connection = Pool::new(
       move || Ok(rusqlite::Connection::open(&path)?),
       pool::Options::default().minimum_pool_size(1).pool_size(3),
     )?;
     let s = Self { connection };
-
-    let mut tx = s.begin_write()?;
-    if s.check_if_table_exists(&mut tx, "gqlite_metadata")?
+    s.initialise()?;
+    Ok(s)
+  }
+  pub(crate) fn in_memory() -> Result<Store>
+  {
+    let id = uuid::Uuid::new_v4().as_u128();
+    let connection = Pool::new(
+      move || {
+        Ok(rusqlite::Connection::open_with_flags(
+          format!("file:{}?mode=memory&cache=shared", id),
+          rusqlite::OpenFlags::default(),
+        )?)
+      },
+      pool::Options::default().minimum_pool_size(1).pool_size(3),
+    )?;
+    let s = Self { connection };
+    s.initialise()?;
+    Ok(s)
+  }
+  fn initialise(&self) -> Result<()>
+  {
+    use store::Store;
+    let mut tx = self.begin_write()?;
+    if self.check_if_table_exists(&mut tx, "gqlite_metadata")?
     {
       // gqlite version 1.1 incorrectly use ' instead of " in the version number
-      let version_raw = s
+      let version_raw = self
         .get_metadata_value::<String>(&mut tx, "version")?
         .replace("'", "\"");
       let version: utils::Version = serde_json::from_str(&version_raw)?;
       if version.major != consts::GQLITE_VERSION.major
         || version.minor != consts::GQLITE_VERSION.minor
       {
-        s.upgrade_database(&mut tx, version)?;
+        self.upgrade_database(&mut tx, version)?;
       }
     }
-    else if !s.check_if_table_exists(&mut tx, "gqlite_metadata")?
-      && s.check_if_table_exists(&mut tx, "gqlite_default_nodes")?
+    else if !self.check_if_table_exists(&mut tx, "gqlite_metadata")?
+      && self.check_if_table_exists(&mut tx, "gqlite_default_nodes")?
     {
       // 1.0 didn't have the metadata table
-      s.upgrade_database(
+      self.upgrade_database(
         &mut tx,
         utils::Version {
           major: 1,
@@ -307,12 +329,12 @@ impl Store
         include_str!("../../templates/sql/sqlite/metadata_create_table.sql"),
         (),
       )?;
-      s.set_metadata_value_json(&mut tx, "graphs", &Vec::<String>::new())?;
-      s.create_graph(&mut tx, &"default".to_string(), true)?;
+      self.set_metadata_value_json(&mut tx, "graphs", &Vec::<String>::new())?;
+      self.create_graph(&mut tx, &"default".to_string(), true)?;
     }
-    s.set_metadata_value_json(&mut tx, "version", &consts::GQLITE_VERSION)?;
+    self.set_metadata_value_json(&mut tx, "version", &consts::GQLITE_VERSION)?;
     tx.close()?;
-    Ok(s)
+    Ok(())
   }
   fn upgrade_database(&self, transaction: &mut TransactionBox, from: utils::Version) -> Result<()>
   {
@@ -972,7 +994,7 @@ mod tests
   fn test_sqlite_metadata()
   {
     let temp_file = crate::tests::create_tmp_file();
-    let store = super::Store::new(temp_file.path()).unwrap();
+    let store = super::Store::open(temp_file.path()).unwrap();
     let mut tx = store.begin_read().unwrap();
     let version: utils::Version = store.get_metadata_value_json(&mut tx, "version").unwrap();
     assert_eq!(version.major, consts::GQLITE_VERSION.major);
@@ -982,7 +1004,7 @@ mod tests
     drop(store);
 
     // Try to reopen
-    let store = super::Store::new(temp_file.path()).unwrap();
+    let store = super::Store::open(temp_file.path()).unwrap();
     let mut tx = store.begin_read().unwrap();
     let version: utils::Version = store.get_metadata_value_json(&mut tx, "version").unwrap();
     assert_eq!(version.major, consts::GQLITE_VERSION.major);

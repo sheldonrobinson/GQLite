@@ -1,8 +1,15 @@
 #[test]
+fn test_in_memory()
+{
+  let store = crate::store::sqlite::Store::in_memory().unwrap();
+  super::test_select_nodes(store);
+}
+
+#[test]
 fn test_graphs()
 {
   let temp_file = crate::tests::create_tmp_file();
-  let store = crate::store::redb::Store::new(temp_file.path()).unwrap();
+  let store = crate::store::sqlite::Store::open(temp_file.path()).unwrap();
   super::test_graphs(store);
 }
 
@@ -10,7 +17,7 @@ fn test_graphs()
 fn test_select_nodes()
 {
   let temp_file = crate::tests::create_tmp_file();
-  let store = crate::store::sqlite::Store::new(temp_file.path()).unwrap();
+  let store = crate::store::sqlite::Store::open(temp_file.path()).unwrap();
   super::test_select_nodes(store);
 }
 
@@ -18,7 +25,7 @@ fn test_select_nodes()
 fn test_update_nodes()
 {
   let temp_file = crate::tests::create_tmp_file();
-  let store = crate::store::sqlite::Store::new(temp_file.path()).unwrap();
+  let store = crate::store::sqlite::Store::open(temp_file.path()).unwrap();
   super::test_update_nodes(store);
 }
 
@@ -26,7 +33,7 @@ fn test_update_nodes()
 fn test_select_edges()
 {
   let temp_file = crate::tests::create_tmp_file();
-  let store = crate::store::sqlite::Store::new(temp_file.path()).unwrap();
+  let store = crate::store::sqlite::Store::open(temp_file.path()).unwrap();
   super::test_select_edges(store);
 }
 
@@ -34,6 +41,6 @@ fn test_select_edges()
 fn test_update_edges()
 {
   let temp_file = crate::tests::create_tmp_file();
-  let store = crate::store::sqlite::Store::new(temp_file.path()).unwrap();
+  let store = crate::store::sqlite::Store::open(temp_file.path()).unwrap();
   super::test_update_edges(store);
 }

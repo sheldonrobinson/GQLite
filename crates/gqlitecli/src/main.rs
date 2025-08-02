@@ -139,8 +139,9 @@ impl Cli
               }
               else
               {
-                let connection_res =
-                  gqlitedb::Connection::open(splited_line[1], gqlitedb::ValueMap::new());
+                let connection_res = gqlitedb::Connection::builder()
+                  .path(splited_line[1])
+                  .create();
                 match connection_res
                 {
                   Ok(c) =>
@@ -308,7 +309,7 @@ fn main_loop(rl: &mut rustyline::DefaultEditor) -> rustyline::Result<()>
   args.next(); // remove program name
   if let Some(filename) = args.next()
   {
-    let connection_res = gqlitedb::Connection::open(filename, gqlitedb::ValueMap::new());
+    let connection_res = gqlitedb::Connection::builder().path(filename).create();
     match connection_res
     {
       Ok(c) =>
