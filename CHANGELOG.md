@@ -3,6 +3,7 @@
 <!-- next-header -->
 
 ## [Unreleased] - ReleaseDate
+- Add egui-based, GQLite browser.
 - Add support for in-memory databases.
 
 ## [0.5.2] - 2025-07-26

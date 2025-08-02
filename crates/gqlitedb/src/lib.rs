@@ -35,7 +35,7 @@ pub use {
   connection::Connection,
   error::{CompileTimeError, Error, RunTimeError, StoreError},
   graph::{Edge, Node, Path},
-  value::{Value, ValueMap},
+  value::{Value, ValueMap, ValueTryIntoRef},
 };
 
 /// GQLite Result alias. Usable as a standard `Result<T, E>` or default to gqlite::Error with `Result<T>`

@@ -10,5 +10,8 @@ homepage = "https://gqlite.org"
 repository = "https://gitlab.com/gqlite/gqlite"
 
 [workspace.dependencies]
-# versions have to be specified with path: https://github.com/rust-lang/cargo/issues/11133
 gqlitedb = { version = "0.5.2", path = "crates/gqlitedb" }
+
+# versions have to be specified with path: https://github.com/rust-lang/cargo/issues/11133
+[patch.crates-io]
+# rusqlite = { git = "https://github.com/Spxg/rusqlite.git", branch = "wasm-demo", features = [] }

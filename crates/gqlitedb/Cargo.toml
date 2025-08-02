@@ -34,12 +34,12 @@ pest = "2"
 pest_derive = "2"
 rand = "0.9"
 redb = { version = "2", optional = true }
-serde = "1"
-serde_json = "1"
-rusqlite = { version = "0.37", optional = true, features = [
+rusqlite = { package = "rusqlite", version = "0.37", optional = true, features = [
   "functions",
   "uuid",
 ] }
+serde = "1"
+serde_json = "1"
 thiserror = "2"
 uuid = { version = "1", features = ["v4"] }
 
@@ -48,6 +48,20 @@ ccutils = { version = "0.3", features = ["temporary"] }
 divan = "0.1"
 iai-callgrind = { version = "0.16" }
 regex = "1"
+
+# web:
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+# rusqlite_wasm = { package = "rusqlite", version = "0.37", optional = true, git = "https://github.com/Spxg/rusqlite.git", branch = "wasm-demo", features = [
+#   "functions",
+#   "uuid",
+# ] }
+uuid = { version = "1", features = ["js"] }
+
+# [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+# rusqlite_main = { package = "rusqlite", version = "0.37", optional = true, features = [
+#   "functions",
+#   "uuid",
+# ] }
 
 [[bench]]
 name = "pokec_divan"

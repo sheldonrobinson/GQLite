@@ -52,10 +52,12 @@ impl ConnectionBuilder
       {
         self.map.insert(key, "automatic".into());
       }
+      #[cfg(feature = "sqlite")]
       Backend::SQLite =>
       {
         self.map.insert(key, "sqlite".into());
       }
+      #[cfg(feature = "redb")]
       Backend::Redb =>
       {
         self.map.insert(key, "redb".into());
@@ -203,7 +205,7 @@ impl Connection
           Self::create(options)
         };
         #[cfg(not(feature = "sqlite"))]
-        let sq_e = error::ConnectionError::UnavailableBackend { backend: "sqlite" }.into();
+        let sq_e = Err(error::StoreError::UnavailableBackend { backend: "sqlite" }.into());
         let sq_r = match sq_e
         {
           Ok(sq) => Ok(sq),
@@ -216,7 +218,7 @@ impl Connection
               Self::create(options)
             };
             #[cfg(not(feature = "redb"))]
-            let sq_r = error::ConnectionError::UnavailableBackend { backend: "redb" }.into();
+            let sq_r = Err(error::StoreError::UnavailableBackend { backend: "redb" }.into());
 
             sq_r.map_err(|rb_e| {
               StoreError::OpeningError {

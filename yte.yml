@@ -1,6 +1,6 @@
 tasks:
-  hello:
-    description: "Say hello"
-    arguments: ["who"]
+  gqlitebrowser:
+    description: "Run gqlitebrowser."
+    arguments: []
     command: !commands
-      - env.execute(format!("echo hello {who}"))
+      - cargo run --bin gqlitebrowser

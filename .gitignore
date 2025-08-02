@@ -6,3 +6,6 @@ bindings/ruby/ext/
 bindings/ruby/pkg/
 bindings/ruby/tmp/
 gqlite_bench_data
+
+# trunk output folder
+crates/gqlitebrowser/dist
