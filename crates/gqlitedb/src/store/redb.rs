@@ -845,8 +845,12 @@ impl store::Store for Store
 
     Ok(())
   }
-  fn delete_graph(&self, transaction: &mut Self::TransactionBox, graph_name: &String)
-    -> Result<()>
+  fn drop_graph(
+    &self,
+    transaction: &mut Self::TransactionBox,
+    graph_name: &String,
+    if_exists: bool,
+  ) -> Result<()>
   {
     let mut graphs_list = self.graphs_list(transaction)?;
     if graphs_list.contains(graph_name)
@@ -862,6 +866,10 @@ impl store::Store for Store
       graphs_list.retain(|x| x != graph_name);
       self.set_metadata_value(transaction, "graphs", &graphs_list)?;
 
+      Ok(())
+    }
+    else if if_exists
+    {
       Ok(())
     }
     else

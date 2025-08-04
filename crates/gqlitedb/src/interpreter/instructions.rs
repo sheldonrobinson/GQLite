@@ -208,6 +208,10 @@ pub(crate) enum Block
   {
     name: String
   },
+  DropGraph
+  {
+    name: String, if_exists: bool
+  },
   UseGraph
   {
     name: String

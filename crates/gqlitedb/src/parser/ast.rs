@@ -95,6 +95,7 @@ impl VariableIdentifiers
 pub(crate) enum Statement
 {
   CreateGraph(CreateGraph),
+  DropGraph(DropGraph),
   UseGraph(UseGraph),
   Create(Create),
   Match(Match),
@@ -128,6 +129,13 @@ pub(crate) enum Node {}
 pub(crate) struct CreateGraph
 {
   pub(crate) name: String,
+}
+
+#[derive(Debug)]
+pub(crate) struct DropGraph
+{
+  pub(crate) name: String,
+  pub(crate) if_exists: bool,
 }
 
 #[derive(Debug)]

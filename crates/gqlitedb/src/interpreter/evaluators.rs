@@ -1201,6 +1201,7 @@ fn is_write_program(program: &super::Program) -> bool
     | Block::Call { .. }
     | Block::With { .. } => false,
     Block::CreateGraph { .. }
+    | Block::DropGraph { .. }
     | Block::Create { .. }
     | Block::Update { .. }
     | Block::Delete { .. } => true,
@@ -1241,6 +1242,16 @@ pub(crate) fn eval_program<TStore: store::Store>(
           .create_graph(&mut tx, name, false)
           .map_err(|e|
             error::map_error!(e, Error::StoreError(StoreError::DuplicatedGraph { graph_name }) => RunTimeError::DuplicatedGraph {
+              graph_name: graph_name.clone(),
+            } ))?;
+        graph_name = name.to_owned();
+      }
+      instructions::Block::DropGraph { name, if_exists } =>
+      {
+        store
+          .drop_graph(&mut tx, name, *if_exists)
+          .map_err(|e|
+            error::map_error!(e, Error::StoreError(StoreError::UnknownGraph { graph_name }) => RunTimeError::UnknownGraph {
               graph_name: graph_name.clone(),
             } ))?;
         graph_name = name.to_owned();

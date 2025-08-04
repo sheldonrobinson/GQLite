@@ -874,6 +874,14 @@ impl AstBuilder
       Rule::create_graph_statement => Ok(ast::Statement::CreateGraph(ast::CreateGraph {
         name: self.build_ident(&mut pair.into_inner())?,
       })),
+      Rule::drop_graph_statement => Ok(ast::Statement::DropGraph(ast::DropGraph {
+        name: self.build_ident(&mut pair.into_inner())?,
+        if_exists: false,
+      })),
+      Rule::drop_graph_if_exists_statement => Ok(ast::Statement::DropGraph(ast::DropGraph {
+        name: self.build_ident(&mut pair.into_inner())?,
+        if_exists: true,
+      })),
       Rule::use_graph_statement => Ok(ast::Statement::UseGraph(ast::UseGraph {
         name: self.build_ident(&mut pair.into_inner())?,
       })),

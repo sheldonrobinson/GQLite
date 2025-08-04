@@ -113,10 +113,15 @@ pub(crate) trait Store
     &self,
     transaction: &mut Self::TransactionBox,
     name: &String,
-    _ignore_if_exists: bool,
+    ignore_if_exists: bool,
   ) -> Result<()>;
   /// Delete a graph
-  fn delete_graph(&self, transaction: &mut Self::TransactionBox, name: &String) -> Result<()>;
+  fn drop_graph(
+    &self,
+    transaction: &mut Self::TransactionBox,
+    name: &String,
+    if_exists: bool,
+  ) -> Result<()>;
   /// Create nodes and add them to a graph
   fn create_nodes<'a, T: Iterator<Item = &'a crate::graph::Node>>(
     &self,

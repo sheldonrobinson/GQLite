@@ -53,10 +53,10 @@ where
     vec!["default".to_string(), "test_graph".to_string()]
   );
 
-  // Delete graph
+  // Drop graph
   let mut tx = store.begin_write().unwrap();
   store
-    .delete_graph(&mut tx, &"test_graph".to_string())
+    .drop_graph(&mut tx, &"test_graph".to_string(), false)
     .unwrap();
   tx.close().unwrap();
 
@@ -81,10 +81,18 @@ where
     vec!["default".to_string(), "test_graph".to_string()]
   );
 
+  // Drop unexisting graph
   let mut tx = store.begin_write().unwrap();
   store
-    .delete_graph(&mut tx, &"unknown".to_string())
+    .drop_graph(&mut tx, &"unknown".to_string(), false)
     .expect_err("Attempt at deleting unknown graph.");
+  drop(tx);
+
+  // Drop unexisting graph
+  let mut tx = store.begin_write().unwrap();
+  store
+    .drop_graph(&mut tx, &"unknown".to_string(), true)
+    .unwrap();
   drop(tx);
 }
 

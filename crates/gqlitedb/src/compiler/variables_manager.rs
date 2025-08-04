@@ -558,12 +558,13 @@ impl VariablesManager
         .into(),
       );
     }
-    #[allow(unused_variables)]
     match statement
     {
-      ast::Statement::CreateGraph(create_graph) =>
+      ast::Statement::CreateGraph(..) =>
       {}
-      ast::Statement::UseGraph(use_graph) =>
+      ast::Statement::DropGraph(..) =>
+      {}
+      ast::Statement::UseGraph(..) =>
       {}
       ast::Statement::Create(create) =>
       {
@@ -596,11 +597,11 @@ impl VariablesManager
           self.analyse_pattern(pattern, false)?;
         }
       }
-      ast::Statement::Return(return_statement) =>
+      ast::Statement::Return(..) =>
       {}
-      ast::Statement::Call(call) =>
+      ast::Statement::Call(..) =>
       {}
-      ast::Statement::With(with) =>
+      ast::Statement::With(..) =>
       {}
       ast::Statement::Unwind(unwind) =>
       {
@@ -610,9 +611,9 @@ impl VariablesManager
         )?;
         self.mark_variables_as_set(&unwind.identifier)?;
       }
-      ast::Statement::Delete(delete) =>
+      ast::Statement::Delete(..) =>
       {}
-      ast::Statement::Update(update) =>
+      ast::Statement::Update(..) =>
       {}
     }
     Ok(())

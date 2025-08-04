@@ -37,7 +37,7 @@ end
 
 gql = [
   # Graph
-  'Graph1'
+  'Graph1', 'Graph2'
   ]
 
 features = [
