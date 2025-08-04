@@ -25,7 +25,7 @@ include:
   script:
     - mkdir build
     - pushd build
-    - cmake .. -DCMAKE_INSTALL_PREFIX=../inst -DGQLITE_TESTS_OUTPUT_JUNIT=ON -DGQLITE_TESTS_DISABLE_RUST_TESTS=ON
+    - cmake .. -DCMAKE_INSTALL_PREFIX=../inst -DGQLITE_TESTS_OUTPUT_JUNIT=ON -DGQLITE_TESTS_DISABLE_RUST_TESTS=ON -DCMAKE_BUILD_TYPE=release
     - make -j8 install
     - popd
   artifacts:
