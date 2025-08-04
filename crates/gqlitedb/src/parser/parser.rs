@@ -1062,7 +1062,6 @@ impl AstBuilder
         Ok(ast::Statement::Call(ast::Call {
           name: name,
           arguments: Default::default(),
-          yield_: Default::default(),
         }))
       }
       unknown_expression => Err(

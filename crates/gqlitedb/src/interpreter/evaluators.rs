@@ -16,18 +16,6 @@ enum Value
   EdgeQuery(store::SelectEdgeQuery),
 }
 
-impl Value
-{
-  fn is_null(&self) -> bool
-  {
-    match self
-    {
-      Value::GraphValue(gv) => gv.is_null(),
-      _ => false,
-    }
-  }
-}
-
 impl<T> From<T> for Value
 where
   T: Into<value::Value>,
@@ -659,10 +647,6 @@ fn eval_instructions(
         stack.push(a);
         stack.push(b);
       }
-      &instructions::Instruction::Drop =>
-      {
-        stack.try_pop()?;
-      }
       &instructions::Instruction::AndBinaryOperator
       | &instructions::Instruction::OrBinaryOperator
       | &instructions::Instruction::XorBinaryOperator =>
@@ -874,8 +858,6 @@ pub(crate) fn eval_update_property<TStore: store::Store>(
   Ok(())
 }
 
-struct OrderByKey(Vec<(value::Value, bool)>);
-
 fn handle_asc(o: std::cmp::Ordering, asc: bool) -> std::cmp::Ordering
 {
   if asc
@@ -891,18 +873,6 @@ fn handle_asc(o: std::cmp::Ordering, asc: bool) -> std::cmp::Ordering
       std::cmp::Ordering::Greater => std::cmp::Ordering::Less,
     }
   }
-}
-
-fn compute_order_by(
-  a: &Vec<(value::Value, bool)>,
-  b: &Vec<(value::Value, bool)>,
-) -> std::cmp::Ordering
-{
-  a.iter()
-    .zip(b.iter())
-    .map(|(a, b)| handle_asc(a.0.orderability(&b.0), a.1))
-    .find(|p| *p != std::cmp::Ordering::Equal)
-    .unwrap_or(std::cmp::Ordering::Equal)
 }
 
 #[derive(Debug, Default, Clone, Hash, PartialEq)]

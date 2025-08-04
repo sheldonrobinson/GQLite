@@ -255,6 +255,7 @@ impl SelectNodeQuery
       select_all: false,
     }
   }
+  #[allow(dead_code)]
   pub(crate) fn select_labels(labels: impl Into<Vec<String>>) -> Self
   {
     Self {
@@ -328,6 +329,7 @@ pub(crate) struct SelectEdgeQuery
 
 impl SelectEdgeQuery
 {
+  #[allow(dead_code)]
   pub(crate) fn is_select_only_keys(&self) -> bool
   {
     self.keys.is_some()

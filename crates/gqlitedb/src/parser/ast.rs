@@ -123,9 +123,6 @@ pub(crate) type Statements = Vec<Statement>;
 pub(crate) type Queries = Vec<Statements>;
 
 #[derive(Debug)]
-pub(crate) enum Node {}
-
-#[derive(Debug)]
 pub(crate) struct CreateGraph
 {
   pub(crate) name: String,
@@ -207,17 +204,10 @@ pub(crate) struct Update
 }
 
 #[derive(Debug)]
-pub(crate) struct Remove
-{
-  pub(crate) expressions: Vec<Expression>,
-}
-
-#[derive(Debug)]
 pub(crate) struct Call
 {
   pub(crate) name: String,
   pub(crate) arguments: Vec<Expression>,
-  pub(crate) yield_: Vec<String>,
 }
 
 // Set/remove Statements
@@ -358,6 +348,7 @@ pub(crate) struct PathPattern
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum LabelExpression
 {
+  #[allow(dead_code)]
   Not(Box<LabelExpression>),
   And(Vec<Box<LabelExpression>>),
   Or(Vec<Box<LabelExpression>>),
@@ -428,10 +419,6 @@ impl LabelExpression
         _ => LabelExpression::Or(vec![self.boxed(), rhs.boxed()]),
       },
     }
-  }
-  fn clone_boxed(&self) -> Box<LabelExpression>
-  {
-    self.clone().boxed()
   }
   pub(crate) fn boxed(self) -> Box<LabelExpression>
   {
@@ -538,12 +525,6 @@ pub(crate) struct RangeAccess
   pub(crate) start: Option<Expression>,
   pub(crate) end: Option<Expression>,
 }
-#[derive(Debug)]
-pub(crate) struct HasLabels
-{
-  pub(crate) left: String,
-  pub(crate) labels: Vec<String>,
-}
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct FunctionCall
@@ -602,11 +583,6 @@ create_unary_op! {IsNull}
 create_unary_op! {IsNotNull}
 
 // Values
-
-#[derive(Debug)]
-pub(crate) struct All {}
-#[derive(Debug)]
-pub(crate) struct EndOfList {}
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Value

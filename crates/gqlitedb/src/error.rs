@@ -372,11 +372,7 @@ pub enum Error
   Internal(#[from] InternalError),
 }
 
-fn assert_send_sync<T: Send + Sync>() {}
-fn _check_error_send_sync()
-{
-  assert_send_sync::<Error>();
-}
+ccutils::assert_impl_all!(Error: Send, Sync);
 
 impl Error
 {
@@ -402,12 +398,14 @@ impl Error
 // |_____|_|  |_|  \___/|_|    \_/\_/  |_|\__|_| |_|____/ \__,_|\___|_|\_\\__|_|  \__,_|\___\___|
 
 #[derive(Debug)]
+#[cfg(feature = "_backtrace")]
 pub struct ErrorWithBacktrace
 {
   error: Error,
   backtrace: std::backtrace::Backtrace,
 }
 
+#[cfg(feature = "_backtrace")]
 impl ErrorWithBacktrace
 {
   /// Return the underlying error
@@ -425,6 +423,7 @@ impl ErrorWithBacktrace
   }
 }
 
+#[cfg(feature = "_backtrace")]
 impl std::fmt::Display for ErrorWithBacktrace
 {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
@@ -432,6 +431,8 @@ impl std::fmt::Display for ErrorWithBacktrace
     self.error.fmt(f)
   }
 }
+
+#[cfg(feature = "_backtrace")]
 impl<T> From<T> for ErrorWithBacktrace
 where
   T: Into<Error>,
@@ -579,7 +580,6 @@ impl From<std::convert::Infallible> for Error
 pub(crate) trait GenericErrors: Into<Error>
 {
   fn unknown_function(name: impl Into<String>) -> Self;
-  fn not_comparable() -> Self;
 }
 
 impl GenericErrors for CompileTimeError
@@ -588,10 +588,6 @@ impl GenericErrors for CompileTimeError
   {
     Self::UnknownFunction { name: name.into() }
   }
-  fn not_comparable() -> Self
-  {
-    Self::NotComparable
-  }
 }
 
 impl GenericErrors for RunTimeError
@@ -599,10 +595,6 @@ impl GenericErrors for RunTimeError
   fn unknown_function(name: impl Into<String>) -> Self
   {
     Self::UnknownFunction { name: name.into() }
-  }
-  fn not_comparable() -> Self
-  {
-    Self::NotComparable
   }
 }
 

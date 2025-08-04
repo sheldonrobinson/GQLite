@@ -58,7 +58,6 @@ pub(crate) enum Instruction
   Rot3,        // If a is the top of the stack, then a b c -> b c a
   InverseRot3, // If a is the top of the stack, then a b c -> c a b
   Swap,
-  Drop,
   AndBinaryOperator,
   OrBinaryOperator,
   XorBinaryOperator,
@@ -237,6 +236,7 @@ pub(crate) enum Block
   },
   Call
   {
+    #[allow(dead_code)]
     arguments: Instructions,
     name: String,
   },

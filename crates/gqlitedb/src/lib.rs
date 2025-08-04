@@ -7,7 +7,6 @@
 //! for an example of use.
 
 #![warn(missing_docs)]
-#![allow(dead_code)]
 #![deny(warnings)]
 
 mod aggregators;

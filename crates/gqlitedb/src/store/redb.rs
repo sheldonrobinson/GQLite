@@ -164,21 +164,6 @@ impl EdgeIdResult
 //   | | (_| | |_) | |  __/
 //   |_|\__,_|_.__/|_|\___|
 
-trait NodeTableExtension
-{
-  fn get_node(&self, key: graph::Key) -> Result<graph::Node>;
-}
-
-impl<'txn> NodeTableExtension for redb::Table<'txn, graph::Key, &[u8]>
-{
-  fn get_node(&self, key: graph::Key) -> Result<graph::Node>
-  {
-    let v = self.get_required(key, || InternalError::UnknownNode)?;
-    let c = ciborium::from_reader::<graph::Node, &[u8]>(&mut v.value())?;
-    Ok::<graph::Node, crate::prelude::ErrorType>(c)
-  }
-}
-
 trait TableExtension<K, V>
 where
   K: redb::Key + 'static,
@@ -217,6 +202,7 @@ where
 #[derive(Debug)]
 struct GraphInfo
 {
+  #[allow(dead_code)]
   name: String,
   nodes_table: String,
   edges_table: String,
@@ -343,6 +329,7 @@ impl Store
     tx.close()?;
     Ok(())
   }
+  #[allow(dead_code)]
   fn get_metadata_from_table<TTable, TValue>(
     &self,
     table: TTable,
@@ -358,6 +345,7 @@ impl Store
       .ok_or_else(|| InternalError::MissingMetadata { key: key })?;
     Ok(ciborium::from_reader(value.value().as_slice())?)
   }
+  #[allow(dead_code)]
   fn get_metadata_value<T: for<'a> Deserialize<'a>>(
     &self,
     transaction: &mut TransactionBox,

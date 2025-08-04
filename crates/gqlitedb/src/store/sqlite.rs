@@ -416,6 +416,7 @@ impl Store
       |row| row.get(0),
     )?)
   }
+  #[allow(dead_code)]
   pub(crate) fn get_metadata_value_or_else<T: FromSql>(
     &self,
     transaction: &mut TransactionBox,
@@ -459,6 +460,7 @@ impl Store
       &self.get_metadata_value::<String>(transaction, key)?,
     )?)
   }
+  #[allow(dead_code)]
   pub(crate) fn get_metadata_value_json_or_else<T: for<'a> Deserialize<'a>>(
     &self,
     transaction: &mut TransactionBox,
