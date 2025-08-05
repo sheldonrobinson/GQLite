@@ -165,6 +165,7 @@ benchmarks_iai:
     TARGET_REPO: git@gitlab.com:GQLite/benchmark-results.git
     TARGET_SUB_DIR: $CI_COMMIT_SHA/pokec_iai
     TARGET_DIR: results_repo/$TARGET_SUB_DIR
+  dependencies: []
   script:
     - mkdir -p ${TARGET_DIR}
 
