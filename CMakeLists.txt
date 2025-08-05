@@ -162,17 +162,19 @@ set_target_properties(gqlitecpp PROPERTIES VERSION ${GQLITE_VERSION} SOVERSION $
 ########################
 ## Install library
 
+option(GQLITE_INSTALL "Install applicatuins and libraries" OFF)
+
 include_directories(BEFORE include ${CMAKE_CURRENT_BINARY_DIR}/src)
-
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libgqlitedb.so DESTINATION ${INSTALL_LIB_DIR})
-install(TARGETS gqlitecpp EXPORT GQLiteTargets ${INSTALL_TARGETS_DEFAULT_ARGS} )
-install(FILES include/gqlite-c.h  include/gqlite.h DESTINATION ${INSTALL_INCLUDE_DIR}/)
-
+if(GQLITE_INSTALL)
+	install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libgqlitedb.so DESTINATION ${INSTALL_LIB_DIR})
+	install(TARGETS gqlitecpp EXPORT GQLiteTargets ${INSTALL_TARGETS_DEFAULT_ARGS} )
+	install(FILES include/gqlite-c.h  include/gqlite.h DESTINATION ${INSTALL_INCLUDE_DIR}/)
+endif()
 ########################
 ## Install cmd line tool
-
-INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/gqlite DESTINATION ${INSTALL_BIN_DIR} PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
-
+if(GQLITE_INSTALL)
+	INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/gqlite DESTINATION ${INSTALL_BIN_DIR} PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+endif()
 ########################
 ## Build python
 
@@ -180,16 +182,18 @@ if(Python3_FOUND)
   set(Python3_SHORT_VERSION "${Python3_VERSION_MAJOR}.${Python3_VERSION_MINOR}")
 
   set(PYTHON_SITE_PACKAGES_INSTALL_DIR ${INSTALL_LIB_DIR}/python${Python3_SHORT_VERSION}/dist-packages/)
-  install(DIRECTORY bindings/python/gqlitepy/gqlite DESTINATION ${PYTHON_SITE_PACKAGES_INSTALL_DIR})
-  install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libgqlitepy.so DESTINATION ${PYTHON_SITE_PACKAGES_INSTALL_DIR}/gqlite RENAME gqlite.so)
+  if(GQLITE_INSTALL)
+	  install(DIRECTORY bindings/python/gqlitepy/gqlite DESTINATION ${PYTHON_SITE_PACKAGES_INSTALL_DIR})
+	  install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libgqlitepy.so DESTINATION ${PYTHON_SITE_PACKAGES_INSTALL_DIR}/gqlite RENAME gqlite.so)
+  endif()
 endif()
 
 ########################
 ## Build ruby
-
-install(FILES bindings/ruby/lib/gqlite.rb DESTINATION ${INSTALL_LIB_DIR}/ruby)
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libgqliterb.so DESTINATION ${INSTALL_LIB_DIR}/ruby RENAME gqliterb.so)
-
+if(GQLITE_INSTALL)
+	install(FILES bindings/ruby/lib/gqlite.rb DESTINATION ${INSTALL_LIB_DIR}/ruby)
+	install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libgqliterb.so DESTINATION ${INSTALL_LIB_DIR}/ruby RENAME gqliterb.so)
+endif()
 ########################
 ## Build examples
 
@@ -217,6 +221,7 @@ endif()
 
 option(GQLITE_TESTS_OUTPUT_JUNIT "Make GQLite test output junit" OFF)
 option(GQLITE_TESTS_DISABLE_RUST_TESTS "Disable rust unittest (intended for CI)" OFF)
+
 
 if(GQLITE_TESTS_OUTPUT_JUNIT)
   make_directory(${CMAKE_BINARY_DIR}/Testing/junit)
@@ -267,10 +272,12 @@ configure_package_config_file(GQLiteConfig.cmake.in "${PROJECT_BINARY_DIR}/GQLit
 write_basic_package_version_file("${PROJECT_BINARY_DIR}/GQLiteConfigVersion.cmake" VERSION ${GQLITE_VERSION} COMPATIBILITY SameMajorVersion)
 
 # Install the GQLiteConfig.cmake and GQLiteConfigVersion.cmake
-install(FILES
-"${PROJECT_BINARY_DIR}/GQLiteConfig.cmake"
-"${PROJECT_BINARY_DIR}/GQLiteConfigVersion.cmake"
-DESTINATION "${INSTALL_CMAKE_DIR}" COMPONENT dev)
+if(GQLITE_INSTALL)
+	install(FILES
+	"${PROJECT_BINARY_DIR}/GQLiteConfig.cmake"
+	"${PROJECT_BINARY_DIR}/GQLiteConfigVersion.cmake"
+	DESTINATION "${INSTALL_CMAKE_DIR}" COMPONENT dev)
+endif()
 
 # Install the export set for use with the install-tree
 # install(EXPORT GQLiteTargets DESTINATION "${INSTALL_CMAKE_DIR}" COMPONENT dev)
