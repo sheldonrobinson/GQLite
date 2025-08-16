@@ -1,5 +1,7 @@
 #![deny(warnings)]
 
+use std::fmt::Display;
+
 use magnus::{
   function, method,
   prelude::*,
@@ -179,7 +181,9 @@ fn to_rarray(ruby: &Ruby, arr: Vec<gqlitedb::Value>) -> Result<r_array::RArray, 
   Ok(r_arr)
 }
 
-fn map_err<T>(ruby: &Ruby, result: gqlitedb::Result<T>) -> Result<T, Error>
+fn map_err<T, E>(ruby: &Ruby, result: Result<T, E>) -> Result<T, Error>
+where
+  E: Display,
 {
   result.map_err(|e| Error::new(ruby.get_inner(&ERROR), format!("{}", e)))
 }

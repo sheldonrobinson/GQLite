@@ -54,7 +54,7 @@ impl Nodes
 {
   fn call_impl(path: &graph::Path) -> FResult<Vec<graph::Node>>
   {
-    Ok(vec![path.source.clone(), path.destination.clone()])
+    Ok(vec![path.source().clone(), path.destination().clone()])
   }
 }
 
@@ -67,13 +67,11 @@ impl Edges
 {
   fn call_impl(path: &graph::Path) -> FResult<Vec<graph::Edge>>
   {
-    Ok(vec![graph::Edge {
-      key: path.key.clone(),
-      source: path.source.clone(),
-      destination: path.destination.clone(),
-      properties: path.properties.clone(),
-      labels: path.labels.clone(),
-    }])
+    Ok(vec![graph::Edge::new(
+      path.key().clone(),
+      path.labels().clone(),
+      path.properties().clone(),
+    )])
   }
 }
 

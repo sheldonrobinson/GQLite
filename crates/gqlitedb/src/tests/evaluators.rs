@@ -80,11 +80,7 @@ fn test_evaluate_match_loop()
   let temp_file = crate::tests::create_tmp_file();
   let store = crate::store::redb::Store::open(temp_file.path()).unwrap();
 
-  let node = graph::Node {
-    key: graph::Key { uuid: 1 },
-    labels: vec![],
-    properties: Default::default(),
-  };
+  let node = graph::Node::new(graph::Key::new(1), vec![], Default::default());
   let mut tx = store.begin_write().unwrap();
   store
     .create_nodes(&mut tx, &"default".to_string(), vec![&node].into_iter())
@@ -93,13 +89,13 @@ fn test_evaluate_match_loop()
     .create_edges(
       &mut tx,
       &"default".to_string(),
-      vec![&graph::Edge {
-        key: graph::Key { uuid: 2 },
-        source: node.clone(),
-        destination: node.clone(),
-        labels: vec![],
-        properties: Default::default(),
-      }]
+      vec![&graph::Path::new(
+        graph::Key::new(2),
+        node.clone(),
+        vec![],
+        Default::default(),
+        node.clone(),
+      )]
       .into_iter(),
     )
     .unwrap();
@@ -147,11 +143,7 @@ fn test_evaluate_match_count()
   );
 
   // Count 1
-  let node = graph::Node {
-    key: graph::Key { uuid: 1 },
-    labels: vec![],
-    properties: Default::default(),
-  };
+  let node = graph::Node::new(graph::Key::new(1), vec![], Default::default());
   let mut tx = store.begin_write().unwrap();
   store
     .create_nodes(&mut tx, &"default".to_string(), vec![&node].into_iter())
@@ -177,21 +169,17 @@ fn test_evaluate_aggregation()
   let program = programs::aggregation(&function_manager);
 
   let nodes = vec![
-    graph::Node {
-      key: graph::Key { uuid: 1 },
-      labels: vec![],
-      properties: value::map!("name" => "a", "num" => 33),
-    },
-    graph::Node {
-      key: graph::Key { uuid: 2 },
-      labels: vec![],
-      properties: value::map!("name" => "a"),
-    },
-    graph::Node {
-      key: graph::Key { uuid: 3 },
-      labels: vec![],
-      properties: value::map!("name" => "b", "num" => 42),
-    },
+    graph::Node::new(
+      graph::Key::new(1),
+      vec![],
+      value::map!("name" => "a", "num" => 33),
+    ),
+    graph::Node::new(graph::Key::new(2), vec![], value::map!("name" => "a")),
+    graph::Node::new(
+      graph::Key::new(3),
+      vec![],
+      value::map!("name" => "b", "num" => 42),
+    ),
   ];
   let mut tx = store.begin_write().unwrap();
   store

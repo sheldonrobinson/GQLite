@@ -34,7 +34,7 @@ macro_rules! try_into_gv_impl {
       fn try_into(self) -> crate::Result<$vn>
       {
         let a: value::Value = self.try_into()?;
-        a.try_into()
+        Ok(a.try_into()?)
       }
     }
     impl TryPopInto<$vn> for Stack
@@ -42,12 +42,12 @@ macro_rules! try_into_gv_impl {
       fn try_pop_into(&mut self) -> crate::Result<$vn>
       {
         self.try_pop()?.try_into()
-          .map_err(|e: ErrorType| error::map_error!(e, Error::Internal(InternalError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))
+          .map_err(|e: ErrorType| error::map_error!(e, Error::RunTime(RunTimeError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))
       }
       fn try_drain_into(&mut self, n: usize) -> Result<Vec<$vn>>
       {
         self.try_drain(n)?.map(|x| x.try_into()).collect::<Result<_>>()
-          .map_err(|e| error::map_error!(e, Error::Internal(InternalError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))
+          .map_err(|e| error::map_error!(e, Error::RunTime(RunTimeError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))
       }
     }
   };
@@ -84,13 +84,13 @@ macro_rules! try_into_impl {
       fn try_pop_into(&mut self) -> Result<$type>
       {
         self.try_pop()?.try_into()
-        .map_err(|e: ErrorType| error::map_error!(e, Error::Internal(InternalError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))
+        .map_err(|e: ErrorType| error::map_error!(e, Error::RunTime(RunTimeError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))
 
       }
       fn try_drain_into(&mut self, n: usize) -> Result<Vec<$type>>
       {
         self.try_drain(n)?.map(|x| x.try_into()).collect::<Result<_>>()
-          .map_err(|e| error::map_error!(e, Error::Internal(InternalError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))
+          .map_err(|e| error::map_error!(e, Error::RunTime(RunTimeError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))
       }
     }
   };
@@ -214,12 +214,12 @@ where
   fn try_pop_into(&mut self) -> Result<T>
   {
     self.try_pop()?.try_into()
-      .map_err(|e: ErrorType| error::map_error!(e, Error::Internal(InternalError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))
+      .map_err(|e: ErrorType| error::map_error!(e, Error::RunTime(RunTimeError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))
   }
   fn try_drain_into(&mut self, n: usize) -> Result<Vec<T>>
   {
     self.try_drain(n)?.map(|x| x.try_into()).collect::<Result<Vec<_>>>()
-      .map_err(|e| error::map_error!(e, Error::Internal(InternalError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))
+      .map_err(|e| error::map_error!(e, Error::RunTime(RunTimeError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))
   }
 }
 
@@ -323,7 +323,7 @@ fn execute_boolean_operator(
 
 fn execute_binary_operator<T: Into<crate::value::Value>>(
   stack: &mut Stack,
-  operand: impl FnOnce(crate::value::Value, crate::value::Value) -> Result<T>,
+  operand: impl FnOnce(crate::value::Value, crate::value::Value) -> Result<T, graphcore::Error>,
 ) -> Result<()>
 {
   let a = stack.try_pop()?;
@@ -359,22 +359,22 @@ fn eval_instructions(
         let props: value::Value = stack.try_pop_into()?;
         let dst: graph::Node = stack.try_pop_into()?;
         let src: graph::Node = stack.try_pop_into()?;
-        stack.push(crate::graph::Edge {
-          key: graph::Key::default(),
-          source: src,
-          destination: dst,
-          labels: labels.to_owned(),
-          properties: props.into_map(),
-        });
+        stack.push(crate::graph::Path::new(
+          graph::Key::default(),
+          src,
+          labels.to_owned(),
+          props.into_map(),
+          dst,
+        ));
       }
       instructions::Instruction::CreateNodeLiteral { labels } =>
       {
         let props: value::Value = stack.try_pop_into()?;
-        stack.push(crate::graph::Node {
-          key: crate::graph::Key::default(),
-          labels: labels.clone(),
-          properties: props.into_map(),
-        });
+        stack.push(crate::graph::Node::new(
+          crate::graph::Key::default(),
+          labels.clone(),
+          props.into_map(),
+        ));
       }
       instructions::Instruction::CreateEdgeQuery { labels } =>
       {
@@ -387,7 +387,7 @@ fn eval_instructions(
           {
             stack.push(store::SelectEdgeQuery::select_source_destination_keys(
               src,
-              [ed.key],
+              [ed.key()],
               dst,
             ));
           }
@@ -406,7 +406,7 @@ fn eval_instructions(
           {
             stack.push(store::SelectEdgeQuery::select_none());
           }
-          _ => Err(InternalError::InvalidValueCast {
+          _ => Err(RunTimeError::InvalidValueCast {
             value: props,
             typename: "Edge properties",
           })?,
@@ -419,7 +419,7 @@ fn eval_instructions(
         {
           value::Value::Node(no) =>
           {
-            stack.push(store::SelectNodeQuery::select_keys([no.key]));
+            stack.push(store::SelectNodeQuery::select_keys([no.key()]));
           }
           value::Value::Map(ob) =>
           {
@@ -432,7 +432,7 @@ fn eval_instructions(
           {
             stack.push(store::SelectNodeQuery::select_none());
           }
-          _ => Err(InternalError::InvalidValueCast {
+          _ => Err(RunTimeError::InvalidValueCast {
             value: props,
             typename: "Node properties",
           })?,
@@ -519,7 +519,7 @@ fn eval_instructions(
             value::Value::Array(array) =>
             {
               let idx: i64 = index.try_into()
-              .map_err(|e: ErrorType| error::map_error!(e, Error::Internal(InternalError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))?;
+              .map_err(|e: graphcore::Error| error::map_error!(e.into(), Error::RunTime(RunTimeError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))?;
               stack.push(
                 array
                   .get(idx as usize)
@@ -527,23 +527,35 @@ fn eval_instructions(
                   .to_owned(),
               );
             }
-            value::Value::Map(map)
-            | value::Value::Node(graph::Node {
-              key: _,
-              labels: _,
-              properties: map,
-            })
-            | value::Value::Edge(graph::Edge {
-              key: _,
-              source: _,
-              destination: _,
-              labels: _,
-              properties: map,
-            }) =>
+            value::Value::Map(map) =>
             {
               let idx: String = index.try_into()
-                .map_err(|e: ErrorType| error::map_error!(e, Error::Internal(InternalError::InvalidValueCast{..}) => RunTimeError::MapElementAccessByNonString ))?;
+              .map_err(|e: graphcore::Error| error::map_error!(e.into(), Error::RunTime(RunTimeError::InvalidValueCast{..}) => RunTimeError::MapElementAccessByNonString ))?;
               stack.push(map.get(&idx).unwrap_or(&value::Value::Null).to_owned());
+            }
+            value::Value::Node(node) =>
+            {
+              let idx: String = index.try_into()
+              .map_err(|e: graphcore::Error| error::map_error!(e.into(), Error::RunTime(RunTimeError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))?;
+              stack.push(
+                node
+                  .properties()
+                  .get(&idx)
+                  .unwrap_or(&value::Value::Null)
+                  .to_owned(),
+              );
+            }
+            value::Value::Edge(edge) =>
+            {
+              let idx: String = index.try_into()
+              .map_err(|e: graphcore::Error| error::map_error!(e.into(), Error::RunTime(RunTimeError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))?;
+              stack.push(
+                edge
+                  .properties()
+                  .get(&idx)
+                  .unwrap_or(&value::Value::Null)
+                  .to_owned(),
+              );
             }
             value::Value::Null => stack.push(value::Value::Null),
             _ => Err(error::RunTimeError::InvalidArgumentType)?,
@@ -814,8 +826,8 @@ pub(crate) fn eval_update_property<TStore: store::Store>(
   let value: value::Value = stack.try_pop_into()?;
   let value = match value
   {
-    value::Value::Node(n) => n.properties.into(),
-    value::Value::Edge(e) => e.properties.into(),
+    value::Value::Node(n) => n.take_properties().into(),
+    value::Value::Edge(e) => e.take_properties().into(),
     _ => value,
   };
   let mut piter = path.iter();
@@ -826,12 +838,12 @@ pub(crate) fn eval_update_property<TStore: store::Store>(
       let mut n = n.to_owned();
       if set
       {
-        n.properties
+        n.properties_mut()
           .set_value(piter.next(), piter, value.remove_null())?;
       }
       else
       {
-        n.properties
+        n.properties_mut()
           .add_values(piter.next(), piter, value.try_into()?)?;
       }
       store.update_node(&mut tx, &graph_name, &n)?;
@@ -842,12 +854,12 @@ pub(crate) fn eval_update_property<TStore: store::Store>(
       let mut e = e.to_owned();
       if set
       {
-        e.properties
+        e.properties_mut()
           .set_value(piter.next(), piter, value.remove_null())?;
       }
       else
       {
-        e.properties
+        e.properties_mut()
           .add_values(piter.next(), piter, value.try_into()?)?;
       }
       store.update_edge(&mut tx, &graph_name, &e)?;
@@ -1264,18 +1276,18 @@ pub(crate) fn eval_program<TStore: store::Store>(
               {
                 crate::value::Value::Node(n) =>
                 {
-                  store.create_nodes(&mut tx, &graph_name, vec![n.to_owned()].iter())?;
+                  store.create_nodes(&mut tx, &graph_name, vec![&n])?;
                   if let Some(var) = var
                   {
                     new_row.set_if_unset(*var, crate::value::Value::Node(n))?;
                   }
                 }
-                crate::value::Value::Edge(e) =>
+                crate::value::Value::Path(p) =>
                 {
-                  store.create_edges(&mut tx, &graph_name, vec![e.to_owned()].iter())?;
+                  store.create_edges(&mut tx, &graph_name, vec![&p])?;
                   if let Some(var) = var
                   {
-                    new_row.set(*var, crate::value::Value::Edge(e))?;
+                    new_row.set(*var, crate::value::Value::Edge(p.into()))?;
                   }
                 }
                 _ =>
@@ -1317,7 +1329,7 @@ pub(crate) fn eval_program<TStore: store::Store>(
                   let query: store::SelectNodeQuery = stack.try_pop_into()?;
                   let nodes = store.select_nodes(&mut tx, &graph_name, query)?;
 
-                  for node in nodes.iter()
+                  for node in nodes.into_iter()
                   {
                     let mut new_row = row.clone();
                     match &variable
@@ -1337,7 +1349,7 @@ pub(crate) fn eval_program<TStore: store::Store>(
                     {
                       let mut stack = Stack::default();
                       stack.push(true);
-                      stack.push(node.to_owned());
+                      stack.push(node);
                       eval_instructions(&mut stack, &new_row, &filter, &parameters)?;
                       stack.try_pop()?; // Get rid of the edge
                       stack.try_pop_into()?
@@ -1363,49 +1375,32 @@ pub(crate) fn eval_program<TStore: store::Store>(
 
                   let edges = store.select_edges(&mut tx, &graph_name, query, *directivity)?;
 
-                  for edge in edges.iter()
+                  for edge in edges.into_iter()
                   {
                     let mut new_row = row.clone();
+                    let (left, right) = if edge.reversed
+                    {
+                      (edge.path.destination(), edge.path.source())
+                    }
+                    else
+                    {
+                      (edge.path.source(), edge.path.destination())
+                    };
                     if let Some(left_variable) = left_variable.to_owned()
                     {
-                      new_row.set(
-                        left_variable,
-                        if edge.reversed
-                        {
-                          edge.edge.destination.to_owned()
-                        }
-                        else
-                        {
-                          edge.edge.source.to_owned()
-                        }
-                        .into(),
-                      )?;
+                      new_row.set(left_variable, left.to_owned().into())?;
                     }
                     if let Some(right_variable) = right_variable.to_owned()
                     {
-                      new_row.set(
-                        right_variable,
-                        if edge.reversed
-                        {
-                          edge.edge.source.to_owned()
-                        }
-                        else
-                        {
-                          edge.edge.destination.to_owned()
-                        }
-                        .into(),
-                      )?;
+                      new_row.set(right_variable, right.to_owned().into())?;
                     }
                     if let Some(edge_variable) = edge_variable.to_owned()
                     {
-                      new_row.set(edge_variable, edge.edge.to_owned().into())?;
+                      new_row.set(edge_variable, edge.path.to_edge().into())?;
                     }
                     if let Some(path_variable) = path_variable.to_owned()
                     {
-                      new_row.set(
-                        path_variable,
-                        crate::value::Value::Path(edge.edge.to_owned().into()),
-                      )?;
+                      new_row.set(path_variable, edge.path.to_owned().into())?;
                     }
                     let should_add_row = if filter.is_empty()
                     {
@@ -1415,7 +1410,7 @@ pub(crate) fn eval_program<TStore: store::Store>(
                     {
                       let mut stack = Stack::default();
                       stack.push(true);
-                      stack.push(edge.edge.to_owned());
+                      stack.push(edge.path.into_edge());
                       eval_instructions(&mut stack, &new_row, &filter, &parameters)?;
                       stack.try_pop()?; // Get rid of the edge
                       stack.try_pop_into()?
@@ -1543,8 +1538,8 @@ pub(crate) fn eval_program<TStore: store::Store>(
             let value: value::Value = stack.try_pop_into()?;
             match value
             {
-              value::Value::Node(node) => nodes_keys.push(node.key),
-              value::Value::Edge(edge) => edges_keys.push(edge.key),
+              value::Value::Node(node) => nodes_keys.push(node.unpack().0),
+              value::Value::Edge(edge) => edges_keys.push(edge.unpack().0),
               value::Value::Null =>
               {}
               _ => return Err(RunTimeError::InvalidDelete.into()),
@@ -1623,14 +1618,14 @@ pub(crate) fn eval_program<TStore: store::Store>(
                   value::Value::Node(n) =>
                   {
                     let mut n = n.to_owned();
-                    n.properties.remove_value(piter.next(), piter)?;
+                    n.properties_mut().remove_value(piter.next(), piter)?;
                     store.update_node(&mut tx, &graph_name, &n)?;
                     out_row.set(*target, n.into())?;
                   }
                   value::Value::Edge(e) =>
                   {
                     let mut e = e.to_owned();
-                    e.properties.remove_value(piter.next(), piter)?;
+                    e.properties_mut().remove_value(piter.next(), piter)?;
                     store.update_edge(&mut tx, &graph_name, &e)?;
                     out_row.set(*target, e.into())?;
                   }
@@ -1661,15 +1656,11 @@ pub(crate) fn eval_program<TStore: store::Store>(
                     let mut n = n.to_owned();
                     if add_labels
                     {
-                      n.labels.append(&mut labels.clone());
+                      n.labels_mut().append(&mut labels.clone());
                     }
                     else
                     {
-                      n.labels = n
-                        .labels
-                        .into_iter()
-                        .filter(|x| !labels.contains(x))
-                        .collect();
+                      n.labels_edit(|l| l.into_iter().filter(|x| !labels.contains(x)).collect());
                     }
                     store.update_node(&mut tx, &graph_name, &n)?;
                     out_row.set(*target, n.into())?;
@@ -1679,15 +1670,11 @@ pub(crate) fn eval_program<TStore: store::Store>(
                     let mut e = e.to_owned();
                     if add_labels
                     {
-                      e.labels.append(&mut labels.clone());
+                      e.labels_mut().append(&mut labels.clone());
                     }
                     else
                     {
-                      e.labels = e
-                        .labels
-                        .into_iter()
-                        .filter(|x| !labels.contains(x))
-                        .collect();
+                      e.labels_edit(|l| l.into_iter().filter(|x| !labels.contains(x)).collect());
                     }
                     store.update_edge(&mut tx, &graph_name, &e)?;
                     out_row.set(*target, e.into())?;

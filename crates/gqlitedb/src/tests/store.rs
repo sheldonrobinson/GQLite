@@ -102,16 +102,16 @@ where
 {
   // Add two nodes
   let nodes = [
-    graph::Node {
-      labels: graph::labels!("hello", "world"),
-      properties: value::map!("key" => 42i64),
-      key: graph::Key::default(),
-    },
-    graph::Node {
-      labels: graph::labels!("not"),
-      properties: Default::default(),
-      key: graph::Key::default(),
-    },
+    graph::Node::new(
+      graph::Key::default(),
+      graph::labels!("hello", "world"),
+      value::map!("key" => 42i64),
+    ),
+    graph::Node::new(
+      graph::Key::default(),
+      graph::labels!("not"),
+      Default::default(),
+    ),
   ];
 
   check_stats(&store, None, 0, 0, 0, 0);
@@ -128,7 +128,7 @@ where
     .select_nodes(
       store.begin_read().unwrap().borrow_mut(),
       &"default".into(),
-      store::SelectNodeQuery::select_keys([nodes[0].key]),
+      store::SelectNodeQuery::select_keys([nodes[0].key()]),
     )
     .unwrap();
 
@@ -152,11 +152,11 @@ where
   TStore: store::Store,
 {
   // Add a node
-  let node = graph::Node {
-    labels: graph::labels!("hello", "world"),
-    properties: value::map!("key" => 42i64),
-    key: graph::Key::default(),
-  };
+  let node = graph::Node::new(
+    graph::Key::default(),
+    graph::labels!("hello", "world"),
+    value::map!("key" => 42i64),
+  );
 
   check_stats(&store, None, 0, 0, 0, 0);
 
@@ -173,11 +173,11 @@ where
   check_stats(&store, None, 1, 0, 2, 1);
 
   // Modify node
-  let modified_node = graph::Node {
-    labels: graph::labels!("world"),
-    properties: value::map!("key" => 12i64),
-    key: node.key.clone(),
-  };
+  let modified_node = graph::Node::new(
+    node.key().clone(),
+    graph::labels!("world"),
+    value::map!("key" => 12i64),
+  );
 
   let mut tx = store.begin_write().unwrap();
   store
@@ -202,7 +202,7 @@ where
     .delete_nodes(
       &mut tx,
       &"default".into(),
-      store::SelectNodeQuery::select_keys([modified_node.key]),
+      store::SelectNodeQuery::select_keys([modified_node.key()]),
       true,
     )
     .unwrap();
@@ -215,23 +215,23 @@ fn test_select_edges<TStore>(store: TStore)
 where
   TStore: store::Store,
 {
-  let source_node = graph::Node {
-    labels: graph::labels!("hello"),
-    properties: value::map!("key" => 42i64),
-    key: graph::Key::default(),
-  };
-  let destination_node = graph::Node {
-    labels: graph::labels!("world"),
-    properties: value::map!("key" => 12i64),
-    key: graph::Key::default(),
-  };
-  let edge = graph::Edge {
-    source: source_node.clone(),
-    destination: destination_node.clone(),
-    key: graph::Key::default(),
-    labels: vec!["!".into()],
-    properties: value::map!("existence" => true),
-  };
+  let source_node = graph::Node::new(
+    graph::Key::default(),
+    graph::labels!("hello"),
+    value::map!("key" => 42i64),
+  );
+  let destination_node = graph::Node::new(
+    graph::Key::default(),
+    graph::labels!("world"),
+    value::map!("key" => 12i64),
+  );
+  let edge = graph::SinglePath::new(
+    graph::Key::default(),
+    source_node.clone(),
+    vec!["!".into()],
+    value::map!("existence" => true),
+    destination_node.clone(),
+  );
 
   check_stats(&store, None, 0, 0, 0, 0);
 
@@ -257,13 +257,13 @@ where
     .select_edges(
       store.begin_read().unwrap().borrow_mut(),
       &"default".into(),
-      store::SelectEdgeQuery::select_keys([edge.key]),
+      store::SelectEdgeQuery::select_keys([edge.key()]),
       graph::EdgeDirectivity::Directed,
     )
     .unwrap();
 
   assert_eq!(1, selected_edges.len());
-  assert_eq!(edge, selected_edges[0].edge);
+  assert_eq!(edge, selected_edges[0].path);
   assert!(!selected_edges[0].reversed);
 
   let selected_edges = store
@@ -281,7 +281,7 @@ where
     .unwrap();
 
   assert_eq!(1, selected_edges.len());
-  assert_eq!(edge, selected_edges[0].edge);
+  assert_eq!(edge, selected_edges[0].path);
   assert!(!selected_edges[0].reversed);
 
   let selected_edges = store
@@ -299,7 +299,7 @@ where
     .unwrap();
 
   assert_eq!(1, selected_edges.len());
-  assert_eq!(edge, selected_edges[0].edge);
+  assert_eq!(edge, selected_edges[0].path);
   assert!(!selected_edges[0].reversed);
 
   // Check reverse direction
@@ -308,10 +308,10 @@ where
       store.begin_read().unwrap().borrow_mut(),
       &"default".into(),
       store::SelectEdgeQuery::select_source_destination_labels_properties(
-        store::SelectNodeQuery::select_keys(vec![edge.destination.key]),
+        store::SelectNodeQuery::select_keys(vec![edge.destination().key()]),
         vec![],
         Default::default(),
-        store::SelectNodeQuery::select_keys(vec![edge.source.key]),
+        store::SelectNodeQuery::select_keys(vec![edge.source().key()]),
       ),
       graph::EdgeDirectivity::Directed,
     )
@@ -324,17 +324,17 @@ where
       store.begin_read().unwrap().borrow_mut(),
       &"default".into(),
       store::SelectEdgeQuery::select_source_destination_labels_properties(
-        store::SelectNodeQuery::select_keys(vec![edge.destination.key]),
+        store::SelectNodeQuery::select_keys(vec![edge.destination().key()]),
         vec![],
         Default::default(),
-        store::SelectNodeQuery::select_keys(vec![edge.source.key]),
+        store::SelectNodeQuery::select_keys(vec![edge.source().key()]),
       ),
       graph::EdgeDirectivity::Undirected,
     )
     .unwrap();
 
   assert_eq!(1, selected_edges.len());
-  assert_eq!(edge, selected_edges[0].edge);
+  assert_eq!(edge, selected_edges[0].path);
   assert!(selected_edges[0].reversed);
 }
 
@@ -342,23 +342,23 @@ fn test_update_edges<TStore>(store: TStore)
 where
   TStore: store::Store,
 {
-  let source_node = graph::Node {
-    labels: graph::labels!("hello"),
-    properties: value::map!("key" => 42i64),
-    key: graph::Key::default(),
-  };
-  let destination_node = graph::Node {
-    labels: graph::labels!("world"),
-    properties: value::map!("key" => 12i64),
-    key: graph::Key::default(),
-  };
-  let edge = graph::Edge {
-    source: source_node.clone(),
-    destination: destination_node.clone(),
-    key: graph::Key::default(),
-    labels: vec!["!".into()],
-    properties: value::map!("existence" => true),
-  };
+  let source_node = graph::Node::new(
+    graph::Key::default(),
+    graph::labels!("hello"),
+    value::map!("key" => 42i64),
+  );
+  let destination_node = graph::Node::new(
+    graph::Key::default(),
+    graph::labels!("world"),
+    value::map!("key" => 12i64),
+  );
+  let edge = graph::SinglePath::new(
+    graph::Key::default(),
+    source_node.clone(),
+    vec!["!".into()],
+    value::map!("existence" => true),
+    destination_node.clone(),
+  );
 
   check_stats(&store, None, 0, 0, 0, 0);
 
@@ -383,13 +383,11 @@ where
 
   // Modify edge
 
-  let modified_edge = graph::Edge {
-    key: edge.key.clone(),
-    source: edge.source.clone(),
-    destination: edge.destination.clone(),
-    labels: vec!["?".into()],
-    properties: value::map!("existence" => false),
-  };
+  let modified_edge = graph::Edge::new(
+    edge.key().clone(),
+    graph::labels!("?"),
+    value::map!("existence" => false),
+  );
 
   let mut tx = store.begin_write().unwrap();
   store
@@ -409,7 +407,7 @@ where
   check_stats(&store, None, 2, 1, 2, 3);
 
   assert_eq!(1, selected_edges.len());
-  assert_eq!(modified_edge, selected_edges[0].edge);
+  assert_eq!(modified_edge, selected_edges[0].path.to_owned().into());
   assert!(!selected_edges[0].reversed);
 
   // Remove edge

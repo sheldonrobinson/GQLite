@@ -21,7 +21,6 @@ mod graph;
 mod interpreter;
 mod parser;
 mod prelude;
-mod serialize_with;
 mod store;
 mod utils;
 mod value;
@@ -31,10 +30,10 @@ mod value_table;
 pub(crate) mod tests;
 
 pub use {
-  connection::Connection,
+  connection::{Backend, Connection},
   error::{CompileTimeError, Error, RunTimeError, StoreError},
   graph::{Edge, Node, Path},
-  value::{Value, ValueMap, ValueTryIntoRef},
+  value::{map, value_map, Value, ValueMap, ValueTryIntoRef},
 };
 
 /// GQLite Result alias. Usable as a standard `Result<T, E>` or default to gqlite::Error with `Result<T>`

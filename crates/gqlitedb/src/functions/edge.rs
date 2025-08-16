@@ -10,7 +10,7 @@ impl Type
   fn call_impl(edge: &graph::Edge) -> FResult<String>
   {
     edge
-      .labels
+      .labels()
       .first()
       .ok_or_else(|| RunTimeError::MissingEdgeLabel)
       .map(|v| v.to_owned())

@@ -34,8 +34,8 @@ impl Keys
     match container
     {
       value::Value::Map(obj) => Ok(obj.keys().map(|x| x.to_owned().into()).collect()),
-      value::Value::Node(n) => Ok(n.properties.keys().map(|x| x.to_owned().into()).collect()),
-      value::Value::Edge(e) => Ok(e.properties.keys().map(|x| x.to_owned().into()).collect()),
+      value::Value::Node(n) => Ok(n.properties().keys().map(|x| x.to_owned().into()).collect()),
+      value::Value::Edge(e) => Ok(e.properties().keys().map(|x| x.to_owned().into()).collect()),
       _ =>
       {
         return Err(

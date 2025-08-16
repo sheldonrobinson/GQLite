@@ -16,9 +16,9 @@ use crate::{prelude::*, store::TransactionBoxable};
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 struct PersistentEdge
 {
-  pub key: graph::Key,
-  pub source: graph::Key,
-  pub destination: graph::Key,
+  pub key: PersistentKey,
+  pub source: PersistentKey,
+  pub destination: PersistentKey,
   pub labels: Vec<String>,
   pub properties: value::ValueMap,
 }
@@ -51,23 +51,25 @@ impl redb::Value for PersistentEdge
   }
 }
 
-impl redb::Value for graph::Node
+ccutils::alias!(PersistentNode, graph::Node, derive: Debug, Deserialize, Serialize, Clone);
+
+impl redb::Value for PersistentNode
 {
   type AsBytes<'a> = Vec<u8>;
-  type SelfType<'a> = graph::Node;
+  type SelfType<'a> = PersistentNode;
   fn as_bytes<'a, 'b: 'a>(value: &'a Self::SelfType<'b>) -> Self::AsBytes<'a>
   where
     Self: 'b,
   {
     let mut data = Vec::<u8>::new();
-    ciborium::into_writer(value, &mut data).unwrap(); // This unwrap should not happen, unless there is a bug
+    ciborium::into_writer(&value.0, &mut data).unwrap(); // This unwrap should not happen, unless there is a bug
     data
   }
   fn from_bytes<'a>(data: &'a [u8]) -> Self::SelfType<'a>
   where
     Self: 'a,
   {
-    ciborium::from_reader(data).unwrap() // This unwrap should not happen, unless there is a bug
+    PersistentNode(ciborium::from_reader(data).unwrap()) // This unwrap should not happen, unless there is a bug
   }
   fn fixed_width() -> Option<usize>
   {
@@ -79,15 +81,25 @@ impl redb::Value for graph::Node
   }
 }
 
-impl redb::Value for graph::Key
+ccutils::alias!(PersistentKey, graph::Key, derive: Debug, Deserialize, Serialize, PartialEq, Clone);
+
+impl PersistentKey
+{
+  fn to_owned_key(&self) -> graph::Key
+  {
+    *self.clone()
+  }
+}
+
+impl redb::Value for PersistentKey
 {
   type AsBytes<'a> = <u128 as redb::Value>::AsBytes<'a>;
-  type SelfType<'a> = graph::Key;
+  type SelfType<'a> = PersistentKey;
   fn as_bytes<'a, 'b: 'a>(value: &'a Self::SelfType<'b>) -> Self::AsBytes<'a>
   where
     Self: 'b,
   {
-    u128::as_bytes(&value.uuid)
+    u128::as_bytes(&value.uuid())
   }
   fn fixed_width() -> Option<usize>
   {
@@ -97,9 +109,7 @@ impl redb::Value for graph::Key
   where
     Self: 'a,
   {
-    graph::Key {
-      uuid: u128::from_bytes(data),
-    }
+    PersistentKey(graph::Key::new(u128::from_bytes(data)))
   }
   fn type_name() -> redb::TypeName
   {
@@ -107,7 +117,7 @@ impl redb::Value for graph::Key
   }
 }
 
-impl redb::Key for graph::Key
+impl redb::Key for PersistentKey
 {
   fn compare(data1: &[u8], data2: &[u8]) -> std::cmp::Ordering
   {
@@ -147,10 +157,10 @@ impl EdgeIdResult
       Some(v) => v,
       None => match self.source_id
       {
-        Some(v) => self.edge_data.destination == v,
+        Some(v) => *self.edge_data.destination == v,
         None => match self.destination_id
         {
-          Some(v) => self.edge_data.source == v,
+          Some(v) => *self.edge_data.source == v,
           None => panic!("is_reversed"),
         },
       },
@@ -228,23 +238,27 @@ impl GraphInfo
       edges_destination_index,
     }
   }
-  fn nodes_table_definition<'a>(&'a self) -> redb::TableDefinition<'a, graph::Key, graph::Node>
+  fn nodes_table_definition<'a>(
+    &'a self,
+  ) -> redb::TableDefinition<'a, PersistentKey, PersistentNode>
   {
     redb::TableDefinition::new(&self.nodes_table)
   }
-  fn edges_table_definition<'a>(&'a self) -> redb::TableDefinition<'a, graph::Key, PersistentEdge>
+  fn edges_table_definition<'a>(
+    &'a self,
+  ) -> redb::TableDefinition<'a, PersistentKey, PersistentEdge>
   {
     redb::TableDefinition::new(&self.edges_table)
   }
   fn edges_source_index_definition<'a>(
     &'a self,
-  ) -> redb::TableDefinition<'a, graph::Key, Vec<graph::Key>>
+  ) -> redb::TableDefinition<'a, PersistentKey, Vec<PersistentKey>>
   {
     redb::TableDefinition::new(&self.edges_source_index)
   }
   fn edges_destination_index_definition<'a>(
     &'a self,
-  ) -> redb::TableDefinition<'a, graph::Key, Vec<graph::Key>>
+  ) -> redb::TableDefinition<'a, PersistentKey, Vec<PersistentKey>>
   {
     redb::TableDefinition::new(&self.edges_destination_index)
   }
@@ -441,28 +455,32 @@ impl Store
   fn select_nodes_from_table<'txn, T>(
     &self,
     nodes_table: &'txn T,
-    query: super::SelectNodeQuery,
+    query: &super::SelectNodeQuery,
   ) -> Result<Vec<crate::graph::Node>>
   where
-    T: ReadableTable<graph::Key, graph::Node>,
+    T: ReadableTable<PersistentKey, PersistentNode>,
   {
-    let r = match query.keys
+    let r = match &query.keys
     {
       Some(keys) => Box::new(keys.into_iter().map(|key| {
         Ok(
           nodes_table
-            .get_required(key, || InternalError::UnknownNode)?
-            .value(),
+            .get_required(PersistentKey(key.to_owned()), || InternalError::UnknownNode)?
+            .value()
+            .into(),
         )
       })) as Box<dyn Iterator<Item = Result<graph::Node>>>,
       None => Box::new({
-        nodes_table.range::<graph::Key>(..)?.into_iter().map(|r| {
-          let (_, v) = r?;
-          Ok(v.value())
-        })
+        nodes_table
+          .range::<PersistentKey>(..)?
+          .into_iter()
+          .map(|r| {
+            let (_, v) = r?;
+            Ok(v.value().into())
+          })
       }) as Box<dyn Iterator<Item = Result<graph::Node>>>,
     };
-    let r = match query.labels
+    let r = match &query.labels
     {
       Some(labels) => Box::new(r.filter(move |n| match n
       {
@@ -470,7 +488,7 @@ impl Store
         {
           for l in labels.iter()
           {
-            if !n.labels.contains(l)
+            if !n.labels().contains(l)
             {
               return false;
             }
@@ -481,7 +499,7 @@ impl Store
       })) as Box<dyn Iterator<Item = Result<crate::graph::Node>>>,
       None => Box::new(r) as Box<dyn Iterator<Item = Result<crate::graph::Node>>>,
     };
-    let r = match query.properties
+    let r = match &query.properties
     {
       Some(properties) => Box::new(r.filter(move |n| match n
       {
@@ -489,7 +507,7 @@ impl Store
         {
           for (k, v) in properties.iter()
           {
-            match n.properties.get(k)
+            match n.properties().get(k)
             {
               Some(val) =>
               {
@@ -523,9 +541,9 @@ impl Store
     edges_destination_index: Rc<RefCell<TEdgesIndex>>,
   ) -> Result<Vec<super::EdgeResult>>
   where
-    TEdges: ReadableTable<graph::Key, PersistentEdge>,
-    TNodes: ReadableTable<graph::Key, graph::Node>,
-    TEdgesIndex: ReadableTable<graph::Key, Vec<graph::Key>>,
+    TEdges: ReadableTable<PersistentKey, PersistentEdge>,
+    TNodes: ReadableTable<PersistentKey, PersistentNode>,
+    TEdgesIndex: ReadableTable<PersistentKey, Vec<PersistentKey>>,
   {
     let edges_uuid_indices = match directivity
     {
@@ -547,8 +565,7 @@ impl Store
         {
           edges_raw.push(EdgeIdResult::new(
             edges_table
-              .get(key)?
-              .ok_or_else(|| InternalError::UnknownNode)?
+              .get_required(PersistentKey(key.to_owned()), || InternalError::UnknownNode)?
               .value(),
             Some(false),
             None,
@@ -561,7 +578,7 @@ impl Store
         if query.source.is_select_all() && query.destination.is_select_all()
         {
           edges_raw = edges_table
-            .range::<graph::Key>(..)?
+            .range::<PersistentKey>(..)?
             .into_iter()
             .map(|r| {
               let (_, v) = r?;
@@ -576,33 +593,36 @@ impl Store
           {
             if !query.destination.is_select_all() && !query.source.is_select_all()
             {
-              let dest_it =
-                self.select_nodes_from_table(&nodes_table, query.destination.clone())?;
+              let dest_it = self.select_nodes_from_table(&nodes_table, &query.destination)?;
               let dest_it: Vec<graph::Key> = dest_it
                 .into_iter()
                 .map(|n| {
                   edges_destination_uuid_index
+                    .as_ref()
                     .borrow()
-                    .get_required(n.key, || InternalError::UnknownNode)
-                    .map(|x| x.value())
+                    .get_required(PersistentKey(n.key()), || InternalError::UnknownNode)
+                    .map(|x| -> Vec<graph::Key> {
+                      x.value().into_iter().map(|x| x.into()).collect()
+                    })
                 })
                 .collect::<Result<Vec<_>>>()?
                 .into_iter()
                 .flatten()
                 .collect();
-              let nodes = self.select_nodes_from_table(&nodes_table, query.source.clone())?;
+              let nodes = self.select_nodes_from_table(&nodes_table, &query.source)?;
               for n in nodes.iter()
               {
-                let nkey = n.key;
+                let nkey = n.key();
                 for k in edges_source_uuid_index
+                  .as_ref()
                   .borrow()
-                  .get_required(nkey, || InternalError::UnknownNode)?
+                  .get_required(PersistentKey(nkey.into()), || InternalError::UnknownNode)?
                   .value()
                   .iter()
                 {
                   if dest_it.contains(k)
                   {
-                    let uniq_k = (k.to_owned(), Some(nkey), None);
+                    let uniq_k: (graph::Key, _, _) = ((**k).into(), Some(nkey), None);
                     if !edge_ids.contains(&uniq_k)
                     {
                       edges_raw.push(EdgeIdResult::new(
@@ -621,18 +641,19 @@ impl Store
             }
             else if !query.source.is_select_all()
             {
-              let nodes = self.select_nodes_from_table(&nodes_table, query.source.clone())?;
+              let nodes = self.select_nodes_from_table(&nodes_table, &query.source)?;
 
               for n in nodes.into_iter()
               {
-                let nkey = n.key;
+                let nkey = n.key();
                 for k in edges_source_uuid_index
+                  .as_ref()
                   .borrow()
-                  .get_required(nkey, || InternalError::UnknownNode)?
+                  .get_required(PersistentKey(nkey), || InternalError::UnknownNode)?
                   .value()
                   .iter()
                 {
-                  let uniq_k = (k.to_owned(), Some(nkey), None);
+                  let uniq_k = (k.to_owned_key(), Some(nkey), None);
                   if !edge_ids.contains(&uniq_k)
                   {
                     edges_raw.push(EdgeIdResult::new(
@@ -650,17 +671,18 @@ impl Store
             }
             else
             {
-              let nodes = self.select_nodes_from_table(&nodes_table, query.destination.clone())?;
+              let nodes = self.select_nodes_from_table(&nodes_table, &query.destination)?;
               for n in nodes.into_iter()
               {
-                let nkey = n.key;
+                let nkey = n.key();
                 for k in edges_destination_uuid_index
+                  .as_ref()
                   .borrow()
-                  .get_required(nkey, || InternalError::UnknownNode)?
+                  .get_required(PersistentKey(nkey), || InternalError::UnknownNode)?
                   .value()
                   .iter()
                 {
-                  let uniq_k = (k.to_owned(), None, Some(nkey));
+                  let uniq_k = (k.to_owned_key(), None, Some(nkey));
                   if !edge_ids.contains(&uniq_k)
                   {
                     edges_raw.push(EdgeIdResult::new(
@@ -694,14 +716,17 @@ impl Store
           .get_required(edge.destination, || InternalError::UnknownNode)?
           .value();
 
-        let edge = graph::Edge {
-          key: edge.key,
-          source,
-          destination,
-          labels: edge.labels,
-          properties: edge.properties,
-        };
-        super::EdgeResult { edge, reversed }
+        let edge = graph::Path::new(
+          edge.key.into(),
+          source.into(),
+          edge.labels,
+          edge.properties,
+          destination.into(),
+        );
+        super::EdgeResult {
+          path: edge,
+          reversed,
+        }
       })
     });
     // Filter using the labels
@@ -713,7 +738,7 @@ impl Store
         {
           for l in labels.iter()
           {
-            if !e.edge.labels.contains(l)
+            if !e.path.labels().contains(l)
             {
               return false;
             }
@@ -732,7 +757,7 @@ impl Store
         {
           for (k, v) in properties.iter()
           {
-            match e.edge.properties.get(k)
+            match e.path.properties().get(k)
             {
               Some(val) =>
               {
@@ -758,7 +783,7 @@ impl Store
       r.filter(|e| {
         if let Ok(e) = &e
         {
-          query.is_match(&e.edge)
+          query.is_match(&e.path)
         }
         else
         {
@@ -871,7 +896,7 @@ impl store::Store for Store
     }
   }
   /// Create nodes and add them to a graph
-  fn create_nodes<'a, T: Iterator<Item = &'a crate::graph::Node>>(
+  fn create_nodes<'a, T: IntoIterator<Item = &'a crate::graph::Node>>(
     &self,
     transaction: &mut Self::TransactionBox,
     graph_name: &String,
@@ -886,9 +911,10 @@ impl store::Store for Store
       transaction.open_table(graph_info.edges_destination_index_definition())?;
     for x in nodes_iter
     {
-      table.insert(x.key, x)?;
-      table_source.insert(x.key, vec![])?;
-      table_destination.insert(x.key, vec![])?;
+      let pk = PersistentKey(x.key());
+      table.insert(&pk, PersistentNode(x.to_owned()))?;
+      table_source.insert(&pk, vec![])?;
+      table_destination.insert(&pk, vec![])?;
     }
     Ok(())
   }
@@ -903,7 +929,7 @@ impl store::Store for Store
     let graph_info = self.get_graph_info(graph_name)?;
     let transaction = transaction.try_into_write()?;
     let mut table = transaction.open_table(graph_info.nodes_table_definition())?;
-    table.insert(node.key, node)?;
+    table.insert(PersistentKey(node.key()), PersistentNode(node.to_owned()))?;
     Ok(())
   }
   /// Delete nodes according to a given query
@@ -955,7 +981,7 @@ impl store::Store for Store
         self
           .select_nodes(transaction, graph_name, query)?
           .into_iter()
-          .map(|x| x.key)
+          .map(|x| x.key())
           .collect()
       };
 
@@ -983,11 +1009,11 @@ impl store::Store for Store
         for key in node_keys.iter()
         {
           if !table_source
-            .get_required(key, || InternalError::UnknownNode)?
+            .get_required(PersistentKey(key.to_owned()), || InternalError::UnknownNode)?
             .value()
             .is_empty()
             || !table_destination
-              .get_required(key, || InternalError::UnknownNode)?
+              .get_required(PersistentKey(key.to_owned()), || InternalError::UnknownNode)?
               .value()
               .is_empty()
           {
@@ -1004,9 +1030,9 @@ impl store::Store for Store
         write_transaction.open_table(graph_info.edges_destination_index_definition())?;
       for key in node_keys.into_iter()
       {
-        table_nodes.remove(key)?;
-        table_source.remove(key)?;
-        table_destination.remove(key)?;
+        table_nodes.remove(PersistentKey(key))?;
+        table_source.remove(PersistentKey(key))?;
+        table_destination.remove(PersistentKey(key))?;
       }
     }
     Ok(())
@@ -1025,17 +1051,17 @@ impl store::Store for Store
       store::TransactionBox::Read(read) =>
       {
         let nodes_table = read.open_table(graph_info.nodes_table_definition())?;
-        self.select_nodes_from_table(&nodes_table, query)
+        self.select_nodes_from_table(&nodes_table, &query)
       }
       store::TransactionBox::Write(write) =>
       {
         let nodes_table = write.open_table(graph_info.nodes_table_definition())?;
-        self.select_nodes_from_table(&nodes_table, query)
+        self.select_nodes_from_table(&nodes_table, &query)
       }
     }
   }
   /// Add edge
-  fn create_edges<'a, T: Iterator<Item = &'a crate::graph::Edge>>(
+  fn create_edges<'a, T: IntoIterator<Item = &'a crate::graph::SinglePath>>(
     &self,
     transaction: &mut Self::TransactionBox,
     graph_name: &String,
@@ -1052,28 +1078,28 @@ impl store::Store for Store
     for x in edges_iter
     {
       let mut keys_source = table_source
-        .remove(x.source.key)?
+        .remove(PersistentKey(x.source().key()))?
         .ok_or(InternalError::UnknownNode)?
         .value();
-      keys_source.push(x.key);
+      keys_source.push(x.key().into());
       let mut keys_destination = table_destination
-        .remove(x.destination.key)?
+        .remove(PersistentKey(x.destination().key()))?
         .ok_or(InternalError::UnknownNode)?
         .value();
-      keys_destination.push(x.key);
+      keys_destination.push(x.key().into());
 
       table.insert(
-        x.key,
+        PersistentKey(x.key()),
         &PersistentEdge {
-          key: x.key,
-          source: x.source.key,
-          destination: x.destination.key,
-          labels: x.labels.clone(),
-          properties: x.properties.clone(),
+          key: x.key().into(),
+          source: x.source().key().into(),
+          destination: x.destination().key().into(),
+          labels: x.labels().clone(),
+          properties: x.properties().clone(),
         },
       )?;
-      table_source.insert(x.source.key, keys_source)?;
-      table_destination.insert(x.destination.key, keys_destination)?;
+      table_source.insert(PersistentKey(x.source().key()), keys_source)?;
+      table_destination.insert(PersistentKey(x.destination().key()), keys_destination)?;
     }
     Ok(())
   }
@@ -1087,16 +1113,12 @@ impl store::Store for Store
     let transaction = transaction.try_into_write()?;
     let graph_info = self.get_graph_info(graph_name)?;
     let mut table = transaction.open_table(graph_info.edges_table_definition())?;
-    table.insert(
-      edge.key,
-      &PersistentEdge {
-        key: edge.key,
-        source: edge.source.key,
-        destination: edge.destination.key,
-        labels: edge.labels.to_owned(),
-        properties: edge.properties.to_owned(),
-      },
-    )?;
+    let mut pe = table
+      .get_required(&edge.key().into(), || InternalError::UnknownEdge)?
+      .value();
+    pe.labels = edge.labels().to_owned();
+    pe.properties = edge.properties().to_owned();
+    table.insert(PersistentKey(edge.key()), &pe)?;
     Ok(())
   }
   /// Delete nodes according to a given query
@@ -1120,29 +1142,29 @@ impl store::Store for Store
 
     for e in edges
     {
-      table.remove(e.edge.key)?;
+      table.remove(PersistentKey(e.path.key()))?;
       let (sk, dk) = if e.reversed
       {
-        (e.edge.destination.key, e.edge.source.key)
+        (e.path.destination().key(), e.path.source().key())
       }
       else
       {
-        (e.edge.source.key, e.edge.destination.key)
+        (e.path.source().key(), e.path.destination().key())
       };
 
       let mut v = table_source
-        .remove(sk)?
+        .remove(PersistentKey(sk))?
         .ok_or_else(|| InternalError::UnknownNode)?
         .value();
-      v.retain(|x| *x != e.edge.key);
-      table_source.insert(sk, v)?;
+      v.retain(|x| *x != e.path.key().into());
+      table_source.insert(PersistentKey(sk), v)?;
 
       let mut v = table_destination
-        .remove(dk)?
+        .remove(PersistentKey(dk))?
         .ok_or_else(|| InternalError::UnknownNode)?
         .value();
-      v.retain(|x| *x != e.edge.key);
-      table_destination.insert(dk, v)?;
+      v.retain(|x| *x != e.path.key().into());
+      table_destination.insert(PersistentKey(dk), v)?;
     }
     Ok(())
   }
@@ -1222,7 +1244,7 @@ impl store::Store for Store
     )?
     {
       nodes_count += 1;
-      for l in n.labels.iter()
+      for l in n.labels().iter()
       {
         if !labels.contains(l)
         {
@@ -1230,7 +1252,7 @@ impl store::Store for Store
         }
       }
       properties_count += n
-        .properties
+        .properties()
         .iter()
         .filter(|(_, v)| **v != value::Value::Null)
         .count();
@@ -1245,8 +1267,8 @@ impl store::Store for Store
       edges_count += 1;
 
       properties_count += e
-        .edge
-        .properties
+        .path
+        .properties()
         .iter()
         .filter(|(_, v)| **v != value::Value::Null)
         .count();

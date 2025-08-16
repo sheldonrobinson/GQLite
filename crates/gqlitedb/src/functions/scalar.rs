@@ -70,8 +70,8 @@ impl Properties
   {
     match value
     {
-      value::Value::Node(n) => Ok(n.properties.to_owned()),
-      value::Value::Edge(e) => Ok(e.properties.to_owned()),
+      value::Value::Node(n) => Ok(n.properties().to_owned()),
+      value::Value::Edge(e) => Ok(e.properties().to_owned()),
       value::Value::Map(m) => Ok(m.to_owned()),
       _ => Err(RunTimeError::InvalidArgument {
         function_name: "properties",

@@ -74,7 +74,7 @@ fn compare_f64(lhs: &f64, rhs: &f64) -> Ordering
 
 fn compare_node(lhs: &graph::Node, rhs: &graph::Node) -> Ordering
 {
-  lhs.key.uuid.cmp(&rhs.key.uuid).into()
+  lhs.key().uuid().cmp(&rhs.key().uuid()).into()
 }
 
 pub(crate) fn compare(lhs: &value::Value, rhs: &value::Value) -> Ordering
@@ -175,30 +175,21 @@ pub(crate) fn compare(lhs: &value::Value, rhs: &value::Value) -> Ordering
     },
     Value::Edge(lhs) => match rhs
     {
-      Value::Edge(rhs) =>
-      {
-        lhs.key.uuid.cmp(&rhs.key.uuid).into()
-        // let labels_cmp = lhs.labels.cmp(&rhs.labels);
-        // match labels_cmp
-        // {
-        //   std::cmp::Ordering::Equal => compare_map(&lhs.properties, &rhs.properties),
-        //   o => o.into(),
-        // }
-      }
+      Value::Edge(rhs) => lhs.key().uuid().cmp(&rhs.key().uuid()).into(),
       _ => Ordering::Null,
     },
     Value::Path(lhs) => match rhs
     {
       Value::Path(rhs) =>
       {
-        let labels_cmp = lhs.labels.cmp(&rhs.labels);
+        let labels_cmp = lhs.labels().cmp(&rhs.labels());
         match labels_cmp
         {
-          std::cmp::Ordering::Equal => match compare_map(&lhs.properties, &rhs.properties)
+          std::cmp::Ordering::Equal => match compare_map(&lhs.properties(), &rhs.properties())
           {
-            Ordering::Equal => match compare_node(&lhs.source, &rhs.source)
+            Ordering::Equal => match compare_node(&lhs.source(), &rhs.source())
             {
-              Ordering::Equal => compare_node(&lhs.destination, &rhs.destination),
+              Ordering::Equal => compare_node(&lhs.destination(), &rhs.destination()),
               o => o,
             },
             o => o,

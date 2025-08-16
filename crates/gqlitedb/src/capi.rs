@@ -1,5 +1,7 @@
 use std::borrow::Borrow;
 
+use crate::value::ValueExt as _;
+
 fn handle_error<T, E: std::borrow::Borrow<E> + ToString>(
   context: *mut GqliteApiContextT,
   result: Result<T, E>,

@@ -11,8 +11,8 @@ impl HasLabel
   {
     match value
     {
-      value::Value::Edge(e) => Ok(e.labels.contains(label)),
-      value::Value::Node(n) => Ok(n.labels.contains(label)),
+      value::Value::Edge(e) => Ok(e.labels().contains(label)),
+      value::Value::Node(n) => Ok(n.labels().contains(label)),
       _ => Err(RunTimeError::InvalidArgument {
         function_name: "has_label",
         index: 0,
@@ -45,11 +45,11 @@ impl super::FunctionTrait for HasLabels
     }
     else
     {
-      let mut it = arguments.into_iter();
+      let mut it = arguments.iter();
       let labels = match it.next().unwrap()
       {
-        value::Value::Edge(e) => e.labels,
-        value::Value::Node(n) => n.labels,
+        value::Value::Edge(e) => e.labels(),
+        value::Value::Node(n) => n.labels(),
         value::Value::Null => return Ok(value::Value::Null),
         _ => Err(RunTimeError::InvalidArgument {
           function_name: "has_labels",

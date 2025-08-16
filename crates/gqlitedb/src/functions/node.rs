@@ -9,7 +9,7 @@ impl Labels
 {
   fn call_impl(node: &graph::Node) -> FResult<Vec<String>>
   {
-    Ok(node.labels.to_owned())
+    Ok(node.labels().to_owned())
   }
 }
 

@@ -19,23 +19,31 @@ use crate::{
 //   |_|\___/|_|  |_|  \___/|_| |_| |_|____/ \__, |_|
 //                                              |_|
 
-impl rusqlite::ToSql for graph::Key
+ccutils::alias!(PersistentKey, graph::Key, derive: Debug, PartialEq);
+
+impl rusqlite::ToSql for PersistentKey
 {
   fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>>
   {
     Ok(rusqlite::types::ToSqlOutput::Owned(
-      rusqlite::types::Value::Blob(self.uuid.to_be_bytes().into()),
+      rusqlite::types::Value::Blob(self.uuid().to_be_bytes().into()),
     ))
   }
 }
 
-impl rusqlite::types::FromSql for graph::Key
+impl rusqlite::types::FromSql for PersistentKey
 {
   fn column_result(value: rusqlite::types::ValueRef<'_>) -> rusqlite::types::FromSqlResult<Self>
   {
-    Ok(Self {
-      uuid: u128::from_be_bytes(<[u8; 16]>::column_result(value)?),
-    })
+    Ok(u128::from_be_bytes(<[u8; 16]>::column_result(value)?).into())
+  }
+}
+
+impl From<u128> for PersistentKey
+{
+  fn from(value: u128) -> Self
+  {
+    Self(graph::Key::new(value))
   }
 }
 
@@ -251,14 +259,14 @@ mod templates
 
 type TransactionBox = store::TransactionBox<ReadTransaction, WriteTransaction>;
 
-fn hex(key: &graph::Key) -> String
+fn hex(key: impl Into<graph::Key>) -> String
 {
-  format!("{:032X}", key.uuid)
+  format!("{:032X}", key.into().uuid())
 }
 
 pub(crate) struct Store
 {
-  connection: Pool<rusqlite::Connection, Error>,
+  connection: Pool<rusqlite::Connection, ErrorType>,
 }
 
 ccutils::assert_impl_all!(Store: Sync, Send);
@@ -594,7 +602,7 @@ impl store::Store for Store
       )
     }
   }
-  fn create_nodes<'a, T: Iterator<Item = &'a crate::graph::Node>>(
+  fn create_nodes<'a, T: IntoIterator<Item = &'a crate::graph::Node>>(
     &self,
     transaction: &mut Self::TransactionBox,
     graph_name: &String,
@@ -610,9 +618,9 @@ impl store::Store for Store
         .render()?
         .as_str(),
         (
-          x.key,
-          serde_json::to_string(&x.labels)?,
-          serde_json::to_string(&x.properties)?,
+          PersistentKey(x.key()),
+          serde_json::to_string(x.labels())?,
+          serde_json::to_string(x.properties())?,
         ),
       )?;
     }
@@ -627,7 +635,7 @@ impl store::Store for Store
   ) -> Result<()>
   {
     let nodes = self.select_nodes(transaction, graph_name, query)?;
-    let nodes_keys: Vec<String> = nodes.into_iter().map(|x| hex(&x.key)).collect();
+    let nodes_keys: Vec<String> = nodes.into_iter().map(|x| hex(x.key())).collect();
     if detach
     {
       transaction.get_connection().execute(
@@ -682,9 +690,9 @@ impl store::Store for Store
       .render()?
       .as_str(),
       named_params! {
-        ":key": node.key,
-        ":labels": serde_json::to_string(&node.labels)?,
-        ":properties": serde_json::to_string(&node.properties)?
+        ":key": PersistentKey(node.key()),
+        ":labels": serde_json::to_string(node.labels())?,
+        ":properties": serde_json::to_string(node.properties())?
       },
     )?;
     Ok(())
@@ -709,7 +717,7 @@ impl store::Store for Store
     let mut bindings = Vec::<(&'static str, String)>::new();
     if let Some(keys) = query.keys
     {
-      let hex_keys = keys.iter().map(|key| hex(key)).collect::<Vec<_>>();
+      let hex_keys = keys.iter().map(|key| hex(*key)).collect::<Vec<_>>();
       bindings.push((":keys", serde_json::to_string(&hex_keys)?));
     }
     if let Some(labels) = query.labels
@@ -730,18 +738,14 @@ impl store::Store for Store
     let mut nodes: Vec<graph::Node> = Default::default();
     while let Some(row) = it.next()?
     {
-      let key = row.get(0)?;
+      let key: graph::Key = row.get::<_, PersistentKey>(0)?.into();
       let labels = serde_json::from_str(&row.get::<_, String>(1)?)?;
       let properties = serde_json::from_str(&row.get::<_, String>(2)?)?;
-      nodes.push(graph::Node {
-        key,
-        labels,
-        properties,
-      });
+      nodes.push(graph::Node::new(key, labels, properties));
     }
     Ok(nodes)
   }
-  fn create_edges<'a, T: Iterator<Item = &'a crate::graph::Edge>>(
+  fn create_edges<'a, T: IntoIterator<Item = &'a crate::graph::SinglePath>>(
     &self,
     transaction: &mut Self::TransactionBox,
     graph_name: &String,
@@ -757,11 +761,11 @@ impl store::Store for Store
         .render()?
         .as_str(),
         (
-          x.key,
-          serde_json::to_string(&x.labels)?,
-          serde_json::to_string(&x.properties)?,
-          x.source.key,
-          x.destination.key,
+          PersistentKey(x.key()),
+          serde_json::to_string(x.labels())?,
+          serde_json::to_string(x.properties())?,
+          PersistentKey(x.source().key()),
+          PersistentKey(x.destination().key()),
         ),
       )?;
     }
@@ -776,7 +780,7 @@ impl store::Store for Store
   ) -> Result<()>
   {
     let edges = self.select_edges(transaction, graph_name, query, directivity)?;
-    let edges_keys: Vec<String> = edges.into_iter().map(|x| hex(&x.edge.key)).collect();
+    let edges_keys: Vec<String> = edges.into_iter().map(|x| hex(x.path.key())).collect();
     transaction.get_connection().execute(
       templates::EdgeDelete {
         graph_name: &graph_name,
@@ -802,9 +806,9 @@ impl store::Store for Store
       .render()?
       .as_str(),
       named_params! {
-        ":key": edge.key,
-        ":labels": serde_json::to_string(&edge.labels)?,
-        ":properties": serde_json::to_string(&edge.properties)?
+        ":key": PersistentKey(edge.key().to_owned()),
+        ":labels": serde_json::to_string(edge.labels())?,
+        ":properties": serde_json::to_string(edge.properties())?
       },
     )?;
     Ok(())
@@ -850,7 +854,7 @@ impl store::Store for Store
     // Edge queries
     if let Some(keys) = query.keys
     {
-      let hex_keys = keys.iter().map(|key| hex(&key)).collect::<Vec<_>>();
+      let hex_keys = keys.iter().map(|key| hex(*key)).collect::<Vec<_>>();
       bindings.push((":edge_keys", serde_json::to_string(&hex_keys)?));
     }
     if let Some(labels) = query.labels
@@ -865,7 +869,7 @@ impl store::Store for Store
     // Left queries
     if let Some(keys) = query.source.keys
     {
-      let hex_keys = keys.iter().map(|key| hex(&key)).collect::<Vec<_>>();
+      let hex_keys = keys.iter().map(|key| hex(*key)).collect::<Vec<_>>();
       bindings.push((":n_left_keys", serde_json::to_string(&hex_keys)?));
     }
     if let Some(labels) = query.source.labels
@@ -880,7 +884,7 @@ impl store::Store for Store
     // Right queries
     if let Some(keys) = query.destination.keys
     {
-      let hex_keys = keys.iter().map(|key| hex(&key)).collect::<Vec<_>>();
+      let hex_keys = keys.iter().map(|key| hex(*key)).collect::<Vec<_>>();
       bindings.push((":n_right_keys", serde_json::to_string(&hex_keys)?));
     }
     if let Some(labels) = query.destination.labels
@@ -905,16 +909,16 @@ impl store::Store for Store
     let mut edges_keys: HashSet<u128> = Default::default();
     while let Some(row) = it.next()?
     {
-      let edge_key: graph::Key = row.get(0)?;
-      let n_left_key = row.get(4)?;
-      let n_right_key = row.get(7)?;
+      let edge_key: PersistentKey = row.get(0)?;
+      let n_left_key: PersistentKey = row.get(4)?;
+      let n_right_key: PersistentKey = row.get(7)?;
 
       // This ensure that if (a)-[]->(a) the edge is returned only once. But matching [a]-[]-[b] return the edge twice.
-      if n_left_key == n_right_key && edges_keys.contains(&edge_key.uuid)
+      if n_left_key == n_right_key && edges_keys.contains(&edge_key.uuid())
       {
         continue;
       }
-      edges_keys.insert(edge_key.uuid);
+      edges_keys.insert(edge_key.uuid());
       let edge_labels = serde_json::from_str(&row.get::<_, String>(1)?)?;
       let edge_properties = serde_json::from_str(&row.get::<_, String>(2)?)?;
 
@@ -924,16 +928,8 @@ impl store::Store for Store
       let n_right_labels = serde_json::from_str(&row.get::<_, String>(8)?)?;
       let n_right_properties = serde_json::from_str(&row.get::<_, String>(9)?)?;
 
-      let source = graph::Node {
-        key: n_left_key,
-        labels: n_left_labels,
-        properties: n_left_properties,
-      };
-      let destination = graph::Node {
-        key: n_right_key,
-        labels: n_right_labels,
-        properties: n_right_properties,
-      };
+      let source = graph::Node::new(n_left_key.into(), n_left_labels, n_left_properties);
+      let destination = graph::Node::new(n_right_key.into(), n_right_labels, n_right_properties);
       let reversed = row.get::<_, u32>(3)? == 1;
       let (source, destination) = if reversed
       {
@@ -945,13 +941,13 @@ impl store::Store for Store
       };
 
       edges.push(EdgeResult {
-        edge: graph::Edge {
-          key: edge_key,
-          labels: edge_labels,
-          properties: edge_properties,
+        path: graph::Path::new(
+          edge_key.into(),
           source,
+          edge_labels,
+          edge_properties,
           destination,
-        },
+        ),
         reversed,
       });
     }
@@ -990,13 +986,11 @@ mod tests
   fn test_hex()
   {
     assert_eq!(
-      super::hex(&graph::Key {
-        uuid: 18580062510968287067562660977870108180
-      }),
+      super::hex(graph::Key::new(18580062510968287067562660977870108180)),
       "0DFA63CEE7484B0DBFC407697F77F614"
     );
     assert_eq!(
-      super::hex(&graph::Key { uuid: 0 }),
+      super::hex(graph::Key::new(0)),
       "00000000000000000000000000000000"
     );
   }

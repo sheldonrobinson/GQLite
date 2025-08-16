@@ -2,16 +2,12 @@ use std::fmt::Debug;
 
 use super::AggregatorState;
 
-use crate::{
-  error::{InternalError, RunTimeError},
-  value::Value,
-  Result,
-};
+use crate::prelude::*;
 
 #[derive(Debug)]
 struct AvgState
 {
-  value: Value,
+  value: value::Value,
   count: usize,
 }
 
@@ -20,7 +16,7 @@ impl AvgState
   fn new() -> Result<Self>
   {
     Ok(Self {
-      value: Value::Null,
+      value: value::Value::Null,
       count: 0,
     })
   }
@@ -28,7 +24,7 @@ impl AvgState
 
 impl AggregatorState for AvgState
 {
-  fn next(&mut self, value: Value) -> crate::Result<()>
+  fn next(&mut self, value: value::Value) -> crate::Result<()>
   {
     if self.value.is_null()
     {
@@ -38,25 +34,25 @@ impl AggregatorState for AvgState
     {
       match value
       {
-        Value::Null =>
+        value::Value::Null =>
         {}
-        Value::Integer(i) =>
+        value::Value::Integer(i) =>
         {
           self.count += 1;
           match self.value
           {
-            Value::Integer(vi) => self.value = (vi + i).into(),
-            Value::Float(vf) => self.value = (vf + i as f64).into(),
+            value::Value::Integer(vi) => self.value = (vi + i).into(),
+            value::Value::Float(vf) => self.value = (vf + i as f64).into(),
             _ => Err(InternalError::InvalidAggregationState)?,
           }
         }
-        Value::Float(f) =>
+        value::Value::Float(f) =>
         {
           self.count += 1;
           match self.value
           {
-            Value::Integer(vi) => self.value = (vi as f64 + f).into(),
-            Value::Float(vf) => self.value = (vf + f).into(),
+            value::Value::Integer(vi) => self.value = (vi as f64 + f).into(),
+            value::Value::Float(vf) => self.value = (vf + f).into(),
             _ => Err(InternalError::InvalidAggregationState)?,
           }
         }
@@ -69,33 +65,35 @@ impl AggregatorState for AvgState
   {
     match self.value
     {
-      Value::Null => Ok(Value::Null),
-      Value::Integer(vi) => Ok((vi / self.count as i64).into()),
-      Value::Float(vf) => Ok((vf / self.count as f64).into()),
+      value::Value::Null => Ok(value::Value::Null),
+      value::Value::Integer(vi) => Ok((vi / self.count as i64).into()),
+      value::Value::Float(vf) => Ok((vf / self.count as f64).into()),
       _ => Err(InternalError::InvalidAggregationState)?,
     }
   }
 }
 
-super::declare_aggregator!(avg, Avg, AvgState, () -> Value);
+super::declare_aggregator!(avg, Avg, AvgState, () -> value::Value);
 
 #[derive(Debug)]
 struct MinState
 {
-  value: Value,
+  value: value::Value,
 }
 
 impl MinState
 {
   fn new() -> Result<Self>
   {
-    Ok(Self { value: Value::Null })
+    Ok(Self {
+      value: value::Value::Null,
+    })
   }
 }
 
 impl AggregatorState for MinState
 {
-  fn next(&mut self, value: Value) -> crate::Result<()>
+  fn next(&mut self, value: value::Value) -> crate::Result<()>
   {
     if self.value.is_null()
     {
@@ -126,20 +124,22 @@ super::declare_aggregator!(min, Min, MinState, () -> i64);
 #[derive(Debug)]
 struct MaxState
 {
-  value: Value,
+  value: value::Value,
 }
 
 impl MaxState
 {
   fn new() -> Result<Self>
   {
-    Ok(Self { value: Value::Null })
+    Ok(Self {
+      value: value::Value::Null,
+    })
   }
 }
 
 impl AggregatorState for MaxState
 {
-  fn next(&mut self, value: Value) -> crate::Result<()>
+  fn next(&mut self, value: value::Value) -> crate::Result<()>
   {
     if self.value.is_null()
     {

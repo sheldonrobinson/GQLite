@@ -123,7 +123,7 @@ pub(crate) trait Store
     if_exists: bool,
   ) -> Result<()>;
   /// Create nodes and add them to a graph
-  fn create_nodes<'a, T: Iterator<Item = &'a crate::graph::Node>>(
+  fn create_nodes<'a, T: IntoIterator<Item = &'a crate::graph::Node>>(
     &self,
     transaction: &mut Self::TransactionBox,
     graph_name: &String,
@@ -152,7 +152,7 @@ pub(crate) trait Store
     query: SelectNodeQuery,
   ) -> Result<Vec<crate::graph::Node>>;
   /// Add edge
-  fn create_edges<'a, T: Iterator<Item = &'a crate::graph::Edge>>(
+  fn create_edges<'a, T: IntoIterator<Item = &'a crate::graph::SinglePath>>(
     &self,
     transaction: &mut Self::TransactionBox,
     graph_name: &String,
@@ -193,7 +193,7 @@ pub(crate) trait Store
 
 pub(crate) struct EdgeResult
 {
-  pub(crate) edge: graph::Edge,
+  pub(crate) path: graph::SinglePath,
   pub(crate) reversed: bool,
 }
 
@@ -285,14 +285,14 @@ impl SelectNodeQuery
     }
     if let Some(keys) = &self.keys
     {
-      if !keys.iter().any(|x| node.key == *x)
+      if !keys.iter().any(|x| node.key() == *x)
       {
         return false;
       }
     }
     if let Some(labels) = &self.labels
     {
-      if !labels.iter().all(|x| node.labels.contains(x))
+      if !labels.iter().all(|x| node.labels().contains(x))
       {
         return false;
       }
@@ -301,7 +301,7 @@ impl SelectNodeQuery
     {
       if !properties
         .iter()
-        .all(|(k, v)| node.properties.get(k) == Some(v))
+        .all(|(k, v)| node.properties().get(k) == Some(v))
       {
         return false;
       }
@@ -409,18 +409,18 @@ impl SelectEdgeQuery
       destination: destination_query,
     }
   }
-  pub(crate) fn is_match(&self, edge: &graph::Edge) -> bool
+  pub(crate) fn is_match(&self, edge: &graph::Path) -> bool
   {
     if let Some(keys) = &self.keys
     {
-      if !keys.iter().any(|x| edge.key == *x)
+      if !keys.iter().any(|x| edge.key() == *x)
       {
         return false;
       }
     }
     if let Some(labels) = &self.labels
     {
-      if !labels.iter().all(|x| edge.labels.contains(x))
+      if !labels.iter().all(|x| edge.labels().contains(x))
       {
         return false;
       }
@@ -429,11 +429,11 @@ impl SelectEdgeQuery
     {
       if !properties
         .iter()
-        .all(|(k, v)| edge.properties.get(k) == Some(v))
+        .all(|(k, v)| edge.properties().get(k) == Some(v))
       {
         return false;
       }
     }
-    return self.source.is_match(&edge.source) && self.destination.is_match(&edge.destination);
+    return self.source.is_match(&edge.source()) && self.destination.is_match(&edge.destination());
   }
 }

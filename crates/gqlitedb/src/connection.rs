@@ -275,8 +275,9 @@ impl Connection
   }
   /// Create a builder, with a high-level API to set the options.
   /// Example of use:
-  /// ```
-  /// let connection = Connection::builder().path("path/to/file").backend(Backend::SQLite).create()?;
+  /// ```no_run
+  /// # use gqlitedb::{Connection, Backend};
+  /// let connection = Connection::builder().path("path/to/file").backend(Backend::SQLite).create().unwrap();
   /// ```
   pub fn builder() -> ConnectionBuilder
   {

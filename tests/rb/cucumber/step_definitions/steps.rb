@@ -501,7 +501,7 @@ end
 Then(/^a SyntaxError should be raised at compile time: InvalidParameterUse$/) do
   pending if @ignored_scenario
   expect(@exception).not_to be_nil
-  expect(@exception.message).to match(/^CompileTime: ParseError: .*$/)
+  expect(@exception.message).to match(/^RunTime: UnknownParameter: Unknown parameter .*$/)
 end
 
 Then(/^a SyntaxError should be raised at compile time: VariableTypeConflict$/) do

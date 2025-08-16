@@ -129,6 +129,12 @@ pub enum RunTimeError
   InvalidBinaryOperands,
   #[error("InvalidNegationOperands: operands for negation operation are not compatible.")]
   InvalidNegationOperands,
+  #[error("Invalid value cast, cannot cast {value} to {typename}.")]
+  InvalidValueCast
+  {
+    value: crate::Value,
+    typename: &'static str,
+  },
   #[error("InvalidDelete: invalid delete argument, expected node or edge.")]
   InvalidDelete,
   #[error("DeleteConnectedNode: node is still connected and cannot be deleted.")]
@@ -149,6 +155,13 @@ pub enum RunTimeError
   {
     graph_name: String
   },
+  #[error("Key {key} cannot be found in a path in a ValueMap.")]
+  MissingKeyInPath
+  {
+    key: String
+  },
+  #[error("Path cannot have null key.")]
+  MissingKey,
 }
 
 /// Internal errors, should be treated as bugs.
@@ -215,6 +228,7 @@ pub enum InternalError
   #[error("Empty stack.")]
   EmptyStack,
   #[error("Invalid value cast, cannot cast {value} to {typename}.")]
+  #[deprecated(note = "use `RuntimeError::InvalidValueCast` instead")]
   InvalidValueCast
   {
     value: crate::Value,
@@ -381,13 +395,34 @@ impl Error
   {
     self
   }
+  #[cfg(not(feature = "_backtrace"))]
   pub(crate) fn split_error(self) -> (Error, ())
   {
     (self, ())
   }
+  #[cfg(not(feature = "_backtrace"))]
   pub(crate) fn make_error(error: Error, _: ()) -> Error
   {
     error
+  }
+}
+
+impl From<graphcore::Error> for Error
+{
+  fn from(value: graphcore::Error) -> Self
+  {
+    match value
+    {
+      graphcore::Error::InvalidBinaryOperands => RunTimeError::InvalidBinaryOperands.into(),
+      graphcore::Error::InvalidNegationOperands => RunTimeError::InvalidNegationOperands.into(),
+      graphcore::Error::InvalidValueCast { value, typename } =>
+      {
+        RunTimeError::InvalidValueCast { value, typename }.into()
+      }
+      graphcore::Error::MissingKey => RunTimeError::MissingKey.into(),
+      graphcore::Error::MissingKeyInPath { key } => RunTimeError::MissingKeyInPath { key }.into(),
+      _ => InternalError::Unimplemented("From graphcore::Error to graphcore::Error.").into(),
+    }
   }
 }
 
@@ -550,7 +585,8 @@ pub(crate) fn parse_int_error_to_compile_error<'a>(
 macro_rules! map_error {
   ($err:expr, $source:pat => $destination:expr) => {{
     use crate::error::*;
-    let (error, meta) = $err.split_error();
+    let error: crate::prelude::ErrorType = $err;
+    let (error, meta) = error.split_error();
     match error
     {
       $source => ErrorType::make_error($destination.into(), meta),
