@@ -619,6 +619,12 @@ impl AstBuilder
           labels = self.build_labels(pair)?;
         }
         Rule::map => properties = Some(self.build_map(pair)?),
+        Rule::parameter =>
+        {
+          properties = Some(ast::Expression::Parameter(ast::Parameter {
+            name: pair.as_str().to_string(),
+          }))
+        }
         unknown_expression =>
         {
           return Err(
@@ -665,6 +671,12 @@ impl AstBuilder
           labels = self.build_labels(pair)?;
         }
         Rule::map => properties = Some(self.build_map(pair)?),
+        Rule::parameter =>
+        {
+          properties = Some(ast::Expression::Parameter(ast::Parameter {
+            name: pair.as_str().to_string(),
+          }))
+        }
         unknown_expression =>
         {
           return Err(

@@ -19,6 +19,7 @@ repository = "https://gitlab.com/gqlite/gqlite"
 graphcore = { version = "0.1.0", path = "crates/graphcore" }
 gqlitedb = { version = "0.6.0", path = "crates/gqlitedb" }
 
+askama = { version = "0.14" }
 itertools = "0.14"
 serde = "1"
 thiserror = "2"

@@ -7,6 +7,25 @@
 
 use std::collections::HashMap;
 
+#[derive(thiserror::Error, Debug)]
+#[allow(missing_docs)]
+#[non_exhaustive]
+pub enum Error
+{
+  #[error("{0}")]
+  GraphCore(#[from] graphcore::Error),
+  #[error("Askama: {0}")]
+  AskamaError(#[from] askama::Error),
+  #[error("Unknwon node.")]
+  UnknownNode,
+  #[error("Unknwon edge.")]
+  UnknownEdge,
+}
+
+type Result<T, E = Error> = std::result::Result<T, E>;
+
+use askama::Template;
+
 #[derive(Debug, Default)]
 struct CreateStatement
 {
@@ -161,6 +180,31 @@ impl_all! {
   20 0 S0 L0 P0 D0, 1 S1 L1 P1 D1, 2 S2 L2 P2 D2, 3 S3 L3 P3 D3, 4 S4 L4 P4 D4, 5 S5 L5 P5 D5, 6 S6 L6 P6 D6, 7 S7 L7 P7 D7, 8 S8 L8 P8 D8, 9 S9 L9 P9 D9, 10 S10 L10 P10 D10, 11 S11 L11 P11 D11, 12 S12 L12 P12 D12, 13 S13 L13 P13 D13, 14 S14 L14 P14 D14, 15 S15 L15 P15 D15, 16 S16 L16 P16 D16, 17 S17 L17 P17 D17, 18 S18 L18 P18 D18, 19 S19 L19 P19 D19;
 }
 
+mod templates
+{
+  use askama::Template;
+
+  // Graph related templates
+  #[derive(Template)]
+  #[template(path = "oc/create_node.oc", escape = "none")]
+  pub(super) struct CreateNode<'a>
+  {
+    pub var: &'a String,
+    pub labels: &'a Vec<String>,
+    pub properties_binding: &'a String,
+  }
+  #[derive(Template)]
+  #[template(path = "oc/create_edge.oc", escape = "none")]
+  pub(super) struct CreateEdge<'a>
+  {
+    pub source: &'a String,
+    pub var: &'a String,
+    pub labels: &'a Vec<String>,
+    pub properties_binding: &'a String,
+    pub destination: &'a String,
+  }
+}
+
 impl Builder
 {
   fn last_create_statement(&mut self) -> &mut CreateStatement
@@ -234,6 +278,82 @@ impl Builder
   {
     self.edges.get(key).map(|(_, x, _)| x)
   }
+  /// Generate an OpenCypher Query.
+  pub fn into_oc_query(self) -> Result<(String, graphcore::ValueMap)>
+  {
+    let mut q = String::new();
+    let mut bindings = graphcore::ValueMap::new();
+
+    let mut vars = HashMap::<graphcore::Key, String>::default();
+
+    for st in self.statements
+    {
+      match st
+      {
+        Statement::Create(create) =>
+        {
+          q += "CREATE ";
+          let mut comma = false;
+          // Create nodes
+          for x in create.nodes.into_iter()
+          {
+            let var = format!("v{}", vars.len());
+            let node = self.nodes.get(&x).unwrap();
+            let properties_binding = format!("$b{}", bindings.len());
+            if comma
+            {
+              q += ", "
+            }
+            else
+            {
+              comma = true;
+            }
+            q += templates::CreateNode {
+              var: &var,
+              labels: node.labels(),
+              properties_binding: &properties_binding,
+            }
+            .render()
+            .unwrap()
+            .as_str();
+            vars.insert(x, var);
+            bindings.insert(properties_binding, node.properties().to_owned().into());
+          }
+          // Create edges
+          for x in create.edges.into_iter()
+          {
+            let var = format!("v{}", vars.len());
+            let edge = self.edges.get(&x).unwrap();
+            let properties_binding = format!("$b{}", bindings.len());
+            let source = vars.get(&edge.0).ok_or_else(|| Error::UnknownNode)?;
+            let destination = vars.get(&edge.2).ok_or_else(|| Error::UnknownNode)?;
+            if comma
+            {
+              q += ", "
+            }
+            else
+            {
+              comma = true;
+            }
+            q += templates::CreateEdge {
+              var: &var,
+              source: &source,
+              destination: &destination,
+              labels: edge.1.labels(),
+              properties_binding: &properties_binding,
+            }
+            .render()
+            .unwrap()
+            .as_str();
+            vars.insert(x, var);
+            bindings.insert(properties_binding, edge.1.properties().to_owned().into());
+          }
+        }
+      }
+    }
+
+    Ok((q, bindings))
+  }
 }
 
 #[cfg(test)]
@@ -261,5 +381,37 @@ mod test
     ));
     assert_eq!(*b.edge_ref(&e0).unwrap().labels(), labels!("e"));
     assert_eq!(*b.edge_ref(&e1).unwrap().labels(), labels!("f"));
+  }
+  #[test]
+  fn test_to_oc_query()
+  {
+    let connection = gqlitedb::Connection::builder().create().unwrap();
+    let mut b = Builder::default();
+    let (n2, n3) = b.create_nodes((
+      (labels!("b"), value_map!("id" => 3)),
+      (labels!("c"), ValueMap::default()),
+    ));
+    b.create_edge(n2, labels!("d"), ValueMap::default(), n3);
+    b.create_edge(n2, labels!("e"), value_map!("id" => 5), n3);
+    let (query, parameters) = b.into_oc_query().unwrap();
+    connection.execute_query(query, parameters).unwrap();
+
+    let r = connection
+      .execute_query("MATCH (a:b) RETURN a", Default::default())
+      .unwrap();
+    let r: Vec<Value> = r.try_into().unwrap();
+    let r: &Vec<Value> = r.get(1).unwrap().try_into_ref().unwrap();
+    let r: &Node = r.get(0).unwrap().try_into_ref().unwrap();
+    assert_eq!(*r.labels(), labels!("b"));
+    assert_eq!(*r.properties(), value_map!("id" => 3));
+
+    let r = connection
+      .execute_query("MATCH ()-[a:e]->() RETURN a", Default::default())
+      .unwrap();
+    let r: Vec<Value> = r.try_into().unwrap();
+    let r: &Vec<Value> = r.get(1).unwrap().try_into_ref().unwrap();
+    let r: &SinglePath = r.get(0).unwrap().try_into_ref().unwrap();
+    assert_eq!(*r.labels(), labels!("e"));
+    assert_eq!(*r.properties(), value_map!("id" => 5));
   }
 }

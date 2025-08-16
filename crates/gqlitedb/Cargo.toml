@@ -29,7 +29,7 @@ bundled = ["rusqlite/bundled"]
 [dependencies]
 graphcore = { workspace = true }
 
-askama = { version = "0.14", optional = true }
+askama = { workspace = true, optional = true }
 ccutils = { version = "0.4", features = ["alias", "pool", "sync"] }
 ciborium = "0.2"
 itertools = { workspace = true }

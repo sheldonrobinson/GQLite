@@ -1978,9 +1978,12 @@ dependencies = [
 
 [[package]]
 name = "gqb"
-version = "0.6.0"
+version = "0.1.0"
 dependencies = [
+ "askama",
+ "gqlitedb",
  "graphcore",
+ "thiserror 2.0.15",
 ]
 
 [[package]]

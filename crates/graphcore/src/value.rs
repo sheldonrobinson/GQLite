@@ -395,7 +395,8 @@ macro_rules! value_map {
   // map-like
   ($($k:expr => $v:expr),* $(,)?) => {
     {
-    core::convert::From::from([$(($k.to_string(), $v.into()),)*])
+      let value_map: $crate::ValueMap = core::convert::From::from([$(($k.to_string(), $v.into()),)*]);
+      value_map
     }
   };
 }

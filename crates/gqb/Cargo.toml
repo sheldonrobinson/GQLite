@@ -1,6 +1,6 @@
 [package]
 name = "gqb"
-version.workspace = true
+version = "0.1.0"
 edition.workspace = true
 license.workspace = true
 homepage.workspace = true
@@ -8,3 +8,9 @@ repository.workspace = true
 
 [dependencies]
 graphcore = { workspace = true }
+
+askama = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+gqlitedb = { workspace = true }

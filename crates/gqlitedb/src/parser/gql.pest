@@ -29,7 +29,7 @@ nothing = { nothing_ident? }
 // fragments
 
 labels       = { ":" ~ label_expression }
-pattern      = { ident? ~ labels? ~ map? }
+pattern      = { ident? ~ labels? ~ (map | parameter)? }
 node_pattern = { "(" ~ pattern ~ ")" }
 
 directed_edge_pattern   = { (")-[" ~ pattern ~ "]->(") | (nothing ~ ")-->(") }
