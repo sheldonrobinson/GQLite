@@ -1977,6 +1977,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "gqb"
+version = "0.6.0"
+dependencies = [
+ "graphcore",
+]
+
+[[package]]
 name = "gqlitebrowser"
 version = "0.6.0"
 dependencies = [

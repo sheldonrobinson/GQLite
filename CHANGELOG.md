@@ -3,6 +3,7 @@
 <!-- next-header -->
 
 ## [Unreleased] - ReleaseDate
+- Add `gqb` an experimental crate for generating query using a high-level API.
 
 ## [0.5.3] - 2025-08-17
 - Add egui-based, GQLite browser.
