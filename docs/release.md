@@ -70,5 +70,6 @@ c.execute_oc_query("CREATE (n) RETURN n")
 
   Publish package:
 ```bash
-twine upload dist/*
+twine upload wheels/*
+twine upload wheels/wheelhouse/*
 ```

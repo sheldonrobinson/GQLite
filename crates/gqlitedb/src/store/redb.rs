@@ -173,7 +173,7 @@ where
     &self,
     key: impl std::borrow::Borrow<K::SelfType<'a>>,
     f: impl FnOnce() -> TError,
-  ) -> Result<redb::AccessGuard<V>>;
+  ) -> Result<redb::AccessGuard<'_, V>>;
 }
 
 impl<'txn, K, V, T> TableExtension<K, V> for T
@@ -186,7 +186,7 @@ where
     &self,
     key: impl std::borrow::Borrow<K::SelfType<'a>>,
     f: impl FnOnce() -> TError,
-  ) -> Result<redb::AccessGuard<V>>
+  ) -> Result<redb::AccessGuard<'_, V>>
   {
     self.get(key)?.ok_or_else(|| f().into())
   }

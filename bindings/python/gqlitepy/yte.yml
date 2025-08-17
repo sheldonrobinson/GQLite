@@ -1,7 +1,44 @@
 # Full documentation is available at https://gitlab.com/cyloncore/yte/-/blob/stable/docs/yte_yml.md
 tasks:
-  build_wheel:
-    description: "Build python wheel"
+  make_sdist:
+    description: "Generate sdist"
     command: !script |
       env.set_env("CARGO_TARGET_DIR", env.cwd());
       env.execute("maturin sdist")
+
+  build_many_wheel:
+    description: "Generate a many wheel"
+    command: !commands
+      - |
+        docker run --rm -e PLAT=manylinux2014_x86_64 \
+          -v $(pwd)/wheels:/io \
+          quay.io/pypa/manylinux2014_x86_64 \
+          bash -c '
+            set -e
+
+            cd /io
+
+            # Find the first sdist file (*.tar.gz)
+            SDIST=$(ls *.tar.gz | head -n1)
+            echo "Found sdist: $SDIST"
+
+            # Extract base directory name from the sdist file
+            PKG_DIR=$(tar tzf "$SDIST" | head -1 | cut -f1 -d"/")
+            echo "Extracting to: $PKG_DIR"
+
+            # Extract the sdist
+            tar xf "$SDIST"
+
+            cd "$PKG_DIR"
+
+            # Build wheel for each Python version
+            for PYBIN in /opt/python/cp3*/bin; do
+                "$PYBIN/pip" wheel . -w /io/wheelhouse/ --no-deps
+            done
+
+            # Repair wheels with auditwheel
+            for whl in /io/wheelhouse/*.whl; do
+                auditwheel repair "$whl" -w /io/wheelhouse/
+                rm "$whl"
+            done
+          '

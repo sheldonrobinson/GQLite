@@ -127,7 +127,7 @@ dists:
   image: cyloncore/ci:debian
   script:
     - yte bindings/ruby/build_gem
-    - yte bindings/python/build_wheel
+    - yte bindings/python/make_sdist
   needs:
     - job: "debian:build"
       artifacts: true
