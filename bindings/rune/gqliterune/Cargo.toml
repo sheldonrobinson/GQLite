@@ -1,10 +1,12 @@
 [package]
 name = "gqliterune"
+description = "GQLite bindings for the Rune programming language."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 homepage.workspace = true
 repository.workspace = true
+readme = "README.MD"
 
 [dependencies]
 gqlitedb = { workspace = true }

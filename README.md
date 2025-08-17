@@ -2,7 +2,6 @@
 
 [![stable pipeline](https://gitlab.com/gqlite/gqlite/badges/stable/pipeline.svg?key_text=stable)](https://gitlab.com/gqlite/gqlite/-/pipelines?ref=stable)
 [![dev/1 pipeline](https://gitlab.com/gqlite/gqlite/badges/dev/1/pipeline.svg?key_text=dev/1)](https://gitlab.com/gqlite/gqlite/-/pipelines?ref=dev/1)
-[![dev/2 pipeline](https://gitlab.com/gqlite/gqlite/badges/dev/2/pipeline.svg?key_text=dev/2)](https://gitlab.com/gqlite/gqlite/-/pipelines?ref=dev/2)
 [![docs](https://docs.rs/gqlitedb/badge.svg)](https://docs.rs/gqlitedb)
 [![crates.io](https://img.shields.io/crates/v/gqlitedb.svg)](https://crates.io/crates/gqlitedb)
 </div>

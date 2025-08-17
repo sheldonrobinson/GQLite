@@ -1,10 +1,12 @@
 [package]
 name = "gqlitebrowser"
+description = "GUI Browser for GQLite databases."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 homepage.workspace = true
 repository.workspace = true
+readme = "README.MD"
 
 [package.metadata.docs.rs]
 all-features = true

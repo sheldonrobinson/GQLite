@@ -77,7 +77,7 @@
 - `persy` backend.
 
 <!-- next-url -->
-[Unreleased]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.5.2...dev/2
+[Unreleased]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.5.2...dev/1
 [0.5.2]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.5.1...gqlitedb-v0.5.2
 [0.5.1]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.5.0...gqlitedb-v0.5.1
 [0.5.0]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.4.0...gqlitedb-v0.5.0
