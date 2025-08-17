@@ -12,7 +12,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 pyo3 = { version = "0.25", features = ["extension-module"] }
-gqlitedb = { workspace = true }
+gqlitedb = { workspace = true, features = ["bundled"] }
 
 [package.metadata.release]
 release = false

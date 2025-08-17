@@ -4,7 +4,7 @@ How to release gqlite
 - Check version numbers:
   - CMakeLists.txt
   - bindings/python/gqlpy/pyproject.toml
-  - bindings/ruby/Rakefile
+  - bindings/ruby/gqliterb.gemspec
 - Make sure there is a test database in test/rb/data for the new version, and that it is called used in gqlite-rspec
 
 - Release crates:
@@ -52,12 +52,13 @@ c.execute_oc_query "CREATE (n) RETURN n"
 
 ```bash
   cd bindings/python/gqlitepy
-  yte build_wheel
+  yte make_sdist
+  yte build_many_wheel
 ```
   Usefull documentation:
    - https://betterscientificsoftware.github.io/python-for-hpc/tutorials/python-pypi-packaging/
 
-  Testing:
+  Testing (building):
 ```
 docker run -it -v `pwd`/wheels:/wheels python:3.9 bash
 pip3 install /wheels/gqlite*
@@ -68,8 +69,20 @@ c = gqlite.Connection("testdb")
 c.execute_oc_query("CREATE (n) RETURN n")
 ```
 
+
+  Testing (wheel):
+```
+docker run -it -v `pwd`/wheels:/wheels python:3.9 bash
+pip3 install /wheels/wheelhouse/gqlite*cp39-*
+
+python3
+import gqlite
+c = gqlite.Connection("testdb")
+c.execute_oc_query("CREATE (n) RETURN n")
+```
+
   Publish package:
 ```bash
-twine upload wheels/*
-twine upload wheels/wheelhouse/*
+twine upload wheels/*.tar.gz
+twine upload wheels/wheelhouse/*whl
 ```

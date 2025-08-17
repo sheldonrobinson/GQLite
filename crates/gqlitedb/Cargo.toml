@@ -24,6 +24,7 @@ _pg16 = ["pgrx/pg16"]
 _pg17 = ["pgrx/pg17"]
 sqlite = ["dep:rusqlite", "dep:askama"]
 _value_private = []
+bundled = ["rusqlite/bundled"]
 
 [dependencies]
 askama = { version = "0.14", optional = true }
