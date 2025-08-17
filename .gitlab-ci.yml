@@ -108,7 +108,7 @@ semver:
   stage: postcheck
   image: cyloncore/ci:debian
   script:
-    - cargo semver-checks --exclude gqliterb --exclude gqlitepy
+    - cargo semver-checks --exclude gqliterb --exclude gqlitepy --exclude gqliterune
   needs:
     - job: "debian:build"
       artifacts: true

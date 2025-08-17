@@ -6,6 +6,7 @@
 - Add egui-based, GQLite browser.
 - Add support for in-memory databases.
 - Add `exponent` (^) operator.
+- Add Rune bindings.
 
 ## [0.5.2] - 2025-07-26
 - New Ruby/Python bindings.

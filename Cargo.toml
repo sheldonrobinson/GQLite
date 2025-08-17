@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["bindings/python/gqlitepy", "bindings/ruby/gqliterb", "crates/*"]
+members = ["bindings/python/gqlitepy", "bindings/ruby/gqliterb", "bindings/rune/gqliterune", "crates/*"]
 
 [workspace.package]
 version = "0.5.2"

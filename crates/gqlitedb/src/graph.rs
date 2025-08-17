@@ -99,6 +99,11 @@ impl Node
   {
     (self.key, self.labels, self.properties)
   }
+  /// Convert into value map representation
+  pub fn into_value_map(self) -> value::ValueMap
+  {
+    crate::map!("labels" => self.labels, "properties" => self.properties, "type" => "node")
+  }
 }
 
 impl std::fmt::Display for Node
@@ -158,6 +163,11 @@ impl Edge
   pub fn unpack(self) -> (Key, Vec<String>, value::ValueMap)
   {
     (self.key, self.labels, self.properties)
+  }
+  /// Convert into value map representation
+  pub fn into_value_map(self) -> value::ValueMap
+  {
+    crate::map!( "labels" => self.labels, "properties" => self.properties, "type" => "edge")
   }
 }
 
@@ -239,6 +249,11 @@ impl Path
       self.properties,
       self.destination,
     )
+  }
+  /// Convert into value map representation
+  pub fn into_value_map(self) -> value::ValueMap
+  {
+    crate::map!( "source" => self.source, "labels" => self.labels, "properties" => self.properties, "destination" => self.destination, "type" => "path")
   }
 }
 

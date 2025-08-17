@@ -564,13 +564,21 @@ impl Into<Value> for &str
   }
 }
 
-#[cfg(test)]
+/// Convenient macro for creating Array.
+///
+/// Example:
+///
+/// ```rust
+/// # use gqlitedb::{ValueMap, map};
+/// let value_map = array!("hello", 12);
+/// ```
+#[macro_export]
 macro_rules! array {
   () => (
-      $crate::value::Value::Array(Default::default())
+      $crate::Value::Array(Default::default())
   );
   ($($x:expr),+ $(,)?) => (
-    $crate::value::Value::Array(
+    $crate::Value::Array(
       vec![$($x.into()),+]
     )
   );
