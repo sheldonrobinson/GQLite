@@ -3,6 +3,8 @@
 <!-- next-header -->
 
 ## [Unreleased] - ReleaseDate
+
+## [0.5.3] - 2025-08-17
 - Add egui-based, GQLite browser.
 - Add support for WASM (only redb backend supported)
 - Add support for in-memory databases.
@@ -78,7 +80,8 @@
 - `persy` backend.
 
 <!-- next-url -->
-[Unreleased]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.5.2...dev/1
+[Unreleased]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.5.3...dev/1
+[0.5.3]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.5.2...gqlitedb-v0.5.3
 [0.5.2]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.5.1...gqlitedb-v0.5.2
 [0.5.1]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.5.0...gqlitedb-v0.5.1
 [0.5.0]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.4.0...gqlitedb-v0.5.0
