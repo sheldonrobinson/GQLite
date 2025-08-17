@@ -1970,7 +1970,7 @@ dependencies = [
 
 [[package]]
 name = "gqlitebrowser"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "brisk-eframe",
  "brisk-egui",
@@ -1991,7 +1991,7 @@ dependencies = [
 
 [[package]]
 name = "gqlitecli"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "gqlitedb",
  "rustyline",
@@ -2001,7 +2001,7 @@ dependencies = [
 
 [[package]]
 name = "gqlitedb"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "askama",
  "ccutils",
@@ -2024,7 +2024,7 @@ dependencies = [
 
 [[package]]
 name = "gqlitepy"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "gqlitedb",
  "pyo3",
@@ -2032,7 +2032,7 @@ dependencies = [
 
 [[package]]
 name = "gqliterb"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "gqlitedb",
  "magnus",
@@ -2041,7 +2041,7 @@ dependencies = [
 
 [[package]]
 name = "gqliterune"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "gqlitedb",
  "rune",

@@ -4,6 +4,7 @@
 
 ## [Unreleased] - ReleaseDate
 - Add egui-based, GQLite browser.
+- Add support for WASM (only redb backend supported)
 - Add support for in-memory databases.
 - Add `exponent` (^) operator.
 - Add Rune bindings.

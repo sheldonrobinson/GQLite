@@ -1,16 +1,21 @@
 [workspace]
 resolver = "2"
-members = ["bindings/python/gqlitepy", "bindings/ruby/gqliterb", "bindings/rune/gqliterune", "crates/*"]
+members = [
+  "bindings/python/gqlitepy",
+  "bindings/ruby/gqliterb",
+  "bindings/rune/gqliterune",
+  "crates/*",
+]
 
 [workspace.package]
-version = "0.5.2"
+version = "0.5.3"
 edition = "2021"
 license = "MIT"
 homepage = "https://gqlite.org"
 repository = "https://gitlab.com/gqlite/gqlite"
 
 [workspace.dependencies]
-gqlitedb = { version = "0.5.2", path = "crates/gqlitedb" }
+gqlitedb = { version = "0.5.3", path = "crates/gqlitedb" }
 
 # versions have to be specified with path: https://github.com/rust-lang/cargo/issues/11133
 [patch.crates-io]
