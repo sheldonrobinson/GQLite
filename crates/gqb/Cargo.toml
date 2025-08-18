@@ -1,6 +1,7 @@
 [package]
 name = "gqb"
 version = "0.1.0"
+description = "GQL Query Builder API."
 edition.workspace = true
 license.workspace = true
 homepage.workspace = true
