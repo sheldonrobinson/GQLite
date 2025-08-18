@@ -11,10 +11,6 @@ pub use graphcore::array;
 
 pub(crate) trait ValueExt
 {
-  /// Transform this value into a map. This function is guaranteed to succeed,
-  /// in case the value does not contains a map, it will create a default empty
-  /// map.
-  fn into_map(self) -> ValueMap;
   fn access<'a>(&self, path: impl Iterator<Item = &'a String>) -> Value;
   fn compare(&self, rhs: &Value) -> crate::value::Ordering;
 
@@ -60,17 +56,6 @@ fn orderability_float(lhs: &f64, rhs: &f64) -> std::cmp::Ordering
 }
 impl ValueExt for Value
 {
-  /// Transform this value into a map. This function is guaranteed to succeed,
-  /// in case the value does not contains a map, it will create a default empty
-  /// map.
-  fn into_map(self) -> ValueMap
-  {
-    match self
-    {
-      Value::Map(o) => o.clone(),
-      _ => ValueMap::new(),
-    }
-  }
   fn access<'a>(&self, mut path: impl Iterator<Item = &'a String>) -> Value
   {
     match path.next()

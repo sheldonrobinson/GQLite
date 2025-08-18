@@ -124,6 +124,40 @@ impl_all_create_nodes! {
   20 0 L0 P0, 1 L1 P1, 2 L2 P2, 3 L3 P3, 4 L4 P4, 5 L5 P5, 6 L6 P6, 7 L7 P7, 8 L8 P8, 9 L9 P9, 10 L10 P10, 11 L11 P11, 12 L12 P12, 13 L13 P13, 14 L14 P14, 15 L15 P15, 16 L16 P16, 17 L17 P17, 18 L18 P18, 19 L19 P19;
 }
 
+impl CreateNodes for Vec<(Vec<String>, graphcore::ValueMap)>
+{
+  type Output = Vec<graphcore::Key>;
+  fn fill(self, builder: &mut Builder) -> Self::Output
+  {
+    let mut out = Vec::<graphcore::Key>::new();
+    for (l, p) in self
+    {
+      out.push(builder.create_node(l, p))
+    }
+    out
+  }
+}
+
+impl CreateEdges
+  for Vec<(
+    graphcore::Key,
+    Vec<String>,
+    graphcore::ValueMap,
+    graphcore::Key,
+  )>
+{
+  type Output = Vec<graphcore::Key>;
+  fn fill(self, builder: &mut Builder) -> Self::Output
+  {
+    let mut out = Vec::<graphcore::Key>::new();
+    for (s, l, p, d) in self
+    {
+      out.push(builder.create_edge(s, l, p, d));
+    }
+    out
+  }
+}
+
 macro_rules! impl_create_edges {
   ($n:tt $($idx:tt $s:ident $l:ident $p:ident $d:ident),*) => {
       impl<$($s, $l, $p, $d),*> CreateEdges

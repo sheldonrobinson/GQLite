@@ -44,6 +44,17 @@ pub enum Value
 
 impl Value
 {
+  /// Transform this value into a map. This function is guaranteed to succeed,
+  /// in case the value does not contains a map, it will create a default empty
+  /// map.
+  pub fn into_map(self) -> ValueMap
+  {
+    match self
+    {
+      Value::Map(o) => o.clone(),
+      _ => ValueMap::new(),
+    }
+  }
   /// Return true if the value is null, false otherwise.
   pub fn is_null(&self) -> bool
   {

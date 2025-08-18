@@ -2062,7 +2062,9 @@ dependencies = [
 name = "gqliterune"
 version = "0.6.0"
 dependencies = [
+ "gqb",
  "gqlitedb",
+ "graphcore",
  "rune",
 ]
 

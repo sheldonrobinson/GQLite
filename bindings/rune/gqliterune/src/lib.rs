@@ -11,6 +11,12 @@
 
 use std::collections::HashMap;
 
+#[cfg(feature = "gqb")]
+mod gqb;
+
+#[cfg(feature = "gqb")]
+pub use gqb::gqb_module;
+
 use rune::{
   support::{Error, Result},
   Any, FromValue, TypeHash,
@@ -128,7 +134,7 @@ pub fn connection_to_rune_value(connection: gqlitedb::Connection) -> Result<rune
 }
 
 /// Create the rune module
-pub fn module() -> Result<rune::Module>
+pub fn gqlite_module() -> Result<rune::Module>
 {
   let mut m = rune::Module::with_crate("gqlite")?;
   m.ty::<Connection>()?;
@@ -151,26 +157,23 @@ mod tests
 
   use crate::to_gc_value;
 
-  struct Tester
+  pub(crate) struct Tester
   {
     rune_context: Context,
     sources: Vec<Source>,
   }
-  impl Default for Tester
+  impl Tester
   {
-    fn default() -> Tester
+    pub(crate) fn new(installer: impl FnOnce(&mut rune::Context)) -> Tester
     {
       let mut rune_context = Context::with_default_modules().unwrap();
-      rune_context.install(crate::module().unwrap()).unwrap();
+      installer(&mut rune_context);
       let sources = Default::default();
       Tester {
         rune_context,
         sources,
       }
     }
-  }
-  impl Tester
-  {
     fn build(
       &self,
       script: Option<Source>,
@@ -208,7 +211,7 @@ mod tests
       Ok((Arc::new(self.rune_context.runtime()?), Arc::new(unit)))
     }
 
-    fn eval<T>(&self, source: impl AsRef<str>) -> Result<T>
+    pub(crate) fn eval<T>(&self, source: impl AsRef<str>) -> Result<T>
     where
       T: FromValue,
     {
@@ -220,14 +223,18 @@ mod tests
   }
 
   #[test]
-  fn it_works()
+  fn test_connection()
   {
-    let tester = Tester::default();
+    let tester = Tester::new(|rune_context| {
+      rune_context
+        .install(crate::gqlite_module().unwrap())
+        .unwrap()
+    });
     let n: Vec<gqlitedb::Value> = tester
       .eval::<rune::Value>(
         r#"
-      let connection = gqlite::Connection::create({}).unwrap();
-      connection.execute_oc_query("CREATE (n)", {}).unwrap();
+      let connection = gqlite::Connection::create({})?;
+      connection.execute_oc_query("CREATE (n)", {})?;
       connection.execute_oc_query("MATCH (n) RETURN n", {})
       "#,
       )
@@ -236,10 +243,13 @@ mod tests
       .try_into()
       .unwrap();
     assert_eq!(n.len(), 2);
-    assert_eq!(n[0], gqlitedb::array!("n"));
+    assert_eq!(n[0], graphcore::array!("n"));
     let row_0: Vec<gqlitedb::Value> = n[1].clone().try_into().unwrap();
     let n_0 = row_0[0].clone().into_map();
-    assert_eq!(*n_0.get("labels").unwrap(), gqlitedb::array!());
-    assert_eq!(*n_0.get("properties").unwrap(), gqlitedb::Value::Map(gqlitedb::map!()));
+    assert_eq!(*n_0.get("labels").unwrap(), graphcore::array!());
+    assert_eq!(
+      *n_0.get("properties").unwrap(),
+      gqlitedb::Value::Map(gqlitedb::map!())
+    );
   }
 }
