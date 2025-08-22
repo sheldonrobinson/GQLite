@@ -118,6 +118,15 @@ impl Connection
   }
 }
 
+/// Convert a gqlitedb connection to a rune Value.
+pub fn connection_to_rune_value(connection: gqlitedb::Connection) -> Result<rune::Value>
+{
+  use rune::ToValue as _;
+  Ok(Connection {
+    connection
+  }.to_value()?)
+}
+
 /// Create the rune module
 pub fn module() -> Result<rune::Module>
 {
