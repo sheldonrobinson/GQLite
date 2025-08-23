@@ -8,8 +8,6 @@
 pub mod prelude;
 mod utils;
 
-use std::collections::HashMap;
-
 #[derive(thiserror::Error, Debug)]
 #[allow(missing_docs)]
 #[non_exhaustive]
@@ -28,28 +26,6 @@ pub enum Error
 type Result<T, E = Error> = std::result::Result<T, E>;
 
 use askama::Template;
-
-#[derive(Debug, Default)]
-struct CreateStatement
-{
-  nodes: Vec<graphcore::Key>,
-  edges: Vec<graphcore::Key>,
-}
-
-#[derive(Debug)]
-enum Statement
-{
-  Create(CreateStatement),
-}
-
-/// Structure for building queries.
-#[derive(Debug, Default)]
-pub struct Builder
-{
-  statements: Vec<Statement>,
-  nodes: HashMap<graphcore::Key, graphcore::Node>,
-  edges: HashMap<graphcore::Key, (graphcore::Key, graphcore::Edge, graphcore::Key)>,
-}
 
 /// Trait for multi-node creation.
 pub trait CreateNodes
@@ -71,7 +47,7 @@ pub trait CreateEdges
 
 macro_rules! __key {
   ($idx:tt) => {
-    graphcore::Key
+    Variable
   };
 }
 
@@ -129,10 +105,10 @@ impl_all_create_nodes! {
 
 impl CreateNodes for Vec<(Vec<String>, graphcore::ValueMap)>
 {
-  type Output = Vec<graphcore::Key>;
+  type Output = Vec<Variable>;
   fn fill(self, builder: &mut Builder) -> Self::Output
   {
-    let mut out = Vec::<graphcore::Key>::new();
+    let mut out = Vec::<Variable>::new();
     for (l, p) in self
     {
       out.push(builder.create_node(l, p))
@@ -141,18 +117,12 @@ impl CreateNodes for Vec<(Vec<String>, graphcore::ValueMap)>
   }
 }
 
-impl CreateEdges
-  for Vec<(
-    graphcore::Key,
-    Vec<String>,
-    graphcore::ValueMap,
-    graphcore::Key,
-  )>
+impl CreateEdges for Vec<(Variable, Vec<String>, graphcore::ValueMap, Variable)>
 {
-  type Output = Vec<graphcore::Key>;
+  type Output = Vec<Variable>;
   fn fill(self, builder: &mut Builder) -> Self::Output
   {
-    let mut out = Vec::<graphcore::Key>::new();
+    let mut out = Vec::<Variable>::new();
     for (s, l, p, d) in self
     {
       out.push(builder.create_edge(s, l, p, d));
@@ -166,10 +136,10 @@ macro_rules! impl_create_edges {
       impl<$($s, $l, $p, $d),*> CreateEdges
           for ($(($s, $l, $p, $d),)*)
       where
-          $($s: Into<graphcore::Key>,
+          $($s: Into<Variable>,
             $l: Into<Vec<String>>,
             $p: Into<graphcore::ValueMap>,
-            $d: Into<graphcore::Key>),*
+            $d: Into<Variable>),*
       {
           type Output = ($(__key!($idx),)*);
 
@@ -221,55 +191,138 @@ mod templates
 {
   use askama::Template;
 
+  use crate::Variable;
+
   // Graph related templates
   #[derive(Template)]
-  #[template(path = "oc/create_node.oc", escape = "none")]
-  pub(super) struct CreateNode<'a>
+  #[template(path = "oc/node_pattern.oc", escape = "none")]
+  pub(super) struct NodePattern<'a>
   {
-    pub var: &'a String,
+    pub var: &'a Variable,
     pub labels: &'a Vec<String>,
     pub properties_binding: &'a String,
   }
   #[derive(Template)]
-  #[template(path = "oc/create_edge.oc", escape = "none")]
-  pub(super) struct CreateEdge<'a>
+  #[template(path = "oc/edge_pattern.oc", escape = "none")]
+  pub(super) struct EdgePattern<'a>
   {
-    pub source: &'a String,
-    pub var: &'a String,
+    pub source: &'a Variable,
+    pub var: &'a Variable,
     pub labels: &'a Vec<String>,
     pub properties_binding: &'a String,
-    pub destination: &'a String,
+    pub destination: &'a Variable,
   }
+}
+
+/// Hold the name of a variable in the query.
+#[derive(Debug, Eq, PartialEq, Clone, Copy, Hash)]
+pub struct Variable
+{
+  suffix: &'static str,
+  id: usize,
+}
+
+impl std::fmt::Display for Variable
+{
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
+  {
+    write!(f, "{}{}", self.suffix, self.id)
+  }
+}
+
+#[derive(Debug, Default)]
+struct CreateStatement
+{
+  nodes: Vec<(Variable, graphcore::Node)>,
+  edges: Vec<(Variable, (Variable, graphcore::Edge, Variable))>,
+}
+
+#[derive(Debug, Default)]
+struct MatchStatement
+{
+  nodes: Vec<(Variable, graphcore::Node)>,
+  edges: Vec<(Variable, (Variable, graphcore::Edge, Variable))>,
+}
+
+#[derive(Debug, Default)]
+struct ReturnStatement
+{
+  values: Vec<(Variable, String)>,
+}
+
+#[derive(Debug)]
+enum Statement
+{
+  Create(CreateStatement),
+  Match(MatchStatement),
+  Return_(ReturnStatement),
+}
+
+/// Structure for building queries.
+#[derive(Debug, Default)]
+pub struct Builder
+{
+  statements: Vec<Statement>,
+  variables_count: usize,
+}
+
+macro_rules! last_statement {
+  ($fname: ident, $statement: ty, $ename: path) => {
+    fn $fname<'a>(&'a mut self) -> &'a mut $statement
+    {
+      // Ensure the last statement is a $statement
+      let needs_push = match self.statements.last()
+      {
+        Some($ename(_)) => false,
+        _ => true,
+      };
+
+      if needs_push
+      {
+        self.statements.push($ename(<$statement>::default()));
+      }
+
+      // Single, non-overlapping mutable borrow
+      match self.statements.last_mut().unwrap()
+      {
+        $ename(statement) => statement,
+        _ => unreachable!(), // we just pushed a statement above
+      }
+    }
+  };
 }
 
 impl Builder
 {
-  fn last_create_statement(&mut self) -> &mut CreateStatement
+  last_statement! {last_create_statement, CreateStatement, Statement::Create}
+  last_statement! {last_match_statement, MatchStatement, Statement::Match}
+  last_statement! {last_return_statement, ReturnStatement, Statement::Return_}
+
+  fn next_variable(&mut self, suffix: &'static str) -> Variable
   {
-    if self.statements.is_empty()
-    {
-      self
-        .statements
-        .push(Statement::Create(CreateStatement::default()));
+    self.variables_count += 1;
+    Variable {
+      suffix,
+      id: self.variables_count,
     }
-    match self.statements.last_mut().unwrap()
-    {
-      Statement::Create(statement) => statement,
-    }
+  }
+  /// Create a node variable
+  pub fn node_variable(&mut self) -> Variable
+  {
+    self.next_variable("n")
   }
   /// Create a node
   pub fn create_node(
     &mut self,
     labels: impl Into<Vec<String>>,
     properties: impl Into<graphcore::ValueMap>,
-  ) -> graphcore::Key
+  ) -> Variable
   {
-    let key = Default::default();
-    let node = graphcore::Node::new(key, labels.into(), properties.into());
+    let var = self.node_variable();
+    let node = graphcore::Node::new(Default::default(), labels.into(), properties.into());
     let cs = self.last_create_statement();
-    cs.nodes.push(key);
-    self.nodes.insert(key, node);
-    key
+    cs.nodes.push((var, node));
+    var
   }
   /// Create multiple nodes
   pub fn create_nodes<T>(&mut self, t: T) -> T::Output
@@ -278,30 +331,24 @@ impl Builder
   {
     t.fill(self)
   }
-  /// Return a reference to a node
-  pub fn node_ref(&self, key: &graphcore::Key) -> Option<&graphcore::Node>
-  {
-    self.nodes.get(key)
-  }
   /// Create an edge
   pub fn create_edge(
     &mut self,
-    source: impl Into<graphcore::Key>,
+    source: impl Into<Variable>,
     labels: impl Into<Vec<String>>,
     properties: impl Into<graphcore::ValueMap>,
-    destination: impl Into<graphcore::Key>,
-  ) -> graphcore::Key
+    destination: impl Into<Variable>,
+  ) -> Variable
   {
-    let key = Default::default();
+    let var = self.next_variable("e");
     let edge = (
       source.into(),
-      graphcore::Edge::new(key, labels.into(), properties.into()),
+      graphcore::Edge::new(Default::default(), labels.into(), properties.into()),
       destination.into(),
     );
     let cs = self.last_create_statement();
-    cs.edges.push(key);
-    self.edges.insert(key, edge);
-    key
+    cs.edges.push((var, edge));
+    var
   }
   /// Create multiple edges
   pub fn create_edges<T>(&mut self, t: T) -> T::Output
@@ -310,21 +357,70 @@ impl Builder
   {
     t.fill(self)
   }
-  /// Return a reference to an edge
-  pub fn edge_ref(&self, key: &graphcore::Key) -> Option<&graphcore::Edge>
+  /// Select a node
+  pub fn match_node(
+    &mut self,
+    labels: impl Into<Vec<String>>,
+    properties: impl Into<graphcore::ValueMap>,
+  ) -> Variable
   {
-    self.edges.get(key).map(|(_, x, _)| x)
+    let var = self.node_variable();
+    let ss = self.last_match_statement();
+    ss.nodes.push((
+      var,
+      graphcore::Node::new(Default::default(), labels.into(), properties.into()),
+    ));
+    var
+  }
+  /// Select an edge
+  pub fn match_edge(
+    &mut self,
+    source: impl Into<Option<Variable>>,
+    labels: impl Into<Vec<String>>,
+    properties: impl Into<graphcore::ValueMap>,
+    destination: impl Into<Option<Variable>>,
+  ) -> Variable
+  {
+    let var = self.next_variable("e");
+    let source = source.into().unwrap_or_else(|| self.next_variable("n"));
+    let destination = destination
+      .into()
+      .unwrap_or_else(|| self.next_variable("n"));
+    let ss = self.last_match_statement();
+    ss.edges.push((
+      var,
+      (
+        source,
+        graphcore::Edge::new(Default::default(), labels.into(), properties.into()),
+        destination,
+      ),
+    ));
+    var
+  }
+  /// Add a return statement to the query for the given variable, accessible in the column with the given name
+  pub fn return_variable(&mut self, variable: Variable, name: impl Into<String>)
+  {
+    self
+      .last_return_statement()
+      .values
+      .push((variable, name.into()));
   }
   /// Generate an OpenCypher Query.
   pub fn into_oc_query(self) -> Result<(String, graphcore::ValueMap)>
   {
     let mut q = String::new();
     let mut bindings = graphcore::ValueMap::new();
-
-    let mut vars = HashMap::<graphcore::Key, String>::default();
-
+    let mut space = false;
     for st in self.statements
     {
+      if space
+      {
+        q += " ";
+      }
+      else
+      {
+        space = true;
+      }
       match st
       {
         Statement::Create(create) =>
@@ -332,10 +428,8 @@ impl Builder
           q += "CREATE ";
           let mut comma = false;
           // Create nodes
-          for x in create.nodes.into_iter()
+          for (var, node) in create.nodes.into_iter()
           {
-            let var = format!("v{}", vars.len());
-            let node = self.nodes.get(&x).unwrap();
             let properties_binding = format!("$b{}", bindings.len());
             if comma
             {
@@ -345,7 +439,7 @@ impl Builder
             {
               comma = true;
             }
-            q += templates::CreateNode {
+            q += templates::NodePattern {
               var: &var,
               labels: node.labels(),
               properties_binding: &properties_binding,
@@ -353,17 +447,12 @@ impl Builder
             .render()
             .unwrap()
             .as_str();
-            vars.insert(x, var);
             bindings.insert(properties_binding, node.properties().to_owned().into());
           }
           // Create edges
-          for x in create.edges.into_iter()
+          for (var, (source, edge, destination)) in create.edges.into_iter()
           {
-            let var = format!("v{}", vars.len());
-            let edge = self.edges.get(&x).unwrap();
             let properties_binding = format!("$b{}", bindings.len());
-            let source = vars.get(&edge.0).ok_or_else(|| Error::UnknownNode)?;
-            let destination = vars.get(&edge.2).ok_or_else(|| Error::UnknownNode)?;
             if comma
             {
               q += ", "
@@ -372,18 +461,86 @@ impl Builder
             {
               comma = true;
             }
-            q += templates::CreateEdge {
+            q += templates::EdgePattern {
               var: &var,
               source: &source,
               destination: &destination,
-              labels: edge.1.labels(),
+              labels: edge.labels(),
               properties_binding: &properties_binding,
             }
             .render()
             .unwrap()
             .as_str();
-            vars.insert(x, var);
-            bindings.insert(properties_binding, edge.1.properties().to_owned().into());
+            bindings.insert(properties_binding, edge.properties().to_owned().into());
+          }
+        }
+        Statement::Match(select) =>
+        {
+          q += "MATCH ";
+          let mut comma = false;
+          // Create nodes
+          for (var, node) in select.nodes.into_iter()
+          {
+            let properties_binding = format!("$b{}", bindings.len());
+            if comma
+            {
+              q += ", "
+            }
+            else
+            {
+              comma = true;
+            }
+            q += templates::NodePattern {
+              var: &var,
+              labels: node.labels(),
+              properties_binding: &properties_binding,
+            }
+            .render()
+            .unwrap()
+            .as_str();
+            bindings.insert(properties_binding, node.properties().to_owned().into());
+          }
+          // Create edges
+          for (var, (source, edge, destination)) in select.edges.into_iter()
+          {
+            let properties_binding = format!("$b{}", bindings.len());
+            if comma
+            {
+              q += ", "
+            }
+            else
+            {
+              comma = true;
+            }
+            q += templates::EdgePattern {
+              var: &var,
+              source: &source,
+              destination: &destination,
+              labels: edge.labels(),
+              properties_binding: &properties_binding,
+            }
+            .render()
+            .unwrap()
+            .as_str();
+            bindings.insert(properties_binding, edge.properties().to_owned().into());
+          }
+        }
+        Statement::Return_(return_statement) =>
+        {
+          q += "RETURN ";
+          let mut comma = false;
+          // Create nodes
+          for (var, name) in return_statement.values.into_iter()
+          {
+            if comma
+            {
+              q += ", "
+            }
+            else
+            {
+              comma = true;
+            }
+            q += &format!("{} AS {}", var, name);
           }
         }
       }
@@ -403,21 +560,21 @@ mod test
   {
     let mut b = Builder::default();
     let n1 = b.create_node(labels!("a"), ValueMap::default());
-    assert_eq!(*b.node_ref(&n1).unwrap().labels(), labels!("a"));
     let (n2, n3) = b.create_nodes((
       (labels!("b"), ValueMap::default()),
       (labels!("c"), ValueMap::default()),
     ));
-    assert_eq!(*b.node_ref(&n2).unwrap().labels(), labels!("b"));
-    assert_eq!(*b.node_ref(&n3).unwrap().labels(), labels!("c"));
-    let e = b.create_edge(n1, labels!("d"), ValueMap::default(), n2);
-    assert_eq!(*b.edge_ref(&e).unwrap().labels(), labels!("d"));
-    let (e0, e1) = b.create_edges((
+    let _ = b.create_edge(n1, labels!("d"), ValueMap::default(), n2);
+    let (_, _) = b.create_edges((
       (n1, labels!("e"), ValueMap::default(), n3),
       (n2, labels!("f"), ValueMap::default(), n3),
     ));
-    assert_eq!(*b.edge_ref(&e0).unwrap().labels(), labels!("e"));
-    assert_eq!(*b.edge_ref(&e1).unwrap().labels(), labels!("f"));
+    let (q, b) = b.into_oc_query().unwrap();
+    assert_eq!(q, "CREATE (n1:a $b0), (n2:b $b1), (n3:c $b2), (n1)-[e4:d $b3]->(n2), (n1)-[e5:e $b4]->(n3), (n2)-[e6:f $b5]->(n3)".to_string());
+    assert_eq!(
+      b,
+      value_map!("$b0" => value_map!(), "$b1" => value_map!(), "$b2" => value_map!(), "$b3" => value_map!(), "$b4" => value_map!(), "$b5" => value_map!(), )
+    );
   }
   #[test]
   fn test_to_oc_query()
@@ -447,8 +604,28 @@ mod test
       .unwrap();
     let r: Vec<Value> = r.try_into().unwrap();
     let r: &Vec<Value> = r.get(1).unwrap().try_into_ref().unwrap();
-    let r: &SinglePath = r.get(0).unwrap().try_into_ref().unwrap();
+    let r: &Edge = r.get(0).unwrap().try_into_ref().unwrap();
     assert_eq!(*r.labels(), labels!("e"));
     assert_eq!(*r.properties(), value_map!("id" => 5));
+  }
+  #[test]
+  fn test_select()
+  {
+    let mut b = Builder::default();
+    let n1 = b.match_node(labels!("a"), value_map!("id" => 3));
+    let n2 = b.node_variable();
+    let e1 = b.match_edge(n1, labels!("b"), value_map!("id" => 2), n2);
+    b.return_variable(n1, "n1");
+    b.return_variable(e1, "e1");
+    b.return_variable(n2, "n2");
+    let (q, b) = b.into_oc_query().unwrap();
+    assert_eq!(
+      q,
+      "MATCH (n1:a $b0), (n1)-[e3:b $b1]->(n2) RETURN n1 AS n1, e3 AS e1, n2 AS n2".to_string()
+    );
+    assert_eq!(
+      b,
+      value_map!("$b0" => value_map!("id" => 3), "$b1" => value_map!("id" => 2) )
+    );
   }
 }

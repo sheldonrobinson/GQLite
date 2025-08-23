@@ -1,9 +1,9 @@
 use rune::{support::Result, Any};
 
 #[derive(Any)]
-struct Key
+struct Variable
 {
-  key: graphcore::Key,
+  variable: gqb::Variable,
 }
 
 #[derive(Any)]
@@ -23,7 +23,7 @@ impl Builder
     }
   }
   #[rune::function]
-  fn create_nodes(&mut self, values: Vec<(Vec<String>, rune::Value)>) -> Result<Vec<Key>>
+  fn create_nodes(&mut self, values: Vec<(Vec<String>, rune::Value)>) -> Result<Vec<Variable>>
   {
     Ok(
       self
@@ -38,13 +38,15 @@ impl Builder
             .collect::<Result<Vec<_>>>()?,
         )
         .into_iter()
-        .map(|key| Key { key })
+        .map(|variable| Variable { variable })
         .collect(),
     )
   }
   #[rune::function]
-  fn create_edges(&mut self, values: Vec<(Key, Vec<String>, rune::Value, Key)>)
-    -> Result<Vec<Key>>
+  fn create_edges(
+    &mut self,
+    values: Vec<(Variable, Vec<String>, rune::Value, Variable)>,
+  ) -> Result<Vec<Variable>>
   {
     Ok(
       self
@@ -54,12 +56,12 @@ impl Builder
             .into_iter()
             .map(|(s, l, p, d)| {
               let p: graphcore::ValueMap = crate::to_gc_value(p)?.try_into()?;
-              Ok((s.key, l, p, d.key))
+              Ok((s.variable, l, p, d.variable))
             })
             .collect::<Result<Vec<_>>>()?,
         )
         .into_iter()
-        .map(|key| Key { key })
+        .map(|variable| Variable { variable })
         .collect(),
     )
   }
@@ -105,7 +107,7 @@ mod tests
       "#,
       )
       .unwrap();
-    assert_eq!(n, "CREATE (v0:n $b0), (v1:m $b1), (v0)-[v2:n $b2]->(v1)");
+    assert_eq!(n, "CREATE (n1:n $b0), (n2:m $b1), (n1)-[e3:n $b2]->(n2)");
     assert_eq!(
       crate::to_gc_value(b).unwrap(),
       graphcore::value_map!("$b0" => graphcore::value_map!("a" => 1), "$b2"=> graphcore::value_map!("a" => 2), "$b1" => graphcore::ValueMap::default()).into()
