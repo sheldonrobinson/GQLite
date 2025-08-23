@@ -141,7 +141,7 @@ impl Node
   /// Convert into value map representation
   pub fn into_value_map(self) -> value::ValueMap
   {
-    crate::value_map!("labels" => self.labels, "properties" => self.properties, "type" => "node")
+    crate::value_map!("key" => self.key, "labels" => self.labels, "properties" => self.properties, "type" => "node")
   }
 }
 
@@ -232,7 +232,7 @@ impl Edge
   /// Convert into value map representation
   pub fn into_value_map(self) -> value::ValueMap
   {
-    crate::value_map!( "labels" => self.labels, "properties" => self.properties, "type" => "edge")
+    crate::value_map!("key" => self.key,  "labels" => self.labels, "properties" => self.properties, "type" => "edge")
   }
 }
 
@@ -339,7 +339,7 @@ impl SinglePath
   /// Convert into value map representation
   pub fn into_value_map(self) -> value::ValueMap
   {
-    crate::value_map!( "source" => self.source, "labels" => self.labels, "properties" => self.properties, "destination" => self.destination, "type" => "path")
+    crate::value_map!("key" => self.key, "source" => self.source, "labels" => self.labels, "properties" => self.properties, "destination" => self.destination, "type" => "path")
   }
 }
 
