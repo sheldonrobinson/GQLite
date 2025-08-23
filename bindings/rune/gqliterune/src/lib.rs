@@ -29,11 +29,20 @@ struct Connection
   connection: gqlitedb::Connection,
 }
 
+// Workaround lack of runtime support for u128: https://github.com/rune-rs/rune/issues/960
+#[derive(Any)]
+#[rune(item = ::gqlite)]
+struct Key
+{
+  key: graphcore::Key,
+}
+
 fn to_gc_value(value: rune::Value) -> Result<gqlitedb::Value>
 {
   match value.type_hash()
   {
     <()>::HASH => Ok(gqlitedb::Value::Null),
+    Key::HASH => Ok(Key::from_value(value)?.key.into()),
     bool::HASH => Ok(value.as_bool()?.into()),
     String::HASH => Ok(value.into_string()?.to_string().into()),
     Vec::<rune::Value>::HASH => Ok(
@@ -76,6 +85,7 @@ fn to_ru_value(value: gqlitedb::Value) -> Result<rune::Value, rune::runtime::Run
   match value
   {
     gqlitedb::Value::Null => Ok(rune::Value::empty()),
+    gqlitedb::Value::Key(key) => rune::to_value(Key { key }),
     gqlitedb::Value::Boolean(b) => rune::to_value(b),
     gqlitedb::Value::Integer(i) => rune::to_value(i),
     gqlitedb::Value::Float(f) => rune::to_value(f),
@@ -128,9 +138,7 @@ impl Connection
 pub fn connection_to_rune_value(connection: gqlitedb::Connection) -> Result<rune::Value>
 {
   use rune::ToValue as _;
-  Ok(Connection {
-    connection
-  }.to_value()?)
+  Ok(Connection { connection }.to_value()?)
 }
 
 /// Create the rune module

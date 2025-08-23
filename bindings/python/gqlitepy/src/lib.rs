@@ -132,6 +132,7 @@ fn to_pvalue<'py>(py: Python<'py>, val: gqlitedb::Value) -> PyResult<Bound<'py, 
   {
     gqlitedb::Value::Array(arr) => Ok(to_plist(py, arr)?.into_any()),
     gqlitedb::Value::Boolean(b) => b.into_bound_py_any(py),
+    gqlitedb::Value::Key(k) => k.uuid().into_bound_py_any(py),
     gqlitedb::Value::Integer(i) => i.into_bound_py_any(py),
     gqlitedb::Value::Float(f) => f.into_bound_py_any(py),
     gqlitedb::Value::String(s) => s.into_bound_py_any(py),

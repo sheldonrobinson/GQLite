@@ -83,6 +83,12 @@ pub(crate) fn compare(lhs: &value::Value, rhs: &value::Value) -> Ordering
   match lhs
   {
     Value::Null => Ordering::ComparedNull,
+    Value::Key(kl) => match rhs
+    {
+      Value::Key(kr) => kl.uuid().cmp(&kr.uuid()).into(),
+      Value::Null => Ordering::ComparedNull,
+      _ => Ordering::Null,
+    },
     Value::Boolean(bl) => match rhs
     {
       Value::Boolean(br) => bl.cmp(br).into(),

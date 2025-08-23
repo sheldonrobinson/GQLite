@@ -11,6 +11,7 @@ use crate::{compiler::variables_manager::VariablesManager, parser::ast, prelude:
 pub(crate) enum ExpressionType
 {
   Array,
+  Key,
   Map,
   Node,
   Edge,
@@ -408,6 +409,7 @@ impl<'b> Analyser<'b>
         match val.value
         {
           value::Value::Array(_) => ExpressionType::Array,
+          value::Value::Key(_) => ExpressionType::Key,
           value::Value::Boolean(_) => ExpressionType::Boolean,
           value::Value::Edge(_) => ExpressionType::Edge,
           value::Value::Node(_) => ExpressionType::Node,

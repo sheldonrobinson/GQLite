@@ -148,6 +148,7 @@ fn to_rvalue(ruby: &Ruby, val: gqlitedb::Value) -> Result<magnus::Value, Error>
   {
     gqlitedb::Value::Array(arr) => Ok(to_rarray(ruby, arr)?.into_value()),
     gqlitedb::Value::Boolean(b) => Ok(b.into_value()),
+    gqlitedb::Value::Key(k) => Ok(integer_from_u128(ruby, k.into())?.into_value()),
     gqlitedb::Value::Integer(i) => Ok(i.into_value()),
     gqlitedb::Value::Float(f) => Ok(f.into_value()),
     gqlitedb::Value::String(s) => Ok(s.into_value()),

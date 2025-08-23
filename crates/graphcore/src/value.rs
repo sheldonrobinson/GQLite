@@ -18,6 +18,8 @@ pub enum Value
   /// Null value.
   #[default]
   Null,
+  /// A UUID Key in the graph.
+  Key(graph::Key),
   /// Boolean value.
   Boolean(bool),
   /// Signed integer value.
@@ -82,6 +84,7 @@ impl Hash for Value
     {
       Value::Null =>
       {}
+      Value::Key(k) => k.hash(state),
       Value::Boolean(b) => b.hash(state),
       Value::Integer(i) => i.hash(state),
       Value::Float(f) =>
@@ -113,10 +116,12 @@ impl Add for Value
   {
     match self
     {
-      Value::Boolean(..) | Value::Node(..) | Value::Edge(..) | Value::Map(..) | Value::Path(..) =>
-      {
-        Err(Error::InvalidBinaryOperands.into())
-      }
+      Value::Boolean(..)
+      | Value::Key(..)
+      | Value::Node(..)
+      | Value::Edge(..)
+      | Value::Map(..)
+      | Value::Path(..) => Err(Error::InvalidBinaryOperands.into()),
       Value::Null => Ok(Value::Null),
       Self::Array(lhs) => match rhs
       {
@@ -167,6 +172,7 @@ macro_rules! impl_mdsr {
         match self
         {
           Value::Boolean(..)
+          | Value::Key(..)
           | Value::String(..)
           | Value::Node(..)
           | Value::Edge(..)
@@ -207,6 +213,7 @@ impl Value
     match self
     {
       Value::Boolean(..)
+      | Value::Key(..)
       | Value::String(..)
       | Value::Node(..)
       | Value::Edge(..)
@@ -247,6 +254,7 @@ impl Neg for Value
       Self::Integer(i) => Ok((-i).into()),
       Value::Null => Ok(Value::Null),
       Value::Boolean(..)
+      | Value::Key(..)
       | Value::String(..)
       | Value::Node(..)
       | Value::Edge(..)
@@ -264,6 +272,7 @@ impl std::fmt::Display for Value
     match self
     {
       Value::Null => write!(f, "null"),
+      Value::Key(k) => write!(f, "<{}>", k.uuid()),
       Value::Boolean(b) => write!(f, "{}", b),
       Value::Integer(i) => write!(f, "{}", i),
       Value::Float(fl) => write!(f, "{}", fl),
@@ -355,6 +364,7 @@ macro_rules! impl_to_value {
   };
 }
 
+impl_to_value!(graph::Key, Key);
 impl_to_value!(bool, Boolean);
 impl_to_value!(i64, Integer);
 impl_to_value!(f64, Float);

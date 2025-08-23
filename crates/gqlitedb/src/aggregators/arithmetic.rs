@@ -41,6 +41,7 @@ where
     match self.value
     {
       Value::Boolean(..)
+      | Value::Key(..)
       | Value::Node(..)
       | Value::Edge(..)
       | Value::Array(..)

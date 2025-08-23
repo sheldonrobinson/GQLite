@@ -98,38 +98,49 @@ impl ValueExt for Value
         Value::Null => std::cmp::Ordering::Equal,
         _ => std::cmp::Ordering::Greater,
       },
-      Value::Integer(lhs) => match rhs
+      Value::Key(lhs) => match rhs
       {
         Value::Null => std::cmp::Ordering::Less,
+        Value::Key(rhs) => lhs.uuid().cmp(&rhs.uuid()),
+        _ => std::cmp::Ordering::Greater,
+      },
+      Value::Integer(lhs) => match rhs
+      {
+        Value::Null | Value::Key(..) => std::cmp::Ordering::Less,
         Value::Integer(rhs) => lhs.cmp(rhs),
         Value::Float(rhs) => orderability_float(&(*lhs as f64), rhs),
         _ => std::cmp::Ordering::Greater,
       },
       Value::Float(lhs) => match rhs
       {
-        Value::Null => std::cmp::Ordering::Less,
+        Value::Null | Value::Key(..) => std::cmp::Ordering::Less,
         Value::Integer(rhs) => orderability_float(lhs, &(*rhs as f64)),
         Value::Float(rhs) => orderability_float(lhs, rhs),
         _ => std::cmp::Ordering::Greater,
       },
       Value::Boolean(lhs) => match rhs
       {
-        Value::Null | Value::Integer(..) | Value::Float(..) => std::cmp::Ordering::Less,
+        Value::Null | Value::Key(..) | Value::Integer(..) | Value::Float(..) =>
+        {
+          std::cmp::Ordering::Less
+        }
         Value::Boolean(rhs) => lhs.cmp(rhs),
         _ => std::cmp::Ordering::Greater,
       },
       Value::String(lhs) => match rhs
       {
-        Value::Null | Value::Integer(..) | Value::Float(..) | Value::Boolean(..) =>
-        {
-          std::cmp::Ordering::Less
-        }
+        Value::Null
+        | Value::Key(..)
+        | Value::Integer(..)
+        | Value::Float(..)
+        | Value::Boolean(..) => std::cmp::Ordering::Less,
         Value::String(rhs) => lhs.cmp(rhs),
         _ => std::cmp::Ordering::Greater,
       },
       Value::Path(lhs) => match rhs
       {
         Value::Null
+        | Value::Key(..)
         | Value::Integer(..)
         | Value::Float(..)
         | Value::Boolean(..)
@@ -157,6 +168,7 @@ impl ValueExt for Value
       Value::Array(lhs) => match rhs
       {
         Value::Null
+        | Value::Key(..)
         | Value::Integer(..)
         | Value::Float(..)
         | Value::Boolean(..)
@@ -173,6 +185,7 @@ impl ValueExt for Value
       Value::Edge(lhs) => match rhs
       {
         Value::Null
+        | Value::Key(..)
         | Value::Integer(..)
         | Value::Float(..)
         | Value::Boolean(..)
@@ -185,6 +198,7 @@ impl ValueExt for Value
       Value::Node(lhs) => match rhs
       {
         Value::Null
+        | Value::Key(..)
         | Value::Integer(..)
         | Value::Float(..)
         | Value::Boolean(..)
@@ -198,6 +212,7 @@ impl ValueExt for Value
       Value::Map(lhs) => match rhs
       {
         Value::Null
+        | Value::Key(..)
         | Value::Integer(..)
         | Value::Float(..)
         | Value::Boolean(..)
