@@ -1,7 +1,7 @@
 use std::{collections::HashSet, fs};
 
 use ccutils::temporary::TemporaryFile;
-use gqlitedb::{map, Connection};
+use gqlitedb::{value_map, Connection};
 use rand::{seq::IndexedRandom, Rng};
 use regex::Regex;
 
@@ -24,11 +24,21 @@ impl Pokec
 {
   pub(crate) fn load(backend: &str, size: PokecSize) -> Pokec
   {
+    let backend = match backend
+    {
+      "sqlite" => gqlitedb::Backend::SQLite,
+      "redb" => gqlitedb::Backend::Redb,
+      o => panic!("Unknown backend '{}'", o),
+    };
     let temporary_file = TemporaryFile::builder()
       .should_create_file(false)
       .label("gqlite_bench")
       .create();
-    let connection = Connection::open(temporary_file.path(), map!("backend" => backend)).unwrap();
+    let connection = Connection::builder()
+      .path(temporary_file.path())
+      .backend(backend)
+      .create()
+      .unwrap();
 
     let filename = match size
     {
@@ -73,7 +83,7 @@ impl Pokec
       .connection
       .execute_oc_query(
         "MATCH (n:User {id: $id}) RETURN n",
-        map!("$id" => *random_id),
+        value_map!("$id" => *random_id),
       )
       .unwrap();
   }
@@ -86,7 +96,7 @@ impl Pokec
       .connection
       .execute_oc_query(
         "MATCH (n:User) WHERE n.id = $id RETURN n",
-        map!("$id" => *random_id),
+        value_map!("$id" => *random_id),
       )
       .unwrap();
   }
@@ -99,7 +109,7 @@ impl Pokec
       .connection
       .execute_oc_query(
         "MATCH (s:User {id: $id})-->(n:User) RETURN n.id",
-        map!("$id" => *random_id),
+        value_map!("$id" => *random_id),
       )
       .unwrap();
   }
@@ -112,7 +122,7 @@ impl Pokec
       .connection
       .execute_oc_query(
         "MATCH (s:User {id: $id})-->(n:User) WHERE n.age >= 18 RETURN n.id",
-        map!("$id" => *random_id),
+        value_map!("$id" => *random_id),
       )
       .unwrap();
   }
@@ -125,7 +135,7 @@ impl Pokec
       .connection
       .execute_oc_query(
         "MATCH (s:User {id: $id})-->()-->(n:User) RETURN n.id",
-        map!("$id" => *random_id),
+        value_map!("$id" => *random_id),
       )
       .unwrap();
   }
@@ -138,7 +148,7 @@ impl Pokec
       .connection
       .execute_oc_query(
         "MATCH (s:User {id: $id})-->()-->(n:User) WHERE n.age >= 18 RETURN n.id",
-        map!("$id" => *random_id),
+        value_map!("$id" => *random_id),
       )
       .unwrap();
   }
@@ -151,7 +161,7 @@ impl Pokec
       .connection
       .execute_oc_query(
         "MATCH (n:User {id: $id})-[e1]->(m)-[e2]->(n) RETURN e1, m, e2",
-        map!("$id" => *random_id),
+        value_map!("$id" => *random_id),
       )
       .unwrap();
   }

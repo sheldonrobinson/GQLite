@@ -123,13 +123,13 @@ where
 }
 
 /// Connection is the interface to the database, and allow to execute new queries.
-/// New connection are created with [Connection::open] and queried with [Connection::execute_oc_query].
-/// As shown in the example bellow:
+/// New connection are created with [Connection::create] or [Connection::builder] and queried with
+/// [Connection::execute_oc_query]. As shown in the example bellow:
 ///
 /// ```rust
-/// # use gqlitedb::{Connection, QueryResult};
+/// # use gqlitedb::{Backend, Connection, QueryResult};
 /// # fn example() -> gqlitedb::Result<()> {
-/// let connection = Connection::open("filename.db", gqlitedb::value_map!("backend" => "redb"))?;
+/// let connection = Connection::builder().path("filename.db").backend(Backend::Redb).create()?;
 /// let value = connection.execute_oc_query("MATCH (a) RETURN a", Default::default())?;
 /// match value
 /// {
@@ -160,7 +160,7 @@ impl Connection
   /// - `path` a path to a file, if not present, an in-memory database is created
   /// - `backend` for instance `redb` or `sqlite` (the [Self::available_backends] function contains the list of compiled backends)
   ///
-  /// If the `backend` is not specified, the `open` function will attempt to guess it
+  /// If the `backend` is not specified, the `create` function will attempt to guess it
   /// for existing databases. For new database, depending on availability, it will
   /// create a `sqlite` database, or a `redb` database.
   ///
@@ -280,30 +280,6 @@ impl Connection
     backends
   }
 
-  /// Open a `path` that contains a `GQLite` database. The `options` parameter can
-  /// be used to select the backend, and configure the backend.
-  ///
-  /// Supported parameters:
-  /// - `backend` can be `redb` or `sqlite`
-  ///
-  /// If the `backend` is not specified, the `open` function will attempt to guess it
-  /// for existing databases. For new database, depending on availability, it will
-  /// create a `sqlite` database, or a `redb` database.
-  ///
-  /// Example of use:
-  ///
-  /// ```rust
-  /// # use gqlitedb::Connection;
-  /// # fn example() -> gqlitedb::Result<()> {
-  /// let connection = Connection::open("filename.db", gqlitedb::value_map!("backend" => "redb"))?;
-  /// # Ok(()) }
-  /// ```  
-  #[cfg(any(feature = "redb", feature = "sqlite"))]
-  #[deprecated = "Use create or builder instead."]
-  pub fn open<P: AsRef<std::path::Path>>(path: P, options: value::ValueMap) -> Result<Connection>
-  {
-    Self::builder().options(options).path(path).create()
-  }
   /// Execute the `query` (using OpenCypher), given the query `parameters` (sometimes
   /// also referred as binding).
   ///
@@ -312,7 +288,7 @@ impl Connection
   /// ```rust
   /// # use gqlitedb::{Connection, Value};
   /// # fn example() -> gqlitedb::Result<()> {
-  /// # let connection = gqlitedb::Connection::open("filename.db", gqlitedb::value_map!("backend" => "redb"))?;
+  /// # let connection = gqlitedb::Connection::create(gqlitedb::value_map!("path" => "filename.db", "backend" => "redb"))?;
   /// let result = connection.execute_oc_query("MATCH (a { name: $name }) RETURN a", gqlitedb::value_map!("name" => "Joe"))?;
   /// # Ok(()) }
   /// ```
