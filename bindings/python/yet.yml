@@ -1,8 +1,8 @@
 # Full documentation is available at https://gitlab.com/cyloncore/yte/-/blob/stable/docs/yte_yml.md
 tasks:
   make_sdist:
-    depends:
+    command: !commands
       - gqlitepy/make_sdist
   build_many_wheel:
-    depends:
+    command: !commands
       - gqlitepy/build_many_wheel

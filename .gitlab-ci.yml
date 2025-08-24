@@ -135,8 +135,8 @@ dists:
   stage: postcheck
   image: cyloncore/ci:debian
   script:
-    - yte bindings/ruby/build_gem
-    - yte bindings/python/make_sdist
+    - yet bindings/ruby/build_gem
+    - yet bindings/python/make_sdist
   needs:
     - job: "debian:build"
       artifacts: true
