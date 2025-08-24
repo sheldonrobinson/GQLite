@@ -8,6 +8,8 @@
 pub mod prelude;
 mod utils;
 
+pub use graphcore::{array, labels, value_map};
+
 #[derive(thiserror::Error, Debug)]
 #[allow(missing_docs)]
 #[non_exhaustive]
