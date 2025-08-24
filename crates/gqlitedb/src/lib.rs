@@ -35,7 +35,7 @@ pub use {
   error::{CompileTimeError, Error, RunTimeError, StoreError},
   graph::{Edge, Node, Path},
   query_result::QueryResult,
-  value::{map, value_map, Value, ValueMap, ValueTryIntoRef},
+  value::{value_map, Value, ValueMap, ValueTryIntoRef},
 };
 
 pub use graphcore::{table, Table};

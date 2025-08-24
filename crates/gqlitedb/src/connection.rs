@@ -129,7 +129,7 @@ where
 /// ```rust
 /// # use gqlitedb::{Connection, QueryResult};
 /// # fn example() -> gqlitedb::Result<()> {
-/// let connection = Connection::open("filename.db", gqlitedb::map!("backend" => "redb"))?;
+/// let connection = Connection::open("filename.db", gqlitedb::value_map!("backend" => "redb"))?;
 /// let value = connection.execute_oc_query("MATCH (a) RETURN a", Default::default())?;
 /// match value
 /// {
@@ -169,7 +169,7 @@ impl Connection
   /// ```rust
   /// # use gqlitedb::Connection;
   /// # fn example() -> gqlitedb::Result<()> {
-  /// let connection = Connection::create(gqlitedb::map!("backend" => "redb"))?;
+  /// let connection = Connection::create(gqlitedb::value_map!("backend" => "redb"))?;
   /// # Ok(()) }
   /// ```  
   pub fn create(options: value::ValueMap) -> Result<Connection>
@@ -295,7 +295,7 @@ impl Connection
   /// ```rust
   /// # use gqlitedb::Connection;
   /// # fn example() -> gqlitedb::Result<()> {
-  /// let connection = Connection::open("filename.db", gqlitedb::map!("backend" => "redb"))?;
+  /// let connection = Connection::open("filename.db", gqlitedb::value_map!("backend" => "redb"))?;
   /// # Ok(()) }
   /// ```  
   #[cfg(any(feature = "redb", feature = "sqlite"))]
@@ -312,8 +312,8 @@ impl Connection
   /// ```rust
   /// # use gqlitedb::{Connection, Value};
   /// # fn example() -> gqlitedb::Result<()> {
-  /// # let connection = gqlitedb::Connection::open("filename.db", gqlitedb::map!("backend" => "redb"))?;
-  /// let result = connection.execute_oc_query("MATCH (a { name: $name }) RETURN a", gqlitedb::map!("name" => "Joe"))?;
+  /// # let connection = gqlitedb::Connection::open("filename.db", gqlitedb::value_map!("backend" => "redb"))?;
+  /// let result = connection.execute_oc_query("MATCH (a { name: $name }) RETURN a", gqlitedb::value_map!("name" => "Joe"))?;
   /// # Ok(()) }
   /// ```
   pub fn execute_oc_query(

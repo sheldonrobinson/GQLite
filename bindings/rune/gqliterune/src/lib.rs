@@ -257,7 +257,7 @@ mod tests
     assert_eq!(*n_0.get("labels").unwrap(), graphcore::array!());
     assert_eq!(
       *n_0.get("properties").unwrap(),
-      gqlitedb::Value::Map(gqlitedb::map!())
+      gqlitedb::Value::Map(gqlitedb::value_map!())
     );
   }
 }

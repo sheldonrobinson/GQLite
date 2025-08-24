@@ -154,13 +154,13 @@ fn test_evaluate_aggregation()
     graph::Node::new(
       graph::Key::new(1),
       vec![],
-      value::map!("name" => "a", "num" => 33),
+      value::value_map!("name" => "a", "num" => 33),
     ),
-    graph::Node::new(graph::Key::new(2), vec![], value::map!("name" => "a")),
+    graph::Node::new(graph::Key::new(2), vec![], value::value_map!("name" => "a")),
     graph::Node::new(
       graph::Key::new(3),
       vec![],
-      value::map!("name" => "b", "num" => 42),
+      value::value_map!("name" => "b", "num" => 42),
     ),
   ];
   let mut tx = store.begin_write().unwrap();

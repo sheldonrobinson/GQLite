@@ -105,7 +105,7 @@ where
     graph::Node::new(
       graph::Key::default(),
       graph::labels!("hello", "world"),
-      value::map!("key" => 42i64),
+      value::value_map!("key" => 42i64),
     ),
     graph::Node::new(
       graph::Key::default(),
@@ -155,7 +155,7 @@ where
   let node = graph::Node::new(
     graph::Key::default(),
     graph::labels!("hello", "world"),
-    value::map!("key" => 42i64),
+    value::value_map!("key" => 42i64),
   );
 
   check_stats(&store, None, 0, 0, 0, 0);
@@ -176,7 +176,7 @@ where
   let modified_node = graph::Node::new(
     node.key().clone(),
     graph::labels!("world"),
-    value::map!("key" => 12i64),
+    value::value_map!("key" => 12i64),
   );
 
   let mut tx = store.begin_write().unwrap();
@@ -218,18 +218,18 @@ where
   let source_node = graph::Node::new(
     graph::Key::default(),
     graph::labels!("hello"),
-    value::map!("key" => 42i64),
+    value::value_map!("key" => 42i64),
   );
   let destination_node = graph::Node::new(
     graph::Key::default(),
     graph::labels!("world"),
-    value::map!("key" => 12i64),
+    value::value_map!("key" => 12i64),
   );
   let edge = graph::SinglePath::new(
     graph::Key::default(),
     source_node.clone(),
     vec!["!".into()],
-    value::map!("existence" => true),
+    value::value_map!("existence" => true),
     destination_node.clone(),
   );
 
@@ -345,18 +345,18 @@ where
   let source_node = graph::Node::new(
     graph::Key::default(),
     graph::labels!("hello"),
-    value::map!("key" => 42i64),
+    value::value_map!("key" => 42i64),
   );
   let destination_node = graph::Node::new(
     graph::Key::default(),
     graph::labels!("world"),
-    value::map!("key" => 12i64),
+    value::value_map!("key" => 12i64),
   );
   let edge = graph::SinglePath::new(
     graph::Key::default(),
     source_node.clone(),
     vec!["!".into()],
-    value::map!("existence" => true),
+    value::value_map!("existence" => true),
     destination_node.clone(),
   );
 
@@ -386,7 +386,7 @@ where
   let modified_edge = graph::Edge::new(
     edge.key().clone(),
     graph::labels!("?"),
-    value::map!("existence" => false),
+    value::value_map!("existence" => false),
   );
 
   let mut tx = store.begin_write().unwrap();

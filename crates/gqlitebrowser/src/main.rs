@@ -110,7 +110,7 @@ impl GqliteBrowser
   fn create_connection(&mut self, backend: impl Into<String>)
   {
     self.set_connection(gqlitedb::Connection::create(
-      gqlitedb::map! {"backend" => backend.into()},
+      gqlitedb::value_map! {"backend" => backend.into()},
     ));
   }
   #[cfg(not(target_arch = "wasm32"))]
@@ -125,7 +125,7 @@ impl GqliteBrowser
     else
     {
       let connection = gqlitedb::Connection::builder()
-        .options(gqlitedb::map! {"backend" => backend.into()})
+        .options(gqlitedb::value_map! {"backend" => backend.into()})
         .path(filename)
         .create();
       self.set_connection(connection);
