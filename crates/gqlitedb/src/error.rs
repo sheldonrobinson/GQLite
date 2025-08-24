@@ -277,6 +277,9 @@ pub enum InternalError
   #[error("Invalid aggregation state")]
   InvalidAggregationState,
 
+  #[error("Invalid query result cast")]
+  InvalidQueryResultCast,
+
   // Third-party
   #[error("Missing element in iterator.")]
   MissingElementIterator,

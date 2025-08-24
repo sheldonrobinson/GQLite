@@ -21,4 +21,8 @@ pub enum Error
   },
   #[error("Path cannot have null key.")]
   MissingKey,
+  #[error("Invalid table dimensions.")]
+  InvalidTableDimensions,
+  #[error("Out of range access.")]
+  InvalidRange,
 }

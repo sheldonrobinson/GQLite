@@ -6,9 +6,6 @@ pub(crate) use contains::{contains, ContainResult};
 
 pub use graphcore::{value_map as map, value_map, Value, ValueMap, ValueTryIntoRef};
 
-#[cfg(test)]
-pub use graphcore::array;
-
 pub(crate) trait ValueExt
 {
   fn access<'a>(&self, path: impl Iterator<Item = &'a String>) -> Value;

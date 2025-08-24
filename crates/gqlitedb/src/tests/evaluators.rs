@@ -24,10 +24,7 @@ fn test_evaluate_create_named_node()
   let value = eval_program(&store, &programs::create_named_node(), &Default::default()).unwrap();
   check_stats(&store, None, 1, 0, 0, 1);
 
-  assert_eq!(
-    value,
-    value::array![value::array!["p"], value::array!["foo"]]
-  );
+  assert_eq!(value, graphcore::table![("p"), [["foo"]]].into());
 }
 
 #[test]
@@ -44,10 +41,7 @@ fn test_evaluate_create_named_node_double_return()
   .unwrap();
   check_stats(&store, None, 1, 0, 0, 2);
 
-  assert_eq!(
-    value,
-    value::array![value::array!["id", "p"], value::array![12, "foo"]]
-  );
+  assert_eq!(value, graphcore::table![("id", "p"), [[12, "foo"]]].into());
 }
 
 #[test]
@@ -59,7 +53,7 @@ fn test_evaluate_double_with_return()
   let value = eval_program(&store, &programs::double_with_return(), &Default::default()).unwrap();
   check_stats(&store, None, 0, 0, 0, 0);
 
-  assert_eq!(value, value::array![value::array!["a"], value::array![1]]);
+  assert_eq!(value, crate::table![("a"), [[1,]]].into());
 }
 
 #[test]
@@ -71,7 +65,7 @@ fn test_evaluate_unwind()
   let value = eval_program(&store, &programs::unwind(), &Default::default()).unwrap();
   check_stats(&store, None, 0, 0, 0, 0);
 
-  assert_eq!(value, value::array![value::array!["i"], value::array![0]]);
+  assert_eq!(value, crate::table![("i"), [[0,]]].into());
 }
 
 #[test]
@@ -104,10 +98,7 @@ fn test_evaluate_match_loop()
   let value = eval_program(&store, &programs::match_loop(), &Default::default()).unwrap();
   check_stats(&store, None, 1, 1, 0, 0);
 
-  assert_eq!(
-    value,
-    value::array![value::array!["n"], value::array![node]]
-  );
+  assert_eq!(value, crate::table![("n"), [[node]]].into());
 }
 
 #[test]
@@ -119,10 +110,7 @@ fn test_evaluate_optional_match()
   let value = eval_program(&store, &programs::optional_match(), &Default::default()).unwrap();
   check_stats(&store, None, 0, 0, 0, 0);
 
-  assert_eq!(
-    value,
-    value::array![value::array!["a"], value::array![value::Value::Null]]
-  );
+  assert_eq!(value, crate::table![("a"), [[value::Value::Null]]].into());
 }
 
 #[test]
@@ -137,10 +125,7 @@ fn test_evaluate_match_count()
   let value = eval_program(&store, &program, &Default::default()).unwrap();
   check_stats(&store, None, 0, 0, 0, 0);
 
-  assert_eq!(
-    value,
-    value::array![value::array!["count(*)"], value::array![0]]
-  );
+  assert_eq!(value, crate::table![("count(*)"), [[0]]].into());
 
   // Count 1
   let node = graph::Node::new(graph::Key::new(1), vec![], Default::default());
@@ -154,10 +139,7 @@ fn test_evaluate_match_count()
   let value = eval_program(&store, &program, &Default::default()).unwrap();
   check_stats(&store, None, 1, 0, 0, 0);
 
-  assert_eq!(
-    value,
-    value::array![value::array!["count(*)"], value::array![1]]
-  );
+  assert_eq!(value, crate::table![("count(*)"), [[1]]].into());
 }
 
 #[test]
@@ -192,24 +174,10 @@ fn test_evaluate_aggregation()
   check_stats(&store, None, 3, 0, 0, 5);
 
   assert!(
-    value
-      == value::array![
-        value::array!["n.name", "count(n.num)"],
-        value::array!["a", 1],
-        value::array!["b", 1]
-      ]
-      || value
-        == value::array![
-          value::array!["n.name", "count(n.num)"],
-          value::array!["b", 1],
-          value::array!["a", 1]
-        ],
-    "left ({}) == right ({} in any order) failed",
+    value == crate::table![("n.name", "count(n.num)"), [["a", 1], ["b", 1]]].into()
+      || value == crate::table![("n.name", "count(n.num)"), [["b", 1], ["a", 1]]].into(),
+    "left ({}) == right ({:?} in any order) failed",
     value,
-    value::array![
-      value::array!["n.name", "count(n.num)"],
-      value::array!["a", 1],
-      value::array!["b", 1]
-    ],
+    crate::table![("n.name", "count(n.num)"), [["a", 1], ["b", 1]]],
   );
 }

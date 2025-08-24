@@ -154,6 +154,16 @@ impl FromIterator<value::Value> for Row
   }
 }
 
+impl IntoIterator for Row
+{
+  type Item = value::Value;
+  type IntoIter = <Vec<Self::Item> as IntoIterator>::IntoIter;
+  fn into_iter(self) -> Self::IntoIter
+  {
+    self.values.into_iter()
+  }
+}
+
 pub(crate) trait Header
 {
   fn columns(&self) -> usize;

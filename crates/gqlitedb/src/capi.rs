@@ -173,11 +173,13 @@ pub extern "C" fn gqlite_connection_query(
     let conn = unsafe { Box::from_raw(connection) };
     let result = conn
       .connection
-      .execute_query(query, get_value(bindings).into_map());
+      .execute_oc_query(query, get_value(bindings).into_map());
     let _ = Box::into_raw(conn);
     if let Ok(v) = handle_error(context, result)
     {
-      return Box::into_raw(Box::new(GqliteValueT { value: v }));
+      return Box::into_raw(Box::new(GqliteValueT {
+        value: v.into_value(),
+      }));
     }
   }
   std::ptr::null::<GqliteValueT>() as *mut GqliteValueT

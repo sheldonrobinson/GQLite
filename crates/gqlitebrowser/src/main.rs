@@ -1,8 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 #![deny(warnings)]
 
-use gqlitedb::ValueTryIntoRef as _;
-
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)] // if we add new fields, give them default values when deserializing old state
@@ -11,6 +9,7 @@ pub struct GqliteBrowser
   history: Vec<String>,
   query_text: String,
   last_message: String,
+  #[serde(skip)]
   result_delegate: ResultDelegate,
   #[serde(skip)]
   connection_error: String,
@@ -52,7 +51,7 @@ impl GqliteBrowser
       Default::default()
     }
   }
-  fn execute_query(&mut self)
+  fn execute_oc_query(&mut self)
   {
     match &self.connection
     {
@@ -61,19 +60,19 @@ impl GqliteBrowser
         self.history.retain(|v| *v != self.query_text);
         self.history.push(self.query_text.to_owned());
 
-        let result = connection.execute_query(self.query_text.to_owned(), Default::default());
+        let result = connection.execute_oc_query(self.query_text.to_owned(), Default::default());
         self.last_message.clear();
         match result
         {
           Ok(t) => match t
           {
-            gqlitedb::Value::Array(arr) =>
+            gqlitedb::QueryResult::Table(table) =>
             {
-              self.result_delegate.results = arr;
+              self.result_delegate.results = table;
             }
             _ =>
             {
-              self.result_delegate.results.clear();
+              self.result_delegate.results = Default::default();
             }
           },
           Err(err) =>
@@ -255,7 +254,7 @@ brisk_eframe::brisk_it! {
                       text: &mut self.query_text,
                       labelled_by: name_label.id,
                       hint_text: "Write an OpenCypher query, and then press enter to execute.",
-                      on_editing_finished: { self.execute_query(); }
+                      on_editing_finished: { self.execute_oc_query(); }
                   },
                   Button
                   {
@@ -281,7 +280,7 @@ brisk_eframe::brisk_it! {
               Table {
                   visible: !self.result_delegate.results.is_empty(),
                   table_delegate:  &mut self.result_delegate,
-                  num_rows: self.result_delegate.num_rows(),
+                  num_rows: self.result_delegate.num_rows() as u64,
                   columns: vec![egui_table::Column::new(100.0)
                           .range(10.0..=500.0)
                           .resizable(true); self.result_delegate.num_columns()],
@@ -297,37 +296,27 @@ brisk_eframe::brisk_it! {
   }
 }
 
-#[derive(serde::Deserialize, serde::Serialize)]
 struct ResultDelegate
 {
-  results: Vec<gqlitedb::Value>,
+  results: gqlitedb::Table,
 }
 
 impl ResultDelegate
 {
-  fn num_rows(&self) -> u64
+  fn num_rows(&self) -> usize
   {
-    self.results.len().saturating_sub(1) as u64
+    self.results.rows()
   }
   fn num_columns(&self) -> usize
   {
-    match self.results.len()
-    {
-      0 => 0,
-      _ => match &self.results[0]
-      {
-        gqlitedb::Value::Array(arr) => arr.len(),
-        _ => 1,
-      },
-    }
+    self.results.columns()
   }
-  fn cell_content_ui(&mut self, row_nr: u64, col_nr: usize, ui: &mut egui::Ui)
+  fn cell_content_ui(&mut self, row_nr: usize, col_nr: usize, ui: &mut egui::Ui)
   {
-    let row: &Vec<gqlitedb::Value> = self.results[row_nr as usize + 1].try_into_ref().unwrap();
     brisk_egui::brisk_it! {
       Label
       {
-        text: format!("{}", row[col_nr as usize]),
+        text: format!("{}", self.results.value(row_nr, col_nr).unwrap()),
       }
     }
   }
@@ -341,7 +330,7 @@ impl egui_table::TableDelegate for ResultDelegate
 
     let margin = 4;
 
-    let row: &Vec<gqlitedb::Value> = self.results[0].try_into_ref().unwrap();
+    let row: &Vec<String> = self.results.headers();
 
     egui::Frame::NONE
       .inner_margin(egui::Margin::symmetric(margin, 0))
@@ -362,7 +351,7 @@ impl egui_table::TableDelegate for ResultDelegate
     egui::Frame::NONE
       .inner_margin(egui::Margin::symmetric(4, 0))
       .show(ui, |ui| {
-        self.cell_content_ui(row_nr, col_nr, ui);
+        self.cell_content_ui(row_nr as usize, col_nr as usize, ui);
       });
   }
 }

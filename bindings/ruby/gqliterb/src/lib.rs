@@ -249,9 +249,9 @@ impl Connection
       })
       .transpose()?
       .unwrap_or_default();
-    let result = map_err(ruby, rb_self.dbhandle.execute_query(query, bindings))?;
+    let result = map_err(ruby, rb_self.dbhandle.execute_oc_query(query, bindings))?;
 
-    to_rvalue(ruby, result)
+    to_rvalue(ruby, result.into_value())
   }
 }
 

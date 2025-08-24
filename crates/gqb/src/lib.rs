@@ -590,23 +590,21 @@ mod test
     b.create_edge(n2, labels!("d"), ValueMap::default(), n3);
     b.create_edge(n2, labels!("e"), value_map!("id" => 5), n3);
     let (query, parameters) = b.into_oc_query().unwrap();
-    connection.execute_query(query, parameters).unwrap();
+    connection.execute_oc_query(query, parameters).unwrap();
 
     let r = connection
-      .execute_query("MATCH (a:b) RETURN a", Default::default())
+      .execute_oc_query("MATCH (a:b) RETURN a", Default::default())
       .unwrap();
-    let r: Vec<Value> = r.try_into().unwrap();
-    let r: &Vec<Value> = r.get(1).unwrap().try_into_ref().unwrap();
-    let r: &Node = r.get(0).unwrap().try_into_ref().unwrap();
+    let r: Table = r.try_into().unwrap();
+    let r: &Node = r.get(0, 0).unwrap();
     assert_eq!(*r.labels(), labels!("b"));
     assert_eq!(*r.properties(), value_map!("id" => 3));
 
     let r = connection
-      .execute_query("MATCH ()-[a:e]->() RETURN a", Default::default())
+      .execute_oc_query("MATCH ()-[a:e]->() RETURN a", Default::default())
       .unwrap();
-    let r: Vec<Value> = r.try_into().unwrap();
-    let r: &Vec<Value> = r.get(1).unwrap().try_into_ref().unwrap();
-    let r: &Edge = r.get(0).unwrap().try_into_ref().unwrap();
+    let r: Table = r.try_into().unwrap();
+    let r: &Edge = r.get(0, 0).unwrap();
     assert_eq!(*r.labels(), labels!("e"));
     assert_eq!(*r.properties(), value_map!("id" => 5));
   }

@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use crate::prelude::*;
+use crate::{prelude::*, QueryResult};
 use value::ValueTryIntoRef;
 
 /// Backend
@@ -74,7 +74,7 @@ impl ConnectionBuilder
 
 trait ConnectionTrait: Sync + Send
 {
-  fn execute_query(&self, query: String, parameters: value::ValueMap) -> Result<value::Value>;
+  fn execute_oc_query(&self, query: String, parameters: value::ValueMap) -> Result<QueryResult>;
 }
 
 struct ConnectionImpl<TStore>
@@ -89,31 +89,25 @@ impl<TStore> ConnectionTrait for ConnectionImpl<TStore>
 where
   TStore: store::Store + Sync + Send,
 {
-  fn execute_query(&self, query: String, parameters: value::ValueMap) -> Result<value::Value>
+  fn execute_oc_query(&self, query: String, parameters: value::ValueMap) -> Result<QueryResult>
   {
     let query_txt: String = query.into();
     let queries = parser::parse(query_txt.as_str())?;
-    let mut results = Vec::<value::Value>::default();
+    let mut results = Vec::<QueryResult>::default();
     for query in queries
     {
       let program = compiler::compile(&self.function_manager, query)?;
-      let v = interpreter::evaluators::eval_program(&self.store, &program, &parameters)?;
-      if !v.is_null()
-      {
-        results.push(v);
-      }
+      results.push(interpreter::evaluators::eval_program(
+        &self.store,
+        &program,
+        &parameters,
+      )?)
     }
     match results.len()
     {
-      0 => Ok(value::Value::Null),
-      1 => Ok(results.into_iter().next().unwrap()),
-      _ =>
-      {
-        let mut map = value::ValueMap::new();
-        map.insert("type".into(), "results".into());
-        map.insert("results".into(), results.into());
-        Ok(map.into())
-      }
+      0 => Ok(QueryResult::Empty),
+      1 => Ok(results.into_iter().next().unwrap()), // Guarantee to pass since we check for length
+      _ => Ok(QueryResult::Array(results)),
     }
   }
 }
@@ -129,32 +123,22 @@ where
 }
 
 /// Connection is the interface to the database, and allow to execute new queries.
-/// New connection are created with [Connection::open] and queried with [Connection::execute_query].
+/// New connection are created with [Connection::open] and queried with [Connection::execute_oc_query].
 /// As shown in the example bellow:
 ///
 /// ```rust
-/// # use gqlitedb::{Connection, Value};
+/// # use gqlitedb::{Connection, QueryResult};
 /// # fn example() -> gqlitedb::Result<()> {
 /// let connection = Connection::open("filename.db", gqlitedb::map!("backend" => "redb"))?;
-/// let value = connection.execute_query("MATCH (a) RETURN a", Default::default())?;
+/// let value = connection.execute_oc_query("MATCH (a) RETURN a", Default::default())?;
 /// match value
 /// {
-///   Value::Array(arr) =>
+///   QueryResult::Table(table) =>
 ///   {
-///     arr.iter().for_each(|row| match row
-///     {
-///       Value::Array(arr) =>
-///       {
-///         println!("{:?}", arr);
-///       }
-///       _ =>
-///       {
-///         panic!("Unexpected: {}", row);
-///       }
-///     });
+///     println!("{:?}", table);
 ///   },
 ///   _ => {
-///     panic!("Query result should be an array, got {}!", value);
+///     panic!("Query result should be a table!");
 ///   }
 /// }
 /// # Ok(()) }
@@ -329,15 +313,15 @@ impl Connection
   /// # use gqlitedb::{Connection, Value};
   /// # fn example() -> gqlitedb::Result<()> {
   /// # let connection = gqlitedb::Connection::open("filename.db", gqlitedb::map!("backend" => "redb"))?;
-  /// let result = connection.execute_query("MATCH (a { name: $name }) RETURN a", gqlitedb::map!("name" => "Joe"))?;
+  /// let result = connection.execute_oc_query("MATCH (a { name: $name }) RETURN a", gqlitedb::map!("name" => "Joe"))?;
   /// # Ok(()) }
   /// ```
-  pub fn execute_query(
+  pub fn execute_oc_query(
     &self,
     query: impl Into<String>,
     parameters: value::ValueMap,
-  ) -> Result<value::Value>
+  ) -> Result<QueryResult>
   {
-    self.connection.execute_query(query.into(), parameters)
+    self.connection.execute_oc_query(query.into(), parameters)
   }
 }

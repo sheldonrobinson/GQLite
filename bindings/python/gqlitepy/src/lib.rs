@@ -205,9 +205,9 @@ impl Connection
       .map(|bindings| from_pdict(py, bindings))
       .transpose()?
       .unwrap_or_default();
-    let result = map_err(py, self.dbhandle.execute_query(query, bindings))?;
+    let result = map_err(py, self.dbhandle.execute_oc_query(query, bindings))?;
 
-    to_pvalue(py, result)
+    to_pvalue(py, result.into_value())
   }
 }
 

@@ -19,23 +19,46 @@ To execute a query, write the query and end it with a ';'"
   );
 }
 
-fn print_results(arr: &Vec<gqlitedb::Value>)
+fn print_results(arr: &gqlitedb::Table)
 {
   let mut builder = tabled::builder::Builder::new();
-  arr.iter().for_each(|row| match row
+  builder.push_record(arr.headers());
+  for row in arr.row_iter()
   {
-    gqlitedb::Value::Array(arr) => builder.push_record(arr.iter().map(|x| x.to_string())),
-    _ =>
-    {
-      println!("Unexpected: {}", row);
-    }
-  });
+    builder.push_record(row.iter().map(|x| x.to_string()));
+  }
 
   let table = builder
     .build()
     .with(tabled::settings::Style::ascii_rounded())
     .to_string();
   println!("{}", table);
+}
+
+fn print_query_result(qr: &gqlitedb::QueryResult)
+{
+  match qr
+  {
+    gqlitedb::QueryResult::Table(table) =>
+    {
+      print_results(table);
+    }
+    gqlitedb::QueryResult::Array(arr) =>
+    {
+      for a in arr
+      {
+        print_query_result(a);
+      }
+    }
+    gqlitedb::QueryResult::Value(val) =>
+    {
+      println!("{:?}", val);
+    }
+    gqlitedb::QueryResult::Empty =>
+    {
+      println!("No results.");
+    }
+  }
 }
 
 //   ____ _ _ ___ _                 _
@@ -234,44 +257,10 @@ impl Cli
             {
               Some(ref c) =>
               {
-                let qr = c.execute_query(query, gqlitedb::ValueMap::new());
+                let qr = c.execute_oc_query(query, gqlitedb::ValueMap::new());
                 match qr
                 {
-                  Ok(value) => match value
-                  {
-                    gqlitedb::Value::Array(arr) =>
-                    {
-                      print_results(&arr);
-                    }
-                    gqlitedb::Value::Map(map) =>
-                    {
-                      if matches!(map.get("type"), Some(gqlitedb::Value::String(s)) if s == "results")
-                      {
-                        map.get("results").map(|results| match results
-                        {
-                          gqlitedb::Value::Array(arr) =>
-                          {
-                            for val in arr
-                            {
-                              match val
-                              {
-                                gqlitedb::Value::Array(arr) =>
-                                {
-                                  print_results(arr);
-                                }
-                                _ =>
-                                {}
-                              }
-                            }
-                          }
-                          _ =>
-                          {}
-                        });
-                      }
-                    }
-                    _ =>
-                    {}
-                  },
+                  Ok(value) => print_query_result(&value),
                   Err(err) => match err.error()
                   {
                     gqlitedb::Error::CompileTime(ct) =>

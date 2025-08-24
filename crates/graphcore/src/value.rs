@@ -1,3 +1,4 @@
+use itertools::Itertools as _;
 use serde::{Deserialize, Serialize};
 use std::{
   hash::Hash,
@@ -277,14 +278,7 @@ impl std::fmt::Display for Value
       Value::Integer(i) => write!(f, "{}", i),
       Value::Float(fl) => write!(f, "{}", fl),
       Value::String(s) => write!(f, "{}", s),
-      Value::Array(v) => write!(
-        f,
-        "[{}]",
-        v.iter()
-          .map(|x| x.to_string())
-          .collect::<Vec<String>>()
-          .join(", ")
-      ),
+      Value::Array(v) => write!(f, "[{}]", v.iter().map(|x| x.to_string()).join(", ")),
       Value::Map(o) => write!(f, "{}", o),
       Value::Node(n) => write!(f, "{}", n),
       Value::Edge(e) => write!(f, "{}", e),

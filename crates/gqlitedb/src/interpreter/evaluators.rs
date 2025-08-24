@@ -1202,7 +1202,7 @@ pub(crate) fn eval_program<TStore: store::Store>(
   store: &TStore,
   program: &super::Program,
   parameters: &crate::value::ValueMap,
-) -> crate::Result<crate::value::Value>
+) -> crate::Result<query_result::QueryResult>
 {
   let mut graph_name: String = "default".into();
   let mut input_table = value_table::ValueTable::new(0);
@@ -1457,19 +1457,14 @@ pub(crate) fn eval_program<TStore: store::Store>(
           &parameters,
           &variables_size,
         )?;
-        let mut r = Vec::<crate::value::Value>::new();
-        r.push(crate::value::Value::Array(
-          names
-            .into_iter()
-            .map(|name| crate::value::Value::String(name.to_owned()))
-            .collect(),
-        ));
+        let headers = names.into_iter().map(|name| name.to_owned()).collect();
+        let mut data = Vec::<crate::value::Value>::new();
         for row in output_table.into_row_iter()
         {
-          r.push(row.into());
+          data.extend(row.into_iter());
         }
         tx.close()?;
-        return Ok(r.into());
+        return Ok(graphcore::Table::new(headers, data)?.into());
       }
       instructions::Block::With {
         variables,
@@ -1708,7 +1703,7 @@ pub(crate) fn eval_program<TStore: store::Store>(
             "properties_count".into(),
             (stats.properties_count as i64).into(),
           );
-          return Ok(crate::value::Value::Map(res));
+          return Ok(crate::value::Value::Map(res).into());
         }
         else
         {
@@ -1718,7 +1713,7 @@ pub(crate) fn eval_program<TStore: store::Store>(
     }
   }
   tx.close()?;
-  Ok(crate::value::Value::Null)
+  Ok(crate::QueryResult::Empty)
 }
 
 #[cfg(test)]

@@ -21,6 +21,7 @@ mod graph;
 mod interpreter;
 mod parser;
 mod prelude;
+mod query_result;
 mod store;
 mod utils;
 mod value;
@@ -33,8 +34,11 @@ pub use {
   connection::{Backend, Connection},
   error::{CompileTimeError, Error, RunTimeError, StoreError},
   graph::{Edge, Node, Path},
+  query_result::QueryResult,
   value::{map, value_map, Value, ValueMap, ValueTryIntoRef},
 };
+
+pub use graphcore::{table, Table};
 
 /// GQLite Result alias. Usable as a standard `Result<T, E>` or default to gqlite::Error with `Result<T>`
 pub type Result<T, E = error::export::Error> = std::result::Result<T, E>;

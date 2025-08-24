@@ -129,8 +129,8 @@ impl Connection
   pub fn execute_oc_query(&self, query: String, bindings: rune::Value) -> Result<rune::Value>
   {
     let bindings = Self::to_value_map(bindings)?;
-    let r = self.connection.execute_query(query, bindings)?;
-    Ok(to_ru_value(r)?)
+    let r = self.connection.execute_oc_query(query, bindings)?;
+    Ok(to_ru_value(r.into_value())?)
   }
 }
 
