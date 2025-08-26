@@ -8,6 +8,8 @@
 
 #![warn(missing_docs)]
 #![deny(warnings)]
+#![allow(clippy::result_large_err)]
+#![allow(clippy::unnecessary_lazy_evaluations)]
 
 mod aggregators;
 #[cfg(feature = "capi")]

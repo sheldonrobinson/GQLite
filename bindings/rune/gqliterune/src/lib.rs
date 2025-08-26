@@ -48,7 +48,7 @@ fn to_gc_value(value: rune::Value) -> Result<gqlitedb::Value>
     Vec::<rune::Value>::HASH => Ok(
       Vec::<rune::Value>::from_value(value)?
         .into_iter()
-        .map(|v| to_gc_value(v))
+        .map(to_gc_value)
         .collect::<Result<Vec<_>>>()?
         .into(),
     ),
@@ -92,7 +92,7 @@ fn to_ru_value(value: gqlitedb::Value) -> Result<rune::Value, rune::runtime::Run
     gqlitedb::Value::String(s) => rune::to_value(s),
     gqlitedb::Value::Array(a) => rune::to_value(
       a.into_iter()
-        .map(|x| to_ru_value(x))
+        .map(to_ru_value)
         .collect::<Result<Vec<_>, _>>()?,
     ),
     gqlitedb::Value::Map(m) => rune::to_value(

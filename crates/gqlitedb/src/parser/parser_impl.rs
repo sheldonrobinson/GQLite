@@ -19,7 +19,7 @@ trait TryNext: Iterator
   }
 }
 
-fn remove_hex_prefix<'a>(string: &'a str) -> String
+fn remove_hex_prefix(string: &str) -> String
 {
   if &string[0..1] == "-"
   {
@@ -31,7 +31,7 @@ fn remove_hex_prefix<'a>(string: &'a str) -> String
   }
 }
 
-fn validate_float<'a>(value: f64, text: &'a str) -> Result<f64>
+fn validate_float(value: f64, text: &str) -> Result<f64>
 {
   if value.is_finite()
   {
@@ -67,7 +67,7 @@ impl AstBuilder
     let mut it = pair.into_inner();
     let k = it.try_next()?;
     let v = self.build_expression(it.try_next()?.into_inner())?;
-    return Ok((k.as_str().to_string(), v));
+    Ok((k.as_str().to_string(), v))
   }
 
   fn build_expression(&self, pairs: pest::iterators::Pairs<Rule>) -> Result<ast::Expression>
@@ -338,7 +338,7 @@ impl AstBuilder
             value: value::Value::Float(validate_float(pair.as_str().parse()?, pair.as_str())?),
           })),
           Rule::ident => Ok(ast::Expression::Variable(ast::Variable {
-            identifier: self.var_ids.from_name(pair.as_str()),
+            identifier: self.var_ids.create_variable_from_name(pair.as_str()),
           })),
           Rule::parameter => Ok(ast::Expression::Parameter(ast::Parameter {
             name: pair.as_str().to_string(),
@@ -402,7 +402,7 @@ impl AstBuilder
                   if i == 0
                   {
                     ast::Expression::Variable(ast::Variable {
-                      identifier: self.var_ids.from_name(pair.as_str()),
+                      identifier: self.var_ids.create_variable_from_name(pair.as_str()),
                     })
                   }
                   else
@@ -532,13 +532,15 @@ impl AstBuilder
           {
             let expr = inner.try_next()?;
             Ok(ast::NamedExpression {
-              identifier: self.var_ids.from_name(expr.as_str().trim()),
+              identifier: self.var_ids.create_variable_from_name(expr.as_str().trim()),
               expression: self.build_expression(expr.into_inner())?,
             })
           }
           2 => Ok({
             let expression = self.build_expression(inner.try_next()?.into_inner())?;
-            let identifier = self.var_ids.from_name(inner.try_next()?.as_str());
+            let identifier = self
+              .var_ids
+              .create_variable_from_name(inner.try_next()?.as_str());
             ast::NamedExpression {
               identifier,
               expression,
@@ -563,28 +565,28 @@ impl AstBuilder
     }
   }
 
-  fn build_labels(&self, pair: pest::iterators::Pair<Rule>) -> Result<ast::LabelExpression>
+  fn build_labels(pair: pest::iterators::Pair<Rule>) -> Result<ast::LabelExpression>
   {
     match pair.as_rule()
     {
-      Rule::labels => self.build_labels(pair.into_inner().try_next()?),
+      Rule::labels => Self::build_labels(pair.into_inner().try_next()?),
       Rule::label_alternative =>
       {
         let mut r = ast::LabelExpression::None;
-        let mut inner = pair.into_inner();
-        while let Some(next) = inner.next()
+        let inner = pair.into_inner();
+        for next in inner
         {
-          r = r.or(self.build_labels(next)?);
+          r = r.or(Self::build_labels(next)?);
         }
         Ok(r)
       }
       Rule::label_inclusion =>
       {
         let mut r = ast::LabelExpression::None;
-        let mut inner = pair.into_inner();
-        while let Some(next) = inner.next()
+        let inner = pair.into_inner();
+        for next in inner
         {
-          r = r.and(self.build_labels(next)?);
+          r = r.and(Self::build_labels(next)?);
         }
         Ok(r)
       }
@@ -616,7 +618,7 @@ impl AstBuilder
         }
         Rule::labels =>
         {
-          labels = self.build_labels(pair)?;
+          labels = Self::build_labels(pair)?;
         }
         Rule::map => properties = Some(self.build_map(pair)?),
         Rule::parameter =>
@@ -638,7 +640,7 @@ impl AstBuilder
       }
     }
     Ok(ast::NodePattern {
-      variable: self.var_ids.from_name_optional(variable),
+      variable: self.var_ids.create_variable_from_name_optional(variable),
       labels,
       properties,
     })
@@ -668,7 +670,7 @@ impl AstBuilder
         }
         Rule::labels =>
         {
-          labels = self.build_labels(pair)?;
+          labels = Self::build_labels(pair)?;
         }
         Rule::map => properties = Some(self.build_map(pair)?),
         Rule::parameter =>
@@ -693,7 +695,7 @@ impl AstBuilder
     match edge_rule
     {
       Rule::directed_edge_pattern => Ok(ast::EdgePattern {
-        variable: self.var_ids.from_name_optional(variable),
+        variable: self.var_ids.create_variable_from_name_optional(variable),
         source: source_node,
         destination: destination_node,
         directivity: graph::EdgeDirectivity::Directed,
@@ -701,7 +703,7 @@ impl AstBuilder
         properties,
       }),
       Rule::reversed_edge_pattern => Ok(ast::EdgePattern {
-        variable: self.var_ids.from_name_optional(variable),
+        variable: self.var_ids.create_variable_from_name_optional(variable),
         source: destination_node,
         destination: source_node,
         directivity: graph::EdgeDirectivity::Directed,
@@ -717,7 +719,7 @@ impl AstBuilder
           })?;
         }
         Ok(ast::EdgePattern {
-          variable: self.var_ids.from_name_optional(variable),
+          variable: self.var_ids.create_variable_from_name_optional(variable),
           source: source_node,
           destination: destination_node,
           directivity: graph::EdgeDirectivity::Undirected,
@@ -777,7 +779,7 @@ impl AstBuilder
 
           if it.peek().is_some() && destination_node.variable.is_none()
           {
-            destination_node.variable = Some(self.var_ids.anonymous());
+            destination_node.variable = Some(self.var_ids.create_anonymous_variable());
           }
 
           let edge_pattern = self.build_edge_pattern(
@@ -805,7 +807,7 @@ impl AstBuilder
           allow_undirected_edge,
         )?;
         vec.push(ast::Pattern::Path(ast::PathPattern {
-          variable: self.var_ids.from_name(variable),
+          variable: self.var_ids.create_variable_from_name(variable),
           edge: edge_pattern,
         }));
       }
@@ -1016,7 +1018,9 @@ impl AstBuilder
 
               let mut pair = pair.into_inner();
               let mut pair_left = pair.try_next()?.into_inner();
-              let target = self.var_ids.from_name(pair_left.try_next()?.as_str());
+              let target = self
+                .var_ids
+                .create_variable_from_name(pair_left.try_next()?.as_str());
               let path = pair_left.map(|el| el.as_str().to_string()).collect();
               let expression = self.build_expression(pair.try_next()?.into_inner())?;
               let update_property = ast::UpdateProperty {
@@ -1036,7 +1040,9 @@ impl AstBuilder
             Rule::set_label_expression =>
             {
               let mut pair = pair.into_inner();
-              let target = self.var_ids.from_name(pair.try_next()?.as_str());
+              let target = self
+                .var_ids
+                .create_variable_from_name(pair.try_next()?.as_str());
               let labels = pair.map(|el| el.as_str().to_string()).collect();
               updates.push(ast::OneUpdate::AddLabels(ast::AddRemoveLabels {
                 target,
@@ -1061,7 +1067,9 @@ impl AstBuilder
             Rule::remove_member_access =>
             {
               let mut pair = pair.into_inner();
-              let target = self.var_ids.from_name(pair.try_next()?.as_str());
+              let target = self
+                .var_ids
+                .create_variable_from_name(pair.try_next()?.as_str());
               let path = pair.map(|el| el.as_str().to_string()).collect();
               updates.push(ast::OneUpdate::RemoveProperty(ast::RemoveProperty {
                 target,
@@ -1071,7 +1079,9 @@ impl AstBuilder
             Rule::set_label_expression =>
             {
               let mut pair = pair.into_inner();
-              let target = self.var_ids.from_name(pair.try_next()?.as_str());
+              let target = self
+                .var_ids
+                .create_variable_from_name(pair.try_next()?.as_str());
               let labels = pair.map(|el| el.as_str().to_string()).collect();
               updates.push(ast::OneUpdate::RemoveLabels(ast::AddRemoveLabels {
                 target,
@@ -1094,7 +1104,7 @@ impl AstBuilder
           .collect::<Vec<&str>>()
           .join(".");
         Ok(ast::Statement::Call(ast::Call {
-          name: name,
+          name,
           arguments: Default::default(),
         }))
       }

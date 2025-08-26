@@ -4,6 +4,7 @@ use crate::prelude::*;
 /// Represent compile time errors.
 #[derive(thiserror::Error, Debug)]
 #[allow(missing_docs)]
+#[allow(clippy::large_enum_variant)]
 #[non_exhaustive]
 pub enum CompileTimeError
 {
@@ -21,7 +22,7 @@ pub enum CompileTimeError
   },
   /// Parse error
   #[error("ParseError: '{0}'")]
-  ParseError(#[from] pest::error::Error<crate::parser::parser::Rule>),
+  ParseError(#[from] pest::error::Error<crate::parser::parser_impl::Rule>),
   /// Variable is not defined
   #[error("UndefinedVariable: Unknown variable '{name}'.")]
   UndefinedVariable
@@ -82,6 +83,7 @@ pub enum CompileTimeError
 
 /// Runtime errors.
 #[derive(thiserror::Error, Debug)]
+#[allow(clippy::large_enum_variant)]
 #[allow(missing_docs)]
 #[non_exhaustive]
 pub enum RunTimeError
@@ -132,7 +134,7 @@ pub enum RunTimeError
   #[error("Invalid value cast, cannot cast {value} to {typename}.")]
   InvalidValueCast
   {
-    value: crate::Value,
+    value: Box<crate::Value>,
     typename: &'static str,
   },
   #[error("InvalidDelete: invalid delete argument, expected node or edge.")]
@@ -166,6 +168,7 @@ pub enum RunTimeError
 
 /// Internal errors, should be treated as bugs.
 #[derive(thiserror::Error, Debug)]
+#[allow(clippy::large_enum_variant)]
 #[non_exhaustive]
 pub enum InternalError
 {
@@ -332,6 +335,7 @@ pub enum InternalError
 /// Error in the store backend.
 #[derive(thiserror::Error, Debug)]
 #[allow(missing_docs)]
+#[allow(clippy::large_enum_variant)]
 #[non_exhaustive]
 pub enum StoreError
 {
@@ -372,6 +376,7 @@ pub enum StoreError
 
 /// GQLite errors
 #[derive(thiserror::Error, Debug)]
+#[allow(clippy::large_enum_variant)]
 #[non_exhaustive]
 pub enum Error
 {
@@ -498,9 +503,9 @@ impl<T> From<std::sync::PoisonError<T>> for Error
   }
 }
 
-impl From<pest::error::Error<crate::parser::parser::Rule>> for Error
+impl From<pest::error::Error<crate::parser::parser_impl::Rule>> for Error
 {
-  fn from(value: pest::error::Error<crate::parser::parser::Rule>) -> Self
+  fn from(value: pest::error::Error<crate::parser::parser_impl::Rule>) -> Self
   {
     CompileTimeError::from(value).into()
   }
@@ -557,14 +562,14 @@ mod _trait_impl_sqlite
 }
 
 /// Merge a list of error into a string error message
-pub(crate) fn vec_to_error<E: std::fmt::Display>(errs: &Vec<ErrorType>) -> String
+pub(crate) fn vec_to_error(errs: &[ErrorType]) -> String
 {
   let errs: Vec<String> = errs.iter().map(|x| format!("'{}'", x)).collect();
   errs.join(", ")
 }
 
-pub(crate) fn parse_int_error_to_compile_error<'a>(
-  text: &'a str,
+pub(crate) fn parse_int_error_to_compile_error(
+  text: &str,
   e: std::num::ParseIntError,
 ) -> crate::prelude::ErrorType
 {

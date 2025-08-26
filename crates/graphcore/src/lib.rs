@@ -5,6 +5,7 @@
 
 #![warn(missing_docs)]
 #![deny(warnings)]
+#![allow(clippy::result_large_err)]
 
 mod error;
 mod graph;

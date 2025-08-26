@@ -11,7 +11,7 @@ pub enum Error
   #[error("Invalid value cast, cannot cast {value} to {typename}.")]
   InvalidValueCast
   {
-    value: crate::Value,
+    value: Box<crate::Value>,
     typename: &'static str,
   },
   #[error("Key {key} cannot be found in a path in a ValueMap.")]

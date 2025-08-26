@@ -353,14 +353,14 @@ impl std::fmt::Display for SinglePath
   }
 }
 
-impl Into<Edge> for SinglePath
+impl From<SinglePath> for Edge
 {
-  fn into(self) -> Edge
+  fn from(val: SinglePath) -> Self
   {
     Edge {
-      key: self.key,
-      labels: self.labels,
-      properties: self.properties,
+      key: val.key,
+      labels: val.labels,
+      properties: val.properties,
     }
   }
 }

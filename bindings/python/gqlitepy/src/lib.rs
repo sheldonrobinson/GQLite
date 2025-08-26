@@ -70,22 +70,18 @@ fn from_pany<'py>(py: Python<'py>, value: &Bound<'py, PyAny>) -> PyResult<gqlite
 
 fn from_plist<'py>(py: Python<'py>, list: &Bound<'py, PyList>) -> PyResult<Vec<gqlitedb::Value>>
 {
-  Ok(
-    list
+  list
       .iter()
       .map(|value| from_pany(py, &value))
-      .collect::<Result<Vec<_>, _>>()?,
-  )
+      .collect::<Result<Vec<_>, _>>()
 }
 
 fn from_pdict<'py>(py: Python<'py>, hash: &Bound<'py, PyDict>) -> PyResult<gqlitedb::ValueMap>
 {
-  Ok(
-    hash
+  hash
       .iter()
       .map(|(k, v)| Ok((k.to_string(), from_pany(py, &v)?)))
-      .collect::<PyResult<_>>()?,
-  )
+      .collect::<PyResult<_>>()
 }
 
 fn node_to_pdict<'py>(py: Python<'py>, node: gqlitedb::Node) -> PyResult<Bound<'py, PyAny>>
@@ -161,8 +157,7 @@ fn to_plist<'py>(py: Python<'py>, arr: Vec<gqlitedb::Value>) -> PyResult<Bound<'
     arr
       .into_iter()
       .map(|x| to_pvalue(py, x))
-      .collect::<PyResult<Vec<_>>>()?
-      .into_iter(),
+      .collect::<PyResult<Vec<_>>>()?,
   )
 }
 

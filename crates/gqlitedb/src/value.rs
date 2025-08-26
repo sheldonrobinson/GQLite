@@ -151,8 +151,8 @@ impl ValueExt for Value
               match orderability_map(lhs.properties(), rhs.properties())
               {
                 std::cmp::Ordering::Equal => orderability_map(
-                  &lhs.destination().properties(),
-                  &rhs.destination().properties(),
+                  lhs.destination().properties(),
+                  rhs.destination().properties(),
                 ),
                 o => o,
               }

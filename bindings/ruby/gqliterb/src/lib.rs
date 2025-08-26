@@ -206,7 +206,7 @@ impl Connection
     let filename: String = map_err(
       ruby,
       options
-        .get("filename".into())
+        .get("filename")
         .ok_or_else(|| Error::new(ruby.get_inner(&ERROR), "Missing filename."))?
         .to_owned()
         .try_into(),

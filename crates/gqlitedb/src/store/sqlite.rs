@@ -1,7 +1,5 @@
 use std::{cell::RefCell, collections::HashSet, path::PathBuf};
 
-use rusqlite;
-
 use askama::Template;
 use ccutils::pool::{self, Pool};
 use rusqlite::{named_params, types::FromSql, OptionalExtension, ToSql};
@@ -149,45 +147,45 @@ mod templates
   #[template(path = "sql/sqlite/upgrade_graph_from_1_01.sql", escape = "none")]
   pub(super) struct UpgradeGraphFrom1_01<'a>
   {
-    pub graph_name: &'a String,
+    pub graph_name: &'a str,
   }
   #[derive(Template)]
   #[template(path = "sql/sqlite/graph_create.sql", escape = "none")]
   pub(super) struct GraphCreate<'a>
   {
-    pub graph_name: &'a String,
+    pub graph_name: &'a str,
   }
   #[derive(Template)]
   #[template(path = "sql/sqlite/graph_delete.sql", escape = "none")]
   pub(super) struct GraphDelete<'a>
   {
-    pub graph_name: &'a String,
+    pub graph_name: &'a str,
   }
   // Node related templates
   #[derive(Template)]
   #[template(path = "sql/sqlite/node_create.sql", escape = "none")]
   pub(super) struct NodeCreate<'a>
   {
-    pub graph_name: &'a String,
+    pub graph_name: &'a str,
   }
   #[derive(Template)]
   #[template(path = "sql/sqlite/node_delete.sql", escape = "none")]
   pub(super) struct NodeDelete<'a>
   {
-    pub graph_name: &'a String,
+    pub graph_name: &'a str,
     pub keys: &'a Vec<String>,
   }
   #[derive(Template)]
   #[template(path = "sql/sqlite/node_update.sql", escape = "none")]
   pub(super) struct NodeUpdate<'a>
   {
-    pub graph_name: &'a String,
+    pub graph_name: &'a str,
   }
   #[derive(Template)]
   #[template(path = "sql/sqlite/node_select.sql", escape = "none")]
   pub(super) struct NodeSelect<'a>
   {
-    pub graph_name: &'a String,
+    pub graph_name: &'a str,
     pub has_keys: bool,
     pub has_labels: bool,
     pub has_properties: bool,
@@ -197,40 +195,40 @@ mod templates
   #[template(path = "sql/sqlite/edge_count_for_node.sql", escape = "none")]
   pub(super) struct EdgeCountForNode<'a>
   {
-    pub graph_name: &'a String,
+    pub graph_name: &'a str,
     pub keys: &'a Vec<String>,
   }
   #[derive(Template)]
   #[template(path = "sql/sqlite/edge_create.sql", escape = "none")]
   pub(super) struct EdgeCreate<'a>
   {
-    pub graph_name: &'a String,
+    pub graph_name: &'a str,
   }
   #[derive(Template)]
   #[template(path = "sql/sqlite/edge_delete_by_nodes.sql", escape = "none")]
   pub(super) struct EdgeDeleteByNodes<'a>
   {
-    pub graph_name: &'a String,
+    pub graph_name: &'a str,
     pub keys: &'a Vec<String>,
   }
   #[derive(Template)]
   #[template(path = "sql/sqlite/edge_delete.sql", escape = "none")]
   pub(super) struct EdgeDelete<'a>
   {
-    pub graph_name: &'a String,
+    pub graph_name: &'a str,
     pub keys: &'a Vec<String>,
   }
   #[derive(Template)]
   #[template(path = "sql/sqlite/edge_update.sql", escape = "none")]
   pub(super) struct EdgeUpdate<'a>
   {
-    pub graph_name: &'a String,
+    pub graph_name: &'a str,
   }
   #[derive(Template)]
   #[template(path = "sql/sqlite/edge_select.sql", escape = "none")]
   pub(super) struct EdgeSelect<'a>
   {
-    pub graph_name: &'a String,
+    pub graph_name: &'a str,
     pub is_undirected: bool,
     pub table_suffix: &'a str,
     pub has_edge_keys: bool,
@@ -247,7 +245,7 @@ mod templates
   #[template(path = "sql/sqlite/call_stats.sql", escape = "none")]
   pub(super) struct CallStats<'a>
   {
-    pub graph_name: &'a String,
+    pub graph_name: &'a str,
   }
 }
 
@@ -338,7 +336,7 @@ impl Store
         (),
       )?;
       self.set_metadata_value_json(&mut tx, "graphs", &Vec::<String>::new())?;
-      self.create_graph(&mut tx, &"default".to_string(), true)?;
+      self.create_graph(&mut tx, "default", true)?;
     }
     self.set_metadata_value_json(&mut tx, "version", &consts::GQLITE_VERSION)?;
     tx.close()?;
@@ -347,19 +345,14 @@ impl Store
   fn upgrade_database(&self, transaction: &mut TransactionBox, from: utils::Version) -> Result<()>
   {
     use crate::store::Store;
-    match (from.major, from.minor)
+    if let (1, 0) = (from.major, from.minor)
     {
-      (1, 0) =>
-      {
-        // Create a metadata table and add the default graph.
-        transaction.get_connection().execute(
-          include_str!("../../templates/sql/sqlite/metadata_create_table.sql"),
-          (),
-        )?;
-        self.set_metadata_value_json(transaction, "graphs", &vec!["default".to_string()])?;
-      }
-      _ =>
-      {}
+      // Create a metadata table and add the default graph.
+      transaction.get_connection().execute(
+        include_str!("../../templates/sql/sqlite/metadata_create_table.sql"),
+        (),
+      )?;
+      self.set_metadata_value_json(transaction, "graphs", &vec!["default".to_string()])?;
     }
     match (from.major, from.minor)
     {
@@ -534,12 +527,13 @@ impl store::Store for Store
   fn create_graph(
     &self,
     transaction: &mut Self::TransactionBox,
-    graph_name: &String,
+    graph_name: impl AsRef<str>,
     ignore_if_exists: bool,
   ) -> Result<()>
   {
+    let graph_name = graph_name.as_ref();
     let mut graphs_list = self.graphs_list(transaction)?;
-    if graphs_list.contains(graph_name)
+    if graphs_list.iter().any(|s| s == graph_name)
     {
       if ignore_if_exists
       {
@@ -555,13 +549,9 @@ impl store::Store for Store
         );
       }
     }
-    transaction.get_connection().execute_batch(
-      templates::GraphCreate {
-        graph_name: &graph_name,
-      }
-      .render()?
-      .as_str(),
-    )?;
+    transaction
+      .get_connection()
+      .execute_batch(templates::GraphCreate { graph_name }.render()?.as_str())?;
     graphs_list.push(graph_name.to_owned());
     self.set_metadata_value_json(transaction, "graphs", &graphs_list)?;
     Ok(())
@@ -569,20 +559,17 @@ impl store::Store for Store
   fn drop_graph(
     &self,
     transaction: &mut Self::TransactionBox,
-    graph_name: &String,
+    graph_name: impl AsRef<str>,
     if_exists: bool,
   ) -> Result<()>
   {
+    let graph_name = graph_name.as_ref();
     let mut graphs_list = self.graphs_list(transaction)?;
-    if graphs_list.contains(graph_name)
+    if graphs_list.iter().any(|s| s == graph_name)
     {
-      transaction.get_connection().execute_batch(
-        templates::GraphDelete {
-          graph_name: &graph_name,
-        }
-        .render()?
-        .as_str(),
-      )?;
+      transaction
+        .get_connection()
+        .execute_batch(templates::GraphDelete { graph_name }.render()?.as_str())?;
       graphs_list.retain(|x| x != graph_name);
       self.set_metadata_value_json(transaction, "graphs", &graphs_list)?;
 
@@ -605,7 +592,7 @@ impl store::Store for Store
   fn create_nodes<'a, T: IntoIterator<Item = &'a crate::graph::Node>>(
     &self,
     transaction: &mut Self::TransactionBox,
-    graph_name: &String,
+    graph_name: impl AsRef<str>,
     nodes_iter: T,
   ) -> Result<()>
   {
@@ -613,7 +600,7 @@ impl store::Store for Store
     {
       transaction.get_connection().execute(
         templates::NodeCreate {
-          graph_name: graph_name.into(),
+          graph_name: graph_name.as_ref(),
         }
         .render()?
         .as_str(),
@@ -629,18 +616,19 @@ impl store::Store for Store
   fn delete_nodes(
     &self,
     transaction: &mut Self::TransactionBox,
-    graph_name: &String,
+    graph_name: impl AsRef<str>,
     query: store::SelectNodeQuery,
     detach: bool,
   ) -> Result<()>
   {
+    let graph_name = graph_name.as_ref();
     let nodes = self.select_nodes(transaction, graph_name, query)?;
     let nodes_keys: Vec<String> = nodes.into_iter().map(|x| hex(x.key())).collect();
     if detach
     {
       transaction.get_connection().execute(
         templates::EdgeDeleteByNodes {
-          graph_name: &graph_name.into(),
+          graph_name,
           keys: &nodes_keys,
         }
         .render()?
@@ -652,7 +640,7 @@ impl store::Store for Store
     {
       let count = transaction.get_connection().query_row(
         templates::EdgeCountForNode {
-          graph_name: &graph_name,
+          graph_name,
           keys: &nodes_keys,
         }
         .render()?
@@ -667,7 +655,7 @@ impl store::Store for Store
     }
     transaction.get_connection().execute(
       templates::NodeDelete {
-        graph_name: &graph_name,
+        graph_name,
         keys: &nodes_keys,
       }
       .render()?
@@ -679,13 +667,13 @@ impl store::Store for Store
   fn update_node(
     &self,
     transaction: &mut Self::TransactionBox,
-    graph_name: &String,
+    graph_name: impl AsRef<str>,
     node: &crate::graph::Node,
   ) -> Result<()>
   {
     transaction.get_connection().execute(
       templates::NodeUpdate {
-        graph_name: &graph_name,
+        graph_name: graph_name.as_ref(),
       }
       .render()?
       .as_str(),
@@ -700,13 +688,13 @@ impl store::Store for Store
   fn select_nodes(
     &self,
     transaction: &mut Self::TransactionBox,
-    graph_name: &String,
+    graph_name: impl AsRef<str>,
     query: store::SelectNodeQuery,
   ) -> Result<Vec<crate::graph::Node>>
   {
     let mut prepared_query = transaction.get_connection().prepare(
       templates::NodeSelect {
-        graph_name: graph_name.into(),
+        graph_name: graph_name.as_ref(),
         has_keys: query.keys.is_some(),
         has_labels: query.labels.is_some(),
         has_properties: query.properties.is_some(),
@@ -748,7 +736,7 @@ impl store::Store for Store
   fn create_edges<'a, T: IntoIterator<Item = &'a crate::graph::SinglePath>>(
     &self,
     transaction: &mut Self::TransactionBox,
-    graph_name: &String,
+    graph_name: impl AsRef<str>,
     edges_iter: T,
   ) -> Result<()>
   {
@@ -756,7 +744,7 @@ impl store::Store for Store
     {
       transaction.get_connection().execute(
         templates::EdgeCreate {
-          graph_name: graph_name.into(),
+          graph_name: graph_name.as_ref(),
         }
         .render()?
         .as_str(),
@@ -774,16 +762,17 @@ impl store::Store for Store
   fn delete_edges(
     &self,
     transaction: &mut Self::TransactionBox,
-    graph_name: &String,
+    graph_name: impl AsRef<str>,
     query: store::SelectEdgeQuery,
     directivity: crate::graph::EdgeDirectivity,
   ) -> Result<()>
   {
+    let graph_name = graph_name.as_ref();
     let edges = self.select_edges(transaction, graph_name, query, directivity)?;
     let edges_keys: Vec<String> = edges.into_iter().map(|x| hex(x.path.key())).collect();
     transaction.get_connection().execute(
       templates::EdgeDelete {
-        graph_name: &graph_name,
+        graph_name,
         keys: &edges_keys,
       }
       .render()?
@@ -795,13 +784,13 @@ impl store::Store for Store
   fn update_edge(
     &self,
     transaction: &mut Self::TransactionBox,
-    graph_name: &String,
+    graph_name: impl AsRef<str>,
     edge: &crate::graph::Edge,
   ) -> Result<()>
   {
     transaction.get_connection().execute(
       templates::EdgeUpdate {
-        graph_name: &graph_name,
+        graph_name: graph_name.as_ref(),
       }
       .render()?
       .as_str(),
@@ -816,7 +805,7 @@ impl store::Store for Store
   fn select_edges(
     &self,
     transaction: &mut Self::TransactionBox,
-    graph_name: &String,
+    graph_name: impl AsRef<str>,
     query: store::SelectEdgeQuery,
     directivity: crate::graph::EdgeDirectivity,
   ) -> Result<Vec<store::EdgeResult>>
@@ -832,9 +821,9 @@ impl store::Store for Store
     };
     let mut prepared_query = transaction.get_connection().prepare(
       templates::EdgeSelect {
-        graph_name: graph_name,
+        graph_name: graph_name.as_ref(),
         is_undirected,
-        table_suffix: table_suffix,
+        table_suffix,
         has_edge_keys: query.keys.is_some(),
         has_edge_labels: query.labels.is_some(),
         has_edge_properties: query.properties.is_some(),
@@ -959,7 +948,7 @@ impl store::Store for Store
     let (nodes_count, edges_count, labels_nodes_count, properties_count) =
       transaction.get_connection().query_row(
         templates::CallStats {
-          graph_name: &"default".to_string(),
+          graph_name: "default",
         }
         .render()?
         .as_str(),

@@ -142,7 +142,7 @@ impl Cli
         Some(line) => line,
         None => return Ok(false),
       };
-      if line.len() > 0
+      if !line.is_empty()
       {
         if line.starts_with(".")
         {
@@ -237,7 +237,7 @@ impl Cli
             {
               Some(line) =>
               {
-                if line.len() == 0
+                if line.is_empty()
                 {
                   break;
                 }
@@ -250,7 +250,7 @@ impl Cli
               None => break,
             }
           }
-          if query.len() > 0
+          if !query.is_empty()
           {
             it.add_history_entry(&query)?;
             match self.connection
@@ -265,7 +265,7 @@ impl Cli
                   {
                     gqlitedb::Error::CompileTime(ct) =>
                     {
-                      println!("Compilation error:\n{}", ct.to_string());
+                      println!("Compilation error:\n{}", ct);
                     }
                     _ =>
                     {
@@ -328,8 +328,10 @@ fn main() -> rustyline::Result<()>
   let gqlite_history = standard_paths::StandardPaths::new("gqlitecli", "gqlite.org")
     .writable_location(standard_paths::LocationType::ConfigLocation)?
     .join("gqlite_history");
-  if rl.load_history(&gqlite_history).is_err()
-  {}
+  if let Err(e) = rl.load_history(&gqlite_history)
+  {
+    println!("Failed to read command line history: {:?}", e);
+  }
   println!("Enter '.help' for usage hints.");
   match main_loop(&mut rl)
   {

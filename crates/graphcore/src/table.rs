@@ -55,7 +55,7 @@ impl Table
     Value: ValueTryIntoRef<T>,
   {
     let v = self.value(row, column)?;
-    Ok(v.try_into_ref()?)
+    v.try_into_ref()
   }
   /// value access
   pub fn value(&self, row: usize, column: usize) -> Result<&Value>
@@ -69,7 +69,7 @@ impl Table
       self
         .data
         .get(row * self.headers.len() + column)
-        .ok_or_else(|| error::Error::InvalidRange)
+        .ok_or(error::Error::InvalidRange)
     }
   }
   /// Create an iterator over the rows in the table
@@ -84,21 +84,20 @@ impl Table
   }
 }
 
-impl Into<value::Value> for Table
+impl From<Table> for value::Value
 {
-  fn into(self) -> value::Value
+  fn from(val: Table) -> Self
   {
     let mut rows: Vec<value::Value> = Default::default();
-    let cl = self.headers.len();
-    rows.push(self.headers.into());
-    let mut it = self.data.into_iter();
+    let cl = val.headers.len();
+    rows.push(val.headers.into());
+    let mut it = val.data.into_iter();
     loop
     {
       let first = it.next();
       if let Some(first) = first
       {
-        let mut row = Vec::new();
-        row.reserve(cl);
+        let mut row = Vec::with_capacity(cl);
         row.push(first);
         for _ in 1..cl
         {
@@ -111,7 +110,7 @@ impl Into<value::Value> for Table
         break;
       }
     }
-    return rows.into();
+    rows.into()
   }
 }
 

@@ -270,7 +270,7 @@ pub struct Builder
 
 macro_rules! last_statement {
   ($fname: ident, $statement: ty, $ename: path) => {
-    fn $fname<'a>(&'a mut self) -> &'a mut $statement
+    fn $fname(&mut self) -> &mut $statement
     {
       // Ensure the last statement is a $statement
       let needs_push = match self.statements.last()

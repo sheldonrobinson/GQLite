@@ -61,11 +61,7 @@ impl Value
   /// Return true if the value is null, false otherwise.
   pub fn is_null(&self) -> bool
   {
-    match self
-    {
-      Value::Null => true,
-      _ => false,
-    }
+    matches!(self, Value::Null)
   }
   /// Remove all elements of a map that are null. Walk through the map values recursively.
   pub fn remove_null(self) -> Self
@@ -122,7 +118,7 @@ impl Add for Value
       | Value::Node(..)
       | Value::Edge(..)
       | Value::Map(..)
-      | Value::Path(..) => Err(Error::InvalidBinaryOperands.into()),
+      | Value::Path(..) => Err(Error::InvalidBinaryOperands),
       Value::Null => Ok(Value::Null),
       Self::Array(lhs) => match rhs
       {
@@ -144,20 +140,20 @@ impl Add for Value
         Self::Float(rhs) => Ok((lhs + rhs).into()),
         Self::Integer(rhs) => Ok((lhs + rhs as f64).into()),
         Self::Null => Ok(Self::Null),
-        _ => Err(Error::InvalidBinaryOperands.into()),
+        _ => Err(Error::InvalidBinaryOperands),
       },
       Self::Integer(lhs) => match rhs
       {
         Self::Float(rhs) => Ok((lhs as f64 + rhs).into()),
         Self::Integer(rhs) => Ok((lhs + rhs).into()),
         Self::Null => Ok(Self::Null),
-        _ => Err(Error::InvalidBinaryOperands.into()),
+        _ => Err(Error::InvalidBinaryOperands),
       },
       Self::String(lhs) => match rhs
       {
         Self::String(rhs) => Ok((lhs + &rhs).into()),
         Self::Null => Ok(Self::Null),
-        _ => Err(Error::InvalidBinaryOperands.into()),
+        _ => Err(Error::InvalidBinaryOperands),
       },
     }
   }
@@ -227,7 +223,7 @@ impl Value
         Self::Float(rhs) => Ok(lhs.powf(rhs).into()),
         Self::Integer(rhs) => Ok(lhs.powf(rhs as f64).into()),
         Self::Null => Ok(Self::Null),
-        _ => Err(Error::InvalidBinaryOperands.into()),
+        _ => Err(Error::InvalidBinaryOperands),
       },
       Self::Integer(lhs) => match rhs
       {
@@ -291,12 +287,12 @@ impl std::fmt::Display for Value
 pub trait ValueTryIntoRef<T>
 {
   /// Return a reference to T
-  fn try_into_ref<'a>(&'a self) -> Result<&'a T, Error>;
+  fn try_into_ref(&self) -> Result<&T, Error>;
 }
 
 impl ValueTryIntoRef<Value> for Value
 {
-  fn try_into_ref<'a>(&'a self) -> Result<&'a Value, Error>
+  fn try_into_ref(&self) -> Result<&Value, Error>
   {
     Ok(self)
   }
@@ -304,19 +300,19 @@ impl ValueTryIntoRef<Value> for Value
 
 macro_rules! impl_to_value {
   ($type:ty, $vn:tt) => {
-    impl Into<Value> for $type
+    impl From<$type> for Value
     {
-      fn into(self) -> Value
+      fn from(v: $type) -> Value
       {
-        Value::$vn(self.clone())
+        Value::$vn(v)
       }
     }
 
-    impl Into<Value> for Vec<$type>
+    impl From<Vec<$type>> for Value
     {
-      fn into(self) -> Value
+      fn from(v: Vec<$type>) -> Value
       {
-        Value::Array(self.into_iter().map(|v| v.into()).collect())
+        Value::Array(v.into_iter().map(|v| v.into()).collect())
       }
     }
     impl TryInto<$type> for Value
@@ -329,7 +325,7 @@ macro_rules! impl_to_value {
           Value::$vn(v) => Ok(v),
           _ => Err(
             Error::InvalidValueCast {
-              value: self,
+              value: Box::new(self),
               typename: stringify!($type),
             }
             .into(),
@@ -340,14 +336,14 @@ macro_rules! impl_to_value {
 
     impl ValueTryIntoRef<$type> for Value
     {
-      fn try_into_ref<'a>(&'a self) -> Result<&'a $type, Error>
+      fn try_into_ref(&self) -> Result<&$type, Error>
       {
         match self
         {
           Value::$vn(v) => Ok(v),
           _ => Err(
             Error::InvalidValueCast {
-              value: self.clone(),
+              value: Box::new(self.clone()),
               typename: stringify!($type),
             }
             .into(),
@@ -369,11 +365,11 @@ impl_to_value!(graph::SinglePath, Path);
 impl_to_value!(Vec<Value>, Array);
 impl_to_value!(ValueMap, Map);
 
-impl Into<Value> for &str
+impl From<&str> for Value
 {
-  fn into(self) -> Value
+  fn from(val: &str) -> Self
   {
-    Value::String(self.into())
+    Value::String(val.into())
   }
 }
 

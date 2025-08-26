@@ -1,6 +1,7 @@
 use crate::{prelude::*, value_table::ColId};
 
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 pub(crate) enum Instruction
 {
   CreateNodeLiteral
@@ -221,7 +222,7 @@ pub(crate) enum Block
     actions: Vec<CreateAction>,
     variables_size: VariablesSizes,
   },
-  BlockMatch
+  Match
   {
     blocks: Vec<BlockMatch>,
     filter: Instructions,

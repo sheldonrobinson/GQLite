@@ -135,7 +135,7 @@ where
   }
 }
 
-impl<'a, VT> ExpressionAnalyser for (&'a ast::Expression, VT)
+impl<VT> ExpressionAnalyser for (&ast::Expression, VT)
 where
   VT: Fn(ExpressionInfo) -> Result<ExpressionInfo>,
 {
@@ -189,8 +189,8 @@ impl ExpressionInfo
     let dependents = dependents.into();
     Self {
       expression_type,
-      constant: dependents.iter().all(|x| x.constant == true),
-      aggregation_result: dependents.into_iter().any(|x| x.aggregation_result == true),
+      constant: dependents.iter().all(|x| x.constant),
+      aggregation_result: dependents.into_iter().any(|x| x.aggregation_result),
     }
   }
 }
@@ -254,7 +254,7 @@ impl<'b> Analyser<'b>
             arguments.iter().map(|x| x.expression_type).collect(),
           )?,
           self.functions_manager.is_deterministic(&call.name)?
-            && arguments.iter().all(|x| x.constant == true),
+            && arguments.iter().all(|x| x.constant),
           self.functions_manager.is_aggregate(&call.name)?,
         ))
       }

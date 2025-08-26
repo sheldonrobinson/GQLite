@@ -12,7 +12,7 @@ impl Type
     edge
       .labels()
       .first()
-      .ok_or_else(|| RunTimeError::MissingEdgeLabel)
+      .ok_or(RunTimeError::MissingEdgeLabel)
       .map(|v| v.to_owned())
   }
 }

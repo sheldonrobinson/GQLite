@@ -176,24 +176,21 @@ impl ValueMap
           })?,
         }
       }
+      else if value.is_null()
+      {
+        self.remove(field);
+      }
       else
       {
-        if value.is_null()
+        match v
         {
-          self.remove(field);
-        }
-        else
-        {
-          match v
+          Some(v) =>
           {
-            Some(v) =>
-            {
-              *v = value;
-            }
-            None =>
-            {
-              self.insert(field.to_owned(), value);
-            }
+            *v = value;
+          }
+          None =>
+          {
+            self.insert(field.to_owned(), value);
           }
         }
       }

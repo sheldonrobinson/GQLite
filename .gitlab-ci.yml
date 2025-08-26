@@ -95,6 +95,15 @@ check-default-features:
     - grep -q 'default = \["redb", "capi", "sqlite"\]' crates/gqlitedb/Cargo.toml
 
 # Extra-tests
+clippy:
+  stage: postcheck
+  image: cyloncore/ci:debian
+  script:
+    - cargo clippy
+  needs:
+    - job: "debian:build"
+      artifacts: true
+
 doc:
   stage: postcheck
   image: cyloncore/ci:debian

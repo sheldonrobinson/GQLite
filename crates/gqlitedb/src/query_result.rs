@@ -5,6 +5,7 @@ use crate::error::InternalError;
 
 /// Hold the result of executing a query.
 #[derive(Debug, PartialEq, Clone)]
+#[allow(clippy::large_enum_variant)]
 pub enum QueryResult
 {
   /// No results are returned by the query

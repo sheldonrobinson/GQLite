@@ -53,7 +53,7 @@ impl Row
     {
       Err(
         InternalError::InvalidIndex {
-          index: index,
+          index,
           length: self.values.len(),
         }
         .into(),
@@ -138,11 +138,11 @@ impl MutableRowInterface for Row
   }
 }
 
-impl Into<value::Value> for Row
+impl From<Row> for value::Value
 {
-  fn into(self) -> value::Value
+  fn from(v: Row) -> Self
   {
-    value::Value::Array(self.values)
+    value::Value::Array(v.values)
   }
 }
 
@@ -453,7 +453,7 @@ impl Iterator for IntoRowIter
     else
     {
       let v: Vec<_> = self.data.by_ref().take(self.columns).collect();
-      if v.len() == 0
+      if v.is_empty()
       {
         None
       }

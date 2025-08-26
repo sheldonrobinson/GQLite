@@ -74,7 +74,7 @@ impl ConnectionBuilder
 
 trait ConnectionTrait: Sync + Send
 {
-  fn execute_oc_query(&self, query: String, parameters: value::ValueMap) -> Result<QueryResult>;
+  fn execute_oc_query(&self, query: &str, parameters: value::ValueMap) -> Result<QueryResult>;
 }
 
 struct ConnectionImpl<TStore>
@@ -89,10 +89,9 @@ impl<TStore> ConnectionTrait for ConnectionImpl<TStore>
 where
   TStore: store::Store + Sync + Send,
 {
-  fn execute_oc_query(&self, query: String, parameters: value::ValueMap) -> Result<QueryResult>
+  fn execute_oc_query(&self, query: &str, parameters: value::ValueMap) -> Result<QueryResult>
   {
-    let query_txt: String = query.into();
-    let queries = parser::parse(query_txt.as_str())?;
+    let queries = parser::parse(query)?;
     let mut results = Vec::<QueryResult>::default();
     for query in queries
     {
@@ -143,7 +142,6 @@ where
 /// }
 /// # Ok(()) }
 /// ```
-
 pub struct Connection
 {
   connection: Box<dyn ConnectionTrait>,
@@ -190,7 +188,7 @@ impl Connection
         };
         #[cfg(not(feature = "sqlite"))]
         let sq_e = Err(error::StoreError::UnavailableBackend { backend: "sqlite" }.into());
-        let sq_r = match sq_e
+        match sq_e
         {
           Ok(sq) => Ok(sq),
           Err(sq_e) =>
@@ -206,13 +204,12 @@ impl Connection
 
             sq_r.map_err(|rb_e| {
               StoreError::OpeningError {
-                errors: error::vec_to_error::<ErrorType>(&vec![sq_e, rb_e]),
+                errors: error::vec_to_error(&vec![sq_e, rb_e]),
               }
               .into()
             })
           }
-        };
-        sq_r
+        }
       }
       #[cfg(feature = "sqlite")]
       "sqlite" =>
@@ -272,12 +269,12 @@ impl Connection
   /// List of available backends
   pub fn available_backends() -> Vec<String>
   {
-    let mut backends = vec![];
-    #[cfg(feature = "sqlite")]
-    backends.push("sqlite".to_string());
-    #[cfg(feature = "redb")]
-    backends.push("redb".to_string());
-    backends
+    vec![
+      #[cfg(feature = "sqlite")]
+      "sqlite".to_string(),
+      #[cfg(feature = "redb")]
+      "redb".to_string(),
+    ]
   }
 
   /// Execute the `query` (using OpenCypher), given the query `parameters` (sometimes
@@ -286,18 +283,18 @@ impl Connection
   /// Example:
   ///
   /// ```rust
-  /// # use gqlitedb::{Connection, Value};
+  /// # use gqlitedb::{Backend, Connection, Value};
   /// # fn example() -> gqlitedb::Result<()> {
-  /// # let connection = gqlitedb::Connection::create(gqlitedb::value_map!("path" => "filename.db", "backend" => "redb"))?;
+  /// # let connection = Connection::builder().path("filename.db").backend(Backend::Redb).create()?;
   /// let result = connection.execute_oc_query("MATCH (a { name: $name }) RETURN a", gqlitedb::value_map!("name" => "Joe"))?;
   /// # Ok(()) }
   /// ```
   pub fn execute_oc_query(
     &self,
-    query: impl Into<String>,
+    query: impl AsRef<str>,
     parameters: value::ValueMap,
   ) -> Result<QueryResult>
   {
-    self.connection.execute_oc_query(query.into(), parameters)
+    self.connection.execute_oc_query(query.as_ref(), parameters)
   }
 }

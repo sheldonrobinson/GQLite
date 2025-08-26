@@ -60,7 +60,7 @@ impl VariableIdentifiers
       .next_id
       .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
   }
-  pub(crate) fn from_name(&self, name: impl Into<String>) -> VariableIdentifier
+  pub(crate) fn create_variable_from_name(&self, name: impl Into<String>) -> VariableIdentifier
   {
     let name = name.into();
     match self.identifiers.borrow_mut().entry(name)
@@ -77,11 +77,14 @@ impl VariableIdentifiers
       }
     }
   }
-  pub(crate) fn from_name_optional(&self, name: Option<String>) -> Option<VariableIdentifier>
+  pub(crate) fn create_variable_from_name_optional(
+    &self,
+    name: Option<String>,
+  ) -> Option<VariableIdentifier>
   {
-    name.map(|name| self.from_name(name))
+    name.map(|name| self.create_variable_from_name(name))
   }
-  pub(crate) fn anonymous(&self) -> VariableIdentifier
+  pub(crate) fn create_anonymous_variable(&self) -> VariableIdentifier
   {
     let id = self.next_id();
     VariableIdentifier {
@@ -107,13 +110,13 @@ pub(crate) enum Statement
   Update(Update),
 }
 
-macro_rules! create_into_statement {
+macro_rules! create_from_statement {
   ( $x:tt ) => {
-    impl Into<Statement> for $x
+    impl From<$x> for Statement
     {
-      fn into(self) -> Statement
+      fn from(v: $x) -> Statement
       {
-        Statement::$x(self)
+        Statement::$x(v)
       }
     }
   };
@@ -147,7 +150,7 @@ pub(crate) struct Create
   pub(crate) patterns: Vec<Pattern>,
 }
 
-create_into_statement! {Create}
+create_from_statement! {Create}
 
 #[derive(Debug)]
 pub(crate) struct Match
@@ -157,7 +160,7 @@ pub(crate) struct Match
   pub(crate) optional: bool,
 }
 
-create_into_statement! {Match}
+create_from_statement! {Match}
 
 #[derive(Debug)]
 pub(crate) struct Return
@@ -168,7 +171,7 @@ pub(crate) struct Return
   pub(crate) where_expression: Option<Expression>,
 }
 
-create_into_statement! {Return}
+create_from_statement! {Return}
 
 #[derive(Debug)]
 pub(crate) struct With
@@ -179,7 +182,7 @@ pub(crate) struct With
   pub(crate) where_expression: Option<Expression>,
 }
 
-create_into_statement! {With}
+create_from_statement! {With}
 
 #[derive(Debug)]
 pub(crate) struct Unwind
@@ -188,7 +191,7 @@ pub(crate) struct Unwind
   pub(crate) expression: Expression,
 }
 
-create_into_statement! {Unwind}
+create_from_statement! {Unwind}
 
 #[derive(Debug)]
 pub(crate) struct Delete
@@ -263,6 +266,7 @@ pub(crate) struct Modifiers
 // Expressions
 
 #[derive(Debug, Clone, PartialEq)]
+#[allow(clippy::large_enum_variant)]
 pub(crate) enum Expression
 {
   Array(Array),
@@ -351,8 +355,8 @@ pub(crate) enum LabelExpression
 {
   #[allow(dead_code)]
   Not(Box<LabelExpression>),
-  And(Vec<Box<LabelExpression>>),
-  Or(Vec<Box<LabelExpression>>),
+  And(Vec<LabelExpression>),
+  Or(Vec<LabelExpression>),
   String(String),
   None,
 }
@@ -374,7 +378,7 @@ impl LabelExpression
         }
         other =>
         {
-          vec.push(other.boxed());
+          vec.push(other);
           LabelExpression::And(vec)
         }
       },
@@ -383,10 +387,10 @@ impl LabelExpression
         LabelExpression::None => self,
         LabelExpression::And(mut vec) =>
         {
-          vec.push(self.boxed());
+          vec.push(self);
           LabelExpression::And(vec)
         }
-        _ => LabelExpression::And(vec![self.boxed(), rhs.boxed()]),
+        _ => LabelExpression::And(vec![self, rhs]),
       },
     }
   }
@@ -405,7 +409,7 @@ impl LabelExpression
         }
         other =>
         {
-          vec.push(other.boxed());
+          vec.push(other);
           LabelExpression::Or(vec)
         }
       },
@@ -414,16 +418,12 @@ impl LabelExpression
         LabelExpression::None => self,
         LabelExpression::Or(mut vec) =>
         {
-          vec.push(self.boxed());
+          vec.push(self);
           LabelExpression::Or(vec)
         }
-        _ => LabelExpression::Or(vec![self.boxed(), rhs.boxed()]),
+        _ => LabelExpression::Or(vec![self, rhs]),
       },
     }
-  }
-  pub(crate) fn boxed(self) -> Box<LabelExpression>
-  {
-    Box::new(self)
   }
   pub(crate) fn is_all_inclusive(&self) -> bool
   {
@@ -438,43 +438,35 @@ impl LabelExpression
   }
   pub(crate) fn is_none(&self) -> bool
   {
-    match self
-    {
-      LabelExpression::None => true,
-      _ => false,
-    }
+    matches!(self, LabelExpression::None)
   }
   pub(crate) fn is_string(&self) -> bool
   {
-    match self
-    {
-      LabelExpression::String(_) => true,
-      _ => false,
-    }
+    matches!(self, LabelExpression::String(_))
   }
 }
 
 // Expressions
 
-macro_rules! create_into_expr {
+macro_rules! create_from_expr {
   ( $x:tt ) => {
-    impl Into<Expression> for $x
+    impl From<$x> for Expression
     {
-      fn into(self) -> Expression
+      fn from(v: $x) -> Expression
       {
-        Expression::$x(self)
+        Expression::$x(v)
       }
     }
   };
 }
 
-macro_rules! create_into_boxed_expr {
+macro_rules! create_from_boxed_expr {
   ( $x:tt ) => {
-    impl Into<Expression> for $x
+    impl From<$x> for Expression
     {
-      fn into(self) -> Expression
+      fn from(v: $x) -> Expression
       {
-        Expression::$x(Box::new(self))
+        Expression::$x(Box::new(v))
       }
     }
   };
@@ -499,7 +491,7 @@ pub(crate) struct Variable
   pub(crate) identifier: VariableIdentifier,
 }
 
-create_into_expr! {Variable}
+create_from_expr! {Variable}
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct MemberAccess
@@ -508,7 +500,7 @@ pub(crate) struct MemberAccess
   pub(crate) path: Vec<String>,
 }
 
-create_into_boxed_expr! {MemberAccess}
+create_from_boxed_expr! {MemberAccess}
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct IndexAccess
@@ -517,7 +509,7 @@ pub(crate) struct IndexAccess
   pub(crate) index: Expression,
 }
 
-create_into_boxed_expr! {IndexAccess}
+create_from_boxed_expr! {IndexAccess}
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct RangeAccess
@@ -534,7 +526,7 @@ pub(crate) struct FunctionCall
   pub(crate) arguments: Vec<Expression>,
 }
 
-create_into_expr! {FunctionCall}
+create_from_expr! {FunctionCall}
 
 macro_rules! create_binary_op {
   ( $x:tt ) => {
@@ -545,7 +537,7 @@ macro_rules! create_binary_op {
       pub(crate) right: Expression,
     }
 
-    create_into_boxed_expr! { $x }
+    create_from_boxed_expr! { $x }
   };
 }
 
@@ -575,7 +567,7 @@ macro_rules! create_unary_op {
     {
       pub(crate) value: Expression,
     }
-    create_into_boxed_expr! { $x }
+    create_from_boxed_expr! { $x }
   };
 }
 
@@ -592,7 +584,7 @@ pub(crate) struct Value
   pub(crate) value: crate::value::Value,
 }
 
-create_into_expr! {Value}
+create_from_expr! {Value}
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Map
@@ -600,7 +592,7 @@ pub(crate) struct Map
   pub(crate) map: Vec<(String, Expression)>,
 }
 
-create_into_expr! {Map}
+create_from_expr! {Map}
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Array
@@ -608,4 +600,4 @@ pub(crate) struct Array
   pub(crate) array: Vec<Expression>,
 }
 
-create_into_expr! {Array}
+create_from_expr! {Array}

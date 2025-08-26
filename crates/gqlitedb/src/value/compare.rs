@@ -43,11 +43,7 @@ fn compare_map(lhs: &value::ValueMap, rhs: &value::ValueMap) -> Ordering
           o => o.into(),
         }
       })
-      .find(|p| match p
-      {
-        Ordering::Equal => false,
-        _ => true,
-      })
+      .find(|p| !matches!(p, Ordering::Equal))
       .unwrap_or(Ordering::Equal)
   }
   else if lhs.len() < rhs.len()
@@ -188,14 +184,14 @@ pub(crate) fn compare(lhs: &value::Value, rhs: &value::Value) -> Ordering
     {
       Value::Path(rhs) =>
       {
-        let labels_cmp = lhs.labels().cmp(&rhs.labels());
+        let labels_cmp = lhs.labels().cmp(rhs.labels());
         match labels_cmp
         {
-          std::cmp::Ordering::Equal => match compare_map(&lhs.properties(), &rhs.properties())
+          std::cmp::Ordering::Equal => match compare_map(lhs.properties(), rhs.properties())
           {
-            Ordering::Equal => match compare_node(&lhs.source(), &rhs.source())
+            Ordering::Equal => match compare_node(lhs.source(), rhs.source())
             {
-              Ordering::Equal => compare_node(&lhs.destination(), &rhs.destination()),
+              Ordering::Equal => compare_node(lhs.destination(), rhs.destination()),
               o => o,
             },
             o => o,

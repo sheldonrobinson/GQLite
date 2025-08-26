@@ -186,7 +186,7 @@ where
   ) -> Result<redb::AccessGuard<'_, V>>;
 }
 
-impl<'txn, K, V, T> TableExtension<K, V> for T
+impl<K, V, T> TableExtension<K, V> for T
 where
   T: ReadableTable<K, V>,
   K: redb::Key + 'static,
@@ -338,7 +338,7 @@ impl Store
   {
     use crate::store::Store;
     let mut tx = self.begin_write()?;
-    self.create_graph(&mut tx, &"default".to_string(), true)?;
+    self.create_graph(&mut tx, "default", true)?;
     self.set_metadata_value(&mut tx, "version", &consts::GQLITE_VERSION)?;
     tx.close()?;
     Ok(())
@@ -356,7 +356,7 @@ impl Store
     let key = key.into();
     let value = table
       .get(&key)?
-      .ok_or_else(|| InternalError::MissingMetadata { key: key })?;
+      .ok_or_else(|| InternalError::MissingMetadata { key })?;
     Ok(ciborium::from_reader(value.value().as_slice())?)
   }
   #[allow(dead_code)]
@@ -433,8 +433,9 @@ impl Store
     metadata_table.insert(&key, data)?;
     Ok(())
   }
-  fn get_graph_info(&self, graph_name: &String) -> Result<Arc<GraphInfo>>
+  fn get_graph_info(&self, graph_name: impl AsRef<str>) -> Result<Arc<GraphInfo>>
   {
+    let graph_name = graph_name.as_ref();
     let graphs = self.graphs.read()?;
     let graph_info = graphs.get(graph_name);
     match graph_info
@@ -443,7 +444,7 @@ impl Store
       None =>
       {
         drop(graphs);
-        let graph_info = Arc::new(GraphInfo::new(graph_name));
+        let graph_info = Arc::new(GraphInfo::new(graph_name.to_owned()));
         self
           .graphs
           .write()?
@@ -452,9 +453,9 @@ impl Store
       }
     }
   }
-  fn select_nodes_from_table<'txn, T>(
+  fn select_nodes_from_table<T>(
     &self,
-    nodes_table: &'txn T,
+    nodes_table: &T,
     query: &super::SelectNodeQuery,
   ) -> Result<Vec<crate::graph::Node>>
   where
@@ -462,7 +463,7 @@ impl Store
   {
     let r = match &query.keys
     {
-      Some(keys) => Box::new(keys.into_iter().map(|key| {
+      Some(keys) => Box::new(keys.iter().map(|key| {
         Ok(
           nodes_table
             .get_required(PersistentKey(key.to_owned()), || InternalError::UnknownNode)?
@@ -471,13 +472,10 @@ impl Store
         )
       })) as Box<dyn Iterator<Item = Result<graph::Node>>>,
       None => Box::new({
-        nodes_table
-          .range::<PersistentKey>(..)?
-          .into_iter()
-          .map(|r| {
-            let (_, v) = r?;
-            Ok(v.value().into())
-          })
+        nodes_table.range::<PersistentKey>(..)?.map(|r| {
+          let (_, v) = r?;
+          Ok(v.value().into())
+        })
       }) as Box<dyn Iterator<Item = Result<graph::Node>>>,
     };
     let r = match &query.labels
@@ -561,7 +559,7 @@ impl Store
     {
       Some(keys) =>
       {
-        for key in keys.into_iter()
+        for key in keys.iter()
         {
           edges_raw.push(EdgeIdResult::new(
             edges_table
@@ -579,7 +577,6 @@ impl Store
         {
           edges_raw = edges_table
             .range::<PersistentKey>(..)?
-            .into_iter()
             .map(|r| {
               let (_, v) = r?;
               Ok(EdgeIdResult::new(v.value(), Some(false), None, None))
@@ -616,13 +613,13 @@ impl Store
                 for k in edges_source_uuid_index
                   .as_ref()
                   .borrow()
-                  .get_required(PersistentKey(nkey.into()), || InternalError::UnknownNode)?
+                  .get_required(PersistentKey(nkey), || InternalError::UnknownNode)?
                   .value()
                   .iter()
                 {
                   if dest_it.contains(k)
                   {
-                    let uniq_k: (graph::Key, _, _) = ((**k).into(), Some(nkey), None);
+                    let uniq_k: (graph::Key, _, _) = ((**k), Some(nkey), None);
                     if !edge_ids.contains(&uniq_k)
                     {
                       edges_raw.push(EdgeIdResult::new(
@@ -787,7 +784,7 @@ impl Store
         }
         else
         {
-          return true;
+          true
         }
       })
       .collect()
@@ -815,17 +812,18 @@ impl store::Store for Store
   }
   fn graphs_list(&self, transaction: &mut Self::TransactionBox) -> Result<Vec<String>>
   {
-    self.get_metadata_value_or_else(transaction, "graphs".to_string(), || vec![])
+    self.get_metadata_value_or_else(transaction, "graphs".to_string(), Vec::new)
   }
   fn create_graph(
     &self,
     transaction: &mut Self::TransactionBox,
-    graph_name: &String,
+    graph_name: impl AsRef<str>,
     ignore_if_exists: bool,
   ) -> Result<()>
   {
+    let graph_name = graph_name.as_ref();
     let mut graphs_list = self.graphs_list(transaction)?;
-    if graphs_list.contains(graph_name)
+    if graphs_list.iter().any(|s| s == graph_name)
     {
       if ignore_if_exists
       {
@@ -853,7 +851,7 @@ impl store::Store for Store
 
       self.graphs.write()?.insert(graph_name.to_owned(), gi);
     }
-    graphs_list.push(graph_name.clone());
+    graphs_list.push(graph_name.to_owned());
     self.set_metadata_value(transaction, "graphs", &graphs_list)?;
 
     Ok(())
@@ -861,12 +859,13 @@ impl store::Store for Store
   fn drop_graph(
     &self,
     transaction: &mut Self::TransactionBox,
-    graph_name: &String,
+    graph_name: impl AsRef<str>,
     if_exists: bool,
   ) -> Result<()>
   {
+    let graph_name = graph_name.as_ref();
     let mut graphs_list = self.graphs_list(transaction)?;
-    if graphs_list.contains(graph_name)
+    if graphs_list.iter().any(|s| s == graph_name)
     {
       {
         let tx = transaction.try_into_write()?;
@@ -899,7 +898,7 @@ impl store::Store for Store
   fn create_nodes<'a, T: IntoIterator<Item = &'a crate::graph::Node>>(
     &self,
     transaction: &mut Self::TransactionBox,
-    graph_name: &String,
+    graph_name: impl AsRef<str>,
     nodes_iter: T,
   ) -> Result<()>
   {
@@ -922,7 +921,7 @@ impl store::Store for Store
   fn update_node(
     &self,
     transaction: &mut Self::TransactionBox,
-    graph_name: &String,
+    graph_name: impl AsRef<str>,
     node: &graph::Node,
   ) -> Result<()>
   {
@@ -936,11 +935,12 @@ impl store::Store for Store
   fn delete_nodes(
     &self,
     transaction: &mut Self::TransactionBox,
-    graph_name: &String,
+    graph_name: impl AsRef<str>,
     query: super::SelectNodeQuery,
     detach: bool,
   ) -> Result<()>
   {
+    let graph_name = graph_name.as_ref();
     let graph_info = self.get_graph_info(graph_name)?;
 
     if query.is_select_all()
@@ -1041,10 +1041,11 @@ impl store::Store for Store
   fn select_nodes(
     &self,
     transaction: &mut Self::TransactionBox,
-    graph_name: &String,
+    graph_name: impl AsRef<str>,
     query: super::SelectNodeQuery,
   ) -> Result<Vec<crate::graph::Node>>
   {
+    let graph_name = graph_name.as_ref();
     let graph_info = self.get_graph_info(graph_name)?;
     match transaction
     {
@@ -1064,7 +1065,7 @@ impl store::Store for Store
   fn create_edges<'a, T: IntoIterator<Item = &'a crate::graph::SinglePath>>(
     &self,
     transaction: &mut Self::TransactionBox,
-    graph_name: &String,
+    graph_name: impl AsRef<str>,
     edges_iter: T,
   ) -> Result<()>
   {
@@ -1106,7 +1107,7 @@ impl store::Store for Store
   fn update_edge(
     &self,
     transaction: &mut Self::TransactionBox,
-    graph_name: &String,
+    graph_name: impl AsRef<str>,
     edge: &graph::Edge,
   ) -> Result<()>
   {
@@ -1125,11 +1126,12 @@ impl store::Store for Store
   fn delete_edges(
     &self,
     transaction: &mut Self::TransactionBox,
-    graph_name: &String,
+    graph_name: impl AsRef<str>,
     query: super::SelectEdgeQuery,
     directivity: graph::EdgeDirectivity,
   ) -> Result<()>
   {
+    let graph_name = graph_name.as_ref();
     let graph_info = self.get_graph_info(graph_name)?;
     let edges = self.select_edges(transaction, graph_name, query, directivity)?;
 
@@ -1172,7 +1174,7 @@ impl store::Store for Store
   fn select_edges(
     &self,
     transaction: &mut Self::TransactionBox,
-    graph_name: &String,
+    graph_name: impl AsRef<str>,
     query: super::SelectEdgeQuery,
     directivity: graph::EdgeDirectivity,
   ) -> Result<Vec<super::EdgeResult>>
@@ -1237,11 +1239,7 @@ impl store::Store for Store
     let mut labels = Vec::new();
     let mut properties_count = 0;
 
-    for n in self.select_nodes(
-      transaction,
-      &"default".into(),
-      super::SelectNodeQuery::select_all(),
-    )?
+    for n in self.select_nodes(transaction, "default", super::SelectNodeQuery::select_all())?
     {
       nodes_count += 1;
       for l in n.labels().iter()
@@ -1259,7 +1257,7 @@ impl store::Store for Store
     }
     for e in self.select_edges(
       transaction,
-      &"default".into(),
+      "default",
       super::SelectEdgeQuery::select_all(),
       graph::EdgeDirectivity::Directed,
     )?

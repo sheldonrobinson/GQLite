@@ -6,6 +6,7 @@ pub(super) struct Head {}
 
 impl Head
 {
+  #[allow(clippy::ptr_arg)]
   fn call_impl(array: &Vec<value::Value>) -> FResult<value::Value>
   {
     Ok(
@@ -36,18 +37,15 @@ impl Keys
       value::Value::Map(obj) => Ok(obj.keys().map(|x| x.to_owned().into()).collect()),
       value::Value::Node(n) => Ok(n.properties().keys().map(|x| x.to_owned().into()).collect()),
       value::Value::Edge(e) => Ok(e.properties().keys().map(|x| x.to_owned().into()).collect()),
-      _ =>
-      {
-        return Err(
-          RunTimeError::InvalidArgument {
-            function_name: "keys",
-            index: 0,
-            expected_type: "map, node or relationship",
-            value: format!("{:?}", container),
-          }
-          .into(),
-        )
-      }
+      _ => Err(
+        RunTimeError::InvalidArgument {
+          function_name: "keys",
+          index: 0,
+          expected_type: "map, node or relationship",
+          value: format!("{:?}", container),
+        }
+        .into(),
+      ),
     }
   }
 }
@@ -88,18 +86,15 @@ impl super::FunctionTrait for Size
       value::Value::Array(arr) => Ok((arr.len() as i64).into()),
       value::Value::Map(obj) => Ok((obj.len() as i64).into()),
       value::Value::Path(..) => Ok(1.into()),
-      _ =>
-      {
-        return Err(
-          RunTimeError::InvalidArgument {
-            function_name: "size",
-            index: 0,
-            expected_type: "array or map",
-            value: format!("{:?}", container),
-          }
-          .into(),
-        )
-      }
+      _ => Err(
+        RunTimeError::InvalidArgument {
+          function_name: "size",
+          index: 0,
+          expected_type: "array or map",
+          value: format!("{:?}", container),
+        }
+        .into(),
+      ),
     }
   }
   fn validate_arguments(&self, _: Vec<ExpressionType>) -> Result<ExpressionType>

@@ -224,7 +224,7 @@ pub extern "C" fn gqlite_value_to_json(
     return r;
   }
   let _ = Box::into_raw(value);
-  return std::ptr::null();
+  std::ptr::null()
 }
 
 #[no_mangle]
@@ -243,7 +243,7 @@ pub extern "C" fn gqlite_value_from_json(
       return Box::into_raw(Box::new(GqliteValueT { value: v }));
     }
   }
-  return std::ptr::null::<GqliteValueT>() as *mut GqliteValueT;
+  std::ptr::null::<GqliteValueT>() as *mut GqliteValueT
 }
 
 #[no_mangle]
@@ -253,9 +253,8 @@ pub extern "C" fn gqlite_value_is_valid(
 ) -> bool
 {
   check_error(context);
-  match unsafe { (*value).value.borrow() }
-  {
-    crate::value::Value::Null => false,
-    _ => true,
-  }
+  !matches!(
+    unsafe { (*value).value.borrow() },
+    crate::value::Value::Null
+  )
 }

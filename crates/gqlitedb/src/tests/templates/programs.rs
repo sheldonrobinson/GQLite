@@ -243,7 +243,7 @@ pub(crate) fn unwind() -> Program
 pub(crate) fn match_loop() -> Program
 {
   vec![
-    Block::BlockMatch {
+    Block::Match {
       blocks: vec![BlockMatch::MatchEdge {
         instructions: vec![
           Instruction::Push {
@@ -297,7 +297,7 @@ pub(crate) fn match_loop() -> Program
 pub(crate) fn optional_match() -> Program
 {
   vec![
-    Block::BlockMatch {
+    Block::Match {
       blocks: vec![BlockMatch::MatchNode {
         instructions: vec![
           Instruction::Push {
@@ -336,7 +336,7 @@ pub(crate) fn optional_match() -> Program
 pub(crate) fn match_count(function_manager: &functions::Manager) -> Program
 {
   vec![
-    Block::BlockMatch {
+    Block::Match {
       blocks: vec![BlockMatch::MatchNode {
         instructions: vec![
           Instruction::Push {
@@ -387,7 +387,7 @@ pub(crate) fn match_count(function_manager: &functions::Manager) -> Program
 pub(crate) fn aggregation(function_manager: &functions::Manager) -> Program
 {
   vec![
-    Block::BlockMatch {
+    Block::Match {
       blocks: vec![BlockMatch::MatchNode {
         instructions: vec![
           Instruction::Push {

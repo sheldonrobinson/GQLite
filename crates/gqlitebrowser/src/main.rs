@@ -53,46 +53,41 @@ impl GqliteBrowser
   }
   fn execute_oc_query(&mut self)
   {
-    match &self.connection
+    if let Some(connection) = &self.connection
     {
-      Some(connection) =>
-      {
-        self.history.retain(|v| *v != self.query_text);
-        self.history.push(self.query_text.to_owned());
+      self.history.retain(|v| *v != self.query_text);
+      self.history.push(self.query_text.to_owned());
 
-        let result = connection.execute_oc_query(self.query_text.to_owned(), Default::default());
-        self.last_message.clear();
-        match result
+      let result = connection.execute_oc_query(&self.query_text, Default::default());
+      self.last_message.clear();
+      match result
+      {
+        Ok(t) => match t
         {
-          Ok(t) => match t
+          gqlitedb::QueryResult::Table(table) =>
           {
-            gqlitedb::QueryResult::Table(table) =>
+            self.result_delegate.results = table;
+          }
+          _ =>
+          {
+            self.result_delegate.results = Default::default();
+          }
+        },
+        Err(err) =>
+        {
+          self.last_message = match err.error()
+          {
+            gqlitedb::Error::CompileTime(ct) =>
             {
-              self.result_delegate.results = table;
+              format!("Compilation error:\n{}", ct)
             }
             _ =>
             {
-              self.result_delegate.results = Default::default();
-            }
-          },
-          Err(err) =>
-          {
-            self.last_message = match err.error()
-            {
-              gqlitedb::Error::CompileTime(ct) =>
-              {
-                format!("Compilation error:\n{}", ct.to_string())
-              }
-              _ =>
-              {
-                format!("Query execution failed: {:?}", err)
-              }
+              format!("Query execution failed: {:?}", err)
             }
           }
         }
       }
-      None =>
-      {}
     }
   }
   fn set_connection(&mut self, connection: gqlitedb::Result<gqlitedb::Connection>)
@@ -335,7 +330,7 @@ impl egui_table::TableDelegate for ResultDelegate
     egui::Frame::NONE
       .inner_margin(egui::Margin::symmetric(margin, 0))
       .show(ui, |ui| {
-        ui.heading(format!("{}", row[*group_index as usize]));
+        ui.heading(row[*group_index].to_string());
       });
   }
   fn cell_ui(&mut self, ui: &mut egui::Ui, cell_info: &egui_table::CellInfo)
@@ -351,7 +346,7 @@ impl egui_table::TableDelegate for ResultDelegate
     egui::Frame::NONE
       .inner_margin(egui::Margin::symmetric(4, 0))
       .show(ui, |ui| {
-        self.cell_content_ui(row_nr as usize, col_nr as usize, ui);
+        self.cell_content_ui(row_nr as usize, col_nr, ui);
       });
   }
 }

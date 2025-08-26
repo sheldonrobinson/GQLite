@@ -96,20 +96,9 @@ impl AggregatorState for MinState
   fn next(&mut self, value: value::Value) -> crate::Result<()>
   {
     if self.value.is_null()
+      || (!value.is_null() && value.orderability(&self.value) == std::cmp::Ordering::Less)
     {
       self.value = value;
-    }
-    else if !value.is_null()
-    {
-      match value.orderability(&self.value)
-      {
-        std::cmp::Ordering::Less =>
-        {
-          self.value = value;
-        }
-        _ =>
-        {}
-      }
     }
     Ok(())
   }
@@ -142,20 +131,9 @@ impl AggregatorState for MaxState
   fn next(&mut self, value: value::Value) -> crate::Result<()>
   {
     if self.value.is_null()
+      || (!value.is_null() && value.orderability(&self.value) == std::cmp::Ordering::Greater)
     {
       self.value = value;
-    }
-    else if !value.is_null()
-    {
-      match value.orderability(&self.value)
-      {
-        std::cmp::Ordering::Greater =>
-        {
-          self.value = value;
-        }
-        _ =>
-        {}
-      }
     }
     Ok(())
   }

@@ -112,35 +112,35 @@ pub(crate) trait Store
   fn create_graph(
     &self,
     transaction: &mut Self::TransactionBox,
-    name: &String,
+    name: impl AsRef<str>,
     ignore_if_exists: bool,
   ) -> Result<()>;
   /// Delete a graph
   fn drop_graph(
     &self,
     transaction: &mut Self::TransactionBox,
-    name: &String,
+    name: impl AsRef<str>,
     if_exists: bool,
   ) -> Result<()>;
   /// Create nodes and add them to a graph
   fn create_nodes<'a, T: IntoIterator<Item = &'a crate::graph::Node>>(
     &self,
     transaction: &mut Self::TransactionBox,
-    graph_name: &String,
+    graph_name: impl AsRef<str>,
     nodes_iter: T,
   ) -> Result<()>;
   /// Create nodes and add them to a graph
   fn update_node(
     &self,
     transaction: &mut Self::TransactionBox,
-    graph_name: &String,
+    graph_name: impl AsRef<str>,
     node: &graph::Node,
   ) -> Result<()>;
   /// Delete nodes according to a given query
   fn delete_nodes(
     &self,
     transaction: &mut Self::TransactionBox,
-    graph_name: &String,
+    graph_name: impl AsRef<str>,
     query: SelectNodeQuery,
     detach: bool,
   ) -> Result<()>;
@@ -148,27 +148,27 @@ pub(crate) trait Store
   fn select_nodes(
     &self,
     transaction: &mut Self::TransactionBox,
-    graph_name: &String,
+    graph_name: impl AsRef<str>,
     query: SelectNodeQuery,
   ) -> Result<Vec<crate::graph::Node>>;
   /// Add edge
   fn create_edges<'a, T: IntoIterator<Item = &'a crate::graph::SinglePath>>(
     &self,
     transaction: &mut Self::TransactionBox,
-    graph_name: &String,
+    graph_name: impl AsRef<str>,
     edges_iter: T,
   ) -> Result<()>;
   fn update_edge(
     &self,
     transaction: &mut Self::TransactionBox,
-    graph_name: &String,
+    graph_name: impl AsRef<str>,
     edge: &graph::Edge,
   ) -> Result<()>;
   /// Delete nodes according to a given query
   fn delete_edges(
     &self,
     transaction: &mut Self::TransactionBox,
-    graph_name: &String,
+    graph_name: impl AsRef<str>,
     query: SelectEdgeQuery,
     directivity: graph::EdgeDirectivity,
   ) -> Result<()>;
@@ -176,7 +176,7 @@ pub(crate) trait Store
   fn select_edges(
     &self,
     transaction: &mut Self::TransactionBox,
-    graph_name: &String,
+    graph_name: impl AsRef<str>,
     query: SelectEdgeQuery,
     directivity: graph::EdgeDirectivity,
   ) -> Result<Vec<EdgeResult>>;
@@ -306,7 +306,7 @@ impl SelectNodeQuery
         return false;
       }
     }
-    return true;
+    true
   }
 }
 
@@ -434,6 +434,6 @@ impl SelectEdgeQuery
         return false;
       }
     }
-    return self.source.is_match(&edge.source()) && self.destination.is_match(&edge.destination());
+    self.source.is_match(edge.source()) && self.destination.is_match(edge.destination())
   }
 }

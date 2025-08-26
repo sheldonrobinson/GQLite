@@ -64,7 +64,7 @@ impl super::FunctionTrait for HasLabels
         {
           value::Value::String(l) =>
           {
-            if !labels.contains(&l)
+            if !labels.contains(l)
             {
               return Ok(false.into());
             }
