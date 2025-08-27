@@ -30,6 +30,11 @@ impl QueryResult
       QueryResult::Array(qr) => value_map!("type" => "results", "results" => qr.into_iter().map(|x| x.into_value()).collect::<Vec<graphcore::Value>>()).into()
     }
   }
+  /// Try convert into table
+  pub fn try_into_table(self) -> Result<graphcore::Table, InternalError>
+  {
+    self.try_into()
+  }
 }
 
 impl From<graphcore::Value> for QueryResult

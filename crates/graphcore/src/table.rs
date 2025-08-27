@@ -58,6 +58,15 @@ impl Table
     v.try_into_ref()
   }
   /// value access
+  pub fn get_owned<T>(&self, row: usize, column: usize) -> Result<T>
+  where
+    Value: ValueTryIntoRef<T>,
+    T: Clone,
+  {
+    let v = self.value(row, column)?;
+    v.try_into_ref().map(T::to_owned)
+  }
+  /// value access
   pub fn value(&self, row: usize, column: usize) -> Result<&Value>
   {
     if column > self.headers.len()
