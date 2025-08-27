@@ -11,6 +11,7 @@ repository.workspace = true
 graphcore = { workspace = true }
 
 askama = { workspace = true }
+itertools = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]

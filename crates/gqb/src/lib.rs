@@ -8,6 +8,9 @@
 pub mod prelude;
 mod utils;
 
+use itertools::Itertools as _;
+use std::borrow::Borrow;
+
 pub use graphcore::{array, labels, value_map};
 
 #[derive(thiserror::Error, Debug)]
@@ -249,7 +252,7 @@ struct MatchStatement
 #[derive(Debug, Default)]
 struct ReturnStatement
 {
-  values: Vec<(Variable, String)>,
+  values: Vec<(Variable, Option<String>, String)>,
 }
 
 #[derive(Debug)]
@@ -405,7 +408,19 @@ impl Builder
     self
       .last_return_statement()
       .values
-      .push((variable, name.into()));
+      .push((variable, None, name.into()));
+  }
+  /// Add a return statement to the query for the given variable, accessible in the column with the given name
+  pub fn return_property<I, S>(&mut self, variable: Variable, path: I, name: impl Into<String>)
+  where
+    I: IntoIterator<Item = S>,
+    S: Borrow<str> + std::fmt::Display,
+  {
+    self.last_return_statement().values.push((
+      variable,
+      Some(path.into_iter().join(".")),
+      name.into(),
+    ));
   }
   /// Generate an OpenCypher Query.
   pub fn into_oc_query(self) -> Result<(String, graphcore::ValueMap)>
@@ -532,7 +547,7 @@ impl Builder
           q += "RETURN ";
           let mut comma = false;
           // Create nodes
-          for (var, name) in return_statement.values.into_iter()
+          for (var, path, name) in return_statement.values.into_iter()
           {
             if comma
             {
@@ -542,7 +557,11 @@ impl Builder
             {
               comma = true;
             }
-            q += &format!("{} AS {}", var, name);
+            match path
+            {
+              Some(path) => q += &format!("{}.{} AS {}", var, path, name),
+              None => q += &format!("{} AS {}", var, name),
+            }
           }
         }
       }
