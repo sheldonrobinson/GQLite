@@ -137,6 +137,28 @@ impl<'a> RowView<'a>
   {
     self.row.iter()
   }
+  /// value access
+  pub fn value(&self, column: usize) -> Result<&Value>
+  {
+    self.row.get(column).ok_or(error::Error::InvalidRange)
+  }
+  /// value access
+  pub fn get<T>(&self, column: usize) -> Result<&T>
+  where
+    Value: ValueTryIntoRef<T>,
+  {
+    let v = self.value(column)?;
+    v.try_into_ref()
+  }
+  /// value access
+  pub fn get_owned<T>(&self, column: usize) -> Result<T>
+  where
+    Value: ValueTryIntoRef<T>,
+    T: Clone,
+  {
+    let v = self.value(column)?;
+    v.try_into_ref().map(T::to_owned)
+  }
 }
 
 /// Iteratpr over rows of a table
