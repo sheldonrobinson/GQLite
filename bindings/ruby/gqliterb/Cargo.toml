@@ -11,7 +11,7 @@ repository.workspace = true
 crate-type = ["cdylib"]
 
 [dependencies]
-gqlitedb = { workspace = true, features = [] }
+gqlitedb = { workspace = true }
 magnus = "0.7"
 
 [build-dependencies]

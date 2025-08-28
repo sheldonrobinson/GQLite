@@ -5,52 +5,32 @@ tasks:
     depends:
       - clean
     command: !script |
-      let tmp_dir = "tmp/";
       let ext_dir = "ext";
+      let root_dir = yte::path_join([env.cwd(), "..", ".."]);
       let gqliterb_dir = yte::path_join([ext_dir, "gqliterb"]);
-      let gqliterb_dot_cargo_dir = yte::path_join([gqliterb_dir, ".cargo"]);
-      println!("{gqliterb_dir}");
-      let gqlitedb_dir = yte::path_join([gqliterb_dir, "vendor/gqlitedb"]);
+      let gqlitedb_dir = yte::path_join([ext_dir, "gqlitedb"]);
+      let graphcore_dir = yte::path_join([ext_dir, "graphcore"]);
+      let gqliterb_src_dir = yte::path_join([env.cwd(), "gqliterb"]);
+      let gqlitedb_src_dir = yte::path_join([root_dir, "crates", "gqlitedb"]);
+      let graphcore_src_dir = yte::path_join([root_dir, "crates", "graphcore"]);
+
       let extconf_source = "extconf.rb";
-      let config_toml_source = "config.toml";
 
       println!("🧹 Cleaning directories");
-      env.rm_rf(tmp_dir);
-      env.mkdir_p(tmp_dir);
-      env.rm_rf(ext_dir);
-      env.mkdir_p(gqliterb_dir);
-      env.mkdir_p(gqlitedb_dir);
+      env.rm_rf(gqliterb_dir);
+      env.rm_rf(gqlitedb_dir);
+      env.rm_rf(graphcore_dir);
 
-      // Helper function to package and find crate
-      fn export_crate(env, crate_name, tmp_dir, dst_dir) {
-        println!("📦 Packaging '{crate_name}' crate...");
-        env.execute(format!("cargo package --package {crate_name} --target-dir={tmp_dir} --allow-dirty --no-verify")).expect(format!("❌ Failed to package {crate_name}"));
-        let crate_paths = env.find_files(yte::path_join([tmp_dir, "package", format!("{crate_name}-*.crate")]))?;
-        if crate_paths.is_empty()
-        {
-          return Err(format!("❌ Could not find packaged crate for {crate_name}"));
-        }
-        let crate_path = crate_paths[0];
-        println!("📦 Unpacking {crate_path} to {dst_dir}");
-        env.execute(format!("tar -xzf {crate_path} --strip-components=1 -C {dst_dir}")).expect(format!("❌ Failed to unpack {crate_path}"));
-        println!("🧼 Removing .crate archive");
-        env.rm_f(crate_path);
-        println!("✅ Done: {crate_name} crate unpacked to {dst_dir}");
-      }
-      export_crate(env, "gqliterb", tmp_dir, gqliterb_dir);
-      export_crate(env, "gqlitedb", tmp_dir, gqlitedb_dir);
+      println!("📦 Copying crates {gqliterb_src_dir} {gqliterb_dir}");
+      env.execute(format!("cp -r {gqliterb_src_dir} {gqliterb_dir}"))?;
+      env.execute(format!("cp -r {gqlitedb_src_dir} {gqlitedb_dir}"))?;
+      env.execute(format!("cp -r {graphcore_src_dir} {graphcore_dir}"))?;
+      // env.cp_r(gqliterb_src_dir, gqliterb_dir);
+      // env.cp_r(gqlitedb_dir, gqlitedb_dir);
+      // env.cp_r(graphcore_src_dir, graphcore_dir);
 
       println!("📄 Copying extconf.rb");
       env.cp(extconf_source, gqliterb_dir)?;
-
-      println!("📄 Copying config.toml");
-      env.mkdir_p(gqliterb_dot_cargo_dir)?;
-      env.cp(config_toml_source, gqliterb_dot_cargo_dir)?;
-
-      println!("🧹 Cleaning temporary directory");
-      env.rm_rf(tmp_dir);
-
-      println!("✅ Done: preparing 'gqliterb'");
 
   build_gem:
     depends:
@@ -62,6 +42,4 @@ tasks:
 
   clean:
     command: !commands
-      - rm -rf "tmp/"
-      - rm -rf "ext/"
       - rm -rf "pkg/"
