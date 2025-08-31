@@ -8,20 +8,12 @@ use pyo3::{
 
 pyo3::create_exception!(gqlitepy, Error, pyo3::exceptions::PyException);
 
-pub fn new_error(py: Python, msg: &str) -> PyErr
+pub fn new_error(py: Python<'_>, msg: &str) -> PyErr
 {
   let exc_type = py.get_type::<Error>();
-
-  let result: PyResult<PyObject> = exc_type.call1((msg,)).and_then(|obj| {
-    obj.setattr("msg", msg.into_bound_py_any(py)?)?;
-    Ok(obj.into())
-  });
-
-  match result
-  {
-    Ok(obj) => PyErr::from_value(obj.bind(py).to_owned()), // converting owned PyObject to borrowed PyAny
-    Err(e) => e,
-  }
+  let obj = exc_type.call1((msg,)).unwrap();
+  obj.setattr("msg", msg).unwrap();
+  PyErr::from_value(obj)
 }
 
 fn map_err<T>(py: Python, result: gqlitedb::Result<T>) -> PyResult<T>
@@ -71,17 +63,17 @@ fn from_pany<'py>(py: Python<'py>, value: &Bound<'py, PyAny>) -> PyResult<gqlite
 fn from_plist<'py>(py: Python<'py>, list: &Bound<'py, PyList>) -> PyResult<Vec<gqlitedb::Value>>
 {
   list
-      .iter()
-      .map(|value| from_pany(py, &value))
-      .collect::<Result<Vec<_>, _>>()
+    .iter()
+    .map(|value| from_pany(py, &value))
+    .collect::<Result<Vec<_>, _>>()
 }
 
 fn from_pdict<'py>(py: Python<'py>, hash: &Bound<'py, PyDict>) -> PyResult<gqlitedb::ValueMap>
 {
   hash
-      .iter()
-      .map(|(k, v)| Ok((k.to_string(), from_pany(py, &v)?)))
-      .collect::<PyResult<_>>()
+    .iter()
+    .map(|(k, v)| Ok((k.to_string(), from_pany(py, &v)?)))
+    .collect::<PyResult<_>>()
 }
 
 fn node_to_pdict<'py>(py: Python<'py>, node: gqlitedb::Node) -> PyResult<Bound<'py, PyAny>>

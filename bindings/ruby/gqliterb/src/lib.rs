@@ -115,7 +115,7 @@ fn node_to_rhash(ruby: &Ruby, node: gqlitedb::Node) -> Result<magnus::Value, Err
   r_hash.aset("key", integer_from_u128(ruby, key.into())?)?;
   r_hash.aset("labels", labels)?;
   r_hash.aset("properties", to_rhash(ruby, properties)?)?;
-  Ok(r_hash.into_value())
+  Ok(r_hash.into_value_with(ruby))
 }
 
 fn edge_to_rhash(ruby: &Ruby, edge: gqlitedb::Edge) -> Result<magnus::Value, Error>
@@ -126,7 +126,7 @@ fn edge_to_rhash(ruby: &Ruby, edge: gqlitedb::Edge) -> Result<magnus::Value, Err
   r_hash.aset("key", integer_from_u128(ruby, key.into())?)?;
   r_hash.aset("labels", labels)?;
   r_hash.aset("properties", to_rhash(ruby, properties)?)?;
-  Ok(r_hash.into_value())
+  Ok(r_hash.into_value_with(ruby))
 }
 
 fn path_to_rhash(ruby: &Ruby, path: gqlitedb::Path) -> Result<magnus::Value, Error>
@@ -139,21 +139,21 @@ fn path_to_rhash(ruby: &Ruby, path: gqlitedb::Path) -> Result<magnus::Value, Err
   r_hash.aset("properties", to_rhash(ruby, properties)?)?;
   r_hash.aset("source", node_to_rhash(ruby, source)?)?;
   r_hash.aset("destination", node_to_rhash(ruby, destination)?)?;
-  Ok(r_hash.into_value())
+  Ok(r_hash.into_value_with(ruby))
 }
 
 fn to_rvalue(ruby: &Ruby, val: gqlitedb::Value) -> Result<magnus::Value, Error>
 {
   match val
   {
-    gqlitedb::Value::Array(arr) => Ok(to_rarray(ruby, arr)?.into_value()),
-    gqlitedb::Value::Boolean(b) => Ok(b.into_value()),
-    gqlitedb::Value::Key(k) => Ok(integer_from_u128(ruby, k.into())?.into_value()),
-    gqlitedb::Value::Integer(i) => Ok(i.into_value()),
-    gqlitedb::Value::Float(f) => Ok(f.into_value()),
-    gqlitedb::Value::String(s) => Ok(s.into_value()),
-    gqlitedb::Value::Map(m) => Ok(to_rhash(ruby, m)?.into_value()),
-    gqlitedb::Value::Null => Ok(ruby.qnil().into_value()),
+    gqlitedb::Value::Array(arr) => Ok(to_rarray(ruby, arr)?.into_value_with(ruby)),
+    gqlitedb::Value::Boolean(b) => Ok(b.into_value_with(ruby)),
+    gqlitedb::Value::Key(k) => Ok(integer_from_u128(ruby, k.into())?.into_value_with(ruby)),
+    gqlitedb::Value::Integer(i) => Ok(i.into_value_with(ruby)),
+    gqlitedb::Value::Float(f) => Ok(f.into_value_with(ruby)),
+    gqlitedb::Value::String(s) => Ok(s.into_value_with(ruby)),
+    gqlitedb::Value::Map(m) => Ok(to_rhash(ruby, m)?.into_value_with(ruby)),
+    gqlitedb::Value::Null => Ok(ruby.qnil().into_value_with(ruby)),
     gqlitedb::Value::Edge(e) => Ok(edge_to_rhash(ruby, e)?),
     gqlitedb::Value::Node(n) => Ok(node_to_rhash(ruby, n)?),
     gqlitedb::Value::Path(p) => Ok(path_to_rhash(ruby, p)?),
@@ -172,7 +172,7 @@ fn to_rhash(ruby: &Ruby, map: gqlitedb::ValueMap) -> Result<r_hash::RHash, Error
 
 fn to_rarray(ruby: &Ruby, arr: Vec<gqlitedb::Value>) -> Result<r_array::RArray, Error>
 {
-  let r_arr = r_array::RArray::with_capacity(arr.len());
+  let r_arr = ruby.ary_new_capa(arr.len());
 
   for value in arr.into_iter()
   {

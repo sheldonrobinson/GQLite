@@ -33,11 +33,11 @@ askama = { workspace = true, optional = true }
 ccutils = { version = "0.4", features = ["alias", "pool", "sync"] }
 ciborium = "0.2"
 itertools = { workspace = true }
-pgrx = { version = "0.15", optional = true }
+pgrx = { version = "0.16", optional = true }
 pest = "2"
 pest_derive = "2"
 rand = "0.9"
-redb = { version = "2", optional = true }
+redb = { version = "3", optional = true }
 rusqlite = { package = "rusqlite", version = "0.37", optional = true, features = [
   "functions",
   "uuid",

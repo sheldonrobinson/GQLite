@@ -1,5 +1,5 @@
 use ccutils::sync::ArcRwLock;
-use redb::{ReadableTable, ReadableTableMetadata};
+use redb::{ReadableDatabase as _, ReadableTable, ReadableTableMetadata as _};
 use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, collections::HashMap, rc::Rc, sync::Arc};
 
