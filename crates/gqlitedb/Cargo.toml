@@ -15,7 +15,7 @@ crate-type = ["cdylib", "lib"]
 default = ["redb", "capi", "sqlite"]
 _backtrace = []
 capi = []
-redb = ["dep:redb"]
+redb = ["dep:redb", "dep:redb2"]
 _pgql = ["dep:pgrx"]
 _pg13 = ["pgrx/pg13"]
 _pg14 = ["pgrx/pg14"]
@@ -38,6 +38,7 @@ pest = "2"
 pest_derive = "2"
 rand = "0.9"
 redb = { version = "3", optional = true }
+redb2 = { version = "2", optional = true, package = "redb" }
 rusqlite = { package = "rusqlite", version = "0.37", optional = true, features = [
   "functions",
   "uuid",

@@ -1,5 +1,5 @@
 use ccutils::sync::ArcRwLock;
-use redb::{ReadableDatabase as _, ReadableTable, ReadableTableMetadata as _};
+use redb::{DatabaseError, ReadableDatabase as _, ReadableTable, ReadableTableMetadata as _};
 use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, collections::HashMap, rc::Rc, sync::Arc};
 
@@ -316,8 +316,34 @@ impl Store
   /// Crate a new store, with a default graph
   pub(crate) fn open<P: AsRef<std::path::Path>>(path: P) -> Result<Store>
   {
+    let redb_store = redb::Database::create(path.as_ref());
+    let redb_store = match redb_store
+    {
+      Ok(redb_store) => redb_store,
+      Err(e) => match e
+      {
+        DatabaseError::UpgradeRequired(v) =>
+        {
+          if v == 2
+          {
+            std::fs::copy(path.as_ref(), path.as_ref().with_extension("redb2.bak"))
+              .map_err(InternalError::IOError)?;
+            redb2::Database::create(path.as_ref())?.upgrade()?;
+            redb::Database::create(path.as_ref())?
+          }
+          else
+          {
+            Err(StoreError::InvalidFormat(format!(
+              "Unsupported redb version {}.",
+              v
+            )))?
+          }
+        }
+        o => Err(o)?,
+      },
+    };
     let s = Self {
-      redb_store: redb::Database::create(path.as_ref())?,
+      redb_store,
       graphs: Default::default(),
     };
     s.initialise()?;

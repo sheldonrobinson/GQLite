@@ -291,6 +291,10 @@ pub enum InternalError
   #[error("redb: {0}")]
   RedbError(#[from] redb::Error),
 
+  #[cfg(feature = "redb")]
+  #[error("redb: {0}")]
+  Redb2Error(#[from] redb2::Error),
+
   // Errors from sqlite
   #[cfg(feature = "sqlite")]
   #[error("Sqlite: {0}")]
@@ -330,6 +334,8 @@ pub enum InternalError
   Infallible(#[from] std::convert::Infallible),
   #[error("Poison error {0}.")]
   Poison(String),
+  #[error("IOError: {0}.")]
+  IOError(#[from] std::io::Error),
 }
 
 /// Error in the store backend.
@@ -372,6 +378,8 @@ pub enum StoreError
     actual: utils::Version,
     expected: utils::Version,
   },
+  #[error("Invalid database format: {0}.")]
+  InvalidFormat(String),
 }
 
 /// GQLite errors
@@ -548,11 +556,27 @@ mod _trait_impl_redb
       }
     };
   }
+  super::error_as_internal! {redb2::Error}
+  macro_rules! redb2_error_as_internal {
+    ($err_type:ty) => {
+      impl From<$err_type> for crate::prelude::ErrorType
+      {
+        fn from(value: $err_type) -> Self
+        {
+          let redb_err: redb2::Error = value.into();
+          let err: crate::error::InternalError = redb_err.into();
+          err.into()
+        }
+      }
+    };
+  }
   redb_error_as_internal! {redb::StorageError}
   redb_error_as_internal! {redb::DatabaseError}
   redb_error_as_internal! {redb::TransactionError}
   redb_error_as_internal! {redb::TableError}
   redb_error_as_internal! {redb::CommitError}
+  redb2_error_as_internal! {redb2::DatabaseError}
+  redb2_error_as_internal! {redb2::UpgradeError}
 }
 #[cfg(feature = "sqlite")]
 mod _trait_impl_sqlite
