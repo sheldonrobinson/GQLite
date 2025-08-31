@@ -51,25 +51,54 @@ impl redb::Value for PersistentEdge
   }
 }
 
-ccutils::alias!(PersistentNode, graph::Node, derive: Debug, Deserialize, Serialize, Clone);
-
-impl redb::Value for PersistentNode
+#[derive(Debug)]
+enum PersistentNode<'a>
 {
-  type AsBytes<'a> = Vec<u8>;
-  type SelfType<'a> = PersistentNode;
+  Reference(&'a graph::Node),
+  Value(graph::Node),
+}
+
+impl<'a> From<PersistentNode<'a>> for graph::Node
+{
+  fn from(value: PersistentNode<'a>) -> Self
+  {
+    match value
+    {
+      PersistentNode::Reference(refe) => refe.to_owned(),
+      PersistentNode::Value(val) => val,
+    }
+  }
+}
+
+// ccutils::alias!(PersistentNode, graph::Node, derive: Debug, Deserialize, Serialize, Clone);
+
+impl<'c> redb::Value for PersistentNode<'c>
+{
+  type AsBytes<'a>
+    = Vec<u8>
+  where
+    Self: 'a;
+  type SelfType<'a>
+    = PersistentNode<'a>
+  where
+    Self: 'a;
   fn as_bytes<'a, 'b: 'a>(value: &'a Self::SelfType<'b>) -> Self::AsBytes<'a>
   where
     Self: 'b,
   {
     let mut data = Vec::<u8>::new();
-    ciborium::into_writer(&value.0, &mut data).unwrap(); // This unwrap should not happen, unless there is a bug
+    match value
+    {
+      PersistentNode::Reference(refe) => ciborium::into_writer(refe, &mut data).unwrap(), // This unwrap should not happen, unless there is a bug
+      PersistentNode::Value(refe) => ciborium::into_writer(&refe, &mut data).unwrap(), // This unwrap should not happen, unless there is a bug
+    }
     data
   }
   fn from_bytes<'a>(data: &'a [u8]) -> Self::SelfType<'a>
   where
     Self: 'a,
   {
-    PersistentNode(ciborium::from_reader(data).unwrap()) // This unwrap should not happen, unless there is a bug
+    PersistentNode::Value(ciborium::from_reader(data).unwrap()) // This unwrap should not happen, unless there is a bug
   }
   fn fixed_width() -> Option<usize>
   {
@@ -238,9 +267,9 @@ impl GraphInfo
       edges_destination_index,
     }
   }
-  fn nodes_table_definition<'a>(
+  fn nodes_table_definition<'a, 'b>(
     &'a self,
-  ) -> redb::TableDefinition<'a, PersistentKey, PersistentNode>
+  ) -> redb::TableDefinition<'a, PersistentKey, PersistentNode<'b>>
   {
     redb::TableDefinition::new(&self.nodes_table)
   }
@@ -485,7 +514,7 @@ impl Store
     query: &super::SelectNodeQuery,
   ) -> Result<Vec<crate::graph::Node>>
   where
-    T: ReadableTable<PersistentKey, PersistentNode>,
+    T: ReadableTable<PersistentKey, PersistentNode<'static>>,
   {
     let r = match &query.keys
     {
@@ -566,7 +595,7 @@ impl Store
   ) -> Result<Vec<super::EdgeResult>>
   where
     TEdges: ReadableTable<PersistentKey, PersistentEdge>,
-    TNodes: ReadableTable<PersistentKey, PersistentNode>,
+    TNodes: ReadableTable<PersistentKey, PersistentNode<'static>>,
     TEdgesIndex: ReadableTable<PersistentKey, Vec<PersistentKey>>,
   {
     let edges_uuid_indices = match directivity
@@ -733,18 +762,21 @@ impl Store
         let edge = v.edge_data;
 
         let source = nodes_table
-          .get_required(edge.source, || InternalError::UnknownNode)?
-          .value();
+          .get(edge.source)?
+          .ok_or(InternalError::UnknownNode)?
+          .value()
+          .into();
         let destination = nodes_table
           .get_required(edge.destination, || InternalError::UnknownNode)?
-          .value();
+          .value()
+          .into();
 
         let edge = graph::Path::new(
           edge.key.into(),
-          source.into(),
+          source,
           edge.labels,
           edge.properties,
-          destination.into(),
+          destination,
         );
         super::EdgeResult {
           path: edge,
@@ -937,7 +969,7 @@ impl store::Store for Store
     for x in nodes_iter
     {
       let pk = PersistentKey(x.key());
-      table.insert(&pk, PersistentNode(x.to_owned()))?;
+      table.insert(&pk, PersistentNode::Reference(x))?;
       table_source.insert(&pk, vec![])?;
       table_destination.insert(&pk, vec![])?;
     }
@@ -954,7 +986,7 @@ impl store::Store for Store
     let graph_info = self.get_graph_info(graph_name)?;
     let transaction = transaction.try_into_write()?;
     let mut table = transaction.open_table(graph_info.nodes_table_definition())?;
-    table.insert(PersistentKey(node.key()), PersistentNode(node.to_owned()))?;
+    table.insert(PersistentKey(node.key()), PersistentNode::Reference(node))?;
     Ok(())
   }
   /// Delete nodes according to a given query
