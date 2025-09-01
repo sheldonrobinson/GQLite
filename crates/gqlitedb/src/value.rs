@@ -4,7 +4,7 @@ mod contains;
 pub(crate) use compare::{compare, Ordering};
 pub(crate) use contains::{contains, ContainResult};
 
-pub use graphcore::{value_map, Value, ValueMap, ValueTryIntoRef};
+pub use graphcore::{array, value_map, Value, ValueMap, ValueTryIntoRef};
 
 pub(crate) trait ValueExt
 {

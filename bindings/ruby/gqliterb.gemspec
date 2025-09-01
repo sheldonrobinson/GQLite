@@ -53,6 +53,7 @@ DESC
   
   s.files = Dir[
     "lib/**/*.rb",
+    "ext/**/README.MD",
     "ext/**/.cargo/config.toml",
     "ext/**/*.{rs,toml,lock,rb,pest,sql}"
   ]

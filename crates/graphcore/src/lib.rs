@@ -1,8 +1,4 @@
-//! ![GQLite logo](https://gqlite.org/assets/images/logo-88x88.png) graphcore
-//! ======================================================================
-//!
-//! Core data structure for representing and manipulating property graphs.
-
+#![doc = include_str!("../README.MD")]
 #![warn(missing_docs)]
 #![deny(warnings)]
 #![allow(clippy::result_large_err)]

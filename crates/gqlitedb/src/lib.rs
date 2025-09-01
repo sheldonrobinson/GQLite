@@ -35,9 +35,9 @@ pub(crate) mod tests;
 pub use {
   connection::{Backend, Connection},
   error::{CompileTimeError, Error, RunTimeError, StoreError},
-  graph::{Edge, Node, Path},
+  graph::{labels, Edge, Node, Path},
   query_result::QueryResult,
-  value::{value_map, Value, ValueMap, ValueTryIntoRef},
+  value::{array, value_map, Value, ValueMap, ValueTryIntoRef},
 };
 
 pub use graphcore::{table, Table};

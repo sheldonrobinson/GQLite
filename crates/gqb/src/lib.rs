@@ -1,7 +1,4 @@
-//! ![GQLite logo](https://gqlite.org/assets/images/logo-88x88.png) gqb
-//! ===================================================================
-//! `graph query builder (gqb)` is a crate with a builder for conveniently create queries using a high-level API.
-
+#![doc = include_str!("../README.MD")]
 #![deny(missing_docs)]
 #![deny(warnings)]
 
@@ -11,7 +8,7 @@ mod utils;
 use itertools::Itertools as _;
 use std::borrow::Borrow;
 
-pub use graphcore::{array, labels, value_map};
+pub use graphcore::{array, labels, value_map, ValueMap};
 
 #[derive(thiserror::Error, Debug)]
 #[allow(missing_docs)]

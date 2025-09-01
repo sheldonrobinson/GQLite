@@ -32,6 +32,7 @@ This table summarizes the versions used by GQLite. The database version refers t
 
 | Database Version | GQLite Version | Crate Version |
 |------------------|----------------|---------------|
+| 1.3 (1.2-1.0)    | 1.3            | 0.6.x         |
 | 1.2 (1.1-1.0)    | 1.2            | 0.5.x         |
 | 1.2              | -              | 0.4.x         |
 | -                | -              | 0.1.x-0.3.x   |
