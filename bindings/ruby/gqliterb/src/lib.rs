@@ -192,7 +192,7 @@ where
 #[magnus::wrap(class = "GQLite::Connection")]
 struct Connection
 {
-  dbhandle: gqlitedb::Connection,
+  dbhandle: std::sync::RwLock<Option<gqlitedb::Connection>>,
 }
 
 impl Connection
@@ -218,7 +218,9 @@ impl Connection
         .path(filename)
         .create(),
     )?;
-    Ok(Self { dbhandle })
+    Ok(Self {
+      dbhandle: std::sync::RwLock::new(Some(dbhandle)),
+    })
   }
   fn execute_oc_query(
     ruby: &Ruby,
@@ -226,32 +228,46 @@ impl Connection
     args: &[magnus::Value],
   ) -> Result<magnus::Value, Error>
   {
-    let args = scan_args::scan_args::<_, (), (), (), _, ()>(args)?;
-    let (query,): (String,) = args.required;
+    match &*rb_self.dbhandle.read().unwrap()
+    {
+      Some(connection) =>
+      {
+        let args = scan_args::scan_args::<_, (), (), (), _, ()>(args)?;
+        let (query,): (String,) = args.required;
 
-    let kw = scan_args::get_kwargs::<_, (), (Option<magnus::Value>,), ()>(
-      args.keywords,
-      &[],
-      &["bindings"],
-    )?;
-    let (bindings,) = kw.optional;
+        let kw = scan_args::get_kwargs::<_, (), (Option<magnus::Value>,), ()>(
+          args.keywords,
+          &[],
+          &["bindings"],
+        )?;
+        let (bindings,) = kw.optional;
 
-    let bindings = bindings
-      .map(|bindings| {
-        if bindings.is_nil()
-        {
-          Ok(Default::default())
-        }
-        else
-        {
-          from_rhash(ruby, r_hash::RHash::try_convert(bindings)?)
-        }
-      })
-      .transpose()?
-      .unwrap_or_default();
-    let result = map_err(ruby, rb_self.dbhandle.execute_oc_query(query, bindings))?;
+        let bindings = bindings
+          .map(|bindings| {
+            if bindings.is_nil()
+            {
+              Ok(Default::default())
+            }
+            else
+            {
+              from_rhash(ruby, r_hash::RHash::try_convert(bindings)?)
+            }
+          })
+          .transpose()?
+          .unwrap_or_default();
+        let result = map_err(ruby, connection.execute_oc_query(query, bindings))?;
 
-    to_rvalue(ruby, result.into_value())
+        to_rvalue(ruby, result.into_value())
+      }
+      None => Err(Error::new(
+        ruby.get_inner(&ERROR),
+        "Connection is closed.".to_string(),
+      )),
+    }
+  }
+  fn close(&self)
+  {
+    *self.dbhandle.write().unwrap() = None;
   }
 }
 
@@ -267,5 +283,6 @@ fn init(ruby: &Ruby) -> Result<(), Error>
     "execute_oc_query",
     method!(Connection::execute_oc_query, -1),
   )?;
+  class.define_method("close", method!(Connection::close, 0))?;
   Ok(())
 }
