@@ -287,19 +287,6 @@ pub enum InternalError
   #[error("Missing element in iterator.")]
   MissingElementIterator,
 
-  #[cfg(feature = "redb")]
-  #[error("redb: {0}")]
-  RedbError(#[from] redb::Error),
-
-  #[cfg(feature = "redb")]
-  #[error("redb: {0}")]
-  Redb2Error(#[from] redb2::Error),
-
-  // Errors from sqlite
-  #[cfg(feature = "sqlite")]
-  #[error("Sqlite: {0}")]
-  SqliteError(#[from] rusqlite::Error),
-
   // Errors from askama
   #[cfg(feature = "sqlite")]
   #[error("Askama: {0}")]
@@ -345,6 +332,19 @@ pub enum InternalError
 #[non_exhaustive]
 pub enum StoreError
 {
+  // Errors from sqlite
+  #[cfg(feature = "sqlite")]
+  #[error("Sqlite: {0}")]
+  SqliteError(#[from] rusqlite::Error),
+
+  #[cfg(feature = "redb")]
+  #[error("redb: {0}")]
+  RedbError(#[from] redb::Error),
+
+  #[cfg(feature = "redb")]
+  #[error("redb: {0}")]
+  Redb2Error(#[from] redb2::Error),
+
   #[error("UnknownBackend: backend '{backend}' is unknown.")]
   UnknownBackend
   {
@@ -532,56 +532,71 @@ macro_rules! error_as_internal {
   };
 }
 
+pub(crate) use error_as_internal;
+
+macro_rules! error_as_store {
+  ($err_type:ty) => {
+    impl From<$err_type> for crate::prelude::ErrorType
+    {
+      fn from(value: $err_type) -> Self
+      {
+        let err: crate::error::StoreError = value.into();
+        err.into()
+      }
+    }
+  };
+}
+
+pub(crate) use error_as_store;
+
 error_as_internal! {ciborium::ser::Error<std::io::Error>}
 error_as_internal! {ciborium::de::Error<std::io::Error>}
 error_as_internal! {serde_json::Error}
 error_as_internal! {std::num::ParseFloatError}
 
-pub(crate) use error_as_internal;
-
 #[cfg(feature = "redb")]
 mod _trait_impl_redb
 {
-  super::error_as_internal! {redb::Error}
-  macro_rules! redb_error_as_internal {
+  super::error_as_store! {redb::Error}
+  macro_rules! redb_error_as_store {
     ($err_type:ty) => {
       impl From<$err_type> for crate::prelude::ErrorType
       {
         fn from(value: $err_type) -> Self
         {
           let redb_err: redb::Error = value.into();
-          let err: crate::error::InternalError = redb_err.into();
+          let err: crate::error::StoreError = redb_err.into();
           err.into()
         }
       }
     };
   }
-  super::error_as_internal! {redb2::Error}
-  macro_rules! redb2_error_as_internal {
+  super::error_as_store! {redb2::Error}
+  macro_rules! redb2_error_as_store {
     ($err_type:ty) => {
       impl From<$err_type> for crate::prelude::ErrorType
       {
         fn from(value: $err_type) -> Self
         {
           let redb_err: redb2::Error = value.into();
-          let err: crate::error::InternalError = redb_err.into();
+          let err: crate::error::StoreError = redb_err.into();
           err.into()
         }
       }
     };
   }
-  redb_error_as_internal! {redb::StorageError}
-  redb_error_as_internal! {redb::DatabaseError}
-  redb_error_as_internal! {redb::TransactionError}
-  redb_error_as_internal! {redb::TableError}
-  redb_error_as_internal! {redb::CommitError}
-  redb2_error_as_internal! {redb2::DatabaseError}
-  redb2_error_as_internal! {redb2::UpgradeError}
+  redb_error_as_store! {redb::StorageError}
+  redb_error_as_store! {redb::DatabaseError}
+  redb_error_as_store! {redb::TransactionError}
+  redb_error_as_store! {redb::TableError}
+  redb_error_as_store! {redb::CommitError}
+  redb2_error_as_store! {redb2::DatabaseError}
+  redb2_error_as_store! {redb2::UpgradeError}
 }
 #[cfg(feature = "sqlite")]
 mod _trait_impl_sqlite
 {
-  error_as_internal! {rusqlite::Error}
+  error_as_store! {rusqlite::Error}
   error_as_internal! {askama::Error}
 }
 
