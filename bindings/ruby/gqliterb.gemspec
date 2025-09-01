@@ -5,7 +5,7 @@ require 'rubygems'
 
 GEMSPEC = Gem::Specification.new do |s|
   s.name = "gqlite"
-  s.version = "1.2.3"
+  s.version = "1.3.0"
   s.summary = "Ruby bindings for GQLite, a Graph Query library."
   s.description = <<-DESC
 GQLite is a Rust-language library, with a C interface, that implements a small, fast, self-contained, high-reliability, full-featured, Graph Query database engine.
