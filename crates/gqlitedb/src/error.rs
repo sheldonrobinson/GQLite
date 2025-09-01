@@ -4,7 +4,6 @@ use crate::prelude::*;
 /// Represent compile time errors.
 #[derive(thiserror::Error, Debug)]
 #[allow(missing_docs)]
-#[allow(clippy::large_enum_variant)]
 #[non_exhaustive]
 pub enum CompileTimeError
 {
@@ -22,7 +21,7 @@ pub enum CompileTimeError
   },
   /// Parse error
   #[error("ParseError: '{0}'")]
-  ParseError(#[from] pest::error::Error<crate::parser::parser_impl::Rule>),
+  ParseError(#[from] Box<pest::error::Error<crate::parser::parser_impl::Rule>>),
   /// Variable is not defined
   #[error("UndefinedVariable: Unknown variable '{name}'.")]
   UndefinedVariable
@@ -83,7 +82,6 @@ pub enum CompileTimeError
 
 /// Runtime errors.
 #[derive(thiserror::Error, Debug)]
-#[allow(clippy::large_enum_variant)]
 #[allow(missing_docs)]
 #[non_exhaustive]
 pub enum RunTimeError
@@ -168,7 +166,6 @@ pub enum RunTimeError
 
 /// Internal errors, should be treated as bugs.
 #[derive(thiserror::Error, Debug)]
-#[allow(clippy::large_enum_variant)]
 #[non_exhaustive]
 pub enum InternalError
 {
@@ -230,13 +227,6 @@ pub enum InternalError
   },
   #[error("Empty stack.")]
   EmptyStack,
-  #[error("Invalid value cast, cannot cast {value} to {typename}.")]
-  #[deprecated(note = "use `RuntimeError::InvalidValueCast` instead")]
-  InvalidValueCast
-  {
-    value: crate::Value,
-    typename: &'static str,
-  },
   #[error("Code is not reachable in {context}.")]
   Unreachable
   {
@@ -328,7 +318,6 @@ pub enum InternalError
 /// Error in the store backend.
 #[derive(thiserror::Error, Debug)]
 #[allow(missing_docs)]
-#[allow(clippy::large_enum_variant)]
 #[non_exhaustive]
 pub enum StoreError
 {
@@ -384,7 +373,6 @@ pub enum StoreError
 
 /// GQLite errors
 #[derive(thiserror::Error, Debug)]
-#[allow(clippy::large_enum_variant)]
 #[non_exhaustive]
 pub enum Error
 {
@@ -515,7 +503,7 @@ impl From<pest::error::Error<crate::parser::parser_impl::Rule>> for Error
 {
   fn from(value: pest::error::Error<crate::parser::parser_impl::Rule>) -> Self
   {
-    CompileTimeError::from(value).into()
+    CompileTimeError::from(Box::new(value)).into()
   }
 }
 
