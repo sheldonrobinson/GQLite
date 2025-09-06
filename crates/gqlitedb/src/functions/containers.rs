@@ -74,7 +74,7 @@ impl super::FunctionTrait for Size
   {
     let container = arguments
       .first()
-      .ok_or_else(|| RunTimeError::InvalidNumberOfArguments {
+      .ok_or(RunTimeError::InvalidNumberOfArguments {
         function_name: "size",
         got: arguments.len(),
         expected: 1,

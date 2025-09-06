@@ -10,7 +10,7 @@ impl super::FunctionTrait for Length
   {
     let container = arguments
       .first()
-      .ok_or_else(|| RunTimeError::InvalidNumberOfArguments {
+      .ok_or(RunTimeError::InvalidNumberOfArguments {
         function_name: "length",
         got: arguments.len(),
         expected: 1,
