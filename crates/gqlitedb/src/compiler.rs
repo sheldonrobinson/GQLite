@@ -19,6 +19,14 @@ macro_rules! compile_binary_op {
   };
 }
 
+struct CompiledReturnWith
+{
+  variables: Vec<(String, RWExpression)>,
+  filter: Instructions,
+  modifiers: Modifiers,
+  variables_sizes: VariablesSizes,
+}
+
 struct Compiler
 {
   function_manager: functions::Manager,
@@ -701,19 +709,13 @@ impl Compiler
     })
   }
 
-  #[allow(clippy::type_complexity)]
   fn compile_return_with(
     &mut self,
     all: bool,
     expressions: &[ast::NamedExpression],
     where_expression: &Option<ast::Expression>,
     modifiers: &ast::Modifiers,
-  ) -> Result<(
-    Vec<(String, RWExpression)>,
-    Instructions,
-    Modifiers,
-    VariablesSizes,
-  )>
+  ) -> Result<CompiledReturnWith>
   {
     let mut variables = Vec::<(ast::VariableIdentifier, RWExpression)>::new();
     let mut filter = Default::default();
@@ -775,7 +777,7 @@ impl Compiler
     }
 
     let modifiers = self.compile_modifiers(modifiers)?;
-    let variables_size = self.variables_size();
+    let variables_sizes = self.variables_size();
     self
       .variables_manager
       .keep_variables(variables.iter().map(|(n, _)| n))?;
@@ -784,7 +786,12 @@ impl Compiler
       .into_iter()
       .map(|(var_id, e)| (var_id.take_name(), e))
       .collect();
-    Ok((variables, filter, modifiers, variables_size))
+    Ok(CompiledReturnWith {
+      variables,
+      filter,
+      modifiers,
+      variables_sizes,
+    })
   }
 
   fn compile_match_patterns(
@@ -951,17 +958,17 @@ pub(crate) fn compile(
         ),
         ast::Statement::Return(return_statement) =>
         {
-          let (variables, filter, modifiers, variables_size) = compiler.compile_return_with(
+          let compiled_return_with = compiler.compile_return_with(
             return_statement.all,
             &return_statement.expressions,
             &return_statement.where_expression,
             &return_statement.modifiers,
           )?;
           Ok(Block::Return {
-            variables,
-            filter,
-            modifiers,
-            variables_size,
+            variables: compiled_return_with.variables,
+            filter: compiled_return_with.filter,
+            modifiers: compiled_return_with.modifiers,
+            variables_sizes: compiled_return_with.variables_sizes,
           })
         }
         ast::Statement::Call(call) =>
@@ -978,17 +985,21 @@ pub(crate) fn compile(
         }
         ast::Statement::With(with) =>
         {
-          let (variables, filter, modifiers, variables_size) = compiler.compile_return_with(
+          let compiled_return_with = compiler.compile_return_with(
             with.all,
             &with.expressions,
             &with.where_expression,
             &with.modifiers,
           )?;
           Ok(Block::With {
-            variables: variables.into_iter().map(|(_, v)| v).collect(),
-            filter,
-            modifiers,
-            variables_size,
+            variables: compiled_return_with
+              .variables
+              .into_iter()
+              .map(|(_, v)| v)
+              .collect(),
+            filter: compiled_return_with.filter,
+            modifiers: compiled_return_with.modifiers,
+            variables_sizes: compiled_return_with.variables_sizes,
           })
         }
         ast::Statement::Unwind(unwind) =>

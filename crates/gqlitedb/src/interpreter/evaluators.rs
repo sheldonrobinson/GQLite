@@ -1429,7 +1429,7 @@ pub(crate) fn eval_program<TStore: store::Store>(
         variables,
         filter,
         modifiers,
-        variables_size,
+        variables_sizes: variables_size,
       } =>
       {
         let (names, variables): (Vec<_>, Vec<_>) = variables.iter().map(|(s, e)| (s, e)).unzip();
@@ -1454,7 +1454,7 @@ pub(crate) fn eval_program<TStore: store::Store>(
         variables,
         filter,
         modifiers,
-        variables_size,
+        variables_sizes: variables_size,
       } =>
       {
         input_table = compute_return_with_table(

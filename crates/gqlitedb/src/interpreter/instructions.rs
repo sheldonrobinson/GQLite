@@ -234,7 +234,7 @@ pub(crate) enum Block
     variables: Vec<(String, RWExpression)>,
     filter: Instructions,
     modifiers: Modifiers,
-    variables_size: VariablesSizes,
+    variables_sizes: VariablesSizes,
   },
   Call
   {
@@ -247,7 +247,7 @@ pub(crate) enum Block
     variables: Vec<RWExpression>,
     filter: Instructions,
     modifiers: Modifiers,
-    variables_size: VariablesSizes,
+    variables_sizes: VariablesSizes,
   },
   Unwind
   {
