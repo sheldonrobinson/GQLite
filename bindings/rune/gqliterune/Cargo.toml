@@ -17,4 +17,4 @@ gqlitedb = { workspace = true }
 gqb = { workspace = true, optional = true }
 graphcore = { workspace = true }
 
-rune = "0.14.0"
+rune = "0.14"

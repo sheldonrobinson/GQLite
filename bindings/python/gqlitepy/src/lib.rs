@@ -41,11 +41,11 @@ fn from_pany<'py>(py: Python<'py>, value: &Bound<'py, PyAny>) -> PyResult<gqlite
   {
     Ok(gqlitedb::Value::String(s))
   }
-  else if let Ok(list) = value.downcast::<PyList>()
+  else if let Ok(list) = value.cast::<PyList>()
   {
     Ok(from_plist(py, list)?.into())
   }
-  else if let Ok(dict) = value.downcast::<PyDict>()
+  else if let Ok(dict) = value.cast::<PyDict>()
   {
     Ok(from_pdict(py, dict)?.into())
   }
