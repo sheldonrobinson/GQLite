@@ -15,7 +15,7 @@ impl Table
   /// of row is equal to length of data divided by number of columns.
   pub fn new(headers: Vec<String>, data: Vec<crate::Value>) -> Result<Table>
   {
-    if data.len() % headers.len() != 0
+    if !data.len().is_multiple_of(headers.len())
     {
       Err(error::Error::InvalidTableDimensions)?;
     }

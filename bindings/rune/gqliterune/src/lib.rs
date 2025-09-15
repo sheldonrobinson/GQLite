@@ -7,7 +7,6 @@
 //! Add to your crate, using `cargo add gqliterune`.
 
 #![warn(missing_docs)]
-#![deny(warnings)]
 
 use std::collections::HashMap;
 

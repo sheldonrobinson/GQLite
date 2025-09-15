@@ -1,5 +1,3 @@
-#![deny(warnings)]
-
 use std::fmt::Display;
 
 use magnus::{

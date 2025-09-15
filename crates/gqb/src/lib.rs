@@ -1,6 +1,5 @@
 #![doc = include_str!("../README.MD")]
 #![deny(missing_docs)]
-#![deny(warnings)]
 
 pub mod prelude;
 mod utils;

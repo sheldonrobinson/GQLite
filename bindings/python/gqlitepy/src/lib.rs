@@ -1,5 +1,3 @@
-#![deny(warnings)]
-
 use pyo3::{
   prelude::*,
   types::{PyDict, PyList, PyNone},

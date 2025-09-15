@@ -1,6 +1,5 @@
 #![doc = include_str!("../README.MD")]
 #![warn(missing_docs)]
-#![deny(warnings)]
 #![allow(clippy::result_large_err)]
 
 mod error;

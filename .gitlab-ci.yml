@@ -99,7 +99,7 @@ clippy:
   stage: postcheck
   image: cyloncore/ci:debian
   script:
-    - cargo clippy
+    - cargo clippy -- -D warnings
   needs:
     - job: "debian:build"
       artifacts: true
