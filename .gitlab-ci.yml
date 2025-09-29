@@ -99,7 +99,7 @@ clippy:
   stage: postcheck
   image: cyloncore/ci:debian
   script:
-    - cargo clippy -- -D warnings
+    - cargo clippy --features capi,gqb,redb,sqlite -- -D warnings
   needs:
     - job: "debian:build"
       artifacts: true
@@ -117,7 +117,7 @@ semver:
   stage: postcheck
   image: cyloncore/ci:debian
   script:
-    - cargo semver-checks --exclude gqliterb --exclude gqlitepy --exclude gqlparser --exclude gqls --exclude gqls-macros
+    - cargo semver-checks --default-features --exclude gqliterb --exclude gqlitepy --exclude gqlparser --exclude gqls --exclude gqls-macros
   needs:
     - job: "debian:build"
       artifacts: true

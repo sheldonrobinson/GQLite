@@ -1,4 +1,4 @@
 UPDATE gqlite_{{ graph_name }}_edges
-SET labels = :labels,
-    properties = :properties
-WHERE edge_key = :key;
+SET labels = ?2,
+    properties = ?3
+WHERE edge_key = ?1;

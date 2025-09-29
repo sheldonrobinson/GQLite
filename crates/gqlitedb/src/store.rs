@@ -1,12 +1,14 @@
-#[cfg(feature = "_pgql")]
-pub(crate) mod pgql;
+#[cfg(any(feature = "sqlite", feature = "postgres", feature = "_pgrx"))]
+pub(crate) mod sqlbase;
+
+#[cfg(feature = "_pgrx")]
+pub(crate) mod pgrx;
+#[cfg(feature = "postgres")]
+pub(crate) mod postgres;
 #[cfg(feature = "redb")]
 pub(crate) mod redb;
 #[cfg(feature = "sqlite")]
 pub(crate) mod sqlite;
-
-#[cfg(feature = "_pgql")]
-pub(crate) use pgql::Store;
 
 use crate::prelude::*;
 

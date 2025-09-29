@@ -17,22 +17,22 @@ JOIN gqlite_{{ graph_name }}_nodes AS n_left  ON e.left  = n_left.id
 JOIN gqlite_{{ graph_name }}_nodes AS n_right ON e.right = n_right.id
 WHERE
     -- Filter by key list (if not empty)
-    {% if has_edge_keys %}
+    {% if let Some(edge_keys_var) = edge_keys_var %}
     (
         hex(e.edge_key) IN (
-            SELECT value FROM json_each(:edge_keys)
+            SELECT value FROM json_each(?{{ edge_keys_var }})
         )
     )
     {% else %}
     1
     {% endif %}
     AND
-    {% if has_edge_labels %}
+    {% if let Some(edge_labels_var) = edge_labels_var %}
     -- Filter by required labels (must all be in e.labels)
     (
         NOT EXISTS (
             SELECT 1
-            FROM json_each(:edge_labels) AS required_label
+            FROM json_each(?{{ edge_labels_var }}) AS required_label
             WHERE NOT EXISTS (
                 SELECT 1
                 FROM json_each(e.labels) AS edge_label
@@ -44,11 +44,11 @@ WHERE
     1
     {% endif %}
     AND
-    {% if has_edge_properties %}
+    {% if let Some(edge_properties_var) = edge_properties_var %}
     -- Filter by required properties (must all exist and match)
         NOT EXISTS (
             SELECT 1
-            FROM json_each(:edge_properties) AS required_prop
+            FROM json_each(?{{ edge_properties_var }}) AS required_prop
             WHERE json_extract(e.properties, '$.' || required_prop.key) IS NULL
                 OR json_extract(e.properties, '$.' || required_prop.key) != required_prop.value
         )
@@ -57,22 +57,22 @@ WHERE
     {% endif %}
     -- Filter by key list (if not empty)
     AND
-    {% if has_n_left_keys %}
+    {% if let Some(left_keys_var) = left_keys_var %}
     (
         hex(n_left.node_key) IN (
-              SELECT value FROM json_each(:n_left_keys)
+              SELECT value FROM json_each(?{{ left_keys_var }})
         )
     )
     {% else %}
         1
     {% endif %}
     AND
-    {% if has_n_left_labels %}
+    {% if let Some(left_labels_var) = left_labels_var %}
     -- Filter by required labels (must all be in n_left.labels)
     (
         NOT EXISTS (
             SELECT 1
-            FROM json_each(:n_left_labels) AS required_label
+            FROM json_each(?{{ left_labels_var }}) AS required_label
             WHERE NOT EXISTS (
                 SELECT 1
                 FROM json_each(n_left.labels) AS node_label
@@ -84,12 +84,12 @@ WHERE
     1
     {% endif %}
     AND 
-    {% if has_n_left_properties %}
+    {% if let Some(left_properties_var) = left_properties_var %}
     -- Filter by required properties (must all exist and match)
     (
         NOT EXISTS (
             SELECT 1
-            FROM json_each(:n_left_properties) AS required_prop
+            FROM json_each(?{{ left_properties_var }}) AS required_prop
             WHERE json_extract(n_left.properties, '$.' || required_prop.key) IS NULL
                OR json_extract(n_left.properties, '$.' || required_prop.key) != required_prop.value
         )
@@ -99,22 +99,22 @@ WHERE
     {% endif %}
     AND
     -- Filter by key list (if not empty)
-    {% if has_n_right_keys %}
+    {% if let Some(right_keys_var) = right_keys_var %}
     (
         hex(n_right.node_key) IN (
-            SELECT value FROM json_each(:n_right_keys)
+            SELECT value FROM json_each(?{{ right_keys_var }})
         )
     )
     {% else %}
     1
     {% endif %}
     AND
-    {% if has_n_right_labels %}
+    {% if let Some(right_labels_var) = right_labels_var %}
     -- Filter by required labels (must all be in n_right.labels)
     (
         NOT EXISTS (
             SELECT 1
-            FROM json_each(:n_right_labels) AS required_label
+            FROM json_each(?{{ right_labels_var }}) AS required_label
             WHERE NOT EXISTS (
                 SELECT 1
                 FROM json_each(n_right.labels) AS node_label
@@ -126,12 +126,12 @@ WHERE
     1
     {% endif %}
 
-    {% if has_n_right_properties %}
+    {% if let Some(right_properties_var) = right_properties_var %}
     -- Filter by required properties (must all exist and match)
     AND (
         NOT EXISTS (
             SELECT 1
-            FROM json_each(:n_right_properties) AS required_prop
+            FROM json_each(?{{ right_properties_var }}) AS required_prop
             WHERE json_extract(n_right.properties, '$.' || required_prop.key) IS NULL
                OR json_extract(n_right.properties, '$.' || required_prop.key) != required_prop.value
         )

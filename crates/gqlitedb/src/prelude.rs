@@ -7,3 +7,6 @@ pub(crate) use crate::{
 };
 
 pub(crate) use error::export::Error as ErrorType;
+
+#[cfg(any(feature = "sqlite", feature = "postgres", feature = "_pgrx"))]
+pub(crate) use store::sqlbase::{self, Row as _, SqlMetaDataStore as _, SqlStore as _};

@@ -313,6 +313,8 @@ pub enum InternalError
   Poison(String),
   #[error("IOError: {0}.")]
   IOError(#[from] std::io::Error),
+  #[error("Utf8Error: {0}.")]
+  Utf8Error(#[from] std::str::Utf8Error),
 }
 
 /// Error in the store backend.
@@ -541,6 +543,7 @@ error_as_internal! {ciborium::ser::Error<std::io::Error>}
 error_as_internal! {ciborium::de::Error<std::io::Error>}
 error_as_internal! {serde_json::Error}
 error_as_internal! {std::num::ParseFloatError}
+error_as_internal! {std::str::Utf8Error}
 
 #[cfg(feature = "redb")]
 mod _trait_impl_redb

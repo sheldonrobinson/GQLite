@@ -8,12 +8,15 @@ pub enum Backend
 {
   /// Select the first available backend.
   Automatic,
-  /// SQLite backend.
-  #[cfg(feature = "sqlite")]
-  SQLite,
+  /// Postgres backend.
+  #[cfg(feature = "postgres")]
+  Postgres,
   /// Redb backend.
   #[cfg(feature = "redb")]
   Redb,
+  /// SQLite backend.
+  #[cfg(feature = "sqlite")]
+  SQLite,
 }
 
 /// Builder with high-level API for creating connection.
@@ -52,15 +55,20 @@ impl ConnectionBuilder
       {
         self.map.insert(key, "automatic".into());
       }
-      #[cfg(feature = "sqlite")]
-      Backend::SQLite =>
+      #[cfg(feature = "postgres")]
+      Backend::Postgres =>
       {
-        self.map.insert(key, "sqlite".into());
+        self.map.insert(key, "postgres".into());
       }
       #[cfg(feature = "redb")]
       Backend::Redb =>
       {
         self.map.insert(key, "redb".into());
+      }
+      #[cfg(feature = "sqlite")]
+      Backend::SQLite =>
+      {
+        self.map.insert(key, "sqlite".into());
       }
     }
     self
@@ -249,6 +257,33 @@ impl Connection
             function_manager: functions::Manager::new(),
           }
           .boxed(),
+        })
+      }
+      #[cfg(feature = "postgres")]
+      "postgres" =>
+      {
+        let mut config = postgres::Config::new();
+        if let Some(host) = options.get("host")
+        {
+          let host: &String = host.try_into_ref()?;
+          config.host(host);
+        }
+        if let Some(user) = options.get("user")
+        {
+          let user: &String = user.try_into_ref()?;
+          config.user(user);
+        }
+        if let Some(password) = options.get("password")
+        {
+          let password: &String = password.try_into_ref()?;
+          config.password(password);
+        }
+        let store = store::postgres::Store::connect(config)?;
+        Ok(Connection {
+          connection: ConnectionImpl {
+            store,
+            function_manager: functions::Manager::new(),
+          },
         })
       }
       _ => Err(StoreError::UnknownBackend { backend }.into()),

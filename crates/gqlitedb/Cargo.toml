@@ -16,12 +16,13 @@ default = ["redb", "capi", "sqlite"]
 _backtrace = []
 capi = []
 redb = ["dep:redb", "dep:redb2"]
-_pgql = ["dep:pgrx"]
+_pgrx = ["dep:pgrx"]
 _pg13 = ["pgrx/pg13"]
 _pg14 = ["pgrx/pg14"]
 _pg15 = ["pgrx/pg15"]
 _pg16 = ["pgrx/pg16"]
 _pg17 = ["pgrx/pg17"]
+postgres = ["dep:postgres"]
 sqlite = ["dep:rusqlite", "dep:askama"]
 _value_private = []
 bundled = ["rusqlite/bundled"]
@@ -33,9 +34,10 @@ askama = { workspace = true, optional = true }
 ccutils = { workspace = true, features = ["alias", "pool", "sync"] }
 ciborium = "0.2"
 itertools = { workspace = true }
-pgrx = { version = "0.16", optional = true }
 pest = "2"
 pest_derive = "2"
+pgrx = { version = "0.16", optional = true }
+postgres = { version = "0.19", optional = true }
 rand = "0.9"
 redb = { version = "3", optional = true }
 redb2 = { version = "2", optional = true, package = "redb" }
@@ -52,6 +54,7 @@ uuid = { workspace = true }
 ccutils = { workspace = true, features = ["alias", "temporary"] }
 divan = "0.1"
 iai-callgrind = { version = "0.16" }
+pgtemp = "0.6"
 regex = "1"
 
 # web:

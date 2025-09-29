@@ -1,4 +1,4 @@
 UPDATE gqlite_{{ graph_name }}_nodes
-SET labels = :labels,
-    properties = :properties
-WHERE node_key = :key;
+SET labels = ?2,
+    properties = ?3
+WHERE node_key = ?1;

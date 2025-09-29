@@ -1,5 +1,3 @@
-#![deny(warnings)]
-
 use std::{
   fs,
   io::{self, BufRead},
