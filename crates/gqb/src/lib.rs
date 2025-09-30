@@ -28,6 +28,13 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 
 use askama::Template;
 
+/// Trait for passing variables to a function.
+pub trait Variables
+{
+  /// Fill the vector of variables
+  fn fill(self, vector: &mut Vec<Variable>);
+}
+
 /// Trait for multi-node creation.
 pub trait CreateNodes
 {
@@ -46,10 +53,69 @@ pub trait CreateEdges
   fn fill(self, builder: &mut Builder) -> Self::Output;
 }
 
+impl Variables for Variable
+{
+  fn fill(self, vector: &mut Vec<Variable>)
+  {
+    vector.push(self);
+  }
+}
+
+impl Variables for Vec<Variable>
+{
+  fn fill(mut self, vector: &mut Vec<Variable>)
+  {
+    vector.append(&mut self);
+  }
+}
+
 macro_rules! __key {
   ($idx:tt) => {
     Variable
   };
+}
+
+macro_rules! impl_variables {
+  ($n:tt $($idx:tt),*) => {
+      impl Variables
+          for ($(__key!($idx),)*)
+      {
+          fn fill(self, vector: &mut Vec<Variable>) {
+              $(
+                  vector.push(self.$idx);
+              )*
+          }
+      }
+  };
+}
+
+// Generate implementations for 1..=20
+macro_rules! impl_all_variables {
+  ($($n:tt $($idx:tt),*;)*) => {
+      $(impl_variables!($n $($idx),*);)*
+  };
+}
+
+impl_all_variables! {
+  2 0, 1;
+  3 0, 1, 2;
+  4 0, 1, 2, 3;
+  5 0, 1, 2, 3, 4;
+  6 0, 1, 2, 3, 4, 5;
+  7 0, 1, 2, 3, 4, 5, 6;
+  8 0, 1, 2, 3, 4, 5, 6, 7;
+  9 0, 1, 2, 3, 4, 5, 6, 7, 8;
+  10 0, 1, 2, 3, 4, 5, 6, 7, 8, 9;
+  11 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10;
+  12 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11;
+  13 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12;
+  14 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13;
+  15 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14;
+  16 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15;
+  17 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16;
+  18 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17;
+  19 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18;
+  20 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19;
 }
 
 macro_rules! impl_create_nodes {
@@ -213,6 +279,12 @@ mod templates
     pub properties_binding: &'a String,
     pub destination: &'a Variable,
   }
+  #[derive(Template)]
+  #[template(path = "oc/delete.oc", escape = "none")]
+  pub(super) struct Delete<'a>
+  {
+    pub variables: &'a Vec<Variable>,
+  }
 }
 
 /// Hold the name of a variable in the query.
@@ -251,12 +323,19 @@ struct ReturnStatement
   values: Vec<(Variable, Option<String>, String)>,
 }
 
+#[derive(Debug, Default)]
+struct DeleteStatement
+{
+  variables: Vec<Variable>,
+}
+
 #[derive(Debug)]
 enum Statement
 {
   Create(CreateStatement),
   Match(MatchStatement),
   Return_(ReturnStatement),
+  Delete(DeleteStatement),
 }
 
 /// Structure for building queries.
@@ -298,6 +377,7 @@ impl Builder
   last_statement! {last_create_statement, CreateStatement, Statement::Create}
   last_statement! {last_match_statement, MatchStatement, Statement::Match}
   last_statement! {last_return_statement, ReturnStatement, Statement::Return_}
+  last_statement! {last_delete_statement, DeleteStatement, Statement::Delete}
 
   fn next_variable(&mut self, suffix: &'static str) -> Variable
   {
@@ -417,6 +497,12 @@ impl Builder
       Some(path.into_iter().join(".")),
       name.into(),
     ));
+  }
+  /// Add a delete statement for variables
+  pub fn delete(&mut self, variables: impl Variables)
+  {
+    let delete_statement = self.last_delete_statement();
+    variables.fill(&mut delete_statement.variables);
   }
   /// Generate an OpenCypher Query.
   pub fn into_oc_query(self) -> Result<(String, graphcore::ValueMap)>
@@ -560,6 +646,15 @@ impl Builder
             }
           }
         }
+        Statement::Delete(delete_statement) =>
+        {
+          q += templates::Delete {
+            variables: &delete_statement.variables,
+          }
+          .render()
+          .unwrap()
+          .as_str();
+        }
       }
     }
 
@@ -570,6 +665,7 @@ impl Builder
 #[cfg(test)]
 mod test
 {
+
   use super::Builder;
   use graphcore::*;
   #[test]
@@ -642,5 +738,23 @@ mod test
       b,
       value_map!("$b0" => value_map!("id" => 3), "$b1" => value_map!("id" => 2) )
     );
+  }
+  #[test]
+  fn test_delete()
+  {
+    let mut b = Builder::default();
+    let n1 = b.node_variable();
+    let n2 = b.node_variable();
+    let n3 = b.node_variable();
+    let n4 = b.node_variable();
+    let n5 = b.node_variable();
+
+    b.delete(n1);
+    b.delete((n2, n3));
+    b.delete(vec![n4, n5]);
+
+    let (q, b) = b.into_oc_query().unwrap();
+    assert_eq!(q, "DELETE n1, n2, n3, n4, n5".to_string());
+    assert_eq!(b, value_map!());
   }
 }
