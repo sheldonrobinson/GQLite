@@ -1,6 +1,6 @@
 [package]
 name = "gqb"
-version = "0.2.0"
+version = "0.2.1"
 readme = "README.MD"
 description = "GQL Query Builder API."
 edition.workspace = true
