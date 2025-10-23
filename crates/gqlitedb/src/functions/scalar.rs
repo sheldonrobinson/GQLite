@@ -33,6 +33,29 @@ impl super::FunctionTrait for Coalesce
 super::declare_function!(coalesce, Coalesce, custom_trait);
 
 #[derive(Debug, Default)]
+pub(super) struct Id {}
+
+impl Id
+{
+  fn call_impl(value: &value::Value) -> FResult<graph::Key>
+  {
+    match value
+    {
+      value::Value::Node(n) => Ok(n.key()),
+      value::Value::Edge(e) => Ok(e.key()),
+      _ => Err(RunTimeError::InvalidArgument {
+        function_name: "id",
+        index: 0,
+        expected_type: "node or edge",
+        value: format!("{:?}", value),
+      }),
+    }
+  }
+}
+
+super::declare_function!(id, Id, call_impl(crate::value::Value) -> graph::Key);
+
+#[derive(Debug, Default)]
 pub(super) struct ToInteger {}
 
 impl ToInteger

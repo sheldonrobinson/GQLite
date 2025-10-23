@@ -59,6 +59,13 @@ impl FunctionTypeTrait for f64
   }
 }
 
+impl FunctionTypeTrait for graph::Key
+{
+  fn result_type() -> ExpressionType
+  {
+    ExpressionType::Key
+  }
+}
 impl<T> FunctionTypeTrait for Vec<T>
 {
   fn result_type() -> ExpressionType
@@ -146,6 +153,7 @@ impl Manager
           path::Nodes::create(),
           path::Edges::create(),
           scalar::Coalesce::create(),
+          scalar::Id::create(),
           scalar::Properties::create(),
           scalar::ToInteger::create(),
           string::ToString::create(),

@@ -4,6 +4,8 @@
 
 ## [Unreleased] - ReleaseDate
 
+- Add `id` function.
+
 ## [0.6.0] - 2025-09-01
 
 - Add `gqb` a crate for generating queries using a high-level API.

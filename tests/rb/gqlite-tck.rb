@@ -40,6 +40,11 @@ gql = [
   'Graph1', 'Graph2'
   ]
 
+extras = [
+  # id
+  'Id'
+]
+
 features = [
   # Create
   'create/Create1', 'create/Create2', 'create/Create3',
@@ -121,10 +126,11 @@ expressions = [
 # Build arguments
 
 gql = gql.map { |file| 'gql/features/' + file + '.feature' }
+extras = extras.map { |file| 'extras/' + file + '.feature' }
 expressions = expressions.map { |file| 'openCypher/tck/features/expressions/' + file + '.feature' }
 features = features.map { |file| 'openCypher/tck/features/clauses/' + file + '.feature' }
 
-args = (gql + features + expressions).concat %w(--require cucumber/step_definitions/)
+args = (gql + features + expressions + extras).concat %w(--require cucumber/step_definitions/)
 
 args = args.concat ['--tags', '~@skipStyleCheck']
 args = args.concat %w(--fail-fast)  if options[:abort_on_first_error]
