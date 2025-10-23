@@ -1,6 +1,8 @@
 //! Module with properties definitions
 
-use std::collections::HashMap;
+use indexmap::IndexMap;
+
+use crate::Error;
 
 /// Literal types
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -19,7 +21,7 @@ pub enum LiteralBaseType
 }
 
 /// This structure allow to map several literal types
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct LiteralAlternativeType(u8);
 
 impl LiteralAlternativeType
@@ -40,10 +42,49 @@ impl From<LiteralBaseType> for LiteralAlternativeType
     {
       LiteralBaseType::Boolean => 1,
       LiteralBaseType::Integer => 1 << 1,
-      LiteralBaseType::Float => 2 << 1,
-      LiteralBaseType::String => 3 << 1,
-      LiteralBaseType::TimeStamp => 4 << 1,
+      LiteralBaseType::Float => 1 << 2,
+      LiteralBaseType::String => 1 << 3,
+      LiteralBaseType::TimeStamp => 1 << 4,
     })
+  }
+}
+
+impl TryFrom<LiteralAlternativeType> for LiteralBaseType
+{
+  type Error = Error;
+  fn try_from(value: LiteralAlternativeType) -> Result<Self, Self::Error>
+  {
+    if value.0.count_ones() == 1
+    {
+      if value.has_type(LiteralBaseType::Boolean)
+      {
+        Ok(LiteralBaseType::Boolean)
+      }
+      else if value.has_type(LiteralBaseType::Float)
+      {
+        Ok(LiteralBaseType::Float)
+      }
+      else if value.has_type(LiteralBaseType::Integer)
+      {
+        Ok(LiteralBaseType::Integer)
+      }
+      else if value.has_type(LiteralBaseType::String)
+      {
+        Ok(LiteralBaseType::String)
+      }
+      else if value.has_type(LiteralBaseType::TimeStamp)
+      {
+        Ok(LiteralBaseType::TimeStamp)
+      }
+      else
+      {
+        Err(Error::InvalidType)
+      }
+    }
+    else
+    {
+      Err(Error::MultiTypeCannotBeConvertedToSingle)
+    }
   }
 }
 
@@ -58,7 +99,7 @@ pub enum Property
   /// Literal value (string, float...)
   Literal(LiteralAlternativeType),
   /// A map of property
-  Map(HashMap<String, Property>),
+  Map(IndexMap<String, Property>),
   /// An array of property
   Array(Box<Property>),
 }

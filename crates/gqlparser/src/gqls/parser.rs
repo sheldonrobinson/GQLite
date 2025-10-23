@@ -1,5 +1,4 @@
-use std::collections::HashMap;
-
+use indexmap::IndexMap;
 use nom::{
   branch::alt,
   bytes::complete::{is_not, tag, take_while1},
@@ -22,7 +21,7 @@ pub(crate) enum ParseTreeElement
   Property
   {
     label: String,
-    properties: HashMap<String, Property>,
+    properties: IndexMap<String, Property>,
     parent: Option<String>,
   },
   Node
@@ -108,7 +107,7 @@ fn parse_property(input: &str) -> SResult<&str, Property>
   .parse(input)
 }
 
-fn parse_property_map(input: &str) -> SResult<&str, HashMap<String, Property>>
+fn parse_property_map(input: &str) -> SResult<&str, IndexMap<String, Property>>
 {
   map(
     (

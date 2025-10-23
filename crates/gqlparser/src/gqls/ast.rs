@@ -1,6 +1,6 @@
 //! AST module
 
-use std::collections::HashMap;
+use indexmap::IndexMap;
 
 use crate::gqls::prelude::*;
 
@@ -18,22 +18,26 @@ pub struct Ast
 #[derive(Debug)]
 pub struct Node
 {
+  /// Main label of the node, used as identifer
+  pub identifier: String,
   /// Labels of the node
   pub labels: Vec<String>,
   /// Properties of the node
-  pub properties: HashMap<String, Property>,
+  pub properties: IndexMap<String, Property>,
 }
 
 /// Represent an edge
 #[derive(Debug)]
 pub struct Edge
 {
-  /// Label of the source
+  /// Main label of the edge, used as identifer
+  pub identifer: String,
+  /// Identifier of the source
   pub source: String,
   /// Labels of the edge
   pub labels: Vec<String>,
-  /// Label of the destination
+  ///   /// Identifier of the destination
   pub destination: String,
   /// Properties of the edge
-  pub properties: HashMap<String, Property>,
+  pub properties: IndexMap<String, Property>,
 }

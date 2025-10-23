@@ -2102,9 +2102,33 @@ dependencies = [
 name = "gqlparser"
 version = "0.1.0"
 dependencies = [
+ "indexmap",
  "nom 8.0.0",
  "nom-language",
  "thiserror 2.0.17",
+]
+
+[[package]]
+name = "gqls"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "gqb",
+ "gqlitedb",
+ "gqls-macros",
+ "graphcore",
+]
+
+[[package]]
+name = "gqls-macros"
+version = "0.1.0"
+dependencies = [
+ "gqlparser",
+ "proc-macro-crate",
+ "proc-macro2",
+ "quote",
+ "stringcase",
+ "syn",
 ]
 
 [[package]]
@@ -4434,6 +4458,12 @@ name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
+
+[[package]]
+name = "stringcase"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "72abeda133c49d7bddece6c154728f83eec8172380c80ab7096da9487e20d27c"
 
 [[package]]
 name = "supports-color"

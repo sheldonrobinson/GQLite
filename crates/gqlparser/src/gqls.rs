@@ -1,22 +1,21 @@
 //! GQL Schema parser
 
-use std::collections::HashMap;
-
 pub mod ast;
 mod parser;
 pub mod prelude;
 pub mod properties;
 
+use indexmap::IndexMap;
 use nom::Finish;
 
 use crate::prelude::*;
 use prelude::*;
 
 fn search_properties(
-  properties_definitions: &HashMap<String, (HashMap<String, Property>, Option<String>)>,
+  properties_definitions: &IndexMap<String, (IndexMap<String, Property>, Option<String>)>,
   label: String,
   required: bool,
-) -> Result<(Vec<String>, HashMap<String, Property>)>
+) -> Result<(Vec<String>, IndexMap<String, Property>)>
 {
   let definition = properties_definitions.get(&label);
 
@@ -67,7 +66,7 @@ pub fn parse_schema(input: &str) -> Result<ast::Ast>
   // Convert to AST
   let mut nodes: Vec<ast::Node> = Default::default();
   let mut edges: Vec<ast::Edge> = Default::default();
-  let mut properties_definitions: HashMap<String, (HashMap<String, Property>, Option<String>)> =
+  let mut properties_definitions: IndexMap<String, (IndexMap<String, Property>, Option<String>)> =
     Default::default();
 
   for element in parse_tree
@@ -84,8 +83,13 @@ pub fn parse_schema(input: &str) -> Result<ast::Ast>
       }
       parser::ParseTreeElement::Node { label } =>
       {
-        let (labels, properties) = search_properties(&properties_definitions, label, false)?;
-        nodes.push(ast::Node { labels, properties });
+        let (labels, properties) =
+          search_properties(&properties_definitions, label.clone(), false)?;
+        nodes.push(ast::Node {
+          identifier: label,
+          labels,
+          properties,
+        });
       }
       parser::ParseTreeElement::Edge {
         source,
@@ -93,8 +97,10 @@ pub fn parse_schema(input: &str) -> Result<ast::Ast>
         destination,
       } =>
       {
-        let (labels, properties) = search_properties(&properties_definitions, label, false)?;
+        let (labels, properties) =
+          search_properties(&properties_definitions, label.clone(), false)?;
         edges.push(ast::Edge {
+          identifer: label,
           source,
           labels,
           properties,

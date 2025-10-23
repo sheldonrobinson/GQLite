@@ -10,6 +10,7 @@ mod variables;
 
 use std::borrow::Borrow;
 
+pub use expression::expression_builder;
 pub use graphcore::{array, labels, value_map, ValueMap};
 
 use crate::prelude::*;

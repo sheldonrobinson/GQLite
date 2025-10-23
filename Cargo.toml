@@ -18,6 +18,9 @@ repository = "https://gitlab.com/gqlite/gqlite"
 graphcore = { version = "0.7.0", path = "crates/graphcore" }
 gqb = { version = "0.3.0", path = "crates/gqb" }
 gqlitedb = { version = "0.7.0", path = "crates/gqlitedb" }
+gqlparser = { version = "0.1.0", path = "crates/gqlparser" }
+gqls-macros = { version = "0.1.0", path = "crates/gqls-macros" }
+
 askama = { version = "0.14" }
 ccutils = { version = "0.4" }
 itertools = "0.14"

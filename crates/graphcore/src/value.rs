@@ -307,7 +307,42 @@ impl ValueTryIntoRef<Value> for Value
   }
 }
 
-macro_rules! impl_to_value {
+impl<T> From<Option<T>> for Value
+where
+  Value: From<T>,
+{
+  fn from(value: Option<T>) -> Self
+  {
+    match value
+    {
+      Some(value) => value.into(),
+      None => Value::Null,
+    }
+  }
+}
+
+macro_rules! impl_from_value {
+  ($type:ty, $vn:tt, try) => {
+    impl_from_value!($type, $vn);
+    impl TryFrom<Value> for $type
+    {
+      type Error = Error;
+      fn try_from(value: Value) -> Result<$type, Self::Error>
+      {
+        match value
+        {
+          Value::$vn(v) => Ok(v),
+          _ => Err(
+            Error::InvalidValueCast {
+              value: Box::new(value),
+              typename: stringify!($type),
+            }
+            .into(),
+          ),
+        }
+      }
+    }
+  };
   ($type:ty, $vn:tt) => {
     impl From<$type> for Value
     {
@@ -324,25 +359,38 @@ macro_rules! impl_to_value {
         Value::Array(v.into_iter().map(|v| v.into()).collect())
       }
     }
-    impl TryInto<$type> for Value
+    impl TryFrom<&Value> for $type
     {
       type Error = Error;
-      fn try_into(self) -> Result<$type, Self::Error>
+      fn try_from(value: &Value) -> Result<$type, Self::Error>
       {
-        match self
+        <$type>::try_from(value.to_owned())
+      }
+    }
+    impl TryFrom<Value> for Option<$type>
+    {
+      type Error = Error;
+      fn try_from(value: Value) -> Result<Self>
+      {
+        match value
         {
-          Value::$vn(v) => Ok(v),
-          _ => Err(
-            Error::InvalidValueCast {
-              value: Box::new(self),
-              typename: stringify!($type),
-            }
-            .into(),
-          ),
+          Value::Null => Ok(None),
+          _ =>
+          {
+            let t: $type = value.try_into()?;
+            Ok(Some(t))
+          }
         }
       }
     }
-
+    impl TryFrom<&Value> for Option<$type>
+    {
+      type Error = Error;
+      fn try_from(value: &Value) -> Result<Option<$type>, Self::Error>
+      {
+        <Option<$type>>::try_from(value.to_owned())
+      }
+    }
     impl ValueTryIntoRef<$type> for Value
     {
       fn try_into_ref(&self) -> Result<&$type, Error>
@@ -363,17 +411,45 @@ macro_rules! impl_to_value {
   };
 }
 
-impl_to_value!(graph::Key, Key);
-impl_to_value!(bool, Boolean);
-impl_to_value!(i64, Integer);
-impl_to_value!(f64, Float);
-impl_to_value!(String, String);
-impl_to_value!(TimeStamp, TimeStamp);
-impl_to_value!(graph::Node, Node);
-impl_to_value!(graph::Edge, Edge);
-impl_to_value!(graph::SinglePath, Path);
-impl_to_value!(Vec<Value>, Array);
-impl_to_value!(ValueMap, Map);
+impl_from_value!(graph::Key, Key, try);
+impl_from_value!(bool, Boolean, try);
+impl_from_value!(i64, Integer, try);
+impl_from_value!(f64, Float, try);
+impl_from_value!(String, String, try);
+impl_from_value!(TimeStamp, TimeStamp);
+impl_from_value!(graph::Node, Node, try);
+impl_from_value!(graph::Edge, Edge, try);
+impl_from_value!(graph::SinglePath, Path, try);
+impl_from_value!(Vec<Value>, Array, try);
+impl_from_value!(ValueMap, Map, try);
+
+impl TryFrom<Value> for TimeStamp
+{
+  type Error = Error;
+  fn try_from(value: Value) -> Result<TimeStamp, Self::Error>
+  {
+    match value
+    {
+      Value::String(s) => Ok(TimeStamp::parse(&s)?.into()),
+      Value::TimeStamp(v) => Ok(v),
+      _ => Err(
+        Error::InvalidValueCast {
+          value: Box::new(value),
+          typename: stringify!($type),
+        }
+        .into(),
+      ),
+    }
+  }
+}
+
+impl From<()> for Value
+{
+  fn from(_: ()) -> Self
+  {
+    Self::Null
+  }
+}
 
 impl From<&str> for Value
 {

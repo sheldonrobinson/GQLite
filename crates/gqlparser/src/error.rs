@@ -12,4 +12,8 @@ pub enum Error
   {
     label: String
   },
+  #[error("MultiTypeCannotBeConvertedToSingle")]
+  MultiTypeCannotBeConvertedToSingle,
+  #[error("InvalidType")]
+  InvalidType,
 }
