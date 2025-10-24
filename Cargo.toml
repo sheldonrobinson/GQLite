@@ -21,6 +21,7 @@ gqb = { version = "0.2.0", path = "crates/gqb" }
 gqlitedb = { version = "0.6.0", path = "crates/gqlitedb" }
 
 askama = { version = "0.14" }
+ccutils = { version = "0.4" }
 itertools = "0.14"
 serde = "1"
 thiserror = "2"

@@ -1,6 +1,7 @@
 #![doc = include_str!("../README.MD")]
-#![deny(missing_docs)]
+#![warn(missing_docs)]
 
+mod expression;
 pub mod prelude;
 mod utils;
 
@@ -8,6 +9,8 @@ use itertools::Itertools as _;
 use std::borrow::Borrow;
 
 pub use graphcore::{array, labels, value_map, ValueMap};
+
+use crate::prelude::*;
 
 #[derive(thiserror::Error, Debug)]
 #[allow(missing_docs)]
@@ -317,6 +320,12 @@ struct MatchStatement
   edges: Vec<(Variable, (Variable, graphcore::Edge, Variable))>,
 }
 
+#[derive(Debug)]
+struct WhereStatement
+{
+  expression: Box<Expression>,
+}
+
 #[derive(Debug, Default)]
 struct ReturnStatement
 {
@@ -334,6 +343,7 @@ enum Statement
 {
   Create(CreateStatement),
   Match(MatchStatement),
+  Where(WhereStatement),
   Return_(ReturnStatement),
   Delete(DeleteStatement),
 }
@@ -477,6 +487,14 @@ impl Builder
       ),
     ));
     var
+  }
+  /// Add a where statement
+  pub fn where_statement(&mut self, expression: Expression)
+  {
+    let expression = Box::new(expression);
+    self
+      .statements
+      .push(Statement::Where(WhereStatement { expression }));
   }
   /// Add a return statement to the query for the given variable, accessible in the column with the given name
   pub fn return_variable(&mut self, variable: Variable, name: impl Into<String>)
@@ -624,6 +642,13 @@ impl Builder
             bindings.insert(properties_binding, edge.properties().to_owned().into());
           }
         }
+        Statement::Where(where_statment) =>
+        {
+          q += &format!(
+            "WHERE {}",
+            where_statment.expression.into_oc_query(&mut bindings)
+          )
+        }
         Statement::Return_(return_statement) =>
         {
           q += "RETURN ";
@@ -756,5 +781,17 @@ mod test
     let (q, b) = b.into_oc_query().unwrap();
     assert_eq!(q, "DELETE n1, n2, n3, n4, n5".to_string());
     assert_eq!(b, value_map!());
+  }
+  #[test]
+  fn test_where()
+  {
+    use crate::expression_builder as eb;
+    let vid = graphcore::Key::default();
+    let mut b = Builder::default();
+    let v1 = b.match_node(labels!(), value_map!());
+    b.where_statement(eb::equal(eb::function_call("id", (v1,)), vid.into()));
+    let (q, b) = b.into_oc_query().unwrap();
+    assert_eq!(q, "MATCH (n1: $b0) WHERE (id(n1)) = ($l1)".to_string());
+    assert_eq!(b, value_map!("$b0" => value_map!(), "$l1" => vid));
   }
 }

@@ -30,7 +30,7 @@ bundled = ["rusqlite/bundled"]
 graphcore = { workspace = true }
 
 askama = { workspace = true, optional = true }
-ccutils = { version = "0.4", features = ["alias", "pool", "sync"] }
+ccutils = { workspace = true, features = ["alias", "pool", "sync"] }
 ciborium = "0.2"
 itertools = { workspace = true }
 pgrx = { version = "0.16", optional = true }
@@ -49,7 +49,7 @@ thiserror = { workspace = true }
 uuid = { workspace = true }
 
 [dev-dependencies]
-ccutils = { version = "0.4", features = ["alias", "temporary"] }
+ccutils = { workspace = true, features = ["alias", "temporary"] }
 divan = "0.1"
 iai-callgrind = { version = "0.16" }
 regex = "1"

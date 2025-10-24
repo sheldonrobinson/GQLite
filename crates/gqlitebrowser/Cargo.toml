@@ -15,7 +15,7 @@ targets = ["x86_64-unknown-linux-gnu", "wasm32-unknown-unknown"]
 [dependencies]
 brisk-eframe = { version = "0.6", features = ["rfd", "table"] }
 brisk-egui = { version = "0.6" }
-ccutils = { version = "0.4", features = ["serde", "sync"] }
+ccutils = { workspace = true, features = ["serde", "sync"] }
 egui = "0.32"
 egui_table = "0.4"
 eframe = { version = "0.32", default-features = false, features = [
