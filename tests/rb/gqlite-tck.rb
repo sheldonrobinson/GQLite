@@ -67,9 +67,10 @@ features = [
   'with/With1', 'with/With2', 'with/With3', 'with/With4', 'with/With6', 'with/With7',
   # WITH ORDER BY
   'with-orderBy/WithOrderBy1', 'with-orderBy/WithOrderBy2', 'with-orderBy/WithOrderBy3', 'with-orderBy/WithOrderBy4',
-  'with/With3', 
   # WITH SKIP LIMIT
   'with-skip-limit/WithSkipLimit1', 'with-skip-limit/WithSkipLimit2', 'with-skip-limit/WithSkipLimit3',
+  # with-where
+  'with-where/WithWhere1', 'with-where/WithWhere2', 'with-where/WithWhere3', 'with-where/WithWhere4', 'with-where/WithWhere5', 'with-where/WithWhere6', 'with-where/WithWhere7',
 ]
 
 expressions = [
