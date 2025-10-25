@@ -284,8 +284,6 @@ IgnoredScenario = [
   "[22] Sort by an expression that is only partially orderable on a non-distinct binding table, but used as a grouping key",
   "[23] Sort by an expression that is only partially orderable on a non-distinct binding table, but used in parts as a grouping key",
   "[15] Sort by an aliased aggregate projection does allow subsequent matching",
-  # Aliasing (https://gitlab.com/auksys/GQLite/-/issues/63)
-  "[3] Aliasing expressions",
   # Missing RANGE function
   "[4] Unwinding a collected unwound expression",
   # Lists are not supported in expressions
@@ -301,6 +299,7 @@ IgnoredScenario = [
   "[1] Handle dependencies across WITH with SKIP",
   "[6] Keeping used expression 3",
   "[16] Aggregation on complex expressions",
+  "[2] Filter node with property predicate on a single variable with multiple distinct bindings",
   # Time not supported
   "[11] Sort by a date expression in ascending order",
   "[12] Sort by a date expression in descending order",

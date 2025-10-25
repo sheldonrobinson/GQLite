@@ -950,7 +950,6 @@ fn compute_return_with_table(
     for row in input_table.into_row_iter()
     {
       // a) compute non-aggregated columns
-      let mut row = row.extended(variables_sizes.total_size())?;
       let out_row = variables
         .iter()
         .map(|rw_expr| {
@@ -959,9 +958,7 @@ fn compute_return_with_table(
             assert_eq!(rw_expr.aggregations.len(), 0);
             let mut stack = Stack::default();
             eval_instructions(&mut stack, &row, &rw_expr.instructions, parameters)?;
-            let value: value::Value = stack.try_pop_into()?;
-            row.set(rw_expr.col_id, value.to_owned())?;
-            Ok(value)
+            stack.try_pop_into()
           }
           else
           {
@@ -1039,12 +1036,12 @@ fn compute_return_with_table(
     output_table = input_table
       .into_row_iter()
       .map(|row| {
-        let mut out_row = row.extended(variables_sizes.total_size())?;
+        let mut out_row = row.clone().extended(variables_sizes.total_size())?;
         for rw_expr in variables.iter()
         {
           assert_eq!(rw_expr.aggregations.len(), 0);
           let mut stack = Stack::default();
-          eval_instructions(&mut stack, &out_row, &rw_expr.instructions, parameters)?;
+          eval_instructions(&mut stack, &row, &rw_expr.instructions, parameters)?;
           let value: value::Value = stack.try_pop_into()?;
           out_row.set(rw_expr.col_id, value.to_owned())?;
         }
