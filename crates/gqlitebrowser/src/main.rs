@@ -1,6 +1,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 #![deny(warnings)]
 
+use std::time::Instant;
+
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)] // if we add new fields, give them default values when deserializing old state
@@ -14,7 +16,11 @@ pub struct GqliteBrowser
   #[serde(skip)]
   connection_error: String,
   #[serde(skip)]
+  no_results: bool,
+  #[serde(skip)]
   connection: Option<gqlitedb::Connection>,
+  #[serde(skip)]
+  status_message: String,
 }
 
 impl Default for GqliteBrowser
@@ -28,8 +34,10 @@ impl Default for GqliteBrowser
       result_delegate: ResultDelegate {
         results: Default::default(),
       },
+      no_results: false,
       connection_error: String::new(),
       connection: None,
+      status_message: "Welcome to GQLite Browser!".to_string(),
     }
   }
 }
@@ -58,7 +66,10 @@ impl GqliteBrowser
       self.history.retain(|v| *v != self.query_text);
       self.history.push(self.query_text.to_owned());
 
+      self.no_results = false;
+      let start = Instant::now();
       let result = connection.execute_oc_query(&self.query_text, Default::default());
+      let elapsed = start.elapsed();
       self.last_message.clear();
       match result
       {
@@ -66,10 +77,16 @@ impl GqliteBrowser
         {
           gqlitedb::QueryResult::Table(table) =>
           {
+            self.status_message = format!(
+              "Query executed in {:.3} s, resulting in {} rows.",
+              elapsed.as_secs_f64(),
+              table.rows()
+            );
             self.result_delegate.results = table;
           }
           _ =>
           {
+            self.no_results = true;
             self.result_delegate.results = Default::default();
           }
         },
@@ -269,6 +286,11 @@ brisk_eframe::brisk_it! {
               },
               Label
               {
+                visible: self.no_results,
+                text: "No results.",
+              },
+              Label
+              {
                 visible: !self.last_message.is_empty(),
                 text: format!("{} {}", egui_material_icons::icons::ICON_ERROR, self.last_message)
               },
@@ -286,7 +308,15 @@ brisk_eframe::brisk_it! {
                       }
                   ]
               }
-          }
+          },
+          TopBottomPanel {
+              id: top,
+              position: Bottom,
+              Label
+              {
+                text: &self.status_message,
+              }
+          },
       }
   }
 }
