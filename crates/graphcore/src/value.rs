@@ -8,6 +8,7 @@ use std::{
 mod value_map;
 
 pub(crate) use crate::prelude::*;
+use crate::TimeStamp;
 
 pub use value_map::ValueMap;
 
@@ -33,6 +34,8 @@ pub enum Value
   Float(f64),
   /// String value.
   String(String),
+  /// Timestamp value
+  TimeStamp(timestamp::TimeStamp),
   /// Array of values.
   Array(Vec<Value>),
   /// Unordered map of values.
@@ -97,6 +100,7 @@ impl Hash for Value
         bits.hash(state);
       }
       Value::String(s) => s.hash(state),
+      Value::TimeStamp(ts) => ts.hash(state),
       Value::Array(a) => a.hash(state),
       Value::Map(m) => m.hash(state),
       Value::Node(n) => n.hash(state),
@@ -118,6 +122,7 @@ impl Add for Value
       | Value::Node(..)
       | Value::Edge(..)
       | Value::Map(..)
+      | Value::TimeStamp(..)
       | Value::Path(..) => Err(Error::InvalidBinaryOperands),
       Value::Null => Ok(Value::Null),
       Self::Array(lhs) => match rhs
@@ -171,6 +176,7 @@ macro_rules! impl_mdsr {
           Value::Boolean(..)
           | Value::Key(..)
           | Value::String(..)
+          | Value::TimeStamp(..)
           | Value::Node(..)
           | Value::Edge(..)
           | Value::Array(..)
@@ -212,6 +218,7 @@ impl Value
       Value::Boolean(..)
       | Value::Key(..)
       | Value::String(..)
+      | Value::TimeStamp(..)
       | Value::Node(..)
       | Value::Edge(..)
       | Value::Array(..)
@@ -255,6 +262,7 @@ impl Neg for Value
       | Value::String(..)
       | Value::Node(..)
       | Value::Edge(..)
+      | Value::TimeStamp(..)
       | Value::Array(..)
       | Value::Map(..)
       | Value::Path(..) => Err(Error::InvalidNegationOperands),
@@ -274,6 +282,7 @@ impl std::fmt::Display for Value
       Value::Integer(i) => write!(f, "{}", i),
       Value::Float(fl) => write!(f, "{}", fl),
       Value::String(s) => write!(f, "{}", s),
+      Value::TimeStamp(t) => write!(f, "{}", t),
       Value::Array(v) => write!(f, "[{}]", v.iter().map(|x| x.to_string()).join(", ")),
       Value::Map(o) => write!(f, "{}", o),
       Value::Node(n) => write!(f, "{}", n),
@@ -359,6 +368,7 @@ impl_to_value!(bool, Boolean);
 impl_to_value!(i64, Integer);
 impl_to_value!(f64, Float);
 impl_to_value!(String, String);
+impl_to_value!(TimeStamp, TimeStamp);
 impl_to_value!(graph::Node, Node);
 impl_to_value!(graph::Edge, Edge);
 impl_to_value!(graph::SinglePath, Path);

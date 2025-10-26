@@ -1,6 +1,6 @@
 use pyo3::{
   prelude::*,
-  types::{PyDict, PyList, PyNone},
+  types::{PyDateTime, PyDelta, PyDict, PyList, PyNone, PyTzInfo},
   IntoPyObjectExt,
 };
 
@@ -122,12 +122,31 @@ fn to_pvalue<'py>(py: Python<'py>, val: gqlitedb::Value) -> PyResult<Bound<'py, 
     gqlitedb::Value::Integer(i) => i.into_bound_py_any(py),
     gqlitedb::Value::Float(f) => f.into_bound_py_any(py),
     gqlitedb::Value::String(s) => s.into_bound_py_any(py),
+    gqlitedb::Value::TimeStamp(ts) => Ok(to_ptime(py, ts)?.into_any()),
     gqlitedb::Value::Map(m) => Ok(to_pdict(py, m)?.into_any()),
     gqlitedb::Value::Null => Ok(PyNone::get(py).to_owned().into_any()),
     gqlitedb::Value::Edge(e) => Ok(edge_to_pdict(py, e)?),
     gqlitedb::Value::Node(n) => Ok(node_to_pdict(py, n)?),
     gqlitedb::Value::Path(p) => Ok(path_to_pdict(py, p)?),
   }
+}
+
+fn to_ptime<'py>(py: Python<'py>, ts: gqlitedb::TimeStamp) -> PyResult<Bound<'py, PyDateTime>>
+{
+  let tzinfo =
+    PyTzInfo::fixed_offset(py, PyDelta::new(py, 0, ts.offset_whole_seconds(), 0, true)?)?;
+
+  PyDateTime::new(
+    py,
+    ts.year(),
+    ts.month(),
+    ts.day(),
+    ts.hour(),
+    ts.minute(),
+    ts.second(),
+    ts.microsecond(),
+    Some(&tzinfo),
+  )
 }
 
 fn to_pdict<'py>(py: Python<'py>, map: gqlitedb::ValueMap) -> PyResult<Bound<'py, PyDict>>

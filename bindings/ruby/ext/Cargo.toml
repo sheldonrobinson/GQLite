@@ -3,15 +3,15 @@ resolver = "2"
 members = ["gqliterb", "gqlitedb", "graphcore"]
 
 [workspace.package]
-version = "0.6.3"
+version = "0.7.0"
 edition = "2021"
 license = "MIT"
 homepage = "https://gqlite.org"
 repository = "https://gitlab.com/gqlite/gqlite"
 
 [workspace.dependencies]
-graphcore = { version = "0.2.3", path = "graphcore" }
-gqlitedb = { version = "0.6.3", path = "gqlitedb" }
+graphcore = { version = "0.7.0", path = "graphcore" }
+gqlitedb = { version = "0.7.0", path = "gqlitedb" }
 
 askama = { version = "0.14" }
 ccutils = { version = "0.4" }

@@ -111,6 +111,12 @@ pub(crate) fn compare(lhs: &value::Value, rhs: &value::Value) -> Ordering
       Value::Null => Ordering::ComparedNull,
       _ => Ordering::Null,
     },
+    Value::TimeStamp(tl) => match rhs
+    {
+      Value::TimeStamp(tr) => tl.cmp(tr).into(),
+      Value::Null => Ordering::ComparedNull,
+      _ => Ordering::Null,
+    },
     Value::Array(al) => match rhs
     {
       Value::Array(ar) =>

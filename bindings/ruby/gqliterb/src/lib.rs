@@ -1,5 +1,6 @@
 use std::fmt::Display;
 
+use gqlitedb::TimeStamp;
 use magnus::{
   function, method,
   prelude::*,
@@ -44,6 +45,22 @@ fn from_rvalue(ruby: &Ruby, value: magnus::Value) -> Result<gqlitedb::Value, Err
   else if value.is_kind_of(ruby.class_string())
   {
     Ok(String::try_convert(value)?.into())
+  }
+  else if value.is_kind_of(ruby.class_time())
+  {
+    let time = magnus::Time::try_convert(value)?;
+    let timespec = time.timespec()?;
+    Ok(
+      map_err(
+        ruby,
+        TimeStamp::from_unix_timestamp(
+          timespec.tv_sec,
+          timespec.tv_nsec as u32,
+          time.utc_offset() as i32,
+        ),
+      )?
+      .into(),
+    )
   }
   else if value.is_kind_of(ruby.class_hash())
   {
@@ -150,12 +167,28 @@ fn to_rvalue(ruby: &Ruby, val: gqlitedb::Value) -> Result<magnus::Value, Error>
     gqlitedb::Value::Integer(i) => Ok(i.into_value_with(ruby)),
     gqlitedb::Value::Float(f) => Ok(f.into_value_with(ruby)),
     gqlitedb::Value::String(s) => Ok(s.into_value_with(ruby)),
+    gqlitedb::Value::TimeStamp(s) => Ok(to_rdatetime(ruby, s)?.into_value_with(ruby)),
     gqlitedb::Value::Map(m) => Ok(to_rhash(ruby, m)?.into_value_with(ruby)),
     gqlitedb::Value::Null => Ok(ruby.qnil().into_value_with(ruby)),
     gqlitedb::Value::Edge(e) => Ok(edge_to_rhash(ruby, e)?),
     gqlitedb::Value::Node(n) => Ok(node_to_rhash(ruby, n)?),
     gqlitedb::Value::Path(p) => Ok(path_to_rhash(ruby, p)?),
   }
+}
+
+fn to_rdatetime(ruby: &Ruby, ts: gqlitedb::TimeStamp) -> Result<magnus::Time, Error>
+{
+  let (tv_sec, tv_nsec) = ts.unix_timestamp();
+  ruby.time_timespec_new(
+    magnus::time::Timespec {
+      tv_sec,
+      tv_nsec: tv_nsec as i64,
+    },
+    map_err(
+      ruby,
+      magnus::time::Offset::from_secs(ts.offset_whole_seconds()),
+    )?,
+  )
 }
 
 fn to_rhash(ruby: &Ruby, map: gqlitedb::ValueMap) -> Result<r_hash::RHash, Error>

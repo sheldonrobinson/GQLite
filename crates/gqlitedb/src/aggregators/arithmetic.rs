@@ -46,6 +46,7 @@ where
       | Value::Edge(..)
       | Value::Array(..)
       | Value::String(..)
+      | Value::TimeStamp(..)
       | Value::Map(..)
       | Value::Path(..) => Err(RunTimeError::InvalidBinaryOperands)?,
       Value::Null =>

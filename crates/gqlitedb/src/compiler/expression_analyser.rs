@@ -21,6 +21,7 @@ pub(crate) enum ExpressionType
   Float,
   Path,
   String,
+  TimeStamp,
   Variant,
 }
 
@@ -419,6 +420,7 @@ impl<'b> Analyser<'b>
           value::Value::Map(_) => ExpressionType::Map,
           value::Value::Path(_) => ExpressionType::Path,
           value::Value::String(_) => ExpressionType::String,
+          value::Value::TimeStamp(_) => ExpressionType::TimeStamp,
         },
         true,
         false,

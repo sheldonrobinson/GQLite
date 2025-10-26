@@ -4,7 +4,7 @@ mod contains;
 pub(crate) use compare::{compare, Ordering};
 pub(crate) use contains::{contains, ContainResult};
 
-pub use graphcore::{array, value_map, Value, ValueMap, ValueTryIntoRef};
+pub use graphcore::{array, value_map, TimeStamp, Value, ValueMap, ValueTryIntoRef};
 
 pub(crate) trait ValueExt
 {
@@ -134,7 +134,7 @@ impl ValueExt for Value
         Value::String(rhs) => lhs.cmp(rhs),
         _ => std::cmp::Ordering::Greater,
       },
-      Value::Path(lhs) => match rhs
+      Value::TimeStamp(lhs) => match rhs
       {
         Value::Null
         | Value::Key(..)
@@ -142,6 +142,18 @@ impl ValueExt for Value
         | Value::Float(..)
         | Value::Boolean(..)
         | Value::String(..) => std::cmp::Ordering::Less,
+        Value::TimeStamp(rhs) => lhs.cmp(rhs),
+        _ => std::cmp::Ordering::Greater,
+      },
+      Value::Path(lhs) => match rhs
+      {
+        Value::Null
+        | Value::Key(..)
+        | Value::Integer(..)
+        | Value::Float(..)
+        | Value::Boolean(..)
+        | Value::String(..)
+        | Value::TimeStamp(..) => std::cmp::Ordering::Less,
         Value::Path(rhs) =>
         {
           match orderability_map(lhs.source().properties(), rhs.source().properties())
@@ -170,6 +182,7 @@ impl ValueExt for Value
         | Value::Float(..)
         | Value::Boolean(..)
         | Value::String(..)
+        | Value::TimeStamp(..)
         | Value::Path(..) => std::cmp::Ordering::Less,
         Value::Array(rhs) => lhs
           .iter()
@@ -187,6 +200,7 @@ impl ValueExt for Value
         | Value::Float(..)
         | Value::Boolean(..)
         | Value::String(..)
+        | Value::TimeStamp(..)
         | Value::Path(..)
         | Value::Array(..) => std::cmp::Ordering::Less,
         Value::Edge(rhs) => orderability_map(lhs.properties(), rhs.properties()),
@@ -200,6 +214,7 @@ impl ValueExt for Value
         | Value::Float(..)
         | Value::Boolean(..)
         | Value::String(..)
+        | Value::TimeStamp(..)
         | Value::Path(..)
         | Value::Array(..)
         | Value::Edge(..) => std::cmp::Ordering::Less,
@@ -214,6 +229,7 @@ impl ValueExt for Value
         | Value::Float(..)
         | Value::Boolean(..)
         | Value::String(..)
+        | Value::TimeStamp(..)
         | Value::Path(..)
         | Value::Array(..)
         | Value::Edge(..)

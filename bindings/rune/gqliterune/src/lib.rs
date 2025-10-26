@@ -84,6 +84,7 @@ fn to_ru_value(value: gqlitedb::Value) -> Result<rune::Value, rune::runtime::Run
     gqlitedb::Value::Integer(i) => rune::to_value(i),
     gqlitedb::Value::Float(f) => rune::to_value(f),
     gqlitedb::Value::String(s) => rune::to_value(s),
+    gqlitedb::Value::TimeStamp(ts) => rune::to_value(format!("{}", ts)),
     gqlitedb::Value::Array(a) => rune::to_value(
       a.into_iter()
         .map(to_ru_value)
