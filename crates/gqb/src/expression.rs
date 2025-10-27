@@ -54,6 +54,10 @@ pub enum Expression
   },
   Variable(Variable),
   Literal(Box<graphcore::Value>),
+  Get {
+    expression: Box<Expression>,
+    path: Vec<String>,
+  },
   BinaryOp
   {
     operator: BinOp,
@@ -90,6 +94,7 @@ impl Expression
         properties_binding
       }
       Expression::Variable(var) => format!("{}", var),
+      Expression::Get { expression, path } => format!("{}.{}", expression.into_oc_query(bindings), path.join("."))
     }
   }
 }

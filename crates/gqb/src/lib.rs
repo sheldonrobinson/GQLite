@@ -5,7 +5,6 @@ mod expression;
 pub mod prelude;
 mod utils;
 
-use itertools::Itertools as _;
 use std::borrow::Borrow;
 
 pub use graphcore::{array, labels, value_map, ValueMap};
@@ -329,7 +328,7 @@ struct WhereStatement
 #[derive(Debug, Default)]
 struct ReturnStatement
 {
-  values: Vec<(Variable, Option<String>, String)>,
+  values: Vec<(Expression, String)>,
 }
 
 #[derive(Debug, Default)]
@@ -499,10 +498,7 @@ impl Builder
   /// Add a return statement to the query for the given variable, accessible in the column with the given name
   pub fn return_variable(&mut self, variable: Variable, name: impl Into<String>)
   {
-    self
-      .last_return_statement()
-      .values
-      .push((variable, None, name.into()));
+    self.return_expression(variable.into(), name.into());
   }
   /// Add a return statement to the query for the given variable, accessible in the column with the given name
   pub fn return_property<I, S>(&mut self, variable: Variable, path: I, name: impl Into<String>)
@@ -510,11 +506,22 @@ impl Builder
     I: IntoIterator<Item = S>,
     S: Borrow<str> + std::fmt::Display,
   {
-    self.last_return_statement().values.push((
-      variable,
-      Some(path.into_iter().join(".")),
+    use expression_builder as eb;
+    self.return_expression(
+      eb::get(
+        variable.into(),
+        path.into_iter().map(|s| s.to_string()).collect(),
+      ),
       name.into(),
-    ));
+    );
+  }
+  /// Add a return statement to the query for the given expression, accessible in the column with the given name
+  pub fn return_expression(&mut self, expression: Expression, name: impl Into<String>)
+  {
+    self
+      .last_return_statement()
+      .values
+      .push((expression, name.into()));
   }
   /// Add a delete statement for variables
   pub fn delete(&mut self, variables: impl Variables)
@@ -654,7 +661,7 @@ impl Builder
           q += "RETURN ";
           let mut comma = false;
           // Create nodes
-          for (var, path, name) in return_statement.values.into_iter()
+          for (expr, name) in return_statement.values.into_iter()
           {
             if comma
             {
@@ -664,11 +671,7 @@ impl Builder
             {
               comma = true;
             }
-            match path
-            {
-              Some(path) => q += &format!("{}.{} AS {}", var, path, name),
-              None => q += &format!("{} AS {}", var, name),
-            }
+            q += &format!("{} AS {}", expr.into_oc_query(&mut bindings), name);
           }
         }
         Statement::Delete(delete_statement) =>

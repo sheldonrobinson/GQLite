@@ -5,7 +5,11 @@
 ## [Unreleased] - ReleaseDate
 
 - Add `id` function.
-- Add `where` statement and expressions in `gqb`.
+
+### gqb
+
+- Add `where` statement and expressions.
+- Add expressions to `return` statement.
 
 ## [0.6.0] - 2025-09-01
 

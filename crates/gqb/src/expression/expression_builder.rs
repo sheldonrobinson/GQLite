@@ -1,6 +1,6 @@
 //! Module for building expressions.
 
-use crate::Expression;
+use crate::{Expression};
 
 /// Convert arguments for function calls
 pub trait IntoFunctionArgs
@@ -60,5 +60,16 @@ pub fn function_call(name: impl AsRef<str>, args: impl IntoFunctionArgs) -> Expr
   Expression::FunctionCall {
     name: name.as_ref().to_string(),
     arguments: args.into_args(),
+  }
+}
+
+/// Access a member of a dictionnary
+pub fn get(expression: Expression, path: Vec<String>) -> Expression
+{
+  let expression = Box::new(expression);
+  Expression::Get
+  {
+    expression,
+    path
   }
 }
