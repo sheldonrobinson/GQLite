@@ -8,7 +8,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.6.0"
+version = "0.6.1"
 edition = "2021"
 license = "MIT"
 homepage = "https://gqlite.org"
@@ -16,9 +16,9 @@ repository = "https://gitlab.com/gqlite/gqlite"
 
 [workspace.dependencies]
 # versions have to be specified with path: https://github.com/rust-lang/cargo/issues/11133
-graphcore = { version = "0.2.0", path = "crates/graphcore" }
-gqb = { version = "0.2.0", path = "crates/gqb" }
-gqlitedb = { version = "0.6.0", path = "crates/gqlitedb" }
+graphcore = { version = "0.2.1", path = "crates/graphcore" }
+gqb = { version = "0.2.2", path = "crates/gqb" }
+gqlitedb = { version = "0.6.1", path = "crates/gqlitedb" }
 
 askama = { version = "0.14" }
 ccutils = { version = "0.4" }

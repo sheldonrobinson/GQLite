@@ -3,6 +3,8 @@ How to release gqlite
 
 - Check version numbers:
   - CMakeLists.txt
+  - Cargo.toml
+  - crates/gqb crates/gqls crates/gqls-macro crates/gqlparser
   - bindings/python/gqlpy/pyproject.toml
   - bindings/ruby/gqliterb.gemspec
 - Make sure there is a test database in test/rb/data for the new version, and that it is called used in gqlite-rspec

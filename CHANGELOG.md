@@ -5,11 +5,14 @@
 ## [Unreleased] - ReleaseDate
 
 - Add `id` function.
+- Fix aliasing in return/with statements.
+- Improve query status reporting in gqlbrowser.
 
 ### gqb
 
 - Add `where` statement and expressions.
 - Add expressions to `return` statement.
+- Add `delete` to query builder (added in gqb 0.2.1).
 
 ## [0.6.0] - 2025-09-01
 

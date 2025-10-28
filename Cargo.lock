@@ -1980,7 +1980,7 @@ dependencies = [
 
 [[package]]
 name = "gqb"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "askama",
  "gqlitedb",
@@ -1991,7 +1991,7 @@ dependencies = [
 
 [[package]]
 name = "gqlitebrowser"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "brisk-eframe",
  "brisk-egui",
@@ -2012,7 +2012,7 @@ dependencies = [
 
 [[package]]
 name = "gqlitecli"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "gqlitedb",
  "rustyline",
@@ -2022,7 +2022,7 @@ dependencies = [
 
 [[package]]
 name = "gqlitedb"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "askama",
  "ccutils",
@@ -2047,7 +2047,7 @@ dependencies = [
 
 [[package]]
 name = "gqlitepy"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "gqlitedb",
  "pyo3",
@@ -2055,7 +2055,7 @@ dependencies = [
 
 [[package]]
 name = "gqliterb"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "gqlitedb",
  "magnus",
@@ -2064,7 +2064,7 @@ dependencies = [
 
 [[package]]
 name = "gqliterune"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "gqb",
  "gqlitedb",
@@ -2074,7 +2074,7 @@ dependencies = [
 
 [[package]]
 name = "graphcore"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "itertools 0.14.0",
  "serde",
