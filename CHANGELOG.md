@@ -4,6 +4,8 @@
 
 ## [Unreleased] - ReleaseDate
 
+## [0.6.1] - 2025-10-28
+
 - Add `id` function.
 - Fix aliasing in return/with statements.
 - Improve query status reporting in gqlbrowser.
@@ -96,7 +98,8 @@
 - `persy` backend.
 
 <!-- next-url -->
-[Unreleased]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.6.0...dev/1
+[Unreleased]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.6.1...dev/1
+[0.6.1]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.6.0...gqlitedb-v0.6.1
 [0.6.0]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.5.3...gqlitedb-v0.6.0
 [0.5.3]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.5.2...gqlitedb-v0.5.3
 [0.5.2]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.5.1...gqlitedb-v0.5.2
