@@ -8,7 +8,7 @@
 
 #![warn(missing_docs)]
 
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 #[cfg(feature = "gqb")]
 mod gqb;
@@ -25,7 +25,7 @@ use rune::{
 #[rune(item = ::gqlite)]
 struct Connection
 {
-  connection: gqlitedb::Connection,
+  connection: Arc<gqlitedb::Connection>,
 }
 
 // Workaround lack of runtime support for u128: https://github.com/rune-rs/rune/issues/960
@@ -121,7 +121,7 @@ impl Connection
   {
     let options = Self::to_value_map(options)?;
     Ok(Connection {
-      connection: gqlitedb::Connection::create(options)?,
+      connection: Arc::new(gqlitedb::Connection::create(options)?),
     })
   }
   #[rune::function]
@@ -135,6 +135,18 @@ impl Connection
 
 /// Convert a gqlitedb connection to a rune Value.
 pub fn connection_to_rune_value(connection: gqlitedb::Connection) -> Result<rune::Value>
+{
+  use rune::ToValue as _;
+  Ok(
+    Connection {
+      connection: Arc::new(connection),
+    }
+    .to_value()?,
+  )
+}
+
+/// Convert a gqlitedb connection to a rune Value.
+pub fn arc_connection_to_rune_value(connection: Arc<gqlitedb::Connection>) -> Result<rune::Value>
 {
   use rune::ToValue as _;
   Ok(Connection { connection }.to_value()?)
