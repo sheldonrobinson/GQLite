@@ -25,6 +25,6 @@ pub enum Error
   InvalidTableDimensions,
   #[error("Out of range access.")]
   InvalidRange,
-  #[error("RangeError")]
-  RangeError(#[from] time::error::ComponentRange),
+  #[error("TimeStamp error {0}.")]
+  TimeError(#[from] jiff::Error),
 }

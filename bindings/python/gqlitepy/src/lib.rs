@@ -133,18 +133,17 @@ fn to_pvalue<'py>(py: Python<'py>, val: gqlitedb::Value) -> PyResult<Bound<'py, 
 
 fn to_ptime<'py>(py: Python<'py>, ts: gqlitedb::TimeStamp) -> PyResult<Bound<'py, PyDateTime>>
 {
-  let tzinfo =
-    PyTzInfo::fixed_offset(py, PyDelta::new(py, 0, ts.offset_whole_seconds(), 0, true)?)?;
+  let tzinfo = PyTzInfo::fixed_offset(py, PyDelta::new(py, 0, ts.offset_seconds(), 0, true)?)?;
 
   PyDateTime::new(
     py,
-    ts.year(),
-    ts.month(),
-    ts.day(),
-    ts.hour(),
-    ts.minute(),
-    ts.second(),
-    ts.microsecond(),
+    ts.year() as i32,
+    ts.month() as u8,
+    ts.day() as u8,
+    ts.hour() as u8,
+    ts.minute() as u8,
+    ts.second() as u8,
+    ts.microsecond() as u32,
     Some(&tzinfo),
   )
 }

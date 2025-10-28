@@ -55,7 +55,7 @@ fn from_rvalue(ruby: &Ruby, value: magnus::Value) -> Result<gqlitedb::Value, Err
         ruby,
         TimeStamp::from_unix_timestamp(
           timespec.tv_sec,
-          timespec.tv_nsec as u32,
+          timespec.tv_nsec as i32,
           time.utc_offset() as i32,
         ),
       )?
@@ -184,10 +184,7 @@ fn to_rdatetime(ruby: &Ruby, ts: gqlitedb::TimeStamp) -> Result<magnus::Time, Er
       tv_sec,
       tv_nsec: tv_nsec as i64,
     },
-    map_err(
-      ruby,
-      magnus::time::Offset::from_secs(ts.offset_whole_seconds()),
-    )?,
+    map_err(ruby, magnus::time::Offset::from_secs(ts.offset_seconds()))?,
   )
 }
 

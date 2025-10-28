@@ -9,10 +9,11 @@ homepage.workspace = true
 repository.workspace = true
 
 [dependencies]
+ccutils = { workspace = true, features = ["alias"] }
 itertools = { workspace = true }
+jiff = { version = "0.2" }
 serde = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
-time = { version = "0.3", features = ["formatting", "parsing"] }
 uuid = { workspace = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
