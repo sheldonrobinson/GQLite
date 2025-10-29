@@ -1,9 +1,12 @@
 #![doc = include_str!("../README.MD")]
 #![warn(missing_docs)]
 
+mod create_edges;
+mod create_nodes;
 mod expression;
 pub mod prelude;
 mod utils;
+mod variables;
 
 use std::borrow::Borrow;
 
@@ -30,46 +33,7 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 
 use askama::Template;
 
-/// Trait for passing variables to a function.
-pub trait Variables
-{
-  /// Fill the vector of variables
-  fn fill(self, vector: &mut Vec<Variable>);
-}
-
-/// Trait for multi-node creation.
-pub trait CreateNodes
-{
-  /// Output of multi-node creation
-  type Output;
-  /// Fill the builder
-  fn fill(self, builder: &mut Builder) -> Self::Output;
-}
-
-/// Trait for multi-edge creation.
-pub trait CreateEdges
-{
-  /// Output of multi-edge creation
-  type Output;
-  /// Fill the builder
-  fn fill(self, builder: &mut Builder) -> Self::Output;
-}
-
-impl Variables for Variable
-{
-  fn fill(self, vector: &mut Vec<Variable>)
-  {
-    vector.push(self);
-  }
-}
-
-impl Variables for Vec<Variable>
-{
-  fn fill(mut self, vector: &mut Vec<Variable>)
-  {
-    vector.append(&mut self);
-  }
-}
+pub use {create_edges::CreateEdges, create_nodes::CreateNodes, variables::Variables};
 
 macro_rules! __key {
   ($idx:tt) => {
@@ -77,184 +41,7 @@ macro_rules! __key {
   };
 }
 
-macro_rules! impl_variables {
-  ($n:tt $($idx:tt),*) => {
-      impl Variables
-          for ($(__key!($idx),)*)
-      {
-          fn fill(self, vector: &mut Vec<Variable>) {
-              $(
-                  vector.push(self.$idx);
-              )*
-          }
-      }
-  };
-}
-
-// Generate implementations for 1..=20
-macro_rules! impl_all_variables {
-  ($($n:tt $($idx:tt),*;)*) => {
-      $(impl_variables!($n $($idx),*);)*
-  };
-}
-
-impl_all_variables! {
-  2 0, 1;
-  3 0, 1, 2;
-  4 0, 1, 2, 3;
-  5 0, 1, 2, 3, 4;
-  6 0, 1, 2, 3, 4, 5;
-  7 0, 1, 2, 3, 4, 5, 6;
-  8 0, 1, 2, 3, 4, 5, 6, 7;
-  9 0, 1, 2, 3, 4, 5, 6, 7, 8;
-  10 0, 1, 2, 3, 4, 5, 6, 7, 8, 9;
-  11 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10;
-  12 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11;
-  13 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12;
-  14 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13;
-  15 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14;
-  16 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15;
-  17 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16;
-  18 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17;
-  19 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18;
-  20 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19;
-}
-
-macro_rules! impl_create_nodes {
-  ($n:tt $($idx:tt $l:ident $p:ident),*) => {
-      impl<$($l, $p),*> CreateNodes
-          for ($(($l, $p),)*)
-      where
-          $($l: Into<Vec<String>>,
-            $p: Into<graphcore::ValueMap>),*
-      {
-          type Output = ($(__key!($idx),)*);
-
-          fn fill(self, builder: &mut Builder) -> Self::Output {
-              ($(
-                  builder.create_node(
-                      (self.$idx).0,
-                      (self.$idx).1,
-                  ),
-              )*)
-          }
-      }
-  };
-}
-
-// Generate implementations for 1..=20
-macro_rules! impl_all_create_nodes {
-  ($($n:tt $($idx:tt $l:ident $p:ident),*;)*) => {
-      $(impl_create_nodes!($n $($idx $l $p),*);)*
-  };
-}
-
-impl_all_create_nodes! {
-  1 0 L0 P0;
-  2 0 L0 P0, 1 L1 P1;
-  3 0 L0 P0, 1 L1 P1, 2 L2 P2;
-  4 0 L0 P0, 1 L1 P1, 2 L2 P2, 3 L3 P3;
-  5 0 L0 P0, 1 L1 P1, 2 L2 P2, 3 L3 P3, 4 L4 P4;
-  6 0 L0 P0, 1 L1 P1, 2 L2 P2, 3 L3 P3, 4 L4 P4, 5 L5 P5;
-  7 0 L0 P0, 1 L1 P1, 2 L2 P2, 3 L3 P3, 4 L4 P4, 5 L5 P5, 6 L6 P6;
-  8 0 L0 P0, 1 L1 P1, 2 L2 P2, 3 L3 P3, 4 L4 P4, 5 L5 P5, 6 L6 P6, 7 L7 P7;
-  9 0 L0 P0, 1 L1 P1, 2 L2 P2, 3 L3 P3, 4 L4 P4, 5 L5 P5, 6 L6 P6, 7 L7 P7, 8 L8 P8;
-  10 0 L0 P0, 1 L1 P1, 2 L2 P2, 3 L3 P3, 4 L4 P4, 5 L5 P5, 6 L6 P6, 7 L7 P7, 8 L8 P8, 9 L9 P9;
-  11 0 L0 P0, 1 L1 P1, 2 L2 P2, 3 L3 P3, 4 L4 P4, 5 L5 P5, 6 L6 P6, 7 L7 P7, 8 L8 P8, 9 L9 P9, 10 L10 P10;
-  12 0 L0 P0, 1 L1 P1, 2 L2 P2, 3 L3 P3, 4 L4 P4, 5 L5 P5, 6 L6 P6, 7 L7 P7, 8 L8 P8, 9 L9 P9, 10 L10 P10, 11 L11 P11;
-  13 0 L0 P0, 1 L1 P1, 2 L2 P2, 3 L3 P3, 4 L4 P4, 5 L5 P5, 6 L6 P6, 7 L7 P7, 8 L8 P8, 9 L9 P9, 10 L10 P10, 11 L11 P11, 12 L12 P12;
-  14 0 L0 P0, 1 L1 P1, 2 L2 P2, 3 L3 P3, 4 L4 P4, 5 L5 P5, 6 L6 P6, 7 L7 P7, 8 L8 P8, 9 L9 P9, 10 L10 P10, 11 L11 P11, 12 L12 P12, 13 L13 P13;
-  15 0 L0 P0, 1 L1 P1, 2 L2 P2, 3 L3 P3, 4 L4 P4, 5 L5 P5, 6 L6 P6, 7 L7 P7, 8 L8 P8, 9 L9 P9, 10 L10 P10, 11 L11 P11, 12 L12 P12, 13 L13 P13, 14 L14 P14;
-  16 0 L0 P0, 1 L1 P1, 2 L2 P2, 3 L3 P3, 4 L4 P4, 5 L5 P5, 6 L6 P6, 7 L7 P7, 8 L8 P8, 9 L9 P9, 10 L10 P10, 11 L11 P11, 12 L12 P12, 13 L13 P13, 14 L14 P14, 15 L15 P15;
-  17 0 L0 P0, 1 L1 P1, 2 L2 P2, 3 L3 P3, 4 L4 P4, 5 L5 P5, 6 L6 P6, 7 L7 P7, 8 L8 P8, 9 L9 P9, 10 L10 P10, 11 L11 P11, 12 L12 P12, 13 L13 P13, 14 L14 P14, 15 L15 P15, 16 L16 P16;
-  18 0 L0 P0, 1 L1 P1, 2 L2 P2, 3 L3 P3, 4 L4 P4, 5 L5 P5, 6 L6 P6, 7 L7 P7, 8 L8 P8, 9 L9 P9, 10 L10 P10, 11 L11 P11, 12 L12 P12, 13 L13 P13, 14 L14 P14, 15 L15 P15, 16 L16 P16, 17 L17 P17;
-  19 0 L0 P0, 1 L1 P1, 2 L2 P2, 3 L3 P3, 4 L4 P4, 5 L5 P5, 6 L6 P6, 7 L7 P7, 8 L8 P8, 9 L9 P9, 10 L10 P10, 11 L11 P11, 12 L12 P12, 13 L13 P13, 14 L14 P14, 15 L15 P15, 16 L16 P16, 17 L17 P17, 18 L18 P18;
-  20 0 L0 P0, 1 L1 P1, 2 L2 P2, 3 L3 P3, 4 L4 P4, 5 L5 P5, 6 L6 P6, 7 L7 P7, 8 L8 P8, 9 L9 P9, 10 L10 P10, 11 L11 P11, 12 L12 P12, 13 L13 P13, 14 L14 P14, 15 L15 P15, 16 L16 P16, 17 L17 P17, 18 L18 P18, 19 L19 P19;
-}
-
-impl CreateNodes for Vec<(Vec<String>, graphcore::ValueMap)>
-{
-  type Output = Vec<Variable>;
-  fn fill(self, builder: &mut Builder) -> Self::Output
-  {
-    let mut out = Vec::<Variable>::new();
-    for (l, p) in self
-    {
-      out.push(builder.create_node(l, p))
-    }
-    out
-  }
-}
-
-impl CreateEdges for Vec<(Variable, Vec<String>, graphcore::ValueMap, Variable)>
-{
-  type Output = Vec<Variable>;
-  fn fill(self, builder: &mut Builder) -> Self::Output
-  {
-    let mut out = Vec::<Variable>::new();
-    for (s, l, p, d) in self
-    {
-      out.push(builder.create_edge(s, l, p, d));
-    }
-    out
-  }
-}
-
-macro_rules! impl_create_edges {
-  ($n:tt $($idx:tt $s:ident $l:ident $p:ident $d:ident),*) => {
-      impl<$($s, $l, $p, $d),*> CreateEdges
-          for ($(($s, $l, $p, $d),)*)
-      where
-          $($s: Into<Variable>,
-            $l: Into<Vec<String>>,
-            $p: Into<graphcore::ValueMap>,
-            $d: Into<Variable>),*
-      {
-          type Output = ($(__key!($idx),)*);
-
-          fn fill(self, builder: &mut Builder) -> Self::Output {
-              ($(
-                  builder.create_edge(
-                      (self.$idx).0,
-                      (self.$idx).1,
-                      (self.$idx).2,
-                      (self.$idx).3,
-                  ),
-              )*)
-          }
-      }
-  };
-}
-
-// Generate implementations for 1..=20
-macro_rules! impl_all {
-  ($($n:tt $($idx:tt $s:ident $l:ident $p:ident $d:ident),*;)*) => {
-      $(impl_create_edges!($n $($idx $s $l $p $d),*);)*
-  };
-}
-
-impl_all! {
-  1 0 S0 L0 P0 D0;
-  2 0 S0 L0 P0 D0, 1 S1 L1 P1 D1;
-  3 0 S0 L0 P0 D0, 1 S1 L1 P1 D1, 2 S2 L2 P2 D2;
-  4 0 S0 L0 P0 D0, 1 S1 L1 P1 D1, 2 S2 L2 P2 D2, 3 S3 L3 P3 D3;
-  5 0 S0 L0 P0 D0, 1 S1 L1 P1 D1, 2 S2 L2 P2 D2, 3 S3 L3 P3 D3, 4 S4 L4 P4 D4;
-  6 0 S0 L0 P0 D0, 1 S1 L1 P1 D1, 2 S2 L2 P2 D2, 3 S3 L3 P3 D3, 4 S4 L4 P4 D4, 5 S5 L5 P5 D5;
-  7 0 S0 L0 P0 D0, 1 S1 L1 P1 D1, 2 S2 L2 P2 D2, 3 S3 L3 P3 D3, 4 S4 L4 P4 D4, 5 S5 L5 P5 D5, 6 S6 L6 P6 D6;
-  8 0 S0 L0 P0 D0, 1 S1 L1 P1 D1, 2 S2 L2 P2 D2, 3 S3 L3 P3 D3, 4 S4 L4 P4 D4, 5 S5 L5 P5 D5, 6 S6 L6 P6 D6, 7 S7 L7 P7 D7;
-  9 0 S0 L0 P0 D0, 1 S1 L1 P1 D1, 2 S2 L2 P2 D2, 3 S3 L3 P3 D3, 4 S4 L4 P4 D4, 5 S5 L5 P5 D5, 6 S6 L6 P6 D6, 7 S7 L7 P7 D7, 8 S8 L8 P8 D8;
-  10 0 S0 L0 P0 D0, 1 S1 L1 P1 D1, 2 S2 L2 P2 D2, 3 S3 L3 P3 D3, 4 S4 L4 P4 D4, 5 S5 L5 P5 D5, 6 S6 L6 P6 D6, 7 S7 L7 P7 D7, 8 S8 L8 P8 D8, 9 S9 L9 P9 D9;
-  11 0 S0 L0 P0 D0, 1 S1 L1 P1 D1, 2 S2 L2 P2 D2, 3 S3 L3 P3 D3, 4 S4 L4 P4 D4, 5 S5 L5 P5 D5, 6 S6 L6 P6 D6, 7 S7 L7 P7 D7, 8 S8 L8 P8 D8, 9 S9 L9 P9 D9, 10 S10 L10 P10 D10;
-  12 0 S0 L0 P0 D0, 1 S1 L1 P1 D1, 2 S2 L2 P2 D2, 3 S3 L3 P3 D3, 4 S4 L4 P4 D4, 5 S5 L5 P5 D5, 6 S6 L6 P6 D6, 7 S7 L7 P7 D7, 8 S8 L8 P8 D8, 9 S9 L9 P9 D9, 10 S10 L10 P10 D10, 11 S11 L11 P11 D11;
-  13 0 S0 L0 P0 D0, 1 S1 L1 P1 D1, 2 S2 L2 P2 D2, 3 S3 L3 P3 D3, 4 S4 L4 P4 D4, 5 S5 L5 P5 D5, 6 S6 L6 P6 D6, 7 S7 L7 P7 D7, 8 S8 L8 P8 D8, 9 S9 L9 P9 D9, 10 S10 L10 P10 D10, 11 S11 L11 P11 D11, 12 S12 L12 P12 D12;
-  14 0 S0 L0 P0 D0, 1 S1 L1 P1 D1, 2 S2 L2 P2 D2, 3 S3 L3 P3 D3, 4 S4 L4 P4 D4, 5 S5 L5 P5 D5, 6 S6 L6 P6 D6, 7 S7 L7 P7 D7, 8 S8 L8 P8 D8, 9 S9 L9 P9 D9, 10 S10 L10 P10 D10, 11 S11 L11 P11 D11, 12 S12 L12 P12 D12, 13 S13 L13 P13 D13;
-  15 0 S0 L0 P0 D0, 1 S1 L1 P1 D1, 2 S2 L2 P2 D2, 3 S3 L3 P3 D3, 4 S4 L4 P4 D4, 5 S5 L5 P5 D5, 6 S6 L6 P6 D6, 7 S7 L7 P7 D7, 8 S8 L8 P8 D8, 9 S9 L9 P9 D9, 10 S10 L10 P10 D10, 11 S11 L11 P11 D11, 12 S12 L12 P12 D12, 13 S13 L13 P13 D13, 14 S14 L14 P14 D14;
-  16 0 S0 L0 P0 D0, 1 S1 L1 P1 D1, 2 S2 L2 P2 D2, 3 S3 L3 P3 D3, 4 S4 L4 P4 D4, 5 S5 L5 P5 D5, 6 S6 L6 P6 D6, 7 S7 L7 P7 D7, 8 S8 L8 P8 D8, 9 S9 L9 P9 D9, 10 S10 L10 P10 D10, 11 S11 L11 P11 D11, 12 S12 L12 P12 D12, 13 S13 L13 P13 D13, 14 S14 L14 P14 D14, 15 S15 L15 P15 D15;
-  17 0 S0 L0 P0 D0, 1 S1 L1 P1 D1, 2 S2 L2 P2 D2, 3 S3 L3 P3 D3, 4 S4 L4 P4 D4, 5 S5 L5 P5 D5, 6 S6 L6 P6 D6, 7 S7 L7 P7 D7, 8 S8 L8 P8 D8, 9 S9 L9 P9 D9, 10 S10 L10 P10 D10, 11 S11 L11 P11 D11, 12 S12 L12 P12 D12, 13 S13 L13 P13 D13, 14 S14 L14 P14 D14, 15 S15 L15 P15 D15, 16 S16 L16 P16 D16;
-  18 0 S0 L0 P0 D0, 1 S1 L1 P1 D1, 2 S2 L2 P2 D2, 3 S3 L3 P3 D3, 4 S4 L4 P4 D4, 5 S5 L5 P5 D5, 6 S6 L6 P6 D6, 7 S7 L7 P7 D7, 8 S8 L8 P8 D8, 9 S9 L9 P9 D9, 10 S10 L10 P10 D10, 11 S11 L11 P11 D11, 12 S12 L12 P12 D12, 13 S13 L13 P13 D13, 14 S14 L14 P14 D14, 15 S15 L15 P15 D15, 16 S16 L16 P16 D16, 17 S17 L17 P17 D17;
-  19 0 S0 L0 P0 D0, 1 S1 L1 P1 D1, 2 S2 L2 P2 D2, 3 S3 L3 P3 D3, 4 S4 L4 P4 D4, 5 S5 L5 P5 D5, 6 S6 L6 P6 D6, 7 S7 L7 P7 D7, 8 S8 L8 P8 D8, 9 S9 L9 P9 D9, 10 S10 L10 P10 D10, 11 S11 L11 P11 D11, 12 S12 L12 P12 D12, 13 S13 L13 P13 D13, 14 S14 L14 P14 D14, 15 S15 L15 P15 D15, 16 S16 L16 P16 D16, 17 S17 L17 P17 D17, 18 S18 L18 P18 D18;
-  20 0 S0 L0 P0 D0, 1 S1 L1 P1 D1, 2 S2 L2 P2 D2, 3 S3 L3 P3 D3, 4 S4 L4 P4 D4, 5 S5 L5 P5 D5, 6 S6 L6 P6 D6, 7 S7 L7 P7 D7, 8 S8 L8 P8 D8, 9 S9 L9 P9 D9, 10 S10 L10 P10 D10, 11 S11 L11 P11 D11, 12 S12 L12 P12 D12, 13 S13 L13 P13 D13, 14 S14 L14 P14 D14, 15 S15 L15 P15 D15, 16 S16 L16 P16 D16, 17 S17 L17 P17 D17, 18 S18 L18 P18 D18, 19 S19 L19 P19 D19;
-}
+pub(crate) use __key;
 
 mod templates
 {
