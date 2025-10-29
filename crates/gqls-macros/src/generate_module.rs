@@ -1,11 +1,49 @@
 use std::{env, path::Path};
 
-use gqlparser::gqls::prelude::*;
+use gqlparser::gqls::{ast::PropertiesDefinition, prelude::*};
+use indexmap::IndexMap;
 use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote};
 use stringcase::snake_case;
 
 use crate::my_crate;
+
+struct ExpandedElement
+{
+  labels: Vec<String>,
+  properties: IndexMap<String, Property>,
+}
+
+fn expand_element(
+  elements: &IndexMap<String, PropertiesDefinition>,
+  label: String,
+) -> Result<ExpandedElement, syn::Error>
+{
+  let definition = elements.get(&label);
+
+  match definition
+  {
+    Some(definition) =>
+    {
+      let mut labels = Vec::<String>::default();
+      let mut properties = IndexMap::<String, Property>::default();
+
+      for parent in definition.parents.iter()
+      {
+        let mut parent_ee = expand_element(elements, parent.clone())?;
+        labels.append(&mut parent_ee.labels);
+        properties.extend(parent_ee.properties.into_iter());
+      }
+      labels.push(label);
+      properties.extend(definition.properties.clone());
+      Ok(ExpandedElement { labels, properties })
+    }
+    None => Err(syn::Error::new(
+      Span::call_site(),
+      format!("UnknownPropertyDefinitionError: '{label}' was not defined."),
+    )),
+  }
+}
 
 pub(super) struct ParsedInput
 {
@@ -94,6 +132,7 @@ pub(super) fn generate_module_impl(input: ParsedInput) -> Result<TokenStream, sy
 
   // Fragments used in the output
   let mut creation_functions: Vec<proc_macro2::TokenStream> = Default::default();
+  let mut elements: Vec<proc_macro2::TokenStream> = Default::default();
   let mut nodes: Vec<proc_macro2::TokenStream> = Default::default();
   let mut edges: Vec<proc_macro2::TokenStream> = Default::default();
 
@@ -105,21 +144,64 @@ pub(super) fn generate_module_impl(input: ParsedInput) -> Result<TokenStream, sy
       let ast = gqlparser::gqls::parse_schema(&contents).map_err(|e| {
         syn::Error::new(filename.span(), format!("Failed to parse schema: {:?}", e))
       })?;
+
+      // Generate the elements
+      for (identifier, properties_definition) in ast.elements.iter()
+      {
+        let element_trait_name =
+          syn::Ident::new(&stringcase::pascal_case(identifier), Span::call_site());
+
+        // Fields
+        let mut property_names = Vec::<syn::Ident>::default();
+        let mut property_names_string = Vec::<String>::default();
+        let mut property_types = Vec::<TokenStream>::default();
+
+        for field in properties_definition.properties.iter()
+        {
+          property_names.push(syn::Ident::new(
+            &snake_case(field.0),
+            proc_macro2::Span::call_site(),
+          ));
+          property_names_string.push(field.0.to_owned());
+          property_types.push(property_type(field.1)?);
+        }
+
+        elements.push(quote! {
+          /// Trait for the element #element_trait_name
+          pub trait #element_trait_name: #my_crate::Element
+          {
+            #(
+              // Retrieve property #arg_names from the database
+              fn #property_names(&self) -> Result<#property_types>
+              {
+                let mut builder = gqb::Builder::default();
+                let var = builder.match_node(labels![#identifier], value_map!());
+                builder.where_statement(eb::equal(eb::function_call("id", (var,)), self.element_key().into()));
+                builder.return_property(var, vec![#property_names_string], #property_names_string);
+                let r = self.query_interface().execute_builder(builder)?.unwrap();
+                let val: #property_types = r.value(0,0)?.try_into()?;
+                Ok(val.to_owned())
+              }
+            )*
+          }
+        });
+      }
+
       // Generate the fragments for nodes
       for node in ast.nodes
       {
-        let node_struct_name = syn::Ident::new(
-          &stringcase::pascal_case(&node.identifier),
-          Span::call_site(),
-        );
+        let node_struct_name =
+          syn::Ident::new(&stringcase::pascal_case(&node.label), Span::call_site());
         let create_node_function_name =
-          format_ident!("create_{}", stringcase::snake_case(&node.identifier));
+          format_ident!("create_{}", stringcase::snake_case(&node.label));
         // Fields
         let mut arg_names = Vec::<syn::Ident>::default();
         let mut arg_names_string = Vec::<String>::default();
         let mut arg_types = Vec::<TokenStream>::default();
 
-        for field in node.properties
+        let expended_element = expand_element(&ast.elements, node.label)?;
+
+        for field in expended_element.properties
         {
           arg_names.push(syn::Ident::new(
             &snake_case(&field.0),
@@ -128,7 +210,11 @@ pub(super) fn generate_module_impl(input: ParsedInput) -> Result<TokenStream, sy
           arg_names_string.push(field.0.to_owned());
           arg_types.push(property_type(&field.1)?);
         }
-        let labels = &node.labels;
+        let elements = expended_element
+          .labels
+          .iter()
+          .map(|x| syn::Ident::new(&stringcase::pascal_case(x), proc_macro2::Span::call_site()));
+        let labels = &expended_element.labels;
         let labels = quote! {labels![#(#labels),*]};
 
         // Node structure
@@ -139,22 +225,23 @@ pub(super) fn generate_module_impl(input: ParsedInput) -> Result<TokenStream, sy
             pub(super) interface: Box<dyn QueryInterface>,
           }
 
-          impl #node_struct_name
+          impl Element for #node_struct_name
           {
-            #(
-              // Retrieve property #arg_names from the database
-              pub fn #arg_names(&self) -> Result<#arg_types>
-              {
-                let mut builder = gqb::Builder::default();
-                let var = builder.match_node(#labels, value_map!());
-                builder.where_statement(eb::equal(eb::function_call("id", (var,)), self.key.into()));
-                builder.return_property(var, vec![#arg_names_string], #arg_names_string);
-                let r = self.interface.execute_builder(builder)?.unwrap();
-                let val: #arg_types = r.value(0,0)?.try_into()?;
-                Ok(val.to_owned())
-              }
-            )*
+            fn query_interface(&self) -> &dyn QueryInterface
+            {
+              use std::ops::Deref;
+              self.interface.deref()
+            }
+            fn element_key(&self) -> graphcore::Key
+            {
+              self.key
+            }
           }
+
+          #(
+            impl elements::#elements for #node_struct_name
+            {}
+          )*
         });
 
         creation_functions.push(quote::quote! {
@@ -185,9 +272,14 @@ pub(super) fn generate_module_impl(input: ParsedInput) -> Result<TokenStream, sy
     /// Module with easy to use API generated from #filename
     pub mod #ident {
       use gqb::expression_builder as eb;
-      use #my_crate::{gqb, anyhow, graphcore::*, QueryInterface};
+      use #my_crate::{gqb, anyhow, graphcore::*, QueryInterface, Element};
 
       type Result<T, E = anyhow::Error> = std::result::Result<T,E>;
+      /// Elements
+      pub mod elements {
+        use super::*;
+        #(#elements)*
+      }
       /// Nodes
       pub mod nodes {
         use super::*;

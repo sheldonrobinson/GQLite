@@ -8,10 +8,22 @@ use crate::gqls::prelude::*;
 #[derive(Debug)]
 pub struct Ast
 {
+  /// List of elements
+  pub elements: IndexMap<String, PropertiesDefinition>,
   /// List of nodes
   pub nodes: Vec<Node>,
   /// List of edges
   pub edges: Vec<Edge>,
+}
+
+/// Represent an element
+#[derive(Debug)]
+pub struct PropertiesDefinition
+{
+  /// List of parament element
+  pub parents: Vec<String>,
+  /// Properties of the element
+  pub properties: IndexMap<String, Property>,
 }
 
 /// Represent a node
@@ -19,25 +31,17 @@ pub struct Ast
 pub struct Node
 {
   /// Main label of the node, used as identifer
-  pub identifier: String,
-  /// Labels of the node
-  pub labels: Vec<String>,
-  /// Properties of the node
-  pub properties: IndexMap<String, Property>,
+  pub label: String,
 }
 
 /// Represent an edge
 #[derive(Debug)]
 pub struct Edge
 {
-  /// Main label of the edge, used as identifer
-  pub identifer: String,
   /// Identifier of the source
   pub source: String,
-  /// Labels of the edge
-  pub labels: Vec<String>,
-  ///   /// Identifier of the destination
+  /// Main label of the edge, used as identifer
+  pub label: String,
+  /// Identifier of the destination
   pub destination: String,
-  /// Properties of the edge
-  pub properties: IndexMap<String, Property>,
 }

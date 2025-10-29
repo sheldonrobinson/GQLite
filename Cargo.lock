@@ -2124,6 +2124,7 @@ name = "gqls-macros"
 version = "0.1.0"
 dependencies = [
  "gqlparser",
+ "indexmap",
  "proc-macro-crate",
  "proc-macro2",
  "quote",

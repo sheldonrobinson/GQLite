@@ -12,7 +12,8 @@ gqlite = ["dep:gqlitedb"]
 
 [dependencies]
 gqlitedb = { workspace = true, optional = true }
-graphcore.workspace = true
-gqls-macros.workspace = true
 gqb.workspace = true
+gqls-macros.workspace = true
+graphcore.workspace = true
+
 anyhow = "1"

@@ -430,15 +430,12 @@ impl TryFrom<Value> for TimeStamp
   {
     match value
     {
-      Value::String(s) => Ok(TimeStamp::parse(&s)?.into()),
+      Value::String(s) => Ok(TimeStamp::parse(&s)?),
       Value::TimeStamp(v) => Ok(v),
-      _ => Err(
-        Error::InvalidValueCast {
-          value: Box::new(value),
-          typename: stringify!($type),
-        }
-        .into(),
-      ),
+      _ => Err(Error::InvalidValueCast {
+        value: Box::new(value),
+        typename: stringify!($type),
+      }),
     }
   }
 }

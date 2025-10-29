@@ -7,11 +7,6 @@ pub enum Error
   Parse(String),
   #[error("IncompleteParsingError: '{0}' was not parsed.")]
   IncompleteParsing(String),
-  #[error("UnknownPropertyDefinitionError: '{label}' was not defined.")]
-  UnknownPropertyDefinition
-  {
-    label: String
-  },
   #[error("MultiTypeCannotBeConvertedToSingle")]
   MultiTypeCannotBeConvertedToSingle,
   #[error("InvalidType")]

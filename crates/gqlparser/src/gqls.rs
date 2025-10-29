@@ -9,46 +9,6 @@ use indexmap::IndexMap;
 use nom::Finish;
 
 use crate::prelude::*;
-use prelude::*;
-
-fn search_properties(
-  properties_definitions: &IndexMap<String, (IndexMap<String, Property>, Option<String>)>,
-  label: String,
-  required: bool,
-) -> Result<(Vec<String>, IndexMap<String, Property>)>
-{
-  let definition = properties_definitions.get(&label);
-
-  match definition
-  {
-    Some((current_properties, Some(parent))) =>
-    {
-      let (mut labels, mut properties) =
-        search_properties(properties_definitions, parent.to_owned(), true)?;
-      labels.push(label);
-      properties.extend(
-        current_properties
-          .iter()
-          .map(|(k, v)| (k.to_owned(), v.to_owned())),
-      );
-      Ok((labels, properties))
-    }
-    Some((current_properties, None)) => Ok((vec![label], current_properties.to_owned())),
-    None =>
-    {
-      if required
-      {
-        Err(Error::UnknownPropertyDefinition {
-          label: label.clone(),
-        })
-      }
-      else
-      {
-        Ok((vec![label], Default::default()))
-      }
-    }
-  }
-}
 
 /// Parse a schmea into an AST.
 pub fn parse_schema(input: &str) -> Result<ast::Ast>
@@ -66,8 +26,7 @@ pub fn parse_schema(input: &str) -> Result<ast::Ast>
   // Convert to AST
   let mut nodes: Vec<ast::Node> = Default::default();
   let mut edges: Vec<ast::Edge> = Default::default();
-  let mut properties_definitions: IndexMap<String, (IndexMap<String, Property>, Option<String>)> =
-    Default::default();
+  let mut properties_definitions: IndexMap<String, ast::PropertiesDefinition> = Default::default();
 
   for element in parse_tree
   {
@@ -79,17 +38,18 @@ pub fn parse_schema(input: &str) -> Result<ast::Ast>
         parent,
       } =>
       {
-        properties_definitions.insert(label, (properties, parent));
+        let parents = parent.map_or_else(Vec::new, |x| vec![x]);
+        properties_definitions.insert(
+          label,
+          ast::PropertiesDefinition {
+            parents,
+            properties,
+          },
+        );
       }
       parser::ParseTreeElement::Node { label } =>
       {
-        let (labels, properties) =
-          search_properties(&properties_definitions, label.clone(), false)?;
-        nodes.push(ast::Node {
-          identifier: label,
-          labels,
-          properties,
-        });
+        nodes.push(ast::Node { label });
       }
       parser::ParseTreeElement::Edge {
         source,
@@ -97,20 +57,20 @@ pub fn parse_schema(input: &str) -> Result<ast::Ast>
         destination,
       } =>
       {
-        let (labels, properties) =
-          search_properties(&properties_definitions, label.clone(), false)?;
         edges.push(ast::Edge {
-          identifer: label,
           source,
-          labels,
-          properties,
+          label,
           destination,
         });
       }
     }
   }
 
-  Ok(ast::Ast { nodes, edges })
+  Ok(ast::Ast {
+    elements: properties_definitions,
+    nodes,
+    edges,
+  })
 }
 
 #[cfg(test)]
@@ -153,52 +113,77 @@ KNOWS {
 
     // Check nodes
     assert_eq!(ast.nodes.len(), 3);
-    let n0 = &ast.nodes[0];
-    assert_eq!(n0.labels, vec!["Person".to_string()]);
-    assert_eq!(n0.properties.len(), 2);
-    assert_eq!(n0.properties["firstName"], LiteralBaseType::String.into());
-    assert_eq!(n0.properties["lastName"], LiteralBaseType::String.into());
-    let n1 = &ast.nodes[1];
-    assert_eq!(n1.labels, vec!["Message".to_string(), "Post".to_string()]);
-    assert_eq!(n1.properties.len(), 3);
-    assert_eq!(
-      n1.properties["creationDate"],
-      LiteralBaseType::TimeStamp.into()
-    );
-    assert_eq!(n1.properties["browserUsed"], LiteralBaseType::String.into());
-    assert_eq!(
-      n1.properties["imageFile"],
-      Property::Optional(Box::new(LiteralBaseType::String.into()))
-    );
-    let n2 = &ast.nodes[2];
-    assert_eq!(
-      n2.labels,
-      vec!["Message".to_string(), "Comment".to_string()]
-    );
-    assert_eq!(n2.properties.len(), 2);
-    assert_eq!(
-      n2.properties["creationDate"],
-      LiteralBaseType::TimeStamp.into()
-    );
-    assert_eq!(n2.properties["browserUsed"], LiteralBaseType::String.into());
+    assert_eq!(&ast.nodes[0].label, "Person");
+    assert_eq!(&ast.nodes[1].label, "Post");
+    assert_eq!(&ast.nodes[2].label, "Comment");
 
-    // Check edges
     assert_eq!(ast.edges.len(), 4);
     let e0 = &ast.edges[0];
-    assert_eq!(e0.source, "Person");
-    assert_eq!(e0.labels, vec!["KNOWS".to_string()]);
-    assert_eq!(e0.destination, "Person");
+    assert_eq!(&e0.source, "Person");
+    assert_eq!(&e0.label, "KNOWS");
+    assert_eq!(&e0.destination, "Person");
     let e1 = &ast.edges[1];
-    assert_eq!(e1.source, "Person");
-    assert_eq!(e1.labels, vec!["LIKES".to_string()]);
-    assert_eq!(e1.destination, "Message");
+    assert_eq!(&e1.source, "Person");
+    assert_eq!(&e1.label, "LIKES");
+    assert_eq!(&e1.destination, "Message");
     let e2 = &ast.edges[2];
-    assert_eq!(e2.source, "Message");
-    assert_eq!(e2.labels, vec!["HAS_CREATOR".to_string()]);
-    assert_eq!(e2.destination, "Person");
+    assert_eq!(&e2.source, "Message");
+    assert_eq!(&e2.label, "HAS_CREATOR");
+    assert_eq!(&e2.destination, "Person");
     let e3 = &ast.edges[3];
-    assert_eq!(e3.source, "Comment");
-    assert_eq!(e3.labels, vec!["REPLY_OF".to_string()]);
-    assert_eq!(e3.destination, "Message");
+    assert_eq!(&e3.source, "Comment");
+    assert_eq!(&e3.label, "REPLY_OF");
+    assert_eq!(&e3.destination, "Message");
+
+    let (pd0_key, pd0_v) = &ast.elements.get_index(0).unwrap();
+    assert_eq!(pd0_key.as_str(), "Person");
+    assert!(pd0_v.parents.is_empty());
+    assert_eq!(pd0_v.properties.len(), 2);
+    assert_eq!(
+      pd0_v.properties["firstName"],
+      LiteralBaseType::String.into()
+    );
+    assert_eq!(pd0_v.properties["lastName"], LiteralBaseType::String.into());
+
+    let (pd1_key, pd1_v) = &ast.elements.get_index(1).unwrap();
+    assert_eq!(pd1_key.as_str(), "Message");
+    assert!(pd1_v.parents.is_empty());
+    assert_eq!(pd1_v.properties.len(), 2);
+    assert_eq!(
+      pd1_v.properties["creationDate"],
+      LiteralBaseType::TimeStamp.into()
+    );
+    assert_eq!(
+      pd1_v.properties["browserUsed"],
+      LiteralBaseType::String.into()
+    );
+
+    let (pd2_key, pd2_v) = &ast.elements.get_index(2).unwrap();
+    assert_eq!(pd2_key.as_str(), "Comment");
+    assert_eq!(pd2_v.parents, vec!["Message".to_string()]);
+    assert!(pd2_v.properties.is_empty());
+
+    let (pd3_key, pd3_v) = &ast.elements.get_index(3).unwrap();
+    assert_eq!(pd3_key.as_str(), "Post");
+    assert_eq!(pd3_v.parents, vec!["Message".to_string()]);
+    assert_eq!(pd3_v.properties.len(), 1);
+    assert_eq!(
+      pd3_v.properties["imageFile"],
+      Property::Optional(Box::new(LiteralBaseType::String.into()))
+    );
+
+    let (pd4_key, pd4_v) = &ast.elements.get_index(4).unwrap();
+    assert_eq!(pd4_key.as_str(), "REPLY_OF");
+    assert!(pd4_v.parents.is_empty());
+    assert!(pd4_v.properties.is_empty());
+
+    let (pd5_key, pd5_v) = &ast.elements.get_index(5).unwrap();
+    assert_eq!(pd5_key.as_str(), "KNOWS");
+    assert!(pd5_v.parents.is_empty());
+    assert_eq!(pd5_v.properties.len(), 1);
+    assert_eq!(
+      pd5_v.properties["creationDate"],
+      LiteralBaseType::TimeStamp.into()
+    );
   }
 }

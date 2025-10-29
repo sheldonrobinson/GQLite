@@ -23,6 +23,7 @@ gqls-macros = { version = "0.1.0", path = "crates/gqls-macros" }
 
 askama = { version = "0.14" }
 ccutils = { version = "0.4" }
+indexmap = "2"
 itertools = "0.14"
 serde = "1"
 thiserror = "2"

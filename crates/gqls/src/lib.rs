@@ -18,6 +18,15 @@ pub trait QueryInterface: Sync + Send
   fn clone_interface(&self) -> Box<dyn QueryInterface>;
 }
 
+/// Base trait for Elements
+pub trait Element: Sync + Send
+{
+  /// Access to the query interface
+  fn query_interface(&self) -> &dyn QueryInterface;
+  /// Access to the key referencing the element
+  fn element_key(&self) -> graphcore::Key;
+}
+
 #[cfg(feature = "gqlite")]
 mod gqlitedb_impl
 {
@@ -64,6 +73,8 @@ mod tests
 
     let connection = Arc::new(gqlitedb::Connection::create(Default::default()).unwrap());
     let graph = test_module::Graph::new(connection.clone());
+
+    use test_module::elements::*;
 
     // Test creating person
     let bob_marley = graph.create_person("Bob", "Marley").unwrap();
