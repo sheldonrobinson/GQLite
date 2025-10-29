@@ -374,6 +374,16 @@ pub(super) fn generate_module_impl(input: ParsedInput) -> Result<TokenStream, sy
                 #my_crate::ElementType::Edge
               }
             }
+            impl<TSource, TDestination> Edge for #edge_struct_name<TSource, TDestination>
+              where (TSource, TDestination): #into_edge_trait_name,
+                    TSource: Node,
+                    TDestination: Node,
+            {
+              fn labels() -> Vec<String>
+              {
+                #labels
+              }
+            }
             pub trait #into_edge_trait_name
             {
             }
@@ -437,7 +447,7 @@ pub(super) fn generate_module_impl(input: ParsedInput) -> Result<TokenStream, sy
     /// Module with easy to use API generated from #filename
     pub mod #ident {
       use gqb::expression_builder as eb;
-      use #my_crate::{gqb, anyhow, graphcore::*, QueryInterface, Element, Node};
+      use #my_crate::{gqb, anyhow, graphcore::*, QueryInterface, Element, Node, Edge};
 
       type Result<T, E = anyhow::Error> = std::result::Result<T,E>;
       /// Elements
@@ -472,6 +482,26 @@ pub(super) fn generate_module_impl(input: ParsedInput) -> Result<TokenStream, sy
           }
         }
         #(#creation_functions)*
+        /// Delete a node
+        pub fn delete_node<TNode: Node>(&self, node: TNode) -> Result<()>
+        {
+          let mut builder = gqb::Builder::default();
+          let var = builder.match_node(TNode::labels(), value_map!());
+          builder.where_statement(eb::equal(eb::function_call("id", (var,)), node.element_key().into()));
+          builder.detach_delete(var);
+          let _ = self.interface.execute_builder(builder)?;
+          Ok(())
+        }
+        /// Delete an edge
+        pub fn delete_edge<TEdge: Edge>(&self, edge: TEdge) -> Result<()>
+        {
+          let mut builder = gqb::Builder::default();
+          let var = builder.match_edge(None, TEdge::labels(), value_map!(), None);
+          builder.where_statement(eb::equal(eb::function_call("id", (var,)), edge.element_key().into()));
+          builder.delete(var);
+          let _ = self.interface.execute_builder(builder)?;
+          Ok(())
+        }
       }
     }
   })

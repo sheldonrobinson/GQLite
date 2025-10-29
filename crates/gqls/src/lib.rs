@@ -24,7 +24,7 @@ pub enum ElementType
   /// It is a node
   Node,
   /// It is an edge
-  Edge
+  Edge,
 }
 
 /// Base trait for Elements
@@ -38,10 +38,18 @@ pub trait Element: Sync + Send
   fn element_type(&self) -> ElementType;
 }
 
+/// Base trait for nodes
 pub trait Node: Element
 {
   /// Create the element from the key
   fn from_key(key: graphcore::Key, query_interface: Box<dyn QueryInterface>) -> Self;
+  /// Vector of labels for the node
+  fn labels() -> Vec<String>;
+}
+
+/// Base trait for edges
+pub trait Edge: Element
+{
   /// Vector of labels for the node
   fn labels() -> Vec<String>;
 }
@@ -158,5 +166,9 @@ mod tests
       bob_marley.element_key()
     );
     assert_eq!(edge_bm_bm.creation_date().unwrap(), timestamp);
+
+    // Test deletion
+    graph.delete_edge(edge_bm_bm).unwrap();
+    graph.delete_node(bob_marley).unwrap();
   }
 }
