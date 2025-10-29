@@ -168,14 +168,17 @@ pub(super) fn generate_module_impl(input: ParsedInput) -> Result<TokenStream, sy
 
         elements.push(quote! {
           /// Trait for the element #element_trait_name
-          pub trait #element_trait_name: #my_crate::Element
+          pub trait #element_trait_name: Element
           {
             #(
               // Retrieve property #arg_names from the database
               fn #property_names(&self) -> Result<#property_types>
               {
                 let mut builder = gqb::Builder::default();
-                let var = builder.match_node(labels![#identifier], value_map!());
+                let var = match self.element_type() {
+                  #my_crate::ElementType::Node => builder.match_node(labels![#identifier], value_map!()),
+                  #my_crate::ElementType::Edge => builder.match_edge(None, labels![#identifier], value_map!(), None),
+                };
                 builder.where_statement(eb::equal(eb::function_call("id", (var,)), self.element_key().into()));
                 builder.return_property(var, vec![#property_names_string], #property_names_string);
                 let r = self.query_interface().execute_builder(builder)?.unwrap();
@@ -236,6 +239,24 @@ pub(super) fn generate_module_impl(input: ParsedInput) -> Result<TokenStream, sy
             {
               self.key
             }
+            fn element_type(&self) -> #my_crate::ElementType
+            {
+              #my_crate::ElementType::Node
+            }
+          }
+          impl Node for #node_struct_name
+          {
+            fn from_key(key: graphcore::Key, interface: Box<dyn QueryInterface>) -> Self
+            {
+              Self {
+                key,
+                interface
+              }
+            }
+            fn labels() -> Vec<String>
+            {
+              #labels
+            }
           }
 
           #(
@@ -260,6 +281,150 @@ pub(super) fn generate_module_impl(input: ParsedInput) -> Result<TokenStream, sy
           }
         });
       }
+
+      // Generate the fragments for edges
+      let mut generated_edges = Vec::<String>::new();
+      for edge in ast.edges
+      {
+        let node_source_name =
+          syn::Ident::new(&stringcase::pascal_case(&edge.source), Span::call_site());
+        let create_edge_function_name =
+          format_ident!("create_{}", stringcase::snake_case(&edge.label));
+        let node_destination_name = syn::Ident::new(
+          &stringcase::pascal_case(&edge.destination),
+          Span::call_site(),
+        );
+        let edge_struct_name =
+          syn::Ident::new(&stringcase::pascal_case(&edge.label), Span::call_site());
+        let into_edge_trait_name = format_ident!("Into{}", stringcase::pascal_case(&edge.label));
+
+        if !generated_edges.contains(&edge.label)
+        {
+          generated_edges.push(edge.label.clone());
+
+          // Fields
+          let mut arg_names = Vec::<syn::Ident>::default();
+          let mut arg_names_string = Vec::<String>::default();
+          let mut arg_types = Vec::<TokenStream>::default();
+
+          let expended_element = expand_element(&ast.elements, edge.label)?;
+
+          for field in expended_element.properties
+          {
+            arg_names.push(syn::Ident::new(
+              &snake_case(&field.0),
+              proc_macro2::Span::call_site(),
+            ));
+            arg_names_string.push(field.0.to_owned());
+            arg_types.push(property_type(&field.1)?);
+          }
+          let elements = expended_element
+            .labels
+            .iter()
+            .map(|x| syn::Ident::new(&stringcase::pascal_case(x), proc_macro2::Span::call_site()));
+          let labels = &expended_element.labels;
+          let labels = quote! {labels![#(#labels),*]};
+
+          // Define edge structure
+          edges.push(quote::quote! {
+            pub struct #edge_struct_name<TSource, TDestination>
+              where (TSource, TDestination): #into_edge_trait_name,
+                    TSource: Node,
+                    TDestination: Node,
+            {
+              pub(super) source: graphcore::Key,
+              pub(super) destination: graphcore::Key,
+              pub(super) key: graphcore::Key,
+              pub(super) interface: Box<dyn QueryInterface>,
+              pub(super) source_ghost: std::marker::PhantomData<TSource>,
+              pub(super) destination_ghost: std::marker::PhantomData<TDestination>,
+            }
+            impl<TSource, TDestination> #edge_struct_name<TSource, TDestination>
+              where (TSource, TDestination): #into_edge_trait_name,
+                    TSource: Node,
+                    TDestination: Node,
+            {
+              /// Access the source of the edge
+              pub fn source(&self) -> TSource
+              {
+                TSource::from_key(self.source, self.interface.clone_interface())
+              }
+              /// Access the destination of the edge
+              pub fn destination(&self) -> TDestination
+              {
+                TDestination::from_key(self.destination, self.interface.clone_interface())
+              }
+            }
+            impl<TSource, TDestination> Element for #edge_struct_name<TSource, TDestination>
+              where (TSource, TDestination): #into_edge_trait_name,
+                    TSource: Node,
+                    TDestination: Node,
+            {
+              fn query_interface(&self) -> &dyn QueryInterface
+              {
+                use std::ops::Deref;
+                self.interface.deref()
+              }
+              fn element_key(&self) -> graphcore::Key
+              {
+                self.key
+              }
+              fn element_type(&self) -> #my_crate::ElementType
+              {
+                #my_crate::ElementType::Edge
+              }
+            }
+            pub trait #into_edge_trait_name
+            {
+            }
+
+            #(
+              impl<TSource, TDestination> elements::#elements for #edge_struct_name<TSource, TDestination>
+                where (TSource, TDestination): #into_edge_trait_name,
+                      TSource: Node,
+                      TDestination: Node,
+              {}
+            )*
+          });
+
+          creation_functions.push(quote::quote! {
+            /// Create a new edge,
+            pub fn #create_edge_function_name<TSource, TDestination>(&self, source: &TSource, destination: &TDestination, #(#arg_names: impl Into<#arg_types>),*)
+              -> Result<edges::#edge_struct_name<TSource, TDestination>>
+              where (TSource, TDestination): edges::#into_edge_trait_name,
+                    TSource: Node,
+                    TDestination: Node,
+            {
+              let mut builder = gqb::Builder::default();
+              let source_var = builder.match_node(TSource::labels(), value_map!());
+              let destination_var = builder.match_node(TDestination::labels(), value_map!());
+              builder.where_statement(
+                eb::and(
+                  eb::equal(eb::function_call("id", (source_var,)), source.element_key().into()),
+                  eb::equal(eb::function_call("id", (destination_var,)), destination.element_key().into()),
+                )
+              );
+              let variable = builder.create_edge(source_var, #labels, value_map!(#(#arg_names_string => #arg_names.into()),*), destination_var);
+              builder.return_expression(eb::function_call("id", (variable,)), "id");
+              let r = self.interface.execute_builder(builder)?.unwrap();
+              let key: &graphcore::Key = r.value(0,0)?.try_into_ref()?;
+              Ok(edges::#edge_struct_name {
+                source: source.element_key(),
+                destination: destination.element_key(),
+                key: key.to_owned(),
+                interface: self.interface.clone_interface(),
+                source_ghost: Default::default(),
+                destination_ghost: Default::default(),
+              })
+            }
+          });
+        }
+        edges.push(quote::quote! {
+          impl<TSource, TDestination> #into_edge_trait_name for (TSource, TDestination)
+            where TSource: elements::#node_source_name, TDestination: elements::#node_destination_name
+          {}
+        });
+      }
     }
     Err(e) => Err(syn::Error::new(
       filename.span(),
@@ -272,7 +437,7 @@ pub(super) fn generate_module_impl(input: ParsedInput) -> Result<TokenStream, sy
     /// Module with easy to use API generated from #filename
     pub mod #ident {
       use gqb::expression_builder as eb;
-      use #my_crate::{gqb, anyhow, graphcore::*, QueryInterface, Element};
+      use #my_crate::{gqb, anyhow, graphcore::*, QueryInterface, Element, Node};
 
       type Result<T, E = anyhow::Error> = std::result::Result<T,E>;
       /// Elements

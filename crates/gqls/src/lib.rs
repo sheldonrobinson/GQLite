@@ -18,6 +18,15 @@ pub trait QueryInterface: Sync + Send
   fn clone_interface(&self) -> Box<dyn QueryInterface>;
 }
 
+/// Type of the element
+pub enum ElementType
+{
+  /// It is a node
+  Node,
+  /// It is an edge
+  Edge
+}
+
 /// Base trait for Elements
 pub trait Element: Sync + Send
 {
@@ -25,6 +34,16 @@ pub trait Element: Sync + Send
   fn query_interface(&self) -> &dyn QueryInterface;
   /// Access to the key referencing the element
   fn element_key(&self) -> graphcore::Key;
+  /// Access the type of the element
+  fn element_type(&self) -> ElementType;
+}
+
+pub trait Node: Element
+{
+  /// Create the element from the key
+  fn from_key(key: graphcore::Key, query_interface: Box<dyn QueryInterface>) -> Self;
+  /// Vector of labels for the node
+  fn labels() -> Vec<String>;
 }
 
 #[cfg(feature = "gqlite")]
@@ -111,5 +130,33 @@ mod tests
       *n.properties(),
       value_map!("creationDate" => format!("{}", timestamp), "browserUsed" => "FireGoupil", "imageFile" => ())
     );
+
+    // Test creating edge
+    let edge_bm_post = graph.create_likes(&bob_marley, &post).unwrap();
+    assert_eq!(
+      edge_bm_post.source().element_key(),
+      bob_marley.element_key()
+    );
+    assert_eq!(edge_bm_post.destination().element_key(), post.element_key());
+    let r = connection
+      .execute_oc_query("MATCH p = ()-[]->() RETURN p", Default::default())
+      .unwrap();
+    let t = r.try_into_table().unwrap();
+    assert_eq!(t.rows(), 1);
+    let edge_q: &graphcore::SinglePath = &t.get(0, 0).unwrap();
+    assert_eq!(edge_q.source().key(), bob_marley.element_key());
+    assert_eq!(edge_q.key(), edge_bm_post.element_key());
+    assert_eq!(edge_q.destination().key(), post.element_key());
+
+    // Create an other edge
+    let edge_bm_bm = graph
+      .create_knows(&bob_marley, &bob_marley, timestamp.clone())
+      .unwrap();
+    assert_eq!(edge_bm_bm.source().element_key(), bob_marley.element_key());
+    assert_eq!(
+      edge_bm_bm.destination().element_key(),
+      bob_marley.element_key()
+    );
+    assert_eq!(edge_bm_bm.creation_date().unwrap(), timestamp);
   }
 }

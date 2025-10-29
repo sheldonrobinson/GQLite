@@ -13,6 +13,8 @@ REPLY_OF {},
 KNOWS {
   creationDate : TIMESTAMP
 },
+LIKES {},
+HAS_CREATOR {},
 
 // Nodes
 (Person), (Post), (Comment),
