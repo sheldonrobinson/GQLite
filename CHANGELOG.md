@@ -4,6 +4,8 @@
 
 ## [Unreleased] - ReleaseDate
 
+- Add possibility to create Rune connection from arc connection.
+
 ## [0.6.1] - 2025-10-28
 
 - Add `id` function.
