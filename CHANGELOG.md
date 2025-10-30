@@ -6,6 +6,10 @@
 
 - Add possibility to create Rune connection from arc connection.
 
+### gqb
+
+- Add support for set statements.
+
 ## [0.6.1] - 2025-10-28
 
 - Add `id` function.

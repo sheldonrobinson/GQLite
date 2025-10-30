@@ -125,13 +125,29 @@ struct DeleteStatement
 }
 
 #[derive(Debug)]
+enum SetExpression
+{
+  Assignment
+  {
+    lhs: Expression, rhs: Expression
+  },
+}
+
+#[derive(Debug, Default)]
+struct SetStatement
+{
+  expressions: Vec<SetExpression>,
+}
+
+#[derive(Debug)]
 enum Statement
 {
   Create(CreateStatement),
   Match(MatchStatement),
   Where(WhereStatement),
-  Return_(ReturnStatement),
+  Return(ReturnStatement),
   Delete(DeleteStatement),
+  Set(SetStatement),
 }
 
 /// Structure for building queries.
@@ -172,8 +188,9 @@ impl Builder
 {
   last_statement! {last_create_statement, CreateStatement, Statement::Create}
   last_statement! {last_match_statement, MatchStatement, Statement::Match}
-  last_statement! {last_return_statement, ReturnStatement, Statement::Return_}
+  last_statement! {last_return_statement, ReturnStatement, Statement::Return}
   last_statement! {last_delete_statement, DeleteStatement, Statement::Delete}
+  last_statement! {last_set_statement, SetStatement, Statement::Set}
 
   fn next_variable(&mut self, suffix: &'static str) -> Variable
   {
@@ -273,6 +290,24 @@ impl Builder
       ),
     ));
     var
+  }
+  /// Add a set statement for assigning a new value
+  pub fn set_assignment<I, S>(&mut self, variable: Variable, path: I, expression: Expression)
+  where
+    I: IntoIterator<Item = S>,
+    S: Borrow<str> + std::fmt::Display,
+  {
+    use expression_builder as eb;
+    self
+      .last_set_statement()
+      .expressions
+      .push(SetExpression::Assignment {
+        lhs: eb::get(
+          variable.into(),
+          path.into_iter().map(|s| s.to_string()).collect(),
+        ),
+        rhs: expression,
+      });
   }
   /// Add a where statement
   pub fn where_statement(&mut self, expression: Expression)
@@ -436,6 +471,28 @@ impl Builder
             bindings.insert(properties_binding, edge.properties().to_owned().into());
           }
         }
+        Statement::Set(set_statement) =>
+        {
+          q += &format!(
+            "SET {}",
+            set_statement
+              .expressions
+              .into_iter()
+              .map(|x| match x
+              {
+                SetExpression::Assignment { lhs, rhs } =>
+                {
+                  format!(
+                    "{} = {}",
+                    lhs.into_oc_query(&mut bindings),
+                    rhs.into_oc_query(&mut bindings)
+                  )
+                }
+              })
+              .collect::<Vec<_>>()
+              .join(", ")
+          )
+        }
         Statement::Where(where_statment) =>
         {
           q += &format!(
@@ -443,7 +500,7 @@ impl Builder
             where_statment.expression.into_oc_query(&mut bindings)
           )
         }
-        Statement::Return_(return_statement) =>
+        Statement::Return(return_statement) =>
         {
           q += "RETURN ";
           let mut comma = false;
@@ -583,5 +640,24 @@ mod test
     let (q, b) = b.into_oc_query().unwrap();
     assert_eq!(q, "MATCH (n1: $b0) WHERE (id(n1)) = ($l1)".to_string());
     assert_eq!(b, value_map!("$b0" => value_map!(), "$l1" => vid));
+  }
+  #[test]
+  fn test_set()
+  {
+    let connection = gqlitedb::Connection::builder().create().unwrap();
+    let mut b = Builder::default();
+    let var = b.create_node(labels!["a"], value_map!());
+    b.set_assignment(var, vec!["bob"], 1.into());
+    b.return_property(var, vec!["bob"], "bob");
+    let (q, b) = b.into_oc_query().unwrap();
+    assert_eq!(q, "CREATE (n1:a $b0) SET n1.bob = $l1 RETURN n1.bob AS bob");
+    assert_eq!(b, value_map!("$b0" => value_map!(), "$l1" => 1));
+    let t = connection
+      .execute_oc_query(q, b)
+      .unwrap()
+      .try_into_table()
+      .unwrap();
+    assert_eq!(t.rows(), 1);
+    assert_eq!(*t.get::<i64>(0, 0).unwrap(), 1);
   }
 }
