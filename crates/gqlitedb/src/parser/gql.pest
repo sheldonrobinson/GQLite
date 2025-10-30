@@ -63,7 +63,8 @@ where_modifier = { "WHERE" ~ expression }
 
 // Statements
 statement = {
-    create_graph_statement
+    create_graph_if_not_exists_statement
+  | create_graph_statement
   | drop_graph_if_exists_statement
   | drop_graph_statement
   | use_graph_statement
@@ -83,6 +84,7 @@ statement = {
 star = { "*" }
 
 create_graph_statement   = { "CREATE" ~ "GRAPH" ~ ident }
+create_graph_if_not_exists_statement   = { "CREATE" ~ "GRAPH" ~ "IF" ~ "NOT" ~ "EXISTS" ~ ident }
 drop_graph_statement     = { "DROP" ~ "GRAPH" ~ ident }
 drop_graph_if_exists_statement     = { "DROP" ~ "GRAPH" ~ "IF" ~ "EXISTS" ~ ident }
 use_graph_statement      = { "USE" ~ ident }

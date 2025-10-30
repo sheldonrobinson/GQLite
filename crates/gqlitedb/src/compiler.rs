@@ -942,6 +942,7 @@ pub(crate) fn compile(
       {
         ast::Statement::CreateGraph(create_graph) => Ok(Block::CreateGraph {
           name: create_graph.name.to_owned(),
+          if_not_exists: create_graph.if_not_exists,
         }),
         ast::Statement::DropGraph(drop_graph) => Ok(Block::DropGraph {
           name: drop_graph.name.to_owned(),

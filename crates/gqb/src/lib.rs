@@ -142,9 +142,23 @@ struct SetStatement
 }
 
 #[derive(Debug)]
-struct GraphStatement
+struct UseGraphStatement
 {
   name: String,
+}
+
+#[derive(Debug)]
+struct CreateGraphStatement
+{
+  name: String,
+  if_not_exists: bool,
+}
+
+#[derive(Debug)]
+struct DropGraphStatement
+{
+  name: String,
+  if_exists: bool,
 }
 
 #[derive(Debug)]
@@ -156,9 +170,9 @@ enum Statement
   Return(ReturnStatement),
   Delete(DeleteStatement),
   Set(SetStatement),
-  UseGraph(GraphStatement),
-  CreateGraph(GraphStatement),
-  DropGraph(GraphStatement),
+  UseGraph(UseGraphStatement),
+  CreateGraph(CreateGraphStatement),
+  DropGraph(DropGraphStatement),
 }
 
 /// Structure for building queries.
@@ -365,23 +379,29 @@ impl Builder
   /// Select the graph to use
   pub fn use_graph(&mut self, graphname: impl Into<String>)
   {
-    self.statements.push(Statement::UseGraph(GraphStatement {
+    self.statements.push(Statement::UseGraph(UseGraphStatement {
       name: graphname.into(),
     }));
   }
   /// Select the graph to use
-  pub fn create_graph(&mut self, graphname: impl Into<String>)
+  pub fn create_graph(&mut self, graphname: impl Into<String>, if_not_exists: bool)
   {
-    self.statements.push(Statement::CreateGraph(GraphStatement {
-      name: graphname.into(),
-    }));
+    self
+      .statements
+      .push(Statement::CreateGraph(CreateGraphStatement {
+        name: graphname.into(),
+        if_not_exists,
+      }));
   }
   /// Drop the graph
-  pub fn drop_graph(&mut self, graphname: impl Into<String>)
+  pub fn drop_graph(&mut self, graphname: impl Into<String>, if_exists: bool)
   {
-    self.statements.push(Statement::DropGraph(GraphStatement {
-      name: graphname.into(),
-    }));
+    self
+      .statements
+      .push(Statement::DropGraph(DropGraphStatement {
+        name: graphname.into(),
+        if_exists,
+      }));
   }
   /// Generate an OpenCypher Query.
   pub fn into_oc_query(self) -> Result<(String, graphcore::ValueMap)>
@@ -576,8 +596,28 @@ impl Builder
           .as_str();
         }
         Statement::UseGraph(graph) => q += &format!("USE {}", graph.name),
-        Statement::CreateGraph(graph) => q += &format!("CREATE GRAPH {}", graph.name),
-        Statement::DropGraph(graph) => q += &format!("DROP GRAPH {}", graph.name),
+        Statement::CreateGraph(graph) =>
+        {
+          if graph.if_not_exists
+          {
+            q += &format!("CREATE GRAPH IF NOT EXISTS {}", graph.name)
+          }
+          else
+          {
+            q += &format!("CREATE GRAPH {}", graph.name)
+          }
+        }
+        Statement::DropGraph(graph) =>
+        {
+          if graph.if_exists
+          {
+            q += &format!("DROP GRAPH IF EXISTS {}", graph.name)
+          }
+          else
+          {
+            q += &format!("DROP GRAPH {}", graph.name)
+          }
+        }
       }
     }
 
@@ -754,7 +794,7 @@ mod test
   {
     let connection = gqlitedb::Connection::builder().create().unwrap();
     let mut b = Builder::default();
-    b.create_graph("Hello");
+    b.create_graph("Hello", false);
     b.create_node(labels!("a"), value_map!());
     b.use_graph("default");
     b.create_node(labels!("b"), value_map!());
@@ -779,7 +819,7 @@ mod test
     assert_eq!(*r.get::<Node>(0, 1).unwrap().labels(), labels!("a"));
 
     let mut b = Builder::default();
-    b.drop_graph("Hello");
+    b.drop_graph("Hello", false);
     b.use_graph("Hello");
     let (q, b) = b.into_oc_query().unwrap();
     let r = connection.execute_oc_query(q, b).expect_err("should fail");

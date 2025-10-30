@@ -129,6 +129,7 @@ pub(crate) type Queries = Vec<Statements>;
 pub(crate) struct CreateGraph
 {
   pub(crate) name: String,
+  pub(crate) if_not_exists: bool,
 }
 
 #[derive(Debug)]

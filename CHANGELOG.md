@@ -5,6 +5,7 @@
 ## [Unreleased] - ReleaseDate
 
 - Add possibility to create Rune connection from arc connection.
+- Add support for `CREATE GRAPH IF NOT EXISTS`
 
 ### gqb
 

@@ -1212,10 +1212,13 @@ pub(crate) fn eval_program<TStore: store::Store>(
     }
     match block
     {
-      instructions::Block::CreateGraph { name } =>
+      instructions::Block::CreateGraph {
+        name,
+        if_not_exists,
+      } =>
       {
         store
-          .create_graph(&mut tx, name, false)
+          .create_graph(&mut tx, name, *if_not_exists)
           .map_err(|e|
             error::map_error!(e, Error::StoreError(StoreError::DuplicatedGraph { graph_name }) => RunTimeError::DuplicatedGraph {
               graph_name: graph_name.clone(),

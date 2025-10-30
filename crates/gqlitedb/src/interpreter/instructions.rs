@@ -207,7 +207,7 @@ pub(crate) enum Block
 {
   CreateGraph
   {
-    name: String
+    name: String, if_not_exists: bool
   },
   DropGraph
   {
