@@ -1,1 +1,1 @@
-({{ var.suffix }}{{ var.id }}:{{ labels|join(":") }} {{ properties_binding }})
+({{ var.suffix }}{{ var.id }}{% if !labels.is_empty() %}:{{ labels|join(":") }}{% endif %}{% if has_properties %} {{ properties_binding }}{% endif %})

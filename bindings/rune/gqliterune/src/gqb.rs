@@ -107,10 +107,10 @@ mod tests
       "#,
       )
       .unwrap();
-    assert_eq!(n, "CREATE (n1:n $b0), (n2:m $b1), (n1)-[e3:n $b2]->(n2)");
+    assert_eq!(n, "CREATE (n1:n $b0), (n2:m), (n1)-[e3:n $b1]->(n2)");
     assert_eq!(
       crate::to_gc_value(b).unwrap(),
-      graphcore::value_map!("$b0" => graphcore::value_map!("a" => 1), "$b2"=> graphcore::value_map!("a" => 2), "$b1" => graphcore::ValueMap::default()).into()
+      graphcore::value_map!("$b0" => graphcore::value_map!("a" => 1), "$b1"=> graphcore::value_map!("a" => 2)).into()
     )
   }
 }

@@ -56,6 +56,7 @@ mod templates
   {
     pub var: &'a Variable,
     pub labels: &'a Vec<String>,
+    pub has_properties: bool,
     pub properties_binding: &'a String,
   }
   #[derive(Template)]
@@ -65,6 +66,7 @@ mod templates
     pub source: &'a Variable,
     pub var: &'a Variable,
     pub labels: &'a Vec<String>,
+    pub has_properties: bool,
     pub properties_binding: &'a String,
     pub destination: &'a Variable,
   }
@@ -388,12 +390,16 @@ impl Builder
             q += templates::NodePattern {
               var: &var,
               labels: node.labels(),
+              has_properties: !node.properties().is_empty(),
               properties_binding: &properties_binding,
             }
             .render()
             .unwrap()
             .as_str();
-            bindings.insert(properties_binding, node.properties().to_owned().into());
+            if !node.properties().is_empty()
+            {
+              bindings.insert(properties_binding, node.properties().to_owned().into());
+            }
           }
           // Create edges
           for (var, (source, edge, destination)) in create.edges.into_iter()
@@ -411,13 +417,17 @@ impl Builder
               var: &var,
               source: &source,
               destination: &destination,
+              has_properties: !edge.properties().is_empty(),
               labels: edge.labels(),
               properties_binding: &properties_binding,
             }
             .render()
             .unwrap()
             .as_str();
-            bindings.insert(properties_binding, edge.properties().to_owned().into());
+            if !edge.properties().is_empty()
+            {
+              bindings.insert(properties_binding, edge.properties().to_owned().into());
+            }
           }
         }
         Statement::Match(select) =>
@@ -439,12 +449,16 @@ impl Builder
             q += templates::NodePattern {
               var: &var,
               labels: node.labels(),
+              has_properties: !node.properties().is_empty(),
               properties_binding: &properties_binding,
             }
             .render()
             .unwrap()
             .as_str();
-            bindings.insert(properties_binding, node.properties().to_owned().into());
+            if !node.properties().is_empty()
+            {
+              bindings.insert(properties_binding, node.properties().to_owned().into());
+            }
           }
           // Create edges
           for (var, (source, edge, destination)) in select.edges.into_iter()
@@ -463,12 +477,16 @@ impl Builder
               source: &source,
               destination: &destination,
               labels: edge.labels(),
+              has_properties: !edge.properties().is_empty(),
               properties_binding: &properties_binding,
             }
             .render()
             .unwrap()
             .as_str();
-            bindings.insert(properties_binding, edge.properties().to_owned().into());
+            if !edge.properties().is_empty()
+            {
+              bindings.insert(properties_binding, edge.properties().to_owned().into());
+            }
           }
         }
         Statement::Set(set_statement) =>
@@ -555,12 +573,50 @@ mod test
       (n2, labels!("f"), ValueMap::default(), n3),
     ));
     let (q, b) = b.into_oc_query().unwrap();
-    assert_eq!(q, "CREATE (n1:a $b0), (n2:b $b1), (n3:c $b2), (n1)-[e4:d $b3]->(n2), (n1)-[e5:e $b4]->(n3), (n2)-[e6:f $b5]->(n3)".to_string());
     assert_eq!(
-      b,
-      value_map!("$b0" => value_map!(), "$b1" => value_map!(), "$b2" => value_map!(), "$b3" => value_map!(), "$b4" => value_map!(), "$b5" => value_map!(), )
+      q,
+      "CREATE (n1:a), (n2:b), (n3:c), (n1)-[e4:d]->(n2), (n1)-[e5:e]->(n3), (n2)-[e6:f]->(n3)"
+        .to_string()
     );
+    assert_eq!(b, value_map!());
   }
+  #[test]
+  fn test_create_no_label()
+  {
+    let connection = gqlitedb::Connection::builder().create().unwrap();
+    let mut b = Builder::default();
+    b.create_node(labels!(), value_map!());
+    let (q, b) = b.into_oc_query().unwrap();
+    assert_eq!(q, "CREATE (n1)");
+    assert_eq!(b, value_map!());
+    connection.execute_oc_query(q, b).unwrap();
+
+    let mut b = Builder::default();
+    b.create_node(labels!(), value_map!("a" => 1));
+    let (q, b) = b.into_oc_query().unwrap();
+    assert_eq!(q, "CREATE (n1 $b0)");
+    assert_eq!(b, value_map!("$b0" => value_map!("a" => 1)));
+    connection.execute_oc_query(q, b).unwrap();
+
+    let mut b = Builder::default();
+    let n1 = b.create_node(labels!(), value_map!());
+    let n2 = b.create_node(labels!(), value_map!());
+    b.create_edge(n1, labels!("a"), value_map!(), n2);
+    let (q, b) = b.into_oc_query().unwrap();
+    assert_eq!(q, "CREATE (n1), (n2), (n1)-[e3:a]->(n2)");
+    assert_eq!(b, value_map!());
+    connection.execute_oc_query(q, b).unwrap();
+
+    let mut b = Builder::default();
+    let n1 = b.create_node(labels!(), value_map!());
+    let n2 = b.create_node(labels!(), value_map!());
+    b.create_edge(n1, labels!("b"), value_map!("a" => 1), n2);
+    let (q, b) = b.into_oc_query().unwrap();
+    assert_eq!(q, "CREATE (n1), (n2), (n1)-[e3:b $b0]->(n2)");
+    assert_eq!(b, value_map!("$b0" => value_map!("a" => 1)));
+    connection.execute_oc_query(q, b).unwrap();
+  }
+
   #[test]
   fn test_to_oc_query()
   {
@@ -638,8 +694,8 @@ mod test
     let v1 = b.match_node(labels!(), value_map!());
     b.where_statement(eb::equal(eb::function_call("id", (v1,)), vid.into()));
     let (q, b) = b.into_oc_query().unwrap();
-    assert_eq!(q, "MATCH (n1: $b0) WHERE (id(n1)) = ($l1)".to_string());
-    assert_eq!(b, value_map!("$b0" => value_map!(), "$l1" => vid));
+    assert_eq!(q, "MATCH (n1) WHERE (id(n1)) = ($l0)".to_string());
+    assert_eq!(b, value_map!("$l0" => vid));
   }
   #[test]
   fn test_set()
@@ -650,8 +706,8 @@ mod test
     b.set_assignment(var, vec!["bob"], 1.into());
     b.return_property(var, vec!["bob"], "bob");
     let (q, b) = b.into_oc_query().unwrap();
-    assert_eq!(q, "CREATE (n1:a $b0) SET n1.bob = $l1 RETURN n1.bob AS bob");
-    assert_eq!(b, value_map!("$b0" => value_map!(), "$l1" => 1));
+    assert_eq!(q, "CREATE (n1:a) SET n1.bob = $l0 RETURN n1.bob AS bob");
+    assert_eq!(b, value_map!("$l0" => 1));
     let t = connection
       .execute_oc_query(q, b)
       .unwrap()
