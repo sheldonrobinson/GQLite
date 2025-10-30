@@ -131,7 +131,7 @@ pub(super) fn generate_module_impl(input: ParsedInput) -> Result<TokenStream, sy
   let contents = std::fs::read_to_string(gqls_path);
 
   // Fragments used in the output
-  let mut creation_functions: Vec<proc_macro2::TokenStream> = Default::default();
+  let mut graph_functions: Vec<proc_macro2::TokenStream> = Default::default();
   let mut elements: Vec<proc_macro2::TokenStream> = Default::default();
   let mut nodes: Vec<proc_macro2::TokenStream> = Default::default();
   let mut edges: Vec<proc_macro2::TokenStream> = Default::default();
@@ -214,6 +214,8 @@ pub(super) fn generate_module_impl(input: ParsedInput) -> Result<TokenStream, sy
           syn::Ident::new(&stringcase::pascal_case(&node.label), Span::call_site());
         let create_node_function_name =
           format_ident!("create_{}", stringcase::snake_case(&node.label));
+        let match_node_function_name =
+          format_ident!("match_{}", stringcase::snake_case(&node.label));
         // Fields
         let mut arg_names = Vec::<syn::Ident>::default();
         let mut arg_names_string = Vec::<String>::default();
@@ -288,7 +290,7 @@ pub(super) fn generate_module_impl(input: ParsedInput) -> Result<TokenStream, sy
           )*
         });
 
-        creation_functions.push(quote::quote! {
+        graph_functions.push(quote::quote! {
           /// Create a new node,
           pub fn #create_node_function_name(&self, #(#arg_names: impl Into<#arg_types>),*) -> Result<nodes::#node_struct_name>
           {
@@ -297,12 +299,31 @@ pub(super) fn generate_module_impl(input: ParsedInput) -> Result<TokenStream, sy
             let variable = builder.create_node(#labels, value_map!(#(#arg_names_string => #arg_names.into()),*));
             builder.return_expression(eb::function_call("id", (variable,)), "id");
             let r = self.interface.execute_builder(builder)?.unwrap();
-            let key: &graphcore::Key = r.value(0,0)?.try_into_ref()?;
+            let key: &graphcore::Key = r.get(0,0)?;
             Ok(nodes::#node_struct_name {
               key: key.to_owned(),
               interface: self.interface.clone_interface(),
               graph_name: self.graph_name.clone(),
             })
+          }
+          pub fn #match_node_function_name(&self) -> Result<Vec<nodes::#node_struct_name>>
+          {
+            let mut builder = gqb::Builder::default();
+            builder.use_graph(self.graph_name.clone());
+            let variable = builder.match_node(#labels, value_map!());
+            builder.return_expression(eb::function_call("id", (variable,)), "id");
+            let t = self.interface.execute_builder(builder)?.unwrap();
+            let mut res = Vec::<nodes::#node_struct_name>::default();
+            for r in 0..t.rows()
+            {
+              let key: &graphcore::Key = t.get(r,0)?;
+              res.push(nodes::#node_struct_name {
+                key: key.to_owned(),
+                interface: self.interface.clone_interface(),
+                graph_name: self.graph_name.clone(),
+              });
+            }
+            Ok(res)
           }
         });
       }
@@ -315,6 +336,8 @@ pub(super) fn generate_module_impl(input: ParsedInput) -> Result<TokenStream, sy
           syn::Ident::new(&stringcase::pascal_case(&edge.source), Span::call_site());
         let create_edge_function_name =
           format_ident!("create_{}", stringcase::snake_case(&edge.label));
+        let match_edge_function_name =
+          format_ident!("match_{}", stringcase::snake_case(&edge.label));
         let node_destination_name = syn::Ident::new(
           &stringcase::pascal_case(&edge.destination),
           Span::call_site(),
@@ -427,7 +450,7 @@ pub(super) fn generate_module_impl(input: ParsedInput) -> Result<TokenStream, sy
             )*
           });
 
-          creation_functions.push(quote::quote! {
+          graph_functions.push(quote::quote! {
             /// Create a new edge,
             pub fn #create_edge_function_name<TSource, TDestination>(&self, source: &TSource, destination: &TDestination, #(#arg_names: impl Into<#arg_types>),*)
               -> Result<edges::#edge_struct_name<TSource, TDestination>>
@@ -458,6 +481,65 @@ pub(super) fn generate_module_impl(input: ParsedInput) -> Result<TokenStream, sy
                 source_ghost: Default::default(),
                 destination_ghost: Default::default(),
               })
+            }
+            // Match
+            pub fn #match_edge_function_name<TSource, TDestination>(&self, source: Option<TSource>, destination: Option<TDestination>)
+              -> Result<Vec<edges::#edge_struct_name<TSource, TDestination>>>
+              where (TSource, TDestination): edges::#into_edge_trait_name,
+                    TSource: Node,
+                    TDestination: Node,
+            {
+              let mut builder = gqb::Builder::default();
+              builder.use_graph(self.graph_name.clone());
+
+              let (source_var, destination_var) = match (source, destination)
+              {
+                (None, None) => (None, None),
+                (Some(source), None) => {
+                  let source_var = builder.match_node(TSource::labels(), value_map!());
+                  builder.where_statement(
+                    eb::equal(eb::function_call("id", (source_var,)), source.element_key().into()),
+                  );
+                  (Some(source_var), None)
+                }
+                (None, Some(destination)) => {
+                  let destination_var = builder.match_node(TDestination::labels(), value_map!());
+                  builder.where_statement(
+                    eb::equal(eb::function_call("id", (destination_var,)), destination.element_key().into()),
+                  );
+                  (None, Some(destination_var))
+                }
+                (Some(source), Some(destination)) => {
+                  let source_var = builder.match_node(TSource::labels(), value_map!());
+                  let destination_var = builder.match_node(TDestination::labels(), value_map!());
+                  builder.where_statement(
+                    eb::and(
+                      eb::equal(eb::function_call("id", (source_var,)), source.element_key().into()),
+                      eb::equal(eb::function_call("id", (destination_var,)), destination.element_key().into()),
+                    )
+                  );
+                  (Some(source_var), Some(destination_var))
+                }
+              };
+              let (variable, _) = builder.match_path(source_var, #labels, value_map!(), destination_var);
+              builder.return_variable(variable, "path");
+              
+              let t = self.interface.execute_builder(builder)?.unwrap();
+              let mut results = Vec::<edges::#edge_struct_name<TSource, TDestination>>::default();
+              for r in 0..t.rows()
+              {
+                let path: &graphcore::SinglePath = t.get(r,0)?;
+                results.push(edges::#edge_struct_name {
+                  source: path.source().key(),
+                  destination: path.destination().key(),
+                  key: path.key(),
+                  interface: self.interface.clone_interface(),
+                  graph_name: self.graph_name.clone(),
+                  source_ghost: Default::default(),
+                  destination_ghost: Default::default(),
+                });
+              }
+              Ok(results)
             }
           });
         }
@@ -519,7 +601,7 @@ pub(super) fn generate_module_impl(input: ParsedInput) -> Result<TokenStream, sy
             graph_name,
           }
         }
-        #(#creation_functions)*
+        #(#graph_functions)*
         /// Delete a node
         pub fn delete_node<TNode: Node>(&self, node: TNode) -> Result<()>
         {

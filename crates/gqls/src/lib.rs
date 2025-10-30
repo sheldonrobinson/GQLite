@@ -145,6 +145,13 @@ mod tests
       value_map!("creationDate" => format!("{}", timestamp), "browserUsed" => "FireGoupil", "imageFile" => ())
     );
 
+    // Test matching
+    let persons = graph.match_person().unwrap();
+    assert_eq!(persons.len(), 1);
+    let bob_marley_2 = &persons[0];
+    assert_eq!(bob_marley_2.first_name().unwrap(), "Bob");
+    assert_eq!(bob_marley_2.last_name().unwrap(), "Marley");
+
     // Test editing property
     let timestamp = TimeStamp::parse("2024-06-14T07:10:05.123000-00:00[GMT]").unwrap();
     post.set_creation_date(timestamp.clone()).unwrap();
@@ -177,6 +184,16 @@ mod tests
       bob_marley.element_key()
     );
     assert_eq!(edge_bm_bm.creation_date().unwrap(), timestamp);
+
+    // Test matching edge
+    let edge_q_vec = graph
+      .match_knows::<test_module::nodes::Person, test_module::nodes::Person>(None, None)
+      .unwrap();
+    assert_eq!(edge_q_vec.len(), 1);
+    let edge_q = &edge_q_vec[0];
+    assert_eq!(edge_q.source().element_key(), bob_marley.element_key());
+    assert_eq!(edge_q.element_key(), edge_bm_bm.element_key());
+    assert_eq!(edge_q.destination().element_key(), bob_marley.element_key());
 
     // Test deletion
     graph.delete_edge(edge_bm_bm).unwrap();
