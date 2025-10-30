@@ -76,6 +76,12 @@ mod templates
   {
     pub variables: &'a Vec<Variable>,
   }
+  #[derive(Template)]
+  #[template(path = "oc/detach_delete.oc", escape = "none")]
+  pub(super) struct DetachDelete<'a>
+  {
+    pub variables: &'a Vec<Variable>,
+  }
 }
 
 /// Hold the name of a variable in the query.
@@ -126,6 +132,12 @@ struct DeleteStatement
   variables: Vec<Variable>,
 }
 
+#[derive(Debug, Default)]
+struct DetachDeleteStatement
+{
+  variables: Vec<Variable>,
+}
+
 #[derive(Debug)]
 enum SetExpression
 {
@@ -169,6 +181,7 @@ enum Statement
   Where(WhereStatement),
   Return(ReturnStatement),
   Delete(DeleteStatement),
+  DetachDelete(DetachDeleteStatement),
   Set(SetStatement),
   UseGraph(UseGraphStatement),
   CreateGraph(CreateGraphStatement),
@@ -215,6 +228,7 @@ impl Builder
   last_statement! {last_match_statement, MatchStatement, Statement::Match}
   last_statement! {last_return_statement, ReturnStatement, Statement::Return}
   last_statement! {last_delete_statement, DeleteStatement, Statement::Delete}
+  last_statement! {last_detach_delete_statement, DetachDeleteStatement, Statement::DetachDelete}
   last_statement! {last_set_statement, SetStatement, Statement::Set}
 
   fn next_variable(&mut self, suffix: &'static str) -> Variable
@@ -374,6 +388,12 @@ impl Builder
   pub fn delete(&mut self, variables: impl Variables)
   {
     let delete_statement = self.last_delete_statement();
+    variables.fill(&mut delete_statement.variables);
+  }
+  /// Add a detach delete statement for variables
+  pub fn detach_delete(&mut self, variables: impl Variables)
+  {
+    let delete_statement = self.last_detach_delete_statement();
     variables.fill(&mut delete_statement.variables);
   }
   /// Select the graph to use
@@ -589,6 +609,15 @@ impl Builder
         Statement::Delete(delete_statement) =>
         {
           q += templates::Delete {
+            variables: &delete_statement.variables,
+          }
+          .render()
+          .unwrap()
+          .as_str();
+        }
+        Statement::DetachDelete(delete_statement) =>
+        {
+          q += templates::DetachDelete {
             variables: &delete_statement.variables,
           }
           .render()
