@@ -153,16 +153,19 @@ pub(super) fn generate_module_impl(input: ParsedInput) -> Result<TokenStream, sy
 
         // Fields
         let mut property_names = Vec::<syn::Ident>::default();
+        let mut property_setters = Vec::<syn::Ident>::default();
         let mut property_names_string = Vec::<String>::default();
         let mut property_types = Vec::<TokenStream>::default();
 
         for field in properties_definition.properties.iter()
         {
+          let snaked_case_name = snake_case(field.0);
           property_names.push(syn::Ident::new(
-            &snake_case(field.0),
+            &snaked_case_name,
             proc_macro2::Span::call_site(),
           ));
           property_names_string.push(field.0.to_owned());
+          property_setters.push(format_ident!("set_{}", snaked_case_name));
           property_types.push(property_type(field.1)?);
         }
 
@@ -185,6 +188,19 @@ pub(super) fn generate_module_impl(input: ParsedInput) -> Result<TokenStream, sy
                 let r = self.query_interface().execute_builder(builder)?.unwrap();
                 let val: #property_types = r.value(0,0)?.try_into()?;
                 Ok(val.to_owned())
+              }
+              fn #property_setters(&self, value: impl Into<#property_types>) -> Result<()>
+              {
+                let mut builder = gqb::Builder::default();
+                builder.use_graph(self.graph_name().clone());
+                let var = match self.element_type() {
+                  #my_crate::ElementType::Node => builder.match_node(labels![#identifier], value_map!()),
+                  #my_crate::ElementType::Edge => builder.match_edge(None, labels![#identifier], value_map!(), None),
+                };
+                builder.where_statement(eb::equal(eb::function_call("id", (var,)), self.element_key().into()));
+                builder.set_assignment(var, vec![#property_names_string], value.into().into());
+                self.query_interface().execute_builder(builder)?;
+                Ok(())
               }
             )*
           }

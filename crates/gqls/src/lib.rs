@@ -145,6 +145,11 @@ mod tests
       value_map!("creationDate" => format!("{}", timestamp), "browserUsed" => "FireGoupil", "imageFile" => ())
     );
 
+    // Test editing property
+    let timestamp = TimeStamp::parse("2024-06-14T07:10:05.123000-00:00[GMT]").unwrap();
+    post.set_creation_date(timestamp.clone()).unwrap();
+    assert_eq!(post.creation_date().unwrap(), timestamp);
+
     // Test creating edge
     let edge_bm_post = graph.create_likes(&bob_marley, &post).unwrap();
     assert_eq!(
