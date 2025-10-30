@@ -175,6 +175,7 @@ pub(super) fn generate_module_impl(input: ParsedInput) -> Result<TokenStream, sy
               fn #property_names(&self) -> Result<#property_types>
               {
                 let mut builder = gqb::Builder::default();
+                builder.use_graph(self.graph_name().clone());
                 let var = match self.element_type() {
                   #my_crate::ElementType::Node => builder.match_node(labels![#identifier], value_map!()),
                   #my_crate::ElementType::Edge => builder.match_edge(None, labels![#identifier], value_map!(), None),
@@ -226,6 +227,7 @@ pub(super) fn generate_module_impl(input: ParsedInput) -> Result<TokenStream, sy
           {
             pub(super) key: graphcore::Key,
             pub(super) interface: Box<dyn QueryInterface>,
+            pub(super) graph_name: String,
           }
 
           impl Element for #node_struct_name
@@ -234,6 +236,10 @@ pub(super) fn generate_module_impl(input: ParsedInput) -> Result<TokenStream, sy
             {
               use std::ops::Deref;
               self.interface.deref()
+            }
+            fn graph_name(&self) -> &String
+            {
+              &self.graph_name
             }
             fn element_key(&self) -> graphcore::Key
             {
@@ -246,11 +252,12 @@ pub(super) fn generate_module_impl(input: ParsedInput) -> Result<TokenStream, sy
           }
           impl Node for #node_struct_name
           {
-            fn from_key(key: graphcore::Key, interface: Box<dyn QueryInterface>) -> Self
+            fn from_key(key: graphcore::Key, interface: Box<dyn QueryInterface>, graph_name: impl Into<String>) -> Self
             {
               Self {
                 key,
-                interface
+                interface,
+                graph_name: graph_name.into()
               }
             }
             fn labels() -> Vec<String>
@@ -270,6 +277,7 @@ pub(super) fn generate_module_impl(input: ParsedInput) -> Result<TokenStream, sy
           pub fn #create_node_function_name(&self, #(#arg_names: impl Into<#arg_types>),*) -> Result<nodes::#node_struct_name>
           {
             let mut builder = gqb::Builder::default();
+            builder.use_graph(self.graph_name.clone());
             let variable = builder.create_node(#labels, value_map!(#(#arg_names_string => #arg_names.into()),*));
             builder.return_expression(eb::function_call("id", (variable,)), "id");
             let r = self.interface.execute_builder(builder)?.unwrap();
@@ -277,6 +285,7 @@ pub(super) fn generate_module_impl(input: ParsedInput) -> Result<TokenStream, sy
             Ok(nodes::#node_struct_name {
               key: key.to_owned(),
               interface: self.interface.clone_interface(),
+              graph_name: self.graph_name.clone(),
             })
           }
         });
@@ -336,6 +345,7 @@ pub(super) fn generate_module_impl(input: ParsedInput) -> Result<TokenStream, sy
               pub(super) destination: graphcore::Key,
               pub(super) key: graphcore::Key,
               pub(super) interface: Box<dyn QueryInterface>,
+              pub(super) graph_name: String,
               pub(super) source_ghost: std::marker::PhantomData<TSource>,
               pub(super) destination_ghost: std::marker::PhantomData<TDestination>,
             }
@@ -347,12 +357,12 @@ pub(super) fn generate_module_impl(input: ParsedInput) -> Result<TokenStream, sy
               /// Access the source of the edge
               pub fn source(&self) -> TSource
               {
-                TSource::from_key(self.source, self.interface.clone_interface())
+                TSource::from_key(self.source, self.interface.clone_interface(), self.graph_name.clone())
               }
               /// Access the destination of the edge
               pub fn destination(&self) -> TDestination
               {
-                TDestination::from_key(self.destination, self.interface.clone_interface())
+                TDestination::from_key(self.destination, self.interface.clone_interface(), self.graph_name.clone())
               }
             }
             impl<TSource, TDestination> Element for #edge_struct_name<TSource, TDestination>
@@ -364,6 +374,10 @@ pub(super) fn generate_module_impl(input: ParsedInput) -> Result<TokenStream, sy
               {
                 use std::ops::Deref;
                 self.interface.deref()
+              }
+              fn graph_name(&self) -> &String
+              {
+                &self.graph_name
               }
               fn element_key(&self) -> graphcore::Key
               {
@@ -406,6 +420,7 @@ pub(super) fn generate_module_impl(input: ParsedInput) -> Result<TokenStream, sy
                     TDestination: Node,
             {
               let mut builder = gqb::Builder::default();
+              builder.use_graph(self.graph_name.clone());
               let source_var = builder.match_node(TSource::labels(), value_map!());
               let destination_var = builder.match_node(TDestination::labels(), value_map!());
               builder.where_statement(
@@ -423,6 +438,7 @@ pub(super) fn generate_module_impl(input: ParsedInput) -> Result<TokenStream, sy
                 destination: destination.element_key(),
                 key: key.to_owned(),
                 interface: self.interface.clone_interface(),
+                graph_name: self.graph_name.clone(),
                 source_ghost: Default::default(),
                 destination_ghost: Default::default(),
               })
@@ -469,16 +485,22 @@ pub(super) fn generate_module_impl(input: ParsedInput) -> Result<TokenStream, sy
       pub struct Graph
       {
         interface: Box<dyn QueryInterface>,
+        graph_name: String,
       }
       impl Graph
       {
         /// Create a new instance of the graph API for the given interface
-        pub fn new<TQueryInterface>(interface: TQueryInterface) -> Self
+        pub fn new<TQueryInterface>(interface: TQueryInterface, graph_name: impl Into<String>) -> Self
           where TQueryInterface: QueryInterface + 'static
         {
+          let graph_name = graph_name.into();
+          let mut builder = gqb::Builder::default();
+          builder.create_graph(&graph_name, true);
+          let _ = interface.execute_builder(builder);
           Self
           {
             interface: Box::new(interface),
+            graph_name,
           }
         }
         #(#creation_functions)*
@@ -486,6 +508,7 @@ pub(super) fn generate_module_impl(input: ParsedInput) -> Result<TokenStream, sy
         pub fn delete_node<TNode: Node>(&self, node: TNode) -> Result<()>
         {
           let mut builder = gqb::Builder::default();
+          builder.use_graph(self.graph_name.clone());
           let var = builder.match_node(TNode::labels(), value_map!());
           builder.where_statement(eb::equal(eb::function_call("id", (var,)), node.element_key().into()));
           builder.detach_delete(var);
@@ -496,6 +519,7 @@ pub(super) fn generate_module_impl(input: ParsedInput) -> Result<TokenStream, sy
         pub fn delete_edge<TEdge: Edge>(&self, edge: TEdge) -> Result<()>
         {
           let mut builder = gqb::Builder::default();
+          builder.use_graph(self.graph_name.clone());
           let var = builder.match_edge(None, TEdge::labels(), value_map!(), None);
           builder.where_statement(eb::equal(eb::function_call("id", (var,)), edge.element_key().into()));
           builder.delete(var);

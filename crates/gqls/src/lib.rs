@@ -32,6 +32,8 @@ pub trait Element: Sync + Send
 {
   /// Access to the query interface
   fn query_interface(&self) -> &dyn QueryInterface;
+  /// Name of the graph where the element is stored
+  fn graph_name(&self) -> &String;
   /// Access to the key referencing the element
   fn element_key(&self) -> graphcore::Key;
   /// Access the type of the element
@@ -42,7 +44,11 @@ pub trait Element: Sync + Send
 pub trait Node: Element
 {
   /// Create the element from the key
-  fn from_key(key: graphcore::Key, query_interface: Box<dyn QueryInterface>) -> Self;
+  fn from_key(
+    key: graphcore::Key,
+    query_interface: Box<dyn QueryInterface>,
+    graph_name: impl Into<String>,
+  ) -> Self;
   /// Vector of labels for the node
   fn labels() -> Vec<String>;
 }
@@ -99,7 +105,7 @@ mod tests
     use gqlitedb::TimeStamp;
 
     let connection = Arc::new(gqlitedb::Connection::create(Default::default()).unwrap());
-    let graph = test_module::Graph::new(connection.clone());
+    let graph = test_module::Graph::new(connection.clone(), "test");
 
     use test_module::elements::*;
 
@@ -108,7 +114,7 @@ mod tests
     assert_eq!(bob_marley.first_name().unwrap(), "Bob".to_string());
     assert_eq!(bob_marley.last_name().unwrap(), "Marley".to_string());
     let r = connection
-      .execute_oc_query("MATCH (n:Person) RETURN n", value_map!())
+      .execute_oc_query("USE test MATCH (n:Person) RETURN n", value_map!())
       .unwrap();
     let t = r.try_into_table().unwrap();
     assert_eq!(t.rows(), 1);
@@ -128,7 +134,7 @@ mod tests
     assert_eq!(post.browser_used().unwrap(), "FireGoupil".to_string());
     assert!(post.image_file().unwrap().is_none());
     let r = connection
-      .execute_oc_query("MATCH (n:Post) RETURN n", value_map!())
+      .execute_oc_query("USE test MATCH (n:Post) RETURN n", value_map!())
       .unwrap();
     let t = r.try_into_table().unwrap();
     assert_eq!(t.rows(), 1);
@@ -147,7 +153,7 @@ mod tests
     );
     assert_eq!(edge_bm_post.destination().element_key(), post.element_key());
     let r = connection
-      .execute_oc_query("MATCH p = ()-[]->() RETURN p", Default::default())
+      .execute_oc_query("USE test MATCH p = ()-[]->() RETURN p", Default::default())
       .unwrap();
     let t = r.try_into_table().unwrap();
     assert_eq!(t.rows(), 1);
