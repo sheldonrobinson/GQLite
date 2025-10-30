@@ -142,6 +142,12 @@ struct SetStatement
 }
 
 #[derive(Debug)]
+struct GraphStatement
+{
+  name: String,
+}
+
+#[derive(Debug)]
 enum Statement
 {
   Create(CreateStatement),
@@ -150,6 +156,9 @@ enum Statement
   Return(ReturnStatement),
   Delete(DeleteStatement),
   Set(SetStatement),
+  UseGraph(GraphStatement),
+  CreateGraph(GraphStatement),
+  DropGraph(GraphStatement),
 }
 
 /// Structure for building queries.
@@ -353,6 +362,27 @@ impl Builder
     let delete_statement = self.last_delete_statement();
     variables.fill(&mut delete_statement.variables);
   }
+  /// Select the graph to use
+  pub fn use_graph(&mut self, graphname: impl Into<String>)
+  {
+    self.statements.push(Statement::UseGraph(GraphStatement {
+      name: graphname.into(),
+    }));
+  }
+  /// Select the graph to use
+  pub fn create_graph(&mut self, graphname: impl Into<String>)
+  {
+    self.statements.push(Statement::CreateGraph(GraphStatement {
+      name: graphname.into(),
+    }));
+  }
+  /// Drop the graph
+  pub fn drop_graph(&mut self, graphname: impl Into<String>)
+  {
+    self.statements.push(Statement::DropGraph(GraphStatement {
+      name: graphname.into(),
+    }));
+  }
   /// Generate an OpenCypher Query.
   pub fn into_oc_query(self) -> Result<(String, graphcore::ValueMap)>
   {
@@ -545,6 +575,9 @@ impl Builder
           .unwrap()
           .as_str();
         }
+        Statement::UseGraph(graph) => q += &format!("USE {}", graph.name),
+        Statement::CreateGraph(graph) => q += &format!("CREATE GRAPH {}", graph.name),
+        Statement::DropGraph(graph) => q += &format!("DROP GRAPH {}", graph.name),
       }
     }
 
@@ -715,5 +748,40 @@ mod test
       .unwrap();
     assert_eq!(t.rows(), 1);
     assert_eq!(*t.get::<i64>(0, 0).unwrap(), 1);
+  }
+  #[test]
+  fn test_graph_management()
+  {
+    let connection = gqlitedb::Connection::builder().create().unwrap();
+    let mut b = Builder::default();
+    b.create_graph("Hello");
+    b.create_node(labels!("a"), value_map!());
+    b.use_graph("default");
+    b.create_node(labels!("b"), value_map!());
+    let (q, b) = b.into_oc_query().unwrap();
+    connection.execute_oc_query(q, b).unwrap();
+
+    let mut b = Builder::default();
+    let n1 = b.match_node(labels!(), value_map!());
+    b.use_graph("Hello");
+    let n2 = b.match_node(labels!(), value_map!());
+    b.return_variable(n1, "n1");
+    b.return_variable(n2, "n2");
+    let (q, b) = b.into_oc_query().unwrap();
+    let r = connection
+      .execute_oc_query(q, b)
+      .unwrap()
+      .try_into_table()
+      .unwrap();
+    assert_eq!(r.columns(), 2);
+    assert_eq!(r.rows(), 1);
+    assert_eq!(*r.get::<Node>(0, 0).unwrap().labels(), labels!("b"));
+    assert_eq!(*r.get::<Node>(0, 1).unwrap().labels(), labels!("a"));
+
+    let mut b = Builder::default();
+    b.drop_graph("Hello");
+    b.use_graph("Hello");
+    let (q, b) = b.into_oc_query().unwrap();
+    let r = connection.execute_oc_query(q, b).expect_err("should fail");
   }
 }

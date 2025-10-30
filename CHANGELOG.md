@@ -9,6 +9,7 @@
 ### gqb
 
 - Add support for set statements.
+- Add graph management, use, create and drop graph.
 
 ## [0.6.1] - 2025-10-28
 
