@@ -204,7 +204,7 @@ impl Connection
 
             sq_r.map_err(|rb_e| {
               StoreError::OpeningError {
-                errors: error::vec_to_error(&vec![sq_e, rb_e]),
+                errors: error::vec_to_error(&[sq_e, rb_e]),
               }
               .into()
             })
