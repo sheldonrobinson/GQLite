@@ -63,6 +63,7 @@ mod templates
   #[template(path = "oc/edge_pattern.oc", escape = "none")]
   pub(super) struct EdgePattern<'a>
   {
+    pub path_variable: &'a Option<Variable>,
     pub source: &'a Variable,
     pub var: &'a Variable,
     pub labels: &'a Vec<String>,
@@ -100,18 +101,34 @@ impl std::fmt::Display for Variable
   }
 }
 
+#[derive(Debug)]
+enum MatchCreateFragment
+{
+  Node
+  {
+    variable: Variable,
+    node: graphcore::Node,
+  },
+  Edge
+  {
+    path_variable: Option<Variable>,
+    source: Variable,
+    edge_variable: Variable,
+    destination: Variable,
+    edge: graphcore::Edge,
+  },
+}
+
 #[derive(Debug, Default)]
 struct CreateStatement
 {
-  nodes: Vec<(Variable, graphcore::Node)>,
-  edges: Vec<(Variable, (Variable, graphcore::Edge, Variable))>,
+  fragments: Vec<MatchCreateFragment>,
 }
 
 #[derive(Debug, Default)]
 struct MatchStatement
 {
-  nodes: Vec<(Variable, graphcore::Node)>,
-  edges: Vec<(Variable, (Variable, graphcore::Edge, Variable))>,
+  fragments: Vec<MatchCreateFragment>,
 }
 
 #[derive(Debug)]
@@ -252,9 +269,11 @@ impl Builder
   ) -> Variable
   {
     let var = self.node_variable();
-    let node = graphcore::Node::new(Default::default(), labels.into(), properties.into());
     let cs = self.last_create_statement();
-    cs.nodes.push((var, node));
+    cs.fragments.push(MatchCreateFragment::Node {
+      variable: var,
+      node: graphcore::Node::new(Default::default(), labels.into(), properties.into()),
+    });
     var
   }
   /// Create multiple nodes
@@ -274,13 +293,14 @@ impl Builder
   ) -> Variable
   {
     let var = self.next_variable("e");
-    let edge = (
-      source.into(),
-      graphcore::Edge::new(Default::default(), labels.into(), properties.into()),
-      destination.into(),
-    );
     let cs = self.last_create_statement();
-    cs.edges.push((var, edge));
+    cs.fragments.push(MatchCreateFragment::Edge {
+      path_variable: None,
+      source: source.into(),
+      edge_variable: var,
+      destination: destination.into(),
+      edge: graphcore::Edge::new(Default::default(), labels.into(), properties.into()),
+    });
     var
   }
   /// Create multiple edges
@@ -297,13 +317,13 @@ impl Builder
     properties: impl Into<graphcore::ValueMap>,
   ) -> Variable
   {
-    let var = self.node_variable();
+    let variable = self.node_variable();
     let ss = self.last_match_statement();
-    ss.nodes.push((
-      var,
-      graphcore::Node::new(Default::default(), labels.into(), properties.into()),
-    ));
-    var
+    ss.fragments.push(MatchCreateFragment::Node {
+      variable,
+      node: graphcore::Node::new(Default::default(), labels.into(), properties.into()),
+    });
+    variable
   }
   /// Select an edge
   pub fn match_edge(
@@ -320,15 +340,39 @@ impl Builder
       .into()
       .unwrap_or_else(|| self.next_variable("n"));
     let ss = self.last_match_statement();
-    ss.edges.push((
-      var,
-      (
-        source,
-        graphcore::Edge::new(Default::default(), labels.into(), properties.into()),
-        destination,
-      ),
-    ));
+    ss.fragments.push(MatchCreateFragment::Edge {
+      path_variable: None,
+      source,
+      edge_variable: var,
+      destination,
+      edge: graphcore::Edge::new(Default::default(), labels.into(), properties.into()),
+    });
     var
+  }
+  /// Select a path, returns a tuple with the path variable and edge variable
+  pub fn match_path(
+    &mut self,
+    source: impl Into<Option<Variable>>,
+    labels: impl Into<Vec<String>>,
+    properties: impl Into<graphcore::ValueMap>,
+    destination: impl Into<Option<Variable>>,
+  ) -> (Variable, Variable)
+  {
+    let path_variable = self.next_variable("p");
+    let edge_variable = self.next_variable("e");
+    let source = source.into().unwrap_or_else(|| self.next_variable("n"));
+    let destination = destination
+      .into()
+      .unwrap_or_else(|| self.next_variable("n"));
+    let ss = self.last_match_statement();
+    ss.fragments.push(MatchCreateFragment::Edge {
+      path_variable: Some(path_variable),
+      source,
+      edge_variable,
+      destination,
+      edge: graphcore::Edge::new(Default::default(), labels.into(), properties.into()),
+    });
+    (path_variable, edge_variable)
   }
   /// Add a set statement for assigning a new value
   pub fn set_assignment<I, S>(&mut self, variable: Variable, path: I, expression: Expression)
@@ -445,10 +489,8 @@ impl Builder
         {
           q += "CREATE ";
           let mut comma = false;
-          // Create nodes
-          for (var, node) in create.nodes.into_iter()
+          for fragment in create.fragments
           {
-            let properties_binding = format!("$b{}", bindings.len());
             if comma
             {
               q += ", "
@@ -457,46 +499,51 @@ impl Builder
             {
               comma = true;
             }
-            q += templates::NodePattern {
-              var: &var,
-              labels: node.labels(),
-              has_properties: !node.properties().is_empty(),
-              properties_binding: &properties_binding,
-            }
-            .render()
-            .unwrap()
-            .as_str();
-            if !node.properties().is_empty()
+            match fragment
             {
-              bindings.insert(properties_binding, node.properties().to_owned().into());
-            }
-          }
-          // Create edges
-          for (var, (source, edge, destination)) in create.edges.into_iter()
-          {
-            let properties_binding = format!("$b{}", bindings.len());
-            if comma
-            {
-              q += ", "
-            }
-            else
-            {
-              comma = true;
-            }
-            q += templates::EdgePattern {
-              var: &var,
-              source: &source,
-              destination: &destination,
-              has_properties: !edge.properties().is_empty(),
-              labels: edge.labels(),
-              properties_binding: &properties_binding,
-            }
-            .render()
-            .unwrap()
-            .as_str();
-            if !edge.properties().is_empty()
-            {
-              bindings.insert(properties_binding, edge.properties().to_owned().into());
+              MatchCreateFragment::Node { variable, node } =>
+              {
+                let properties_binding = format!("$b{}", bindings.len());
+                q += templates::NodePattern {
+                  var: &variable,
+                  labels: node.labels(),
+                  has_properties: !node.properties().is_empty(),
+                  properties_binding: &properties_binding,
+                }
+                .render()
+                .unwrap()
+                .as_str();
+                if !node.properties().is_empty()
+                {
+                  bindings.insert(properties_binding, node.properties().to_owned().into());
+                }
+              }
+              MatchCreateFragment::Edge {
+                path_variable: _,
+                source,
+                edge_variable,
+                destination,
+                edge,
+              } =>
+              {
+                let properties_binding = format!("$b{}", bindings.len());
+                q += templates::EdgePattern {
+                  path_variable: &None,
+                  var: &edge_variable,
+                  source: &source,
+                  destination: &destination,
+                  has_properties: !edge.properties().is_empty(),
+                  labels: edge.labels(),
+                  properties_binding: &properties_binding,
+                }
+                .render()
+                .unwrap()
+                .as_str();
+                if !edge.properties().is_empty()
+                {
+                  bindings.insert(properties_binding, edge.properties().to_owned().into());
+                }
+              }
             }
           }
         }
@@ -504,10 +551,8 @@ impl Builder
         {
           q += "MATCH ";
           let mut comma = false;
-          // Create nodes
-          for (var, node) in select.nodes.into_iter()
+          for fragment in select.fragments
           {
-            let properties_binding = format!("$b{}", bindings.len());
             if comma
             {
               q += ", "
@@ -516,46 +561,51 @@ impl Builder
             {
               comma = true;
             }
-            q += templates::NodePattern {
-              var: &var,
-              labels: node.labels(),
-              has_properties: !node.properties().is_empty(),
-              properties_binding: &properties_binding,
-            }
-            .render()
-            .unwrap()
-            .as_str();
-            if !node.properties().is_empty()
+            match fragment
             {
-              bindings.insert(properties_binding, node.properties().to_owned().into());
-            }
-          }
-          // Create edges
-          for (var, (source, edge, destination)) in select.edges.into_iter()
-          {
-            let properties_binding = format!("$b{}", bindings.len());
-            if comma
-            {
-              q += ", "
-            }
-            else
-            {
-              comma = true;
-            }
-            q += templates::EdgePattern {
-              var: &var,
-              source: &source,
-              destination: &destination,
-              labels: edge.labels(),
-              has_properties: !edge.properties().is_empty(),
-              properties_binding: &properties_binding,
-            }
-            .render()
-            .unwrap()
-            .as_str();
-            if !edge.properties().is_empty()
-            {
-              bindings.insert(properties_binding, edge.properties().to_owned().into());
+              MatchCreateFragment::Node { variable, node } =>
+              {
+                let properties_binding = format!("$b{}", bindings.len());
+                q += templates::NodePattern {
+                  var: &variable,
+                  labels: node.labels(),
+                  has_properties: !node.properties().is_empty(),
+                  properties_binding: &properties_binding,
+                }
+                .render()
+                .unwrap()
+                .as_str();
+                if !node.properties().is_empty()
+                {
+                  bindings.insert(properties_binding, node.properties().to_owned().into());
+                }
+              }
+              MatchCreateFragment::Edge {
+                path_variable,
+                source,
+                edge_variable,
+                destination,
+                edge,
+              } =>
+              {
+                let properties_binding = format!("$b{}", bindings.len());
+                q += templates::EdgePattern {
+                  path_variable: &path_variable,
+                  var: &edge_variable,
+                  source: &source,
+                  destination: &destination,
+                  labels: edge.labels(),
+                  has_properties: !edge.properties().is_empty(),
+                  properties_binding: &properties_binding,
+                }
+                .render()
+                .unwrap()
+                .as_str();
+                if !edge.properties().is_empty()
+                {
+                  bindings.insert(properties_binding, edge.properties().to_owned().into());
+                }
+              }
             }
           }
         }
@@ -756,18 +806,21 @@ mod test
     let n1 = b.match_node(labels!("a"), value_map!("id" => 3));
     let n2 = b.node_variable();
     let e1 = b.match_edge(n1, labels!("b"), value_map!("id" => 2), n2);
+    let _p1 = b.match_path(n1, labels!("b"), value_map!("id" => 2), n2);
     b.return_variable(n1, "n1");
     b.return_variable(e1, "e1");
     b.return_variable(n2, "n2");
     let (q, b) = b.into_oc_query().unwrap();
     assert_eq!(
       q,
-      "MATCH (n1:a $b0), (n1)-[e3:b $b1]->(n2) RETURN n1 AS n1, e3 AS e1, n2 AS n2".to_string()
+      "MATCH (n1:a $b0), (n1)-[e3:b $b1]->(n2), p4 = (n1)-[e5:b $b2]->(n2) RETURN n1 AS n1, e3 AS e1, n2 AS n2".to_string()
     );
     assert_eq!(
       b,
-      value_map!("$b0" => value_map!("id" => 3), "$b1" => value_map!("id" => 2) )
+      value_map!("$b0" => value_map!("id" => 3), "$b1" => value_map!("id" => 2), "$b2" => value_map!("id" => 2) )
     );
+    let connection = gqlitedb::Connection::builder().create().unwrap();
+    connection.execute_oc_query(q, b).unwrap();
   }
   #[test]
   fn test_delete()
@@ -851,6 +904,6 @@ mod test
     b.drop_graph("Hello", false);
     b.use_graph("Hello");
     let (q, b) = b.into_oc_query().unwrap();
-    let r = connection.execute_oc_query(q, b).expect_err("should fail");
+    let _ = connection.execute_oc_query(q, b).expect_err("should fail");
   }
 }
