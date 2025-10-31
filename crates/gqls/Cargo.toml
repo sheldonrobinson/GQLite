@@ -9,6 +9,7 @@ repository.workspace = true
 [features]
 default = ["gqlite"]
 gqlite = ["dep:gqlitedb"]
+rune = ["dep:rune", "dep:gqliterune"]
 
 [dependencies]
 gqlitedb = { workspace = true, optional = true }
@@ -17,3 +18,9 @@ gqls-macros.workspace = true
 graphcore.workspace = true
 
 anyhow = "1"
+rune = { workspace = true, optional = true }
+gqliterune = { workspace = true, optional = true }
+
+[dev-dependencies]
+
+ccutils = { workspace = true, features = ["rune", "testing"] }

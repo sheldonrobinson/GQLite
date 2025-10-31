@@ -23,17 +23,11 @@ pub use timestamp::TimeStamp;
 
 use rune::{
   support::{Error, Result},
-  Any, FromValue, TypeHash,
+  Any, FromValue, Ref, TypeHash,
 };
 
-#[derive(Any)]
-#[rune(item = ::gqlite)]
-struct Connection
-{
-  connection: Arc<gqlitedb::Connection>,
-}
-
-fn to_gc_value(value: rune::Value) -> Result<gqlitedb::Value>
+/// Convert a rune value to a graphcore::Value.
+pub fn to_gc_value(value: rune::Value) -> Result<graphcore::Value>
 {
   match value.type_hash()
   {
@@ -108,6 +102,14 @@ fn to_ru_value(value: gqlitedb::Value) -> Result<rune::Value, rune::runtime::Run
   }
 }
 
+/// Wrapper for the GQLite connection
+#[derive(Any)]
+#[rune(item = ::gqlite)]
+pub struct Connection
+{
+  connection: Arc<gqlitedb::Connection>,
+}
+
 impl Connection
 {
   fn to_value_map(value: rune::Value) -> Result<gqlitedb::ValueMap>
@@ -128,11 +130,17 @@ impl Connection
     })
   }
   #[rune::function]
-  pub fn execute_oc_query(&self, query: String, bindings: rune::Value) -> Result<rune::Value>
+  pub fn execute_oc_query(&self, query: Ref<str>, bindings: rune::Value) -> Result<rune::Value>
   {
     let bindings = Self::to_value_map(bindings)?;
-    let r = self.connection.execute_oc_query(query, bindings)?;
+    let r = self.connection.execute_oc_query(&query, bindings)?;
     Ok(to_ru_value(r.into_value())?)
+  }
+
+  /// Return a clone of the connection
+  pub fn connection_clone(&self) -> Arc<gqlitedb::Connection>
+  {
+    self.connection.clone()
   }
 }
 
@@ -177,6 +185,7 @@ pub fn gqlite_module() -> Result<rune::Module>
 #[cfg(test)]
 mod tests
 {
+  use ccutils::rune::testing::Tester;
   use rune::{
     alloc::clone::TryClone,
     support::Result,
@@ -186,71 +195,6 @@ mod tests
   use std::sync::Arc;
 
   use crate::to_gc_value;
-
-  pub(crate) struct Tester
-  {
-    rune_context: Context,
-    sources: Vec<Source>,
-  }
-  impl Tester
-  {
-    pub(crate) fn new(installer: impl FnOnce(&mut rune::Context)) -> Tester
-    {
-      let mut rune_context = Context::with_default_modules().unwrap();
-      installer(&mut rune_context);
-      let sources = Default::default();
-      Tester {
-        rune_context,
-        sources,
-      }
-    }
-    fn build(
-      &self,
-      script: Option<Source>,
-    ) -> Result<(Arc<rune::runtime::RuntimeContext>, Arc<rune::runtime::Unit>)>
-    {
-      let mut options = Options::default();
-      let mut sources = Sources::default();
-
-      for source in self.sources.iter()
-      {
-        sources.insert(source.try_clone()?)?;
-      }
-
-      if let Some(script) = script
-      {
-        sources.insert(script)?;
-        options.script(true);
-      }
-
-      let mut diagnostics = Diagnostics::new();
-
-      let result = rune::prepare(&mut sources)
-        .with_context(&self.rune_context)
-        .with_diagnostics(&mut diagnostics)
-        .with_options(&options)
-        .build();
-
-      if !diagnostics.is_empty()
-      {
-        let mut writer = StandardStream::stderr(ColorChoice::Always);
-        diagnostics.emit(&mut writer, &sources)?;
-      }
-
-      let unit = result?;
-      Ok((Arc::new(self.rune_context.runtime()?), Arc::new(unit)))
-    }
-
-    pub(crate) fn eval<T>(&self, source: impl AsRef<str>) -> Result<T>
-    where
-      T: FromValue,
-    {
-      let (runtime, unit) = self.build(Some(Source::memory(source)?))?;
-      let mut vm = Vm::new(runtime, unit);
-      let r = vm.execute(Hash::EMPTY, ())?.complete().into_result()?;
-      Result::<T>::from_value(r)?
-    }
-  }
 
   #[test]
   fn test_connection()

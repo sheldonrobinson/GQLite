@@ -1,10 +1,16 @@
 #![doc = include_str!("../README.MD")]
 #![warn(missing_docs)]
-pub use gqls_macros::generate_module;
 
 pub use anyhow;
 pub use gqb;
 pub use graphcore;
+
+pub use gqls_macros::generate_module;
+#[cfg(feature = "rune")]
+pub use gqls_macros::generate_rune_module;
+
+#[cfg(feature = "rune")]
+pub mod rune;
 
 /// Query interface to a database.
 pub trait QueryInterface: Sync + Send
@@ -92,20 +98,23 @@ mod gqlitedb_impl
 #[cfg(test)]
 mod tests
 {
+
   use super::*;
   use std::sync::Arc;
 
   generate_module!(test_module, "test.gqls");
+  #[cfg(feature = "rune")]
+  generate_rune_module!(test_rune_module, crate::tests::test_module, "test.gqls");
 
   #[test]
   #[cfg(feature = "gqlite")]
-  fn it_works()
+  fn test_orm_rust_api()
   {
     use gqb::{labels, value_map};
     use gqlitedb::TimeStamp;
 
     let connection = Arc::new(gqlitedb::Connection::create(Default::default()).unwrap());
-    let graph = test_module::Graph::new(connection.clone(), "test");
+    let graph = test_module::Graph::new(connection.clone(), "test").unwrap();
 
     use test_module::elements::*;
 
@@ -198,5 +207,17 @@ mod tests
     // Test deletion
     graph.delete_edge(edge_bm_bm).unwrap();
     graph.delete_node(bob_marley).unwrap();
+  }
+  #[test]
+  #[cfg(all(feature = "gqlite", feature = "rune"))]
+  fn test_orm_rune_api()
+  {
+    let tester = ccutils::rune::testing::Tester::new(|rune_context| {
+      rune_context
+        .install(gqliterune::gqlite_module().unwrap())
+        .unwrap();
+      test_rune_module::install(rune_context).unwrap();
+    });
+    tester.eval::<()>(include_str!("test.rn")).unwrap();
   }
 }

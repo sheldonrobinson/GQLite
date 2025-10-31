@@ -15,6 +15,8 @@ homepage = "https://gqlite.org"
 repository = "https://gitlab.com/gqlite/gqlite"
 
 [workspace.dependencies]
+# versions have to be specified with path: https://github.com/rust-lang/cargo/issues/11133
+gqliterune = { version = "0.7.0", path = "bindings/rune/gqliterune" }
 graphcore = { version = "0.7.0", path = "crates/graphcore" }
 gqb = { version = "0.3.0", path = "crates/gqb" }
 gqlitedb = { version = "0.7.0", path = "crates/gqlitedb" }
@@ -25,6 +27,7 @@ askama = { version = "0.14" }
 ccutils = { version = "0.4" }
 indexmap = "2"
 itertools = "0.14"
+rune = { version = "0.14" }
 serde = "1"
 thiserror = "2"
 uuid = { version = "1", features = ["v4"] }

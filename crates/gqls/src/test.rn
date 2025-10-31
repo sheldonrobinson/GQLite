@@ -1,0 +1,12 @@
+fn test_api()
+{
+  let connection = gqlite::Connection::create({})?;
+  let graph = test_rune_module::Graph::new(connection, "test")?;
+  let bob_marley = graph.create_person("Bob", "Marley")?;
+  assert_eq!(bob_marley.first_name()?, "Bob");
+  assert_eq!(bob_marley.last_name()?, "Marley");
+  bob_marley.set_last_name("Marley/The Builder")?;
+  assert_eq!(bob_marley.last_name()?, "Marley/The Builder");
+  Ok(())
+}
+test_api()

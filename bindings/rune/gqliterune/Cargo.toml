@@ -18,4 +18,7 @@ gqb = { workspace = true, optional = true }
 graphcore = { workspace = true }
 
 ccutils = { workspace = true }
-rune = "0.14"
+rune = { workspace = true }
+
+[dev-dependencies]
+ccutils = { workspace = true, features = ["rune", "testing"] }

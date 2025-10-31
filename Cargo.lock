@@ -907,6 +907,7 @@ dependencies = [
  "log",
  "parking_lot",
  "rand",
+ "rune",
  "serde",
  "serde-value",
 ]
@@ -2113,10 +2114,13 @@ name = "gqls"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "ccutils",
  "gqb",
  "gqlitedb",
+ "gqliterune",
  "gqls-macros",
  "graphcore",
+ "rune",
 ]
 
 [[package]]

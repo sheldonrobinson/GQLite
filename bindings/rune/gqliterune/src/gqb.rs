@@ -90,13 +90,13 @@ pub fn gqb_module() -> Result<rune::Module>
 mod tests
 {
   use crate::tests;
+  use ccutils::rune::testing::Tester;
 
   #[test]
   fn test_query_builder()
   {
-    let tester = tests::Tester::new(|rune_context| {
-      rune_context.install(super::gqb_module().unwrap()).unwrap()
-    });
+    let tester =
+      Tester::new(|rune_context| rune_context.install(super::gqb_module().unwrap()).unwrap());
     let (n, b) = tester
       .eval::<(String, rune::Value)>(
         r#"
