@@ -13,11 +13,13 @@ use std::{collections::HashMap, sync::Arc};
 #[cfg(feature = "gqb")]
 mod gqb;
 mod key;
+mod timestamp;
 
 #[cfg(feature = "gqb")]
 pub use gqb::gqb_module;
 
 pub use key::Key;
+pub use timestamp::TimeStamp;
 
 use rune::{
   support::{Error, Result},
@@ -39,6 +41,7 @@ fn to_gc_value(value: rune::Value) -> Result<gqlitedb::Value>
     Key::HASH => Ok(Key::from_value(value)?.key().into()),
     bool::HASH => Ok(value.as_bool()?.into()),
     String::HASH => Ok(value.into_string()?.to_string().into()),
+    TimeStamp::HASH => Ok(TimeStamp::from_value(value)?.into()),
     Vec::<rune::Value>::HASH => Ok(
       Vec::<rune::Value>::from_value(value)?
         .into_iter()
@@ -84,7 +87,11 @@ fn to_ru_value(value: gqlitedb::Value) -> Result<rune::Value, rune::runtime::Run
     gqlitedb::Value::Integer(i) => rune::to_value(i),
     gqlitedb::Value::Float(f) => rune::to_value(f),
     gqlitedb::Value::String(s) => rune::to_value(s),
-    gqlitedb::Value::TimeStamp(ts) => rune::to_value(format!("{}", ts)),
+    gqlitedb::Value::TimeStamp(ts) =>
+    {
+      let ts: TimeStamp = ts.into();
+      rune::to_value(ts)
+    }
     gqlitedb::Value::Array(a) => rune::to_value(
       a.into_iter()
         .map(to_ru_value)
@@ -159,6 +166,10 @@ pub fn gqlite_module() -> Result<rune::Module>
   m.ty::<Key>()?;
   m.function_meta(Key::partial_eq)?;
   m.implement_trait::<Key>(rune::item!(::std::cmp::PartialEq))?;
+
+  m.ty::<TimeStamp>()?;
+  m.function_meta(TimeStamp::parse)?;
+  m.function_meta(TimeStamp::to_string)?;
 
   Ok(m)
 }

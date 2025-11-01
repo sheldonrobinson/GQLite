@@ -17,4 +17,5 @@ gqlitedb = { workspace = true }
 gqb = { workspace = true, optional = true }
 graphcore = { workspace = true }
 
+ccutils = { workspace = true }
 rune = "0.14"

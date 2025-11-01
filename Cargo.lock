@@ -2091,6 +2091,7 @@ dependencies = [
 name = "gqliterune"
 version = "0.7.0"
 dependencies = [
+ "ccutils",
  "gqb",
  "gqlitedb",
  "graphcore",
