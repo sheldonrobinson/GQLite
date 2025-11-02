@@ -1,8 +1,23 @@
-pub use rune::{support::Result, Any, Context, Ref, Value};
+//! Rune support module
+pub use rune::{support::Result, Any, Context, Hash, Ref, TypeHash as _, Value};
 
+use crate::ElementType;
+
+/// Metadata associated with an element, used by the macro generator.
+pub struct ElementMetadata
+{
+  /// Type
+  pub element_type: ElementType,
+  /// List of labels
+  pub labels: &'static [&'static str],
+}
+
+/// Use to cast Rune arguments to Rust arguments
 pub trait IntoRustArgument
 {
+  /// Rust type corresponding to the rune argument
   type RustType;
+  /// Convert to rust
   fn into_rust_argument(self) -> Self::RustType;
 }
 

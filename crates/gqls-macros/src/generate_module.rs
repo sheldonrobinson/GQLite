@@ -534,6 +534,15 @@ pub(super) fn generate_module_impl(input: ParsedInput) -> Result<TokenStream, sy
             }
           )
         }
+        pub fn query_interface(&self) -> &dyn QueryInterface
+        {
+          use std::ops::Deref;
+          self.interface.deref()
+        }
+        pub fn graph_name(&self) -> &String
+        {
+          &self.graph_name
+        }
         #(#graph_functions)*
         /// Delete a node
         pub fn delete_node<TNode: Node>(&self, node: TNode) -> Result<()>
