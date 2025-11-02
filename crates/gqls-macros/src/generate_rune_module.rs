@@ -260,9 +260,20 @@ pub(super) fn generate_rune_module_impl(input: ParsedInput) -> Result<TokenStrea
           }
         )
       }
+      #[rune::function]
+      fn #match_node_function_name(&self) -> Result<Vec<nodes::#node_struct_name>>
+      {
+        let nodes = self.inner.#match_node_function_name()?;
+        Ok(nodes.into_iter().map(|node|
+          nodes::#node_struct_name {
+            inner: node,
+          }
+        ).collect())
+      }
     });
     graph_functions_declare.push(quote! {
         m.function_meta(Graph::#create_node_function_name)?;
+        m.function_meta(Graph::#match_node_function_name)?;
     });
   }
 
@@ -310,7 +321,7 @@ pub(super) fn generate_rune_module_impl(input: ParsedInput) -> Result<TokenStrea
       impl #edge_struct_name
       {
         #[rune::function]
-        fn element_key(&self) -> u128
+        fn element_key(&self) -> gqliterune::Key
         {
           self.inner.element_key().into()
         }
@@ -378,9 +389,24 @@ pub(super) fn generate_rune_module_impl(input: ParsedInput) -> Result<TokenStrea
           }
         )
       }
+      #[rune::function]
+      fn #match_edge_function_name(&self, source: Option<rune::Value>, destination: Option<rune::Value>) -> Result<Vec<edges::#edge_struct_name>>
+      {
+        let edges = self.inner.#match_edge_function_name(
+          source.map(|n| to_generic_node(&n)).transpose()?,
+          destination.map(|n| to_generic_node(&n)).transpose()?
+        )?;
+        Ok(edges.into_iter().map(|edge|
+          edges::#edge_struct_name
+          {
+            inner: edge,
+          }
+        ).collect())
+      }
     });
     graph_functions_declare.push(quote! {
         m.function_meta(Graph::#create_edge_function_name)?;
+        m.function_meta(Graph::#match_edge_function_name)?;
     });
   }
 

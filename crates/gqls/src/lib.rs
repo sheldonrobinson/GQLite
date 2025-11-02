@@ -19,7 +19,7 @@ pub use gqls_macros::generate_rune_module;
 pub use generic_node::GenericNode;
 
 /// True if every &str in b occurs as a String in a (duplicates ignored).
-fn contains_all(a: &Vec<String>, b: &Vec<&str>) -> bool
+pub fn contains_all(a: &[String], b: &[&str]) -> bool
 {
   let set: HashSet<&str> = a.iter().map(String::as_str).collect();
   b.iter().all(|&s| set.contains(s))
