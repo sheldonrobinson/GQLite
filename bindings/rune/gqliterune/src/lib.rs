@@ -12,9 +12,12 @@ use std::{collections::HashMap, sync::Arc};
 
 #[cfg(feature = "gqb")]
 mod gqb;
+mod key;
 
 #[cfg(feature = "gqb")]
 pub use gqb::gqb_module;
+
+pub use key::Key;
 
 use rune::{
   support::{Error, Result},
@@ -28,20 +31,12 @@ struct Connection
   connection: Arc<gqlitedb::Connection>,
 }
 
-// Workaround lack of runtime support for u128: https://github.com/rune-rs/rune/issues/960
-#[derive(Any)]
-#[rune(item = ::gqlite)]
-struct Key
-{
-  key: graphcore::Key,
-}
-
 fn to_gc_value(value: rune::Value) -> Result<gqlitedb::Value>
 {
   match value.type_hash()
   {
-    <()>::HASH => Ok(gqlitedb::Value::Null),
-    Key::HASH => Ok(Key::from_value(value)?.key.into()),
+    <()>::HASH => Ok(graphcore::Value::Null),
+    Key::HASH => Ok(Key::from_value(value)?.key().into()),
     bool::HASH => Ok(value.as_bool()?.into()),
     String::HASH => Ok(value.into_string()?.to_string().into()),
     Vec::<rune::Value>::HASH => Ok(
@@ -84,7 +79,7 @@ fn to_ru_value(value: gqlitedb::Value) -> Result<rune::Value, rune::runtime::Run
   match value
   {
     gqlitedb::Value::Null => Ok(rune::Value::empty()),
-    gqlitedb::Value::Key(key) => rune::to_value(Key { key }),
+    gqlitedb::Value::Key(key) => rune::to_value(Key::new(key)),
     gqlitedb::Value::Boolean(b) => rune::to_value(b),
     gqlitedb::Value::Integer(i) => rune::to_value(i),
     gqlitedb::Value::Float(f) => rune::to_value(f),
@@ -159,6 +154,10 @@ pub fn gqlite_module() -> Result<rune::Module>
   m.ty::<Connection>()?;
   m.function_meta(Connection::create)?;
   m.function_meta(Connection::execute_oc_query)?;
+
+  m.ty::<Key>()?;
+  m.function_meta(Key::partial_eq)?;
+  m.implement_trait::<Key>(rune::item!(::std::cmp::PartialEq))?;
 
   Ok(m)
 }
