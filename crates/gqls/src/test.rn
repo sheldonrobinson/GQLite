@@ -21,6 +21,15 @@ fn test_api()
 
   // Test creating edge
   let edge_bm_post = graph.create_likes(bob_marley, post)?;
+  let edge_bm_post_source = edge_bm_post.source()?;
+  assert_eq!(edge_bm_post_source.element_key(), bob_marley.element_key());
+  assert_eq!(edge_bm_post_source.first_name()?, "Bob");
+  assert_eq!(edge_bm_post_source.last_name()?, "Marley/The Builder");
+  
+  let edge_bm_post_destination = edge_bm_post.destination()?;
+  assert_eq!(edge_bm_post_destination.creation_date().unwrap().to_string(), timestamp.to_string());
+  assert_eq!(edge_bm_post_destination.browser_used()?, "FireGoupil");
+  assert!(edge_bm_post_destination.image_file()?.is_none());
 
   Ok(())
 }

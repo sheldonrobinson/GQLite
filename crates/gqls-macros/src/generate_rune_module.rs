@@ -136,7 +136,8 @@ pub(super) fn generate_rune_module_impl(input: ParsedInput) -> Result<TokenStrea
   let mut edges_declare = TokenStream::new();
   let mut edges_structs = TokenStream::new();
   let mut metadata_function = TokenStream::new();
-  let mut key_function = TokenStream::new();
+  let mut to_generic_node_function = TokenStream::new();
+  let mut to_specific_node_function = TokenStream::new();
 
   let ast = parse_gqls_file(&filename)?;
 
@@ -171,6 +172,7 @@ pub(super) fn generate_rune_module_impl(input: ParsedInput) -> Result<TokenStrea
 
     let labels = &expended_element.labels;
     let labels_slice = quote! {&[#(#labels),*]};
+    let labels_vec = quote! {vec![#(#labels),*]};
 
     nodes_structs.push(quote! {
       #[derive(Any)]
@@ -184,6 +186,11 @@ pub(super) fn generate_rune_module_impl(input: ParsedInput) -> Result<TokenStrea
         pub(super) fn inner_ref(&self) -> &#rust_module_name::nodes::#node_struct_name
         {
           &self.inner
+        }
+        #[rune::function]
+        fn element_key(&self) -> gqliterune::Key
+        {
+          self.inner.element_key().into()
         }
         #(
           #[rune::function]
@@ -210,15 +217,32 @@ pub(super) fn generate_rune_module_impl(input: ParsedInput) -> Result<TokenStrea
     metadata_function.extend(quote! {
       nodes::#node_struct_name::HASH => Ok(&nodes::#node_metadata_const_name),
     });
-    key_function.extend(quote! {
+    to_generic_node_function.extend(quote! {
       nodes::#node_struct_name::HASH => {
         let node = value.borrow_ref::<nodes::#node_struct_name>()?;
-        Ok(node.inner_ref().element_key())
+        Ok(node.inner.clone().into_generic_node())
+      }
+    });
+    to_specific_node_function.extend(quote! {
+      if #my_crate::contains_all(node.labels(), &#labels_vec)
+      {
+        return Ok(
+          rune::to_value(
+            nodes::#node_struct_name {
+              inner: #rust_module_name::nodes::#node_struct_name::from_node(
+                node,
+                query_interface,
+                graph_name
+              )?
+            }
+          )?
+        )
       }
     });
 
     nodes_declare.push(quote! {
       m.ty::<nodes::#node_struct_name>()?;
+      m.function_meta(nodes::#node_struct_name::element_key)?;
       #(
         m.function_meta(nodes::#node_struct_name::#field_names)?;
         m.function_meta(nodes::#node_struct_name::#field_set_function_name)?;
@@ -256,7 +280,6 @@ pub(super) fn generate_rune_module_impl(input: ParsedInput) -> Result<TokenStrea
   for (label, edges) in edge_groups
   {
     let edge_struct_name = syn::Ident::new(&stringcase::pascal_case(&label), Span::call_site());
-    let into_edge_trait_name = format_ident!("Into{}", stringcase::pascal_case(&label));
     let create_edge_function_name = format_ident!("create_{}", stringcase::snake_case(&label));
     let match_edge_function_name = format_ident!("match_{}", stringcase::snake_case(&label));
 
@@ -278,8 +301,6 @@ pub(super) fn generate_rune_module_impl(input: ParsedInput) -> Result<TokenStrea
     }
 
     edges_structs.extend(quote! {
-      impl #rust_module_name::edges::#into_edge_trait_name for (GenericNode, GenericNode)
-      {}
       #[derive(Any)]
       #[rune(item = ::#rune_module_name::edges)]
       pub struct #edge_struct_name
@@ -288,6 +309,21 @@ pub(super) fn generate_rune_module_impl(input: ParsedInput) -> Result<TokenStrea
       }
       impl #edge_struct_name
       {
+        #[rune::function]
+        fn element_key(&self) -> u128
+        {
+          self.inner.element_key().into()
+        }
+        #[rune::function]
+        fn source(&self) -> Result<rune::Value>
+        {
+          to_specific_node(self.inner.source().clone())
+        }
+        #[rune::function]
+        fn destination(&self) -> Result<rune::Value>
+        {
+          to_specific_node(self.inner.destination().clone())
+        }
         #(
           #[rune::function]
           fn #field_names(&self) -> Result<#field_return_types>
@@ -308,6 +344,9 @@ pub(super) fn generate_rune_module_impl(input: ParsedInput) -> Result<TokenStrea
 
     edges_declare.extend(quote! {
       m.ty::<edges::#edge_struct_name>()?;
+      m.function_meta(edges::#edge_struct_name::element_key)?;
+      m.function_meta(edges::#edge_struct_name::source)?;
+      m.function_meta(edges::#edge_struct_name::destination)?;
       #(
         m.function_meta(edges::#edge_struct_name::#field_names)?;
         m.function_meta(edges::#edge_struct_name::#field_set_function_name)?;
@@ -329,17 +368,8 @@ pub(super) fn generate_rune_module_impl(input: ParsedInput) -> Result<TokenStrea
             return Err(anyhow::anyhow!("Invalid node combination for edge"))
           }
         let edge = self.inner.#create_edge_function_name(
-          &edges::GenericNode
-          {
-            key: get_key(&source)?,
-            query_interface: self.inner.query_interface().clone_interface(),
-            graph_name: self.inner.graph_name().clone()
-          },
-          &edges::GenericNode {
-            key: get_key(&destination)?,
-            query_interface: self.inner.query_interface().clone_interface(),
-            graph_name: self.inner.graph_name().clone()
-          },
+          to_generic_node(&source)?,
+          to_generic_node(&destination)?,
           #(#field_names.into_rust_argument()),*)?;
 
         Ok(
@@ -358,7 +388,7 @@ pub(super) fn generate_rune_module_impl(input: ParsedInput) -> Result<TokenStrea
     mod #rune_module_name
     {
       use gqb::expression_builder as eb;
-      use #my_crate::{gqb, anyhow, graphcore::*, QueryInterface, Element, ElementType, Node, Edge, rune::*};
+      use #my_crate::{gqb, anyhow, graphcore::*, GenericNode, QueryInterface, Element, ElementType, Node, Edge, rune::*};
 
       mod nodes
       {
@@ -369,54 +399,23 @@ pub(super) fn generate_rune_module_impl(input: ParsedInput) -> Result<TokenStrea
       mod edges
       {
         use super::*;
-        pub(super) struct GenericNode
-        {
-          pub key: graphcore::Key,
-          pub query_interface: Box<dyn crate::QueryInterface>,
-          pub graph_name: String,
-        }
-
-        impl Element for GenericNode {
-            fn element_key(&self) -> graphcore::Key {
-                self.key
-            }
-            fn element_type(&self) -> ElementType {
-                ElementType::Node
-            }
-            fn graph_name(&self) -> &String {
-                &self.graph_name
-            }
-            fn query_interface(&self) -> &dyn crate::QueryInterface {
-                use std::ops::Deref;
-                self.query_interface.deref()
-            }
-        }
-
-        impl Node for GenericNode
-        {
-          fn from_key(
-              key: graphcore::Key,
-              query_interface: Box<dyn crate::QueryInterface>,
-              graph_name: impl Into<String>,
-            ) -> Self {
-              GenericNode {
-                key,
-                query_interface,
-                graph_name: graph_name.into()
-              }
-          }
-          fn labels() -> Vec<String> {
-              Default::default()
-          }
-        }
         #edges_structs
       }
 
-      fn get_key(value: &rune::Value) -> Result<graphcore::Key> {
+      fn to_specific_node(generic_node: GenericNode)
+        -> Result<rune::Value>
+      {
+        let (key, query_interface, graph_name, labels) = generic_node.unpack();
+        let node = graphcore::Node::new(key, labels, graphcore::value_map!());
+        #to_specific_node_function
+        Err(anyhow::anyhow!("Unknown node with labels {:?}.", node.labels()))
+      }
+
+      fn to_generic_node(value: &rune::Value) -> Result<GenericNode> {
         use rune::FromValue;
         use Element;
         match value.type_hash() {
-          #key_function
+          #to_generic_node_function
           _ => Err(anyhow::anyhow!("Unknown hash.")),
         }
       }
@@ -463,6 +462,7 @@ pub(super) fn generate_rune_module_impl(input: ParsedInput) -> Result<TokenStrea
       {
         let mut m = rune::Module::with_crate_item(#rune_module_name_string, vec!["nodes"])?;
         #(#nodes_declare)*
+        #edges_declare
 
         Ok(m)
       }

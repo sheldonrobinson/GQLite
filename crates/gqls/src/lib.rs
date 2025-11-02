@@ -1,17 +1,29 @@
 #![doc = include_str!("../README.MD")]
 #![warn(missing_docs)]
 
+use std::collections::HashSet;
+
 pub use anyhow;
 pub use gqb;
 pub use graphcore;
+
+#[cfg(feature = "rune")]
+pub mod rune;
+
+mod generic_node;
 
 pub use gqls_macros::generate_module;
 #[cfg(feature = "rune")]
 pub use gqls_macros::generate_rune_module;
 
-#[cfg(feature = "rune")]
-pub mod rune;
+pub use generic_node::GenericNode;
 
+/// True if every &str in b occurs as a String in a (duplicates ignored).
+fn contains_all(a: &Vec<String>, b: &Vec<&str>) -> bool
+{
+  let set: HashSet<&str> = a.iter().map(String::as_str).collect();
+  b.iter().all(|&s| set.contains(s))
+}
 /// Query interface to a database.
 pub trait QueryInterface: Sync + Send
 {
@@ -47,16 +59,18 @@ pub trait Element: Sync + Send
 }
 
 /// Base trait for nodes
-pub trait Node: Element
+pub trait Node: Element + Sized
 {
   /// Create the element from the key
-  fn from_key(
-    key: graphcore::Key,
+  fn from_node(
+    node: graphcore::Node,
     query_interface: Box<dyn QueryInterface>,
     graph_name: impl Into<String>,
-  ) -> Self;
+  ) -> Result<Self, anyhow::Error>;
+  /// Convert into a generic node
+  fn into_generic_node(self) -> GenericNode;
   /// Vector of labels for the node
-  fn labels() -> Vec<String>;
+  fn labels(node: Option<&Self>) -> Vec<String>;
 }
 
 /// Base trait for edges
@@ -167,7 +181,9 @@ mod tests
     assert_eq!(post.creation_date().unwrap(), timestamp);
 
     // Test creating edge
-    let edge_bm_post = graph.create_likes(&bob_marley, &post).unwrap();
+    let edge_bm_post = graph
+      .create_likes(bob_marley.clone(), post.clone())
+      .unwrap();
     assert_eq!(
       edge_bm_post.source().element_key(),
       bob_marley.element_key()
@@ -185,7 +201,7 @@ mod tests
 
     // Create an other edge
     let edge_bm_bm = graph
-      .create_knows(&bob_marley, &bob_marley, timestamp.clone())
+      .create_knows(bob_marley.clone(), bob_marley.clone(), timestamp.clone())
       .unwrap();
     assert_eq!(edge_bm_bm.source().element_key(), bob_marley.element_key());
     assert_eq!(
