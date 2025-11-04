@@ -56,8 +56,8 @@ fn property_arg_type(prop: &Property) -> Result<TokenStream, syn::Error>
           LiteralBaseType::Boolean => quote! {bool},
           LiteralBaseType::Integer => quote! {i64},
           LiteralBaseType::Float => quote! {f64},
-          LiteralBaseType::String => quote! {Ref<str>},
-          LiteralBaseType::TimeStamp => quote! {Ref<gqliterune::TimeStamp>},
+          LiteralBaseType::String => quote! {rune::Ref<str>},
+          LiteralBaseType::TimeStamp => quote! {rune::Ref<gqliterune::TimeStamp>},
         }
       }
       else
@@ -175,7 +175,7 @@ pub(super) fn generate_rune_module_impl(input: ParsedInput) -> Result<TokenStrea
     let labels_vec = quote! {vec![#(#labels),*]};
 
     nodes_structs.push(quote! {
-      #[derive(Any)]
+      #[derive(rune::Any)]
       #[rune(item = ::#rune_module_name::nodes)]
       pub struct #node_struct_name
       {
@@ -312,7 +312,7 @@ pub(super) fn generate_rune_module_impl(input: ParsedInput) -> Result<TokenStrea
     }
 
     edges_structs.extend(quote! {
-      #[derive(Any)]
+      #[derive(rune::Any)]
       #[rune(item = ::#rune_module_name::edges)]
       pub struct #edge_struct_name
       {
@@ -415,7 +415,9 @@ pub(super) fn generate_rune_module_impl(input: ParsedInput) -> Result<TokenStrea
     {
       use gqb::expression_builder as eb;
       use #my_crate::{gqb, anyhow, graphcore::*, GenericNode, QueryInterface, Element, ElementType, Node, Edge, rune::*};
+      use rune::TypeHash as _;
 
+      type Result<T, E = anyhow::Error> = std::result::Result<T,E>;
       mod nodes
       {
         use super::*;
@@ -446,14 +448,14 @@ pub(super) fn generate_rune_module_impl(input: ParsedInput) -> Result<TokenStrea
         }
       }
 
-      fn get_metadata(hash: Hash) -> Result<&'static ElementMetadata> {
+      fn get_metadata(hash: rune::Hash) -> Result<&'static ElementMetadata> {
         match hash {
           #metadata_function
           _ => Err(anyhow::anyhow!("Unknown hash.")),
         }
       }
 
-      #[derive(Any)]
+      #[derive(rune::Any)]
       #[rune(item = ::#rune_module_name)]
       pub struct Graph
       {
@@ -463,7 +465,7 @@ pub(super) fn generate_rune_module_impl(input: ParsedInput) -> Result<TokenStrea
       impl Graph
       {
         #[rune::function(path = Self::new)]
-        pub fn new(connection: gqliterune::Connection, graph_name: Ref<str>) -> Result<Graph>
+        pub fn new(connection: gqliterune::Connection, graph_name: rune::Ref<str>) -> Result<Graph>
         {
           Ok(
             Self {
@@ -492,7 +494,7 @@ pub(super) fn generate_rune_module_impl(input: ParsedInput) -> Result<TokenStrea
 
         Ok(m)
       }
-      pub fn install(context: &mut Context) -> Result<()>
+      pub fn install(context: &mut rune::Context) -> Result<()>
       {
         context.install(rune_module()?)?;
         context.install(rune_nodes_module()?)?;

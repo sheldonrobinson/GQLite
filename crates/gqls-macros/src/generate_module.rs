@@ -220,7 +220,7 @@ pub(super) fn generate_module_impl(input: ParsedInput) -> Result<TokenStream, sy
       {
         fn from_node(
           node: graphcore::Node,
-          query_interface: Box<dyn crate::QueryInterface>,
+          query_interface: Box<dyn QueryInterface>,
           graph_name: impl Into<String>,
         ) -> Result<Self, anyhow::Error>
         {
