@@ -29,13 +29,13 @@ pub(crate) fn parse_gqls_file(
   // Find gqls file, relative to CARGO_MANIFEST_DIR/src
   let root = env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".into());
 
-  let gqls_path = Path::new(&root).join("src/").join(filename.value());
+  let gqls_path = Path::new(&root).join(filename.value());
   if !gqls_path.exists()
   {
     return Err(syn::Error::new(
       filename.span(),
       format!(
-        "Cannot find: {:?} in src, make sure the path is relative to src.",
+        "Cannot find: {:?}, relative to the directory containing Cargo.toml, make sure the path is relative to src.",
         filename.value()
       ),
     ));
