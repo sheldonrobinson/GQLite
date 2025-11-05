@@ -4,6 +4,8 @@
 
 ## [Unreleased] - ReleaseDate
 
+## [0.6.3] - 2025-11-05
+
 - Add possibility to create Rune connection from arc connection.
 - Add support for `CREATE GRAPH IF NOT EXISTS`
 
@@ -107,7 +109,8 @@
 - `persy` backend.
 
 <!-- next-url -->
-[Unreleased]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.6.1...dev/1
+[Unreleased]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.6.3...dev/1
+[0.6.3]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.6.1...gqlitedb-v0.6.3
 [0.6.1]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.6.0...gqlitedb-v0.6.1
 [0.6.0]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.5.3...gqlitedb-v0.6.0
 [0.5.3]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.5.2...gqlitedb-v0.5.3
