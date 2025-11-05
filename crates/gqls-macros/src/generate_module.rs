@@ -7,6 +7,8 @@ use crate::common::{my_crate, parse_gqls_file, expand_element};
 
 pub(super) struct ParsedInput
 {
+  /// visibility of the generated module
+  pub visibility: syn::Visibility,
   /// Identifier for the generated module.
   ident: syn::Ident,
   /// File name with the GQL Schema.
@@ -18,10 +20,11 @@ impl syn::parse::Parse for ParsedInput
 {
   fn parse(input: syn::parse::ParseStream) -> syn::Result<Self>
   {
+    let visibility: syn::Visibility = input.parse()?;
     let ident = input.parse()?;
     let _: syn::Token![,] = input.parse()?;
     let filename = input.parse()?;
-    Ok(Self { ident, filename })
+    Ok(Self { visibility, ident, filename })
   }
 }
 
@@ -69,7 +72,7 @@ fn property_type(prop: &Property) -> Result<TokenStream, syn::Error>
 
 pub(super) fn generate_module_impl(input: ParsedInput) -> Result<TokenStream, syn::Error>
 {
-  let ParsedInput { ident, filename } = input;
+  let ParsedInput { visibility, ident, filename } = input;
 
   let my_crate = my_crate();
 
@@ -514,7 +517,7 @@ pub(super) fn generate_module_impl(input: ParsedInput) -> Result<TokenStream, sy
   Ok(quote::quote! {
 
     /// Module with easy to use API generated from #filename
-    pub mod #ident {
+    #visibility mod #ident {
       use gqb::expression_builder as eb;
       use #my_crate::{gqb, anyhow, graphcore::*, GenericNode, QueryInterface, Element, Node, Edge};
 

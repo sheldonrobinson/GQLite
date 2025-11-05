@@ -116,7 +116,7 @@ mod tests
   use super::*;
   use std::sync::Arc;
 
-  generate_module!(test_module, "src/test.gqls");
+  generate_module!(pub(crate) test_module, "src/test.gqls");
   #[cfg(feature = "rune")]
   generate_rune_module!(test_rune_module, crate::tests::test_module, "src/test.gqls");
 

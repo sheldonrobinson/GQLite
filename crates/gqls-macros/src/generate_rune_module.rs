@@ -9,6 +9,8 @@ use crate::common::{expand_element, my_crate, parse_gqls_file};
 
 pub(super) struct ParsedInput
 {
+  /// visibility of the generated module
+  pub visibility: syn::Visibility,
   /// Identifier for the generated module.
   rune_module_name: syn::Ident,
   /// Identifier for the generated module.
@@ -22,12 +24,14 @@ impl syn::parse::Parse for ParsedInput
 {
   fn parse(input: syn::parse::ParseStream) -> syn::Result<Self>
   {
+    let visibility: syn::Visibility = input.parse()?;
     let rune_module_name = input.parse()?;
     let _: syn::Token![,] = input.parse()?;
     let rust_module_name = input.parse()?;
     let _: syn::Token![,] = input.parse()?;
     let filename = input.parse()?;
     Ok(Self {
+      visibility,
       rune_module_name,
       rust_module_name,
       filename,
@@ -122,6 +126,7 @@ fn property_return_type(prop: &Property) -> Result<TokenStream, syn::Error>
 pub(super) fn generate_rune_module_impl(input: ParsedInput) -> Result<TokenStream, syn::Error>
 {
   let ParsedInput {
+    visibility,
     rune_module_name,
     rust_module_name,
     filename,
@@ -411,7 +416,7 @@ pub(super) fn generate_rune_module_impl(input: ParsedInput) -> Result<TokenStrea
   }
 
   Ok(quote::quote! {
-    mod #rune_module_name
+    #visibility mod #rune_module_name
     {
       use gqb::expression_builder as eb;
       use #my_crate::{gqb, anyhow, graphcore::*, GenericNode, QueryInterface, Element, ElementType, Node, Edge, rune::*};
