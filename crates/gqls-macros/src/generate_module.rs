@@ -582,6 +582,15 @@ pub(super) fn generate_module_impl(input: ParsedInput) -> Result<TokenStream, sy
           let _ = self.interface.execute_builder(builder)?;
           Ok(())
         }
+        /// Delete an iterator of nodes
+        pub fn delete_nodes<TNode: Node>(&self, nodes: impl IntoIterator<Item = TNode>)-> Result<()>
+        {
+          for node in nodes.into_iter()
+          {
+            self.delete_node(node)?
+          }
+          Ok(())
+        }
         /// Delete an edge
         pub fn delete_edge<TEdge: Edge>(&self, edge: TEdge) -> Result<()>
         {
@@ -591,6 +600,15 @@ pub(super) fn generate_module_impl(input: ParsedInput) -> Result<TokenStream, sy
           builder.where_statement(eb::equal(eb::function_call("id", (var,)), edge.element_key().into()));
           builder.delete(var);
           let _ = self.interface.execute_builder(builder)?;
+          Ok(())
+        }
+        /// Delete an iterator of edges
+        pub fn delete_edges<TEdge: Edge>(&self, edges: impl IntoIterator<Item =TEdge>)-> Result<()>
+        {
+          for edge in edges.into_iter()
+          {
+            self.delete_edge(edge)?
+          }
           Ok(())
         }
       }
