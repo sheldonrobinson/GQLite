@@ -469,14 +469,24 @@ pub(super) fn generate_rune_module_impl(input: ParsedInput) -> Result<TokenStrea
 
       impl Graph
       {
-        #[rune::function(path = Self::new)]
-        pub fn new(connection: gqliterune::Connection, graph_name: rune::Ref<str>) -> Result<Graph>
+        pub fn new<TQueryInterface>(interface: TQueryInterface, graph_name: impl Into<String>) -> Result<Graph>
+          where TQueryInterface: QueryInterface + 'static
+        {
+          Ok(
+            Self {
+              inner: #rust_module_name::Graph::new(interface, graph_name)?
+            }
+          )
+        }
+        #[rune::function(keep, path = Self::new)]
+         fn new_rune(connection: gqliterune::Connection, graph_name: rune::Ref<str>) -> Result<Self>
         {
           Ok(
             Self {
               inner: #rust_module_name::Graph::new(connection.connection_clone(), graph_name.to_string())?
             }
           )
+          // Ok(Self::new_rune(connection.connection_clone(), graph_name.to_string())?)
         }
         #(#graph_functions)*
       }
@@ -486,23 +496,27 @@ pub(super) fn generate_rune_module_impl(input: ParsedInput) -> Result<TokenStrea
       {
         let mut m = rune::Module::with_crate(#rune_module_name_string)?;
         m.ty::<Graph>()?;
-        m.function_meta(Graph::new)?;
+        m.function_meta(Graph::new_rune__meta)?;
         #(#graph_functions_declare)*
-
         Ok(m)
       }
       fn rune_nodes_module() -> Result<rune::Module>
       {
         let mut m = rune::Module::with_crate_item(#rune_module_name_string, vec!["nodes"])?;
         #(#nodes_declare)*
+        Ok(m)
+      }
+      fn rune_edges_module() -> Result<rune::Module>
+      {
+        let mut m = rune::Module::with_crate_item(#rune_module_name_string, vec!["edges"])?;
         #edges_declare
-
         Ok(m)
       }
       pub fn install(context: &mut rune::Context) -> Result<()>
       {
         context.install(rune_module()?)?;
         context.install(rune_nodes_module()?)?;
+        context.install(rune_edges_module()?)?;
         Ok(())
       }
 
