@@ -36,6 +36,14 @@ pub trait QueryInterface: Sync + Send
   fn clone_interface(&self) -> Box<dyn QueryInterface>;
 }
 
+impl std::fmt::Debug for Box<dyn QueryInterface>
+{
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
+  {
+    f.write_str("QueryInterface")
+  }
+}
+
 /// Type of the element
 pub enum ElementType
 {
@@ -224,6 +232,52 @@ mod tests
     graph.delete_edge(edge_bm_bm).unwrap();
     graph.delete_node(bob_marley).unwrap();
   }
+  #[test]
+  #[cfg(feature = "gqlite")]
+  fn test_edge_matching_labels()
+  {
+    use gqlitedb::TimeStamp;
+
+    let connection = Arc::new(gqlitedb::Connection::create(Default::default()).unwrap());
+    let graph = test_module::Graph::new(connection.clone(), "test").unwrap();
+
+    let bob_marley = graph.create_person("Bob", "Marley").unwrap();
+    let john_doe = graph.create_person("John", "Doe").unwrap();
+    let timestamp = TimeStamp::parse("2024-06-15T07:00:00.123000-00:00[GMT]").unwrap();
+    let post = graph
+      .create_post(timestamp.clone(), "FireGoupil", None)
+      .unwrap();
+
+    let timestamp_b = TimeStamp::parse("2022-06-15T07:00:00.123000-00:00[GMT]").unwrap();
+    let comment = graph.create_comment(timestamp_b.clone(), "Corner").unwrap();
+
+    graph
+      .create_likes(bob_marley.clone(), post.clone())
+      .unwrap();
+    let likes_bm_comment = graph
+      .create_likes(bob_marley.clone(), comment.clone())
+      .unwrap();
+
+    let has_creatore_post_jd = graph
+      .create_has_creator(post.clone(), john_doe.clone())
+      .unwrap();
+    graph
+      .create_has_creator(comment.clone(), john_doe.clone())
+      .unwrap();
+
+    let likes = graph
+      .match_likes::<_, test_module::nodes::Comment>(Some(bob_marley), None)
+      .unwrap();
+    assert_eq!(likes.len(), 1);
+    assert_eq!(likes[0], likes_bm_comment);
+
+    let has_creator = graph
+      .match_has_creator::<test_module::nodes::Post, _>(None, Some(john_doe))
+      .unwrap();
+    assert_eq!(has_creator.len(), 1);
+    assert_eq!(has_creator[0], has_creatore_post_jd);
+  }
+
   #[test]
   #[cfg(all(feature = "gqlite", feature = "rune"))]
   fn test_orm_rune_api()

@@ -181,6 +181,7 @@ pub(super) fn generate_module_impl(input: ParsedInput) -> Result<TokenStream, sy
 
     // Node structure
     nodes.push(quote::quote! {
+      #[derive(Debug)]
       pub struct #node_struct_name
       {
         pub(super) key: graphcore::Key,
@@ -342,6 +343,7 @@ pub(super) fn generate_module_impl(input: ParsedInput) -> Result<TokenStream, sy
 
       // Define edge structure
       edges.push(quote::quote! {
+        #[derive(Debug)]
         pub struct #edge_struct_name<TSource, TDestination>
           where (TSource, TDestination): #into_edge_trait_name,
                 TSource: Node,
@@ -390,6 +392,16 @@ pub(super) fn generate_module_impl(input: ParsedInput) -> Result<TokenStream, sy
           fn element_type(&self) -> #my_crate::ElementType
           {
             #my_crate::ElementType::Edge
+          }
+        }
+        impl<TSource, TDestination> PartialEq for #edge_struct_name<TSource, TDestination>
+          where (TSource, TDestination): #into_edge_trait_name,
+                TSource: Node,
+                TDestination: Node,
+        {
+          fn eq(&self, other: &Self) -> bool
+          {
+            self.key == other.key
           }
         }
         impl<TSource, TDestination> Edge for #edge_struct_name<TSource, TDestination>
@@ -457,36 +469,29 @@ pub(super) fn generate_module_impl(input: ParsedInput) -> Result<TokenStream, sy
           let mut builder = gqb::Builder::default();
           builder.use_graph(self.graph_name.clone());
 
-          let (source_var, destination_var) = match (source, destination)
+          let mut where_expression = eb::none();
+          let source_var = builder.match_node(TSource::labels(source.as_ref()), value_map!());
+          if let Some(source) = source
           {
-            (None, None) => (None, None),
-            (Some(source), None) => {
-              let source_var = builder.match_node(TSource::labels(Some(&source)), value_map!());
-              builder.where_statement(
-                eb::equal(eb::function_call("id", (source_var,)), source.element_key().into()),
-              );
-              (Some(source_var), None)
+            where_expression = Some(eb::equal(eb::function_call("id", (source_var,)), source.element_key().into()));
+          }
+          
+          let destination_var = builder.match_node(TDestination::labels(destination.as_ref()), value_map!());
+          if let Some(destination) = destination
+          {
+            let expr = eb::equal(eb::function_call("id", (destination_var,)), destination.element_key().into());
+            match where_expression
+            {
+              Some(we) => where_expression = Some(eb::and(we, expr)),
+              None => where_expression = Some(expr),
             }
-            (None, Some(destination)) => {
-              let destination_var = builder.match_node(TDestination::labels(Some(&destination)), value_map!());
-              builder.where_statement(
-                eb::equal(eb::function_call("id", (destination_var,)), destination.element_key().into()),
-              );
-              (None, Some(destination_var))
-            }
-            (Some(source), Some(destination)) => {
-              let source_var = builder.match_node(TSource::labels(Some(&source)), value_map!());
-              let destination_var = builder.match_node(TDestination::labels(Some(&destination)), value_map!());
-              builder.where_statement(
-                eb::and(
-                  eb::equal(eb::function_call("id", (source_var,)), source.element_key().into()),
-                  eb::equal(eb::function_call("id", (destination_var,)), destination.element_key().into()),
-                )
-              );
-              (Some(source_var), Some(destination_var))
-            }
-          };
+          }
+
           let (variable, _) = builder.match_path(source_var, #labels, value_map!(), destination_var);
+          if let Some(where_expression) = where_expression
+          {
+            builder.where_statement(where_expression);
+          } 
           builder.return_variable(variable, "path");
           
           let t = self.interface.execute_builder(builder)?.unwrap();

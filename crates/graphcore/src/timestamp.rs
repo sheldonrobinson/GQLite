@@ -71,7 +71,7 @@ impl TimeStamp
   {
     self.0.microsecond()
   }
-  /// PArse the time string
+  /// Parse the time string
   pub fn parse(date: &str) -> Result<TimeStamp, crate::Error>
   {
     Ok(TimeStamp(date.parse()?))

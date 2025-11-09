@@ -1,6 +1,6 @@
 //! Module for building expressions.
 
-use crate::{Expression};
+use crate::Expression;
 
 /// Convert arguments for function calls
 pub trait IntoFunctionArgs
@@ -54,6 +54,12 @@ binop!(substraction, Substraction);
 binop!(division, Division);
 binop!(multiplication, Multiplication);
 
+/// Return a none expression
+pub fn none() -> Option<Expression>
+{
+  None
+}
+
 /// Create a function call
 pub fn function_call(name: impl AsRef<str>, args: impl IntoFunctionArgs) -> Expression
 {
@@ -67,9 +73,5 @@ pub fn function_call(name: impl AsRef<str>, args: impl IntoFunctionArgs) -> Expr
 pub fn get(expression: Expression, path: Vec<String>) -> Expression
 {
   let expression = Box::new(expression);
-  Expression::Get
-  {
-    expression,
-    path
-  }
+  Expression::Get { expression, path }
 }
