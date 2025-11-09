@@ -10,6 +10,7 @@ repository.workspace = true
 default = ["gqlite"]
 gqlite = ["dep:gqlitedb"]
 rune = ["dep:rune", "dep:gqliterune"]
+bundled = ["gqlitedb/bundled"]
 
 [dependencies]
 gqlitedb = { workspace = true, optional = true }
