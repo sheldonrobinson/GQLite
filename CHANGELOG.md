@@ -4,6 +4,8 @@
 
 ## [Unreleased] - ReleaseDate
 
+## [0.7.0] - 2025-11-11
+
 - Introduce GQL Schema, used for ORB-like API generation in Rust and Rune.
 - Support for storing timestamps.
 - Refactor SQLite backend to make it adaptable to other SQL-based store.
@@ -113,7 +115,8 @@
 - `persy` backend.
 
 <!-- next-url -->
-[Unreleased]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.6.3...dev/1
+[Unreleased]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.7.0...dev/1
+[0.7.0]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.6.3...gqlitedb-v0.7.0
 [0.6.3]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.6.1...gqlitedb-v0.6.3
 [0.6.1]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.6.0...gqlitedb-v0.6.1
 [0.6.0]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.5.3...gqlitedb-v0.6.0
