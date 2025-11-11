@@ -5,7 +5,7 @@ How to release gqlite
   - CMakeLists.txt
   - Cargo.toml
   - crates/gqb crates/gqls crates/gqls-macro crates/gqlparser
-  - bindings/python/gqlpy/pyproject.toml
+  - bindings/python/gqlitepy/pyproject.toml
   - bindings/ruby/gqliterb.gemspec
 - Make sure there is a test database in test/rb/data for the new version, and that it is called used in gqlite-rspec
 
@@ -19,7 +19,7 @@ cargo release
 
 ```bash
   cd bindings/ruby;
-  yte build_gem
+  yet build_gem
 ```
 
   Test gem:
