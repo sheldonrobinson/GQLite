@@ -4,6 +4,10 @@
 
 ## [Unreleased] - ReleaseDate
 
+- Introduce GQL Schema, used for ORB-like API generation in Rust and Rune.
+- Support for storing timestamps.
+- Refactor SQLite backend to make it adaptable to other SQL-based store.
+
 ## [0.6.3] - 2025-11-05
 
 - Add possibility to create Rune connection from arc connection.
