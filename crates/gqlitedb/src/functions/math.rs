@@ -2,7 +2,7 @@ use rand::Rng;
 
 use crate::prelude::*;
 
-use super::{FResult, FunctionTypeTrait};
+use super::FResult;
 
 #[derive(Debug, Default)]
 pub(super) struct Rand {}
@@ -24,7 +24,7 @@ impl Ceil
 {
   fn call_impl(value: &f64) -> FResult<f64>
   {
-    Ok(value.ceil() as f64)
+    Ok(value.ceil())
   }
 }
 
@@ -37,7 +37,7 @@ impl Floor
 {
   fn call_impl(value: &f64) -> FResult<f64>
   {
-    Ok(value.floor() as f64)
+    Ok(value.floor())
   }
 }
 

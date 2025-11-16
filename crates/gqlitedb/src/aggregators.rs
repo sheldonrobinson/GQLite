@@ -28,7 +28,7 @@ macro_rules! declare_aggregator {
     pub(super) struct $type_name {}
     impl $type_name
     {
-      pub(crate) fn new() -> (String, crate::aggregators::Aggregator)
+      pub(crate) fn create() -> (String, crate::aggregators::Aggregator)
       {
         (
           stringify!($function_name).to_string(),
@@ -63,12 +63,12 @@ pub(crate) use declare_aggregator;
 pub(crate) fn init_aggregators() -> std::collections::HashMap<String, Aggregator>
 {
   [
-    count::Count::new(),
-    arithmetic::Sum::new(),
-    containers::Collect::new(),
-    stats::Avg::new(),
-    stats::Min::new(),
-    stats::Max::new(),
+    count::Count::create(),
+    arithmetic::Sum::create(),
+    containers::Collect::create(),
+    stats::Avg::create(),
+    stats::Min::create(),
+    stats::Max::create(),
   ]
   .into()
 }

@@ -40,7 +40,25 @@ Feature: Create Use
       CREATE (:A)
       """
     Then an Error should be raised at run time: DuplicatedGraph
-  Scenario: [4] Cannot Use inexisting graph
+  Scenario: [4] Cannot Create Graph with existing name, unless if not exists
+    Given an empty graph
+    And having executed query:
+      """
+      CREATE GRAPH test1
+      CREATE GRAPH IF NOT EXISTS test1
+      CREATE (:A)
+      """
+    When executing query:
+      """
+      USE test1
+      MATCH (n)
+      RETURN n
+      """
+    Then the result should be, in any order:
+      | n    |
+      | (:A) |
+    And no side effects
+  Scenario: [5] Cannot Use inexisting graph
     Given an empty graph
     When executing query:
       """

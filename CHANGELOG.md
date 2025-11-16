@@ -4,6 +4,48 @@
 
 ## [Unreleased] - ReleaseDate
 
+## [0.7.0] - 2025-11-11
+
+- Introduce GQL Schema, used for ORB-like API generation in Rust and Rune.
+- Support for storing timestamps.
+- Refactor SQLite backend to make it adaptable to other SQL-based store.
+
+## [0.6.3] - 2025-11-05
+
+- Add possibility to create Rune connection from arc connection.
+- Add support for `CREATE GRAPH IF NOT EXISTS`
+
+### gqb
+
+- Add support for set statements.
+- Add graph management, use, create and drop graph.
+- Add support for detach delete.
+
+## [0.6.1] - 2025-10-28
+
+- Add `id` function.
+- Fix aliasing in return/with statements.
+- Improve query status reporting in gqlbrowser.
+
+### gqb
+
+- Add `where` statement and expressions.
+- Add expressions to `return` statement.
+- Add `delete` to query builder (added in gqb 0.2.1).
+
+## [0.6.0] - 2025-09-01
+
+- Add `gqb` a crate for generating queries using a high-level API.
+- Upgrade to redb 3.
+- API cleanup.
+
+## [0.5.3] - 2025-08-17
+- Add egui-based, GQLite browser.
+- Add support for WASM (only redb backend supported)
+- Add support for in-memory databases.
+- Add `exponent` (^) operator.
+- Add Rune bindings.
+
 ## [0.5.2] - 2025-07-26
 - New Ruby/Python bindings.
 - Add `head` function, and `avg` aggregator.
@@ -73,7 +115,12 @@
 - `persy` backend.
 
 <!-- next-url -->
-[Unreleased]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.5.2...dev/2
+[Unreleased]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.7.0...dev/1
+[0.7.0]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.6.3...gqlitedb-v0.7.0
+[0.6.3]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.6.1...gqlitedb-v0.6.3
+[0.6.1]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.6.0...gqlitedb-v0.6.1
+[0.6.0]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.5.3...gqlitedb-v0.6.0
+[0.5.3]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.5.2...gqlitedb-v0.5.3
 [0.5.2]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.5.1...gqlitedb-v0.5.2
 [0.5.1]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.5.0...gqlitedb-v0.5.1
 [0.5.0]: https://gitlab.com/gqlite/gqlite/compare/gqlitedb-v0.4.0...gqlitedb-v0.5.0

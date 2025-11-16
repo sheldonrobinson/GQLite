@@ -1,0 +1,14 @@
+# Full documentation is available at https://gitlab.com/cyloncore/yet/-/blob/stable/docs/yet_yml.md
+tasks:
+  build_crate:
+    description: "build_crate"
+    arguments: ["which"]
+    visibility: hidden
+    command: !commands
+      - cd: "{which}"
+      - cargo build
+  gqlitedb:
+    description: "gqlitedb"
+    arguments: []
+    command: !commands
+      - build_crate gqlitedb

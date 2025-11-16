@@ -64,7 +64,10 @@
     {
       "type": "cargo",
       "command": "test",
-      "args": [],
+      "args": [
+        "--features",
+        "postgres"
+      ],
       "problemMatcher": [
         "$rustc"
       ],

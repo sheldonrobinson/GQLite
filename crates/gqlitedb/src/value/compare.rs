@@ -43,11 +43,7 @@ fn compare_map(lhs: &value::ValueMap, rhs: &value::ValueMap) -> Ordering
           o => o.into(),
         }
       })
-      .find(|p| match p
-      {
-        Ordering::Equal => false,
-        _ => true,
-      })
+      .find(|p| !matches!(p, Ordering::Equal))
       .unwrap_or(Ordering::Equal)
   }
   else if lhs.len() < rhs.len()
@@ -74,7 +70,7 @@ fn compare_f64(lhs: &f64, rhs: &f64) -> Ordering
 
 fn compare_node(lhs: &graph::Node, rhs: &graph::Node) -> Ordering
 {
-  lhs.key.uuid.cmp(&rhs.key.uuid).into()
+  lhs.key().uuid().cmp(&rhs.key().uuid()).into()
 }
 
 pub(crate) fn compare(lhs: &value::Value, rhs: &value::Value) -> Ordering
@@ -83,6 +79,12 @@ pub(crate) fn compare(lhs: &value::Value, rhs: &value::Value) -> Ordering
   match lhs
   {
     Value::Null => Ordering::ComparedNull,
+    Value::Key(kl) => match rhs
+    {
+      Value::Key(kr) => kl.uuid().cmp(&kr.uuid()).into(),
+      Value::Null => Ordering::ComparedNull,
+      _ => Ordering::Null,
+    },
     Value::Boolean(bl) => match rhs
     {
       Value::Boolean(br) => bl.cmp(br).into(),
@@ -106,6 +108,12 @@ pub(crate) fn compare(lhs: &value::Value, rhs: &value::Value) -> Ordering
     Value::String(sl) => match rhs
     {
       Value::String(sr) => sl.cmp(sr).into(),
+      Value::Null => Ordering::ComparedNull,
+      _ => Ordering::Null,
+    },
+    Value::TimeStamp(tl) => match rhs
+    {
+      Value::TimeStamp(tr) => tl.cmp(tr).into(),
       Value::Null => Ordering::ComparedNull,
       _ => Ordering::Null,
     },
@@ -175,30 +183,21 @@ pub(crate) fn compare(lhs: &value::Value, rhs: &value::Value) -> Ordering
     },
     Value::Edge(lhs) => match rhs
     {
-      Value::Edge(rhs) =>
-      {
-        lhs.key.uuid.cmp(&rhs.key.uuid).into()
-        // let labels_cmp = lhs.labels.cmp(&rhs.labels);
-        // match labels_cmp
-        // {
-        //   std::cmp::Ordering::Equal => compare_map(&lhs.properties, &rhs.properties),
-        //   o => o.into(),
-        // }
-      }
+      Value::Edge(rhs) => lhs.key().uuid().cmp(&rhs.key().uuid()).into(),
       _ => Ordering::Null,
     },
     Value::Path(lhs) => match rhs
     {
       Value::Path(rhs) =>
       {
-        let labels_cmp = lhs.labels.cmp(&rhs.labels);
+        let labels_cmp = lhs.labels().cmp(rhs.labels());
         match labels_cmp
         {
-          std::cmp::Ordering::Equal => match compare_map(&lhs.properties, &rhs.properties)
+          std::cmp::Ordering::Equal => match compare_map(lhs.properties(), rhs.properties())
           {
-            Ordering::Equal => match compare_node(&lhs.source, &rhs.source)
+            Ordering::Equal => match compare_node(lhs.source(), rhs.source())
             {
-              Ordering::Equal => compare_node(&lhs.destination, &rhs.destination),
+              Ordering::Equal => compare_node(lhs.destination(), rhs.destination()),
               o => o,
             },
             o => o,

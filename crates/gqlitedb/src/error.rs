@@ -21,7 +21,7 @@ pub enum CompileTimeError
   },
   /// Parse error
   #[error("ParseError: '{0}'")]
-  ParseError(#[from] pest::error::Error<crate::parser::parser::Rule>),
+  ParseError(#[from] Box<pest::error::Error<crate::parser::parser_impl::Rule>>),
   /// Variable is not defined
   #[error("UndefinedVariable: Unknown variable '{name}'.")]
   UndefinedVariable
@@ -52,7 +52,7 @@ pub enum CompileTimeError
   NoSingleRelationshipType,
   #[error("NotComparable: values are not comparable.")]
   NotComparable,
-  #[error("UnknownFunction: {name}")]
+  #[error("UnknownFunction: {name}.")]
   UnknownFunction
   {
     name: String
@@ -120,7 +120,7 @@ pub enum RunTimeError
   /// Edge has no label
   #[error("MissingEdgeLabel")]
   MissingEdgeLabel,
-  #[error("UnknownFunction: {name}")]
+  #[error("UnknownFunction: {name}.")]
   UnknownFunction
   {
     name: String
@@ -129,6 +129,12 @@ pub enum RunTimeError
   InvalidBinaryOperands,
   #[error("InvalidNegationOperands: operands for negation operation are not compatible.")]
   InvalidNegationOperands,
+  #[error("Invalid value cast, cannot cast {value} to {typename}.")]
+  InvalidValueCast
+  {
+    value: Box<crate::Value>,
+    typename: &'static str,
+  },
   #[error("InvalidDelete: invalid delete argument, expected node or edge.")]
   InvalidDelete,
   #[error("DeleteConnectedNode: node is still connected and cannot be deleted.")]
@@ -149,6 +155,13 @@ pub enum RunTimeError
   {
     graph_name: String
   },
+  #[error("Key {key} cannot be found in a path in a ValueMap.")]
+  MissingKeyInPath
+  {
+    key: String
+  },
+  #[error("Path cannot have null key.")]
+  MissingKey,
 }
 
 /// Internal errors, should be treated as bugs.
@@ -214,12 +227,6 @@ pub enum InternalError
   },
   #[error("Empty stack.")]
   EmptyStack,
-  #[error("Invalid value cast, cannot cast {value} to {typename}.")]
-  InvalidValueCast
-  {
-    value: crate::Value,
-    typename: &'static str,
-  },
   #[error("Code is not reachable in {context}.")]
   Unreachable
   {
@@ -263,18 +270,12 @@ pub enum InternalError
   #[error("Invalid aggregation state")]
   InvalidAggregationState,
 
+  #[error("Invalid query result cast")]
+  InvalidQueryResultCast,
+
   // Third-party
   #[error("Missing element in iterator.")]
   MissingElementIterator,
-
-  #[cfg(feature = "redb")]
-  #[error("redb: {0}")]
-  RedbError(#[from] redb::Error),
-
-  // Errors from sqlite
-  #[cfg(feature = "sqlite")]
-  #[error("Sqlite: {0}")]
-  SqliteError(#[from] rusqlite::Error),
 
   // Errors from askama
   #[cfg(feature = "sqlite")]
@@ -310,6 +311,10 @@ pub enum InternalError
   Infallible(#[from] std::convert::Infallible),
   #[error("Poison error {0}.")]
   Poison(String),
+  #[error("IOError: {0}.")]
+  IOError(#[from] std::io::Error),
+  #[error("Utf8Error: {0}.")]
+  Utf8Error(#[from] std::str::Utf8Error),
 }
 
 /// Error in the store backend.
@@ -318,6 +323,19 @@ pub enum InternalError
 #[non_exhaustive]
 pub enum StoreError
 {
+  // Errors from sqlite
+  #[cfg(feature = "sqlite")]
+  #[error("Sqlite: {0}")]
+  SqliteError(#[from] rusqlite::Error),
+
+  #[cfg(feature = "redb")]
+  #[error("redb: {0}")]
+  RedbError(#[from] redb::Error),
+
+  #[cfg(feature = "redb")]
+  #[error("redb: {0}")]
+  Redb2Error(#[from] redb2::Error),
+
   #[error("UnknownBackend: backend '{backend}' is unknown.")]
   UnknownBackend
   {
@@ -351,6 +369,8 @@ pub enum StoreError
     actual: utils::Version,
     expected: utils::Version,
   },
+  #[error("Invalid database format: {0}.")]
+  InvalidFormat(String),
 }
 
 /// GQLite errors
@@ -372,11 +392,7 @@ pub enum Error
   Internal(#[from] InternalError),
 }
 
-fn assert_send_sync<T: Send + Sync>() {}
-fn _check_error_send_sync()
-{
-  assert_send_sync::<Error>();
-}
+ccutils::assert_impl_all!(Error: Send, Sync);
 
 impl Error
 {
@@ -385,13 +401,34 @@ impl Error
   {
     self
   }
+  #[cfg(not(feature = "_backtrace"))]
   pub(crate) fn split_error(self) -> (Error, ())
   {
     (self, ())
   }
+  #[cfg(not(feature = "_backtrace"))]
   pub(crate) fn make_error(error: Error, _: ()) -> Error
   {
     error
+  }
+}
+
+impl From<graphcore::Error> for Error
+{
+  fn from(value: graphcore::Error) -> Self
+  {
+    match value
+    {
+      graphcore::Error::InvalidBinaryOperands => RunTimeError::InvalidBinaryOperands.into(),
+      graphcore::Error::InvalidNegationOperands => RunTimeError::InvalidNegationOperands.into(),
+      graphcore::Error::InvalidValueCast { value, typename } =>
+      {
+        RunTimeError::InvalidValueCast { value, typename }.into()
+      }
+      graphcore::Error::MissingKey => RunTimeError::MissingKey.into(),
+      graphcore::Error::MissingKeyInPath { key } => RunTimeError::MissingKeyInPath { key }.into(),
+      _ => InternalError::Unimplemented("From graphcore::Error to graphcore::Error.").into(),
+    }
   }
 }
 
@@ -402,12 +439,14 @@ impl Error
 // |_____|_|  |_|  \___/|_|    \_/\_/  |_|\__|_| |_|____/ \__,_|\___|_|\_\\__|_|  \__,_|\___\___|
 
 #[derive(Debug)]
+#[cfg(feature = "_backtrace")]
 pub struct ErrorWithBacktrace
 {
   error: Error,
   backtrace: std::backtrace::Backtrace,
 }
 
+#[cfg(feature = "_backtrace")]
 impl ErrorWithBacktrace
 {
   /// Return the underlying error
@@ -425,6 +464,7 @@ impl ErrorWithBacktrace
   }
 }
 
+#[cfg(feature = "_backtrace")]
 impl std::fmt::Display for ErrorWithBacktrace
 {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
@@ -432,6 +472,8 @@ impl std::fmt::Display for ErrorWithBacktrace
     self.error.fmt(f)
   }
 }
+
+#[cfg(feature = "_backtrace")]
 impl<T> From<T> for ErrorWithBacktrace
 where
   T: Into<Error>,
@@ -459,11 +501,11 @@ impl<T> From<std::sync::PoisonError<T>> for Error
   }
 }
 
-impl From<pest::error::Error<crate::parser::parser::Rule>> for Error
+impl From<pest::error::Error<crate::parser::parser_impl::Rule>> for Error
 {
-  fn from(value: pest::error::Error<crate::parser::parser::Rule>) -> Self
+  fn from(value: pest::error::Error<crate::parser::parser_impl::Rule>) -> Self
   {
-    CompileTimeError::from(value).into()
+    CompileTimeError::from(Box::new(value)).into()
   }
 }
 
@@ -480,52 +522,84 @@ macro_rules! error_as_internal {
   };
 }
 
+pub(crate) use error_as_internal;
+
+macro_rules! error_as_store {
+  ($err_type:ty) => {
+    impl From<$err_type> for crate::prelude::ErrorType
+    {
+      fn from(value: $err_type) -> Self
+      {
+        let err: crate::error::StoreError = value.into();
+        err.into()
+      }
+    }
+  };
+}
+
+pub(crate) use error_as_store;
+
 error_as_internal! {ciborium::ser::Error<std::io::Error>}
 error_as_internal! {ciborium::de::Error<std::io::Error>}
 error_as_internal! {serde_json::Error}
 error_as_internal! {std::num::ParseFloatError}
-
-pub(crate) use error_as_internal;
+error_as_internal! {std::str::Utf8Error}
 
 #[cfg(feature = "redb")]
 mod _trait_impl_redb
 {
-  super::error_as_internal! {redb::Error}
-  macro_rules! redb_error_as_internal {
+  super::error_as_store! {redb::Error}
+  macro_rules! redb_error_as_store {
     ($err_type:ty) => {
       impl From<$err_type> for crate::prelude::ErrorType
       {
         fn from(value: $err_type) -> Self
         {
           let redb_err: redb::Error = value.into();
-          let err: crate::error::InternalError = redb_err.into();
+          let err: crate::error::StoreError = redb_err.into();
           err.into()
         }
       }
     };
   }
-  redb_error_as_internal! {redb::StorageError}
-  redb_error_as_internal! {redb::DatabaseError}
-  redb_error_as_internal! {redb::TransactionError}
-  redb_error_as_internal! {redb::TableError}
-  redb_error_as_internal! {redb::CommitError}
+  super::error_as_store! {redb2::Error}
+  macro_rules! redb2_error_as_store {
+    ($err_type:ty) => {
+      impl From<$err_type> for crate::prelude::ErrorType
+      {
+        fn from(value: $err_type) -> Self
+        {
+          let redb_err: redb2::Error = value.into();
+          let err: crate::error::StoreError = redb_err.into();
+          err.into()
+        }
+      }
+    };
+  }
+  redb_error_as_store! {redb::StorageError}
+  redb_error_as_store! {redb::DatabaseError}
+  redb_error_as_store! {redb::TransactionError}
+  redb_error_as_store! {redb::TableError}
+  redb_error_as_store! {redb::CommitError}
+  redb2_error_as_store! {redb2::DatabaseError}
+  redb2_error_as_store! {redb2::UpgradeError}
 }
 #[cfg(feature = "sqlite")]
 mod _trait_impl_sqlite
 {
-  error_as_internal! {rusqlite::Error}
+  error_as_store! {rusqlite::Error}
   error_as_internal! {askama::Error}
 }
 
 /// Merge a list of error into a string error message
-pub(crate) fn vec_to_error<E: std::fmt::Display>(errs: &Vec<ErrorType>) -> String
+pub(crate) fn vec_to_error(errs: &[ErrorType]) -> String
 {
   let errs: Vec<String> = errs.iter().map(|x| format!("'{}'", x)).collect();
   errs.join(", ")
 }
 
-pub(crate) fn parse_int_error_to_compile_error<'a>(
-  text: &'a str,
+pub(crate) fn parse_int_error_to_compile_error(
+  text: &str,
   e: std::num::ParseIntError,
 ) -> crate::prelude::ErrorType
 {
@@ -549,7 +623,8 @@ pub(crate) fn parse_int_error_to_compile_error<'a>(
 macro_rules! map_error {
   ($err:expr, $source:pat => $destination:expr) => {{
     use crate::error::*;
-    let (error, meta) = $err.split_error();
+    let error: crate::prelude::ErrorType = $err;
+    let (error, meta) = error.split_error();
     match error
     {
       $source => ErrorType::make_error($destination.into(), meta),
@@ -579,7 +654,6 @@ impl From<std::convert::Infallible> for Error
 pub(crate) trait GenericErrors: Into<Error>
 {
   fn unknown_function(name: impl Into<String>) -> Self;
-  fn not_comparable() -> Self;
 }
 
 impl GenericErrors for CompileTimeError
@@ -588,10 +662,6 @@ impl GenericErrors for CompileTimeError
   {
     Self::UnknownFunction { name: name.into() }
   }
-  fn not_comparable() -> Self
-  {
-    Self::NotComparable
-  }
 }
 
 impl GenericErrors for RunTimeError
@@ -599,10 +669,6 @@ impl GenericErrors for RunTimeError
   fn unknown_function(name: impl Into<String>) -> Self
   {
     Self::UnknownFunction { name: name.into() }
-  }
-  fn not_comparable() -> Self
-  {
-    Self::NotComparable
   }
 }
 

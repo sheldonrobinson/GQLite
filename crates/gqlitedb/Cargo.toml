@@ -15,28 +15,33 @@ crate-type = ["cdylib", "lib"]
 default = ["redb", "capi", "sqlite"]
 _backtrace = []
 capi = []
-redb = ["dep:redb"]
-_pgql = ["dep:pgrx"]
+redb = ["dep:redb", "dep:redb2"]
+_pgrx = ["dep:pgrx"]
 _pg13 = ["pgrx/pg13"]
 _pg14 = ["pgrx/pg14"]
 _pg15 = ["pgrx/pg15"]
 _pg16 = ["pgrx/pg16"]
 _pg17 = ["pgrx/pg17"]
+postgres = ["dep:postgres"]
 sqlite = ["dep:rusqlite", "dep:askama"]
+_value_private = []
+bundled = ["rusqlite/bundled"]
 
 [dependencies]
-askama = { version = "0.14", optional = true }
-ccutils = { version = "0.3", features = ["sync", "pool"] }
+graphcore = { workspace = true }
+
+askama = { workspace = true, optional = true }
+ccutils = { workspace = true, features = ["alias", "pool", "sync"] }
 ciborium = "0.2"
-itertools = "0.14"
-pgrx = { version = "0.15", optional = true }
+itertools = { workspace = true }
 pest = "2"
 pest_derive = "2"
+pgrx = { version = "0.16", optional = true }
+postgres = { version = "0.19", optional = true }
 rand = "0.9"
-redb = { version = "2", optional = true }
-serde = "1"
-serde_json = "1"
-rusqlite = { version = "0.37", optional = true, features = [
+redb = { version = "3", optional = true }
+redb2 = { version = "2", optional = true, package = "redb" }
+rusqlite = { package = "rusqlite", version = "0.37", optional = true, features = [
   "bundled",
   "functions",
   "uuid",
@@ -44,14 +49,31 @@ rusqlite = { version = "0.37", optional = true, features = [
   "array",
   "loadable_extension",
 ] }
-thiserror = "2"
-uuid = { version = "1", features = ["v4"] }
+serde = { workspace = true }
+serde_json = "1"
+thiserror = { workspace = true }
+uuid = { workspace = true }
 
 [dev-dependencies]
-ccutils = { version = "0.3", features = ["temporary"] }
+ccutils = { workspace = true, features = ["alias", "temporary"] }
 divan = "0.1"
 iai-callgrind = { version = "0.16" }
+pgtemp = "0.6"
 regex = "1"
+
+# web:
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+# rusqlite_wasm = { package = "rusqlite", version = "0.37", optional = true, git = "https://github.com/Spxg/rusqlite.git", branch = "wasm-demo", features = [
+#   "functions",
+#   "uuid",
+# ] }
+uuid = { version = "1", features = ["js"] }
+
+# [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+# rusqlite_main = { package = "rusqlite", version = "0.37", optional = true, features = [
+#   "functions",
+#   "uuid",
+# ] }
 
 [[bench]]
 name = "pokec_divan"

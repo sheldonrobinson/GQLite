@@ -19,6 +19,14 @@ macro_rules! compile_binary_op {
   };
 }
 
+struct CompiledReturnWith
+{
+  variables: Vec<(String, RWExpression)>,
+  filter: Instructions,
+  modifiers: Modifiers,
+  variables_sizes: VariablesSizes,
+}
+
 struct Compiler
 {
   function_manager: functions::Manager,
@@ -52,7 +60,7 @@ impl Compiler
   ) -> Result<()>
   {
     expression_analyser::Analyser::new(&self.variables_manager, &self.function_manager)
-      .analyse(&expression)?;
+      .analyse(expression)?;
 
     let expr = match expression
     {
@@ -83,7 +91,7 @@ impl Compiler
             self.compile_expression(
               function_call
                 .arguments
-                .get(0)
+                .first()
                 .ok_or(error::InternalError::MissingAggregationArgument)?,
               &mut argument_instructions,
               aggregations,
@@ -141,7 +149,7 @@ impl Compiler
           self.compile_expression(v, instructions, aggregations)?;
           keys.push(k.to_owned());
         }
-        Instruction::CreateMap { keys: keys }
+        Instruction::CreateMap { keys }
       }
       ast::Expression::MemberAccess(member_access) =>
       {
@@ -261,6 +269,11 @@ impl Compiler
         compile_binary_op!(self, modulo, instructions, aggregations);
         Instruction::ModuloBinaryOperator
       }
+      ast::Expression::Exponent(exponent) =>
+      {
+        compile_binary_op!(self, exponent, instructions, aggregations);
+        Instruction::ExponentBinaryOperator
+      }
       ast::Expression::Negation(logical_negation) =>
       {
         self.compile_expression(&logical_negation.value, instructions, aggregations)?;
@@ -323,33 +336,32 @@ impl Compiler
       .mark_variables_as_set(&node.variable)?;
     self.compile_optional_expression(&node.properties, instructions)?;
     let mut labels = Default::default();
-    self.compile_labels_expression(&mut labels, &node.labels)?;
+    Self::compile_labels_expression(&mut labels, &node.labels)?;
     instructions.push(Instruction::CreateNodeLiteral { labels });
     Ok(())
   }
 
   fn compile_labels_expression(
-    &mut self,
     labels: &mut Vec<String>,
     label_expressions: &ast::LabelExpression,
   ) -> Result<()>
   {
-    match &label_expressions
+    match label_expressions
     {
-      &ast::LabelExpression::And(expressions) =>
+      ast::LabelExpression::And(expressions) =>
       {
         for expr in expressions.iter()
         {
-          self.compile_labels_expression(labels, &expr)?;
+          Self::compile_labels_expression(labels, expr)?;
         }
         Ok(())
       }
-      &ast::LabelExpression::String(label) =>
+      ast::LabelExpression::String(label) =>
       {
         labels.push(label.to_owned());
         Ok(())
       }
-      &ast::LabelExpression::None => Ok(()),
+      ast::LabelExpression::None => Ok(()),
       _ => Err(
         InternalError::InvalidCreateLabels {
           context: "compile_create_labels",
@@ -361,21 +373,20 @@ impl Compiler
 
   // Assume top of the stack contains an edge or node
   fn compile_filter_labels(
-    &mut self,
     instructions: &mut Instructions,
     label_expressions: &ast::LabelExpression,
     has_label_function: &functions::Function,
   ) -> Result<()>
   {
-    match &label_expressions
+    match label_expressions
     {
-      &ast::LabelExpression::And(expressions) =>
+      ast::LabelExpression::And(expressions) =>
       {
         instructions.push(Instruction::Push { value: true.into() });
         instructions.push(Instruction::Swap);
         for expr in expressions.iter()
         {
-          self.compile_filter_labels(instructions, expr, has_label_function)?;
+          Self::compile_filter_labels(instructions, expr, has_label_function)?;
           // stack contains (a: bool) (b: labels) (c: bool)
           instructions.push(Instruction::InverseRot3);
           // stack contains (c: bool) (a: bool) (b: labels)
@@ -386,7 +397,7 @@ impl Compiler
         }
         Ok(())
       }
-      &ast::LabelExpression::Or(expressions) =>
+      ast::LabelExpression::Or(expressions) =>
       {
         instructions.push(Instruction::Push {
           value: false.into(),
@@ -394,7 +405,7 @@ impl Compiler
         instructions.push(Instruction::Swap);
         for expr in expressions.iter()
         {
-          self.compile_filter_labels(instructions, expr, has_label_function)?;
+          Self::compile_filter_labels(instructions, expr, has_label_function)?;
           // stack contains (a: bool) (b: labels) (c: bool)
           instructions.push(Instruction::InverseRot3);
           // stack contains (c: bool) (a: bool) (b: labels)
@@ -405,13 +416,13 @@ impl Compiler
         }
         Ok(())
       }
-      &ast::LabelExpression::Not(expr) =>
+      ast::LabelExpression::Not(expr) =>
       {
-        self.compile_filter_labels(instructions, expr, has_label_function)?;
+        Self::compile_filter_labels(instructions, expr, has_label_function)?;
         instructions.push(Instruction::NotUnaryOperator);
         Ok(())
       }
-      &ast::LabelExpression::String(label) =>
+      ast::LabelExpression::String(label) =>
       {
         instructions.push(Instruction::Duplicate);
         instructions.push(Instruction::Push {
@@ -423,7 +434,7 @@ impl Compiler
         });
         Ok(())
       }
-      &ast::LabelExpression::None =>
+      ast::LabelExpression::None =>
       {
         instructions.push(Instruction::Push { value: true.into() });
         Ok(())
@@ -431,10 +442,7 @@ impl Compiler
     }
   }
 
-  fn compile_create_patterns(
-    &mut self,
-    patterns: &Vec<crate::parser::ast::Pattern>,
-  ) -> Result<Block>
+  fn compile_create_patterns(&mut self, patterns: &[crate::parser::ast::Pattern]) -> Result<Block>
   {
     let actions = patterns.iter().map(|c| {
       let mut instructions = Instructions::new();
@@ -500,7 +508,7 @@ impl Compiler
             Err(CompileTimeError::NoSingleRelationshipType)?;
           }
           let mut labels = Default::default();
-          self.compile_labels_expression(&mut labels, &edge.labels)?;
+          Self::compile_labels_expression(&mut labels, &edge.labels)?;
           instructions.push(Instruction::CreateEdgeLiteral { labels });
         }
         crate::parser::ast::Pattern::Path(_) =>
@@ -533,7 +541,7 @@ impl Compiler
     let mut labels = Default::default();
     if node.labels.is_all_inclusive()
     {
-      self.compile_labels_expression(&mut labels, &node.labels)?;
+      Self::compile_labels_expression(&mut labels, &node.labels)?;
     }
     else
     {
@@ -550,7 +558,7 @@ impl Compiler
       let has_label_function = self
         .function_manager
         .get_function::<CompileTimeError>("has_label")?;
-      self.compile_filter_labels(filter, &node.labels, &has_label_function)?;
+      Self::compile_filter_labels(filter, &node.labels, &has_label_function)?;
       filter.push(Instruction::Rot3);
       filter.push(Instruction::AndBinaryOperator);
       filter.push(Instruction::Swap);
@@ -629,14 +637,14 @@ impl Compiler
       let mut labels = Default::default();
       if edge.labels.is_all_inclusive()
       {
-        self.compile_labels_expression(&mut labels, &edge.labels)?;
+        Self::compile_labels_expression(&mut labels, &edge.labels)?;
       }
       else
       {
         let has_label_function = self
           .function_manager
           .get_function::<CompileTimeError>("has_label")?;
-        self.compile_filter_labels(&mut filter, &edge.labels, &has_label_function)?;
+        Self::compile_filter_labels(&mut filter, &edge.labels, &has_label_function)?;
         filter.push(Instruction::Rot3);
         filter.push(Instruction::AndBinaryOperator);
         filter.push(Instruction::Swap);
@@ -685,7 +693,7 @@ impl Compiler
       .mark_variables_as_set(&path_variable)?;
     // Create block
     Ok(BlockMatch::MatchEdge {
-      instructions: instructions,
+      instructions,
       left_variable: self
         .variables_manager
         .get_variable_index_option(&source_variable)?,
@@ -704,15 +712,10 @@ impl Compiler
   fn compile_return_with(
     &mut self,
     all: bool,
-    expressions: &Vec<ast::NamedExpression>,
+    expressions: &[ast::NamedExpression],
     where_expression: &Option<ast::Expression>,
     modifiers: &ast::Modifiers,
-  ) -> Result<(
-    Vec<(String, RWExpression)>,
-    Instructions,
-    Modifiers,
-    VariablesSizes,
-  )>
+  ) -> Result<CompiledReturnWith>
   {
     let mut variables = Vec::<(ast::VariableIdentifier, RWExpression)>::new();
     let mut filter = Default::default();
@@ -750,7 +753,7 @@ impl Compiler
           .into(),
         );
       }
-      let col_id = self.variables_manager.analyse_named_expression(&e)?;
+      let col_id = self.variables_manager.analyse_named_expression(e)?;
       variables.push((
         e.identifier.clone(),
         RWExpression {
@@ -773,8 +776,8 @@ impl Compiler
       self.compile_expression(where_expression, &mut filter, &mut None)?;
     }
 
-    let modifiers = self.compile_modifiers(&modifiers)?;
-    let variables_size = self.variables_size();
+    let modifiers = self.compile_modifiers(modifiers)?;
+    let variables_sizes = self.variables_size();
     self
       .variables_manager
       .keep_variables(variables.iter().map(|(n, _)| n))?;
@@ -783,12 +786,17 @@ impl Compiler
       .into_iter()
       .map(|(var_id, e)| (var_id.take_name(), e))
       .collect();
-    Ok((variables, filter, modifiers, variables_size))
+    Ok(CompiledReturnWith {
+      variables,
+      filter,
+      modifiers,
+      variables_sizes,
+    })
   }
 
   fn compile_match_patterns(
     &mut self,
-    patterns: &Vec<crate::parser::ast::Pattern>,
+    patterns: &[crate::parser::ast::Pattern],
     where_expression: &Option<crate::parser::ast::Expression>,
     optional: bool,
   ) -> Result<Block>
@@ -806,7 +814,7 @@ impl Compiler
           .variables_manager
           .mark_variables_as_set(&node.variable)?;
         Ok(BlockMatch::MatchNode {
-          instructions: instructions,
+          instructions,
           variable: self
             .variables_manager
             .get_variable_index_option(&node.variable)?,
@@ -815,7 +823,7 @@ impl Compiler
       }
       crate::parser::ast::Pattern::Edge(edge) =>
       {
-        self.compile_match_edge(None, &edge, is_single_match, &mut edge_variables)
+        self.compile_match_edge(None, edge, is_single_match, &mut edge_variables)
       }
       crate::parser::ast::Pattern::Path(path) => self.compile_match_edge(
         Some(path.variable.to_owned()),
@@ -836,7 +844,7 @@ impl Compiler
       }
       self.compile_expression(where_expression, &mut filter, &mut None)?;
     }
-    Ok(Block::BlockMatch {
+    Ok(Block::Match {
       blocks,
       filter,
       optional,
@@ -847,7 +855,7 @@ impl Compiler
   fn check_for_constant_integer_expression(&mut self, x: &ast::Expression) -> Result<()>
   {
     let ei = expression_analyser::Analyser::new(&self.variables_manager, &self.function_manager)
-      .analyse(&x)?;
+      .analyse(x)?;
     if !ei.constant
     {
       Err(error::CompileTimeError::NonConstantExpression.into())
@@ -874,7 +882,7 @@ impl Compiler
       .map(|x| {
         self.check_for_constant_integer_expression(x)?;
         let mut instructions = Instructions::new();
-        self.compile_expression(&x, &mut instructions, &mut None)?;
+        self.compile_expression(x, &mut instructions, &mut None)?;
         Ok::<_, ErrorType>(instructions)
       })
       .transpose()?;
@@ -884,7 +892,7 @@ impl Compiler
       .map(|x| {
         self.check_for_constant_integer_expression(x)?;
         let mut instructions = Instructions::new();
-        self.compile_expression(&x, &mut instructions, &mut None)?;
+        self.compile_expression(x, &mut instructions, &mut None)?;
         Ok::<_, ErrorType>(instructions)
       })
       .transpose()?;
@@ -934,6 +942,11 @@ pub(crate) fn compile(
       {
         ast::Statement::CreateGraph(create_graph) => Ok(Block::CreateGraph {
           name: create_graph.name.to_owned(),
+          if_not_exists: create_graph.if_not_exists,
+        }),
+        ast::Statement::DropGraph(drop_graph) => Ok(Block::DropGraph {
+          name: drop_graph.name.to_owned(),
+          if_exists: drop_graph.if_exists,
         }),
         ast::Statement::UseGraph(use_graph) => Ok(Block::UseGraph {
           name: use_graph.name.to_owned(),
@@ -946,17 +959,17 @@ pub(crate) fn compile(
         ),
         ast::Statement::Return(return_statement) =>
         {
-          let (variables, filter, modifiers, variables_size) = compiler.compile_return_with(
+          let compiled_return_with = compiler.compile_return_with(
             return_statement.all,
             &return_statement.expressions,
             &return_statement.where_expression,
             &return_statement.modifiers,
           )?;
           Ok(Block::Return {
-            variables,
-            filter,
-            modifiers,
-            variables_size,
+            variables: compiled_return_with.variables,
+            filter: compiled_return_with.filter,
+            modifiers: compiled_return_with.modifiers,
+            variables_sizes: compiled_return_with.variables_sizes,
           })
         }
         ast::Statement::Call(call) =>
@@ -973,17 +986,21 @@ pub(crate) fn compile(
         }
         ast::Statement::With(with) =>
         {
-          let (variables, filter, modifiers, variables_size) = compiler.compile_return_with(
+          let compiled_return_with = compiler.compile_return_with(
             with.all,
             &with.expressions,
             &with.where_expression,
             &with.modifiers,
           )?;
           Ok(Block::With {
-            variables: variables.into_iter().map(|(_, v)| v).collect(),
-            filter,
-            modifiers,
-            variables_size,
+            variables: compiled_return_with
+              .variables
+              .into_iter()
+              .map(|(_, v)| v)
+              .collect(),
+            filter: compiled_return_with.filter,
+            modifiers: compiled_return_with.modifiers,
+            variables_sizes: compiled_return_with.variables_sizes,
           })
         }
         ast::Statement::Unwind(unwind) =>
@@ -1014,7 +1031,7 @@ pub(crate) fn compile(
                 | expression_analyser::ExpressionType::Edge
                 | expression_analyser::ExpressionType::Variant =>
                 {
-                  compiler.compile_expression(&expr, &mut instructions, &mut None)?
+                  compiler.compile_expression(expr, &mut instructions, &mut None)?
                 }
                 _ => Err(CompileTimeError::InvalidDelete)?,
               }

@@ -8,7 +8,7 @@ pub(crate) enum ContainResult
 }
 
 /// Compute contains, according to OpenCypher specification, specifically handling the comparison with null.
-pub(crate) fn contains(container: &Vec<value::Value>, value: &value::Value) -> ContainResult
+pub(crate) fn contains(container: &[value::Value], value: &value::Value) -> ContainResult
 {
   if value.is_null()
   {
@@ -27,7 +27,7 @@ pub(crate) fn contains(container: &Vec<value::Value>, value: &value::Value) -> C
     for v_c in container.iter()
     {
       use value::ContainResult;
-      match value::compare(v_c, &value)
+      match value::compare(v_c, value)
       {
         value::Ordering::Equal => return ContainResult::True,
         value::Ordering::ComparedNull => has_compared_to_null = true,

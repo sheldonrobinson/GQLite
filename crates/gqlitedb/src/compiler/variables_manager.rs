@@ -20,6 +20,7 @@ fn unknown_variable_error(name: &ast::VariableIdentifier) -> ErrorType
 //    \_/ \__,_|_|  |_|\__,_|_.__/|_|\___|
 
 #[derive(Debug, Clone)]
+#[allow(clippy::large_enum_variant)]
 pub(crate) enum VariableContent
 {
   Node(ast::NodePattern),
@@ -137,14 +138,14 @@ impl VariablesManager
   {
     identifier
       .as_ref()
-      .map_or(false, |identifier| self.variables.contains_key(&identifier))
+      .is_some_and(|identifier| self.variables.contains_key(identifier))
   }
   /// Get the index of the variable in the row of variables
   pub(crate) fn get_variable_index(&self, identifier: &ast::VariableIdentifier) -> Result<usize>
   {
     self
       .variables
-      .get(&identifier)
+      .get(identifier)
       .ok_or_else(|| unknown_variable_error(identifier))
       .map(|x| x.col_id)
   }
@@ -175,7 +176,7 @@ impl VariablesManager
     var_id.as_ref().map_or(Ok(false), |name| {
       self
         .variables
-        .get(&name)
+        .get(name)
         .ok_or_else(|| unknown_variable_error(name))
         .map(|x| x.is_set)
     })
@@ -190,7 +191,7 @@ impl VariablesManager
     {
       self
         .variables
-        .get_mut(&var_id)
+        .get_mut(var_id)
         .ok_or_else(|| unknown_variable_error(var_id))
         .map(|x| x.is_set = true)
     }
@@ -205,7 +206,7 @@ impl VariablesManager
     expression_type: ExpressionType,
   ) -> Result<()>
   {
-    if self.variables.contains_key(&var_id)
+    if self.variables.contains_key(var_id)
     {
       Err(
         CompileTimeError::VariableAlreadyBound {
@@ -228,7 +229,7 @@ impl VariablesManager
   {
     if let Some(var_id) = &node.variable
     {
-      if let Some(var) = self.variables.get(&var_id)
+      if let Some(var) = self.variables.get(var_id)
       {
         match var.variable_type
         {
@@ -236,7 +237,7 @@ impl VariablesManager
           {
             VariableContent::Node(var_node) =>
             {
-              if (!node.labels.is_none() || !node.properties.is_none())
+              if (!node.labels.is_none() || node.properties.is_some())
                 && (node.labels != var_node.labels || node.properties != var_node.properties)
               {
                 Err(
@@ -271,7 +272,7 @@ impl VariablesManager
       {
         if let Some(props) = &node.properties
         {
-          expression_analyser::Analyser::new(&self, &self.function_manager).analyse(&props)?;
+          expression_analyser::Analyser::new(self, &self.function_manager).analyse(props)?;
         }
         self.variables.insert(
           var_id.clone(),
@@ -291,7 +292,7 @@ impl VariablesManager
     self.validate_node(&edge.destination)?;
     if let Some(var_id) = &edge.variable
     {
-      if let Some(var) = self.variables.get(&var_id)
+      if let Some(var) = self.variables.get(var_id)
       {
         match var.content
         {
@@ -313,7 +314,7 @@ impl VariablesManager
       {
         if let Some(props) = &edge.properties
         {
-          expression_analyser::Analyser::new(&self, &self.function_manager).analyse(&props)?;
+          expression_analyser::Analyser::new(self, &self.function_manager).analyse(props)?;
         }
         self.variables.insert(
           var_id.clone(),
@@ -333,7 +334,7 @@ impl VariablesManager
   {
     if let Some(var_id) = &node.variable
     {
-      if let Some(var) = self.variables.get(&var_id)
+      if let Some(var) = self.variables.get(var_id)
       {
         match var.variable_type
         {
@@ -341,7 +342,7 @@ impl VariablesManager
           {
             VariableContent::Node(var_node) =>
             {
-              if (!node.labels.is_none() || !node.properties.is_none())
+              if (!node.labels.is_none() || node.properties.is_some())
                 && (node.labels != var_node.labels || node.properties != var_node.properties)
               {
                 Err(
@@ -388,7 +389,7 @@ impl VariablesManager
   {
     if let Some(var_id) = &edge.variable
     {
-      if let Some(var) = self.variables.get(&var_id)
+      if let Some(var) = self.variables.get(var_id)
       {
         match var.variable_type
         {
@@ -396,7 +397,7 @@ impl VariablesManager
           {
             VariableContent::Edge(var_edge) =>
             {
-              if (!edge.labels.is_none() || !edge.properties.is_none())
+              if (!edge.labels.is_none() || edge.properties.is_some())
                 && (var_edge.labels != edge.labels || var_edge.properties != edge.properties)
               {
                 Err(
@@ -474,7 +475,7 @@ impl VariablesManager
     {
       self.validate_node(&edge.destination)?;
     }
-    if is_create || !self.is_valid_existing_edge(&edge)?
+    if is_create || !self.is_valid_existing_edge(edge)?
     {
       self.validate_edge(edge)?;
     }
@@ -507,7 +508,7 @@ impl VariablesManager
     named_expression: &ast::NamedExpression,
   ) -> Result<usize>
   {
-    let expression_info = expression_analyser::Analyser::new(&self, &self.function_manager)
+    let expression_info = expression_analyser::Analyser::new(self, &self.function_manager)
       .analyse(&named_expression.expression)?;
     let col_id = self
       .variables
@@ -529,7 +530,7 @@ impl VariablesManager
     {
       let mut var = self
         .variables
-        .remove(&var_id)
+        .remove(var_id)
         .ok_or_else(|| unknown_variable_error(var_id))?;
       var.col_id = col_id;
       new_variables.insert(var_id.clone(), var.mark_set());
@@ -539,7 +540,7 @@ impl VariablesManager
   }
   pub(crate) fn analyse(&mut self, statement: &ast::Statement) -> Result<()>
   {
-    if self.variables.iter().any(|(_, var)| var.is_set != true)
+    if self.variables.iter().any(|(_, var)| !var.is_set)
     {
       return Err(
         InternalError::NotAllVariablesAreSet {
@@ -558,33 +559,29 @@ impl VariablesManager
         .into(),
       );
     }
-    #[allow(unused_variables)]
     match statement
     {
-      ast::Statement::CreateGraph(create_graph) =>
+      ast::Statement::CreateGraph(..) =>
       {}
-      ast::Statement::UseGraph(use_graph) =>
+      ast::Statement::DropGraph(..) =>
+      {}
+      ast::Statement::UseGraph(..) =>
       {}
       ast::Statement::Create(create) =>
       {
         for pattern in create.patterns.iter()
         {
-          match &pattern
+          if let ast::Pattern::Node(n) = &pattern
           {
-            ast::Pattern::Node(n) =>
+            if self.has_variable(&n.variable)
             {
-              if self.has_variable(&n.variable)
-              {
-                return Err(
-                  CompileTimeError::VariableAlreadyBound {
-                    name: n.variable.clone().unwrap().name().clone(),
-                  }
-                  .into(),
-                );
-              }
+              return Err(
+                CompileTimeError::VariableAlreadyBound {
+                  name: n.variable.clone().unwrap().name().clone(),
+                }
+                .into(),
+              );
             }
-            _ =>
-            {}
           }
           self.analyse_pattern(pattern, true)?;
         }
@@ -596,11 +593,11 @@ impl VariablesManager
           self.analyse_pattern(pattern, false)?;
         }
       }
-      ast::Statement::Return(return_statement) =>
+      ast::Statement::Return(..) =>
       {}
-      ast::Statement::Call(call) =>
+      ast::Statement::Call(..) =>
       {}
-      ast::Statement::With(with) =>
+      ast::Statement::With(..) =>
       {}
       ast::Statement::Unwind(unwind) =>
       {
@@ -610,9 +607,9 @@ impl VariablesManager
         )?;
         self.mark_variables_as_set(&unwind.identifier)?;
       }
-      ast::Statement::Delete(delete) =>
+      ast::Statement::Delete(..) =>
       {}
-      ast::Statement::Update(update) =>
+      ast::Statement::Update(..) =>
       {}
     }
     Ok(())

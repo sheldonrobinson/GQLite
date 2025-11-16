@@ -71,7 +71,7 @@ pub(crate) fn create_named_node() -> Program
         skip: None,
         order_by: vec![],
       },
-      variables_size: create_variable_size(2, 0),
+      variables_sizes: create_variable_size(2, 0),
     },
   ]
 }
@@ -133,7 +133,7 @@ pub(crate) fn create_named_node_double_return() -> Program
         skip: None,
         order_by: vec![],
       },
-      variables_size: create_variable_size(3, 0),
+      variables_sizes: create_variable_size(3, 0),
     },
   ]
 }
@@ -161,7 +161,7 @@ pub(crate) fn double_with_return() -> Program
         skip: None,
         order_by: vec![],
       },
-      variables_size: create_variable_size(2, 0),
+      variables_sizes: create_variable_size(2, 0),
     },
     Block::With {
       variables: vec![
@@ -182,7 +182,7 @@ pub(crate) fn double_with_return() -> Program
         skip: None,
         order_by: vec![],
       },
-      variables_size: create_variable_size(4, 0),
+      variables_sizes: create_variable_size(4, 0),
     },
     Block::Return {
       variables: vec![(
@@ -199,7 +199,7 @@ pub(crate) fn double_with_return() -> Program
         skip: None,
         order_by: vec![],
       },
-      variables_size: create_variable_size(2, 0),
+      variables_sizes: create_variable_size(2, 0),
     },
   ]
 }
@@ -234,7 +234,7 @@ pub(crate) fn unwind() -> Program
         skip: None,
         order_by: vec![],
       },
-      variables_size: create_variable_size(1, 0),
+      variables_sizes: create_variable_size(1, 0),
     },
   ]
 }
@@ -243,7 +243,7 @@ pub(crate) fn unwind() -> Program
 pub(crate) fn match_loop() -> Program
 {
   vec![
-    Block::BlockMatch {
+    Block::Match {
       blocks: vec![BlockMatch::MatchEdge {
         instructions: vec![
           Instruction::Push {
@@ -288,7 +288,7 @@ pub(crate) fn match_loop() -> Program
         skip: None,
         order_by: vec![],
       },
-      variables_size: create_variable_size(1, 0),
+      variables_sizes: create_variable_size(1, 0),
     },
   ]
 }
@@ -297,7 +297,7 @@ pub(crate) fn match_loop() -> Program
 pub(crate) fn optional_match() -> Program
 {
   vec![
-    Block::BlockMatch {
+    Block::Match {
       blocks: vec![BlockMatch::MatchNode {
         instructions: vec![
           Instruction::Push {
@@ -327,7 +327,7 @@ pub(crate) fn optional_match() -> Program
         skip: None,
         order_by: vec![],
       },
-      variables_size: create_variable_size(1, 0),
+      variables_sizes: create_variable_size(1, 0),
     },
   ]
 }
@@ -336,7 +336,7 @@ pub(crate) fn optional_match() -> Program
 pub(crate) fn match_count(function_manager: &functions::Manager) -> Program
 {
   vec![
-    Block::BlockMatch {
+    Block::Match {
       blocks: vec![BlockMatch::MatchNode {
         instructions: vec![
           Instruction::Push {
@@ -378,7 +378,7 @@ pub(crate) fn match_count(function_manager: &functions::Manager) -> Program
         skip: None,
         order_by: vec![],
       },
-      variables_size: create_variable_size(2, 1),
+      variables_sizes: create_variable_size(2, 1),
     },
   ]
 }
@@ -387,7 +387,7 @@ pub(crate) fn match_count(function_manager: &functions::Manager) -> Program
 pub(crate) fn aggregation(function_manager: &functions::Manager) -> Program
 {
   vec![
-    Block::BlockMatch {
+    Block::Match {
       blocks: vec![BlockMatch::MatchNode {
         instructions: vec![
           Instruction::Push {
@@ -449,7 +449,7 @@ pub(crate) fn aggregation(function_manager: &functions::Manager) -> Program
         skip: None,
         order_by: vec![],
       },
-      variables_size: create_variable_size(3, 1),
+      variables_sizes: create_variable_size(3, 1),
     },
   ]
 }

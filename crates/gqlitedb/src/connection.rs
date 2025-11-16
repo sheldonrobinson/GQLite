@@ -1,9 +1,88 @@
-use crate::prelude::*;
+use std::path::Path;
+
+use crate::{prelude::*, QueryResult};
 use value::ValueTryIntoRef;
+
+/// Backend
+pub enum Backend
+{
+  /// Select the first available backend.
+  Automatic,
+  /// Postgres backend.
+  #[cfg(feature = "postgres")]
+  Postgres,
+  /// Redb backend.
+  #[cfg(feature = "redb")]
+  Redb,
+  /// SQLite backend.
+  #[cfg(feature = "sqlite")]
+  SQLite,
+}
+
+/// Builder with high-level API for creating connection.
+pub struct ConnectionBuilder
+{
+  map: value::ValueMap,
+}
+
+impl ConnectionBuilder
+{
+  /// Merge options. This might overwrite value from the builder
+  pub fn options(mut self, options: value::ValueMap) -> Self
+  {
+    for (k, v) in options.into_iter()
+    {
+      self.map.insert(k, v);
+    }
+    self
+  }
+  /// Set path
+  pub fn path<P: AsRef<Path>>(mut self, p: P) -> Self
+  {
+    self.map.insert(
+      "path".to_string(),
+      p.as_ref().to_string_lossy().as_ref().into(),
+    );
+    self
+  }
+  /// Set backend
+  pub fn backend(mut self, backend: Backend) -> Self
+  {
+    let key = "backend".into();
+    match backend
+    {
+      Backend::Automatic =>
+      {
+        self.map.insert(key, "automatic".into());
+      }
+      #[cfg(feature = "postgres")]
+      Backend::Postgres =>
+      {
+        self.map.insert(key, "postgres".into());
+      }
+      #[cfg(feature = "redb")]
+      Backend::Redb =>
+      {
+        self.map.insert(key, "redb".into());
+      }
+      #[cfg(feature = "sqlite")]
+      Backend::SQLite =>
+      {
+        self.map.insert(key, "sqlite".into());
+      }
+    }
+    self
+  }
+  /// Create the connection
+  pub fn create(self) -> Result<Connection>
+  {
+    Connection::create(self.map)
+  }
+}
 
 trait ConnectionTrait: Sync + Send
 {
-  fn execute_query(&self, query: String, parameters: value::ValueMap) -> Result<value::Value>;
+  fn execute_oc_query(&self, query: &str, parameters: value::ValueMap) -> Result<QueryResult>;
 }
 
 struct ConnectionImpl<TStore>
@@ -18,31 +97,24 @@ impl<TStore> ConnectionTrait for ConnectionImpl<TStore>
 where
   TStore: store::Store + Sync + Send,
 {
-  fn execute_query(&self, query: String, parameters: value::ValueMap) -> Result<value::Value>
+  fn execute_oc_query(&self, query: &str, parameters: value::ValueMap) -> Result<QueryResult>
   {
-    let query_txt: String = query.into();
-    let queries = parser::parse(query_txt.as_str())?;
-    let mut results = Vec::<value::Value>::default();
+    let queries = parser::parse(query)?;
+    let mut results = Vec::<QueryResult>::default();
     for query in queries
     {
       let program = compiler::compile(&self.function_manager, query)?;
-      let v = interpreter::evaluators::eval_program(&self.store, &program, &parameters)?;
-      if !v.is_null()
-      {
-        results.push(v);
-      }
+      results.push(interpreter::evaluators::eval_program(
+        &self.store,
+        &program,
+        &parameters,
+      )?)
     }
     match results.len()
     {
-      0 => Ok(value::Value::Null),
-      1 => Ok(results.into_iter().next().unwrap()),
-      _ =>
-      {
-        let mut map = value::ValueMap::new();
-        map.insert("type".into(), "results".into());
-        map.insert("results".into(), results.into());
-        Ok(map.into())
-      }
+      0 => Ok(QueryResult::Empty),
+      1 => Ok(results.into_iter().next().unwrap()), // Guarantee to pass since we check for length
+      _ => Ok(QueryResult::Array(results)),
     }
   }
 }
@@ -58,37 +130,26 @@ where
 }
 
 /// Connection is the interface to the database, and allow to execute new queries.
-/// New connection are created with [Connection::open] and queried with [Connection::execute_query].
-/// As shown in the example bellow:
+/// New connection are created with [Connection::create] or [Connection::builder] and queried with
+/// [Connection::execute_oc_query]. As shown in the example bellow:
 ///
 /// ```rust
-/// # use gqlitedb::{Connection, Value};
+/// # use gqlitedb::{Backend, Connection, QueryResult};
 /// # fn example() -> gqlitedb::Result<()> {
-/// let connection = Connection::open("filename.db", gqlitedb::map!("backend" => "redb"))?;
-/// let value = connection.execute_query("MATCH (a) RETURN a", Default::default())?;
+/// let connection = Connection::builder().path("filename.db").backend(Backend::Redb).create()?;
+/// let value = connection.execute_oc_query("MATCH (a) RETURN a", Default::default())?;
 /// match value
 /// {
-///   Value::Array(arr) =>
+///   QueryResult::Table(table) =>
 ///   {
-///     arr.iter().for_each(|row| match row
-///     {
-///       Value::Array(arr) =>
-///       {
-///         println!("{:?}", arr);
-///       }
-///       _ =>
-///       {
-///         panic!("Unexpected: {}", row);
-///       }
-///     });
+///     println!("{:?}", table);
 ///   },
 ///   _ => {
-///     panic!("Query result should be an array, got {}!", value);
+///     panic!("Query result should be a table!");
 ///   }
 /// }
 /// # Ok(()) }
 /// ```
-
 pub struct Connection
 {
   connection: Box<dyn ConnectionTrait>,
@@ -98,111 +159,177 @@ ccutils::assert_impl_all!(Connection: Sync, Send);
 
 impl Connection
 {
-  /// Open a `path` that contains a `GQLite` database. The `options` parameter can
+  /// Create a new connection to a `GQLite` database. The `options` parameter can
   /// be used to select the backend, and configure the backend.
   ///
   /// Supported parameters:
-  /// - `backend` can be `redb` or `sqlite`
+  /// - `path` a path to a file, if not present, an in-memory database is created
+  /// - `backend` for instance `redb` or `sqlite` (the [Self::available_backends] function contains the list of compiled backends)
   ///
-  /// If the `backend` is not specified, the `open` function will attempt to guess it
+  /// If the `backend` is not specified, the `create` function will attempt to guess it
   /// for existing databases. For new database, depending on availability, it will
   /// create a `sqlite` database, or a `redb` database.
   ///
-  /// Example of use:
+  /// Example of use, this will create an in-memory database:
   ///
   /// ```rust
   /// # use gqlitedb::Connection;
   /// # fn example() -> gqlitedb::Result<()> {
-  /// let connection = Connection::open("filename.db", gqlitedb::map!("backend" => "redb"))?;
+  /// let connection = Connection::create(gqlitedb::value_map!("backend" => "redb"))?;
   /// # Ok(()) }
   /// ```  
-  #[cfg(any(feature = "redb", feature = "sqlite"))]
-  pub fn open<P: AsRef<std::path::Path>>(path: P, options: value::ValueMap) -> Result<Connection>
+  pub fn create(options: value::ValueMap) -> Result<Connection>
   {
-    if let Some(backend) = options.get("backend")
+    let backend = options.get("backend").map_or_else(
+      || Ok("automatic".to_string()),
+      |x| x.try_into_ref().map(|x: &String| x.to_owned()),
+    )?;
+    match backend.as_str()
     {
-      let backend: &String = backend.try_into_ref()?;
-      match backend.as_str()
+      "automatic" =>
       {
-        "sqlite" => Self::open_sqlite(path),
-        "redb" => Self::open_redb(path),
-        _ => Err(
-          StoreError::UnknownBackend {
-            backend: backend.to_owned(),
+        #[cfg(feature = "sqlite")]
+        let sq_e = {
+          let mut options = options.clone();
+          options.insert("backend".into(), "sqlite".into());
+          Self::create(options)
+        };
+        #[cfg(not(feature = "sqlite"))]
+        let sq_e = Err(error::StoreError::UnavailableBackend { backend: "sqlite" }.into());
+        match sq_e
+        {
+          Ok(sq) => Ok(sq),
+          Err(sq_e) =>
+          {
+            #[cfg(feature = "redb")]
+            let sq_r = {
+              let mut options = options;
+              options.insert("backend".into(), "redb".into());
+              Self::create(options)
+            };
+            #[cfg(not(feature = "redb"))]
+            let sq_r = Err(error::StoreError::UnavailableBackend { backend: "redb" }.into());
+
+            sq_r.map_err(|rb_e| {
+              StoreError::OpeningError {
+                errors: error::vec_to_error(&[sq_e, rb_e]),
+              }
+              .into()
+            })
           }
-          .into(),
-        ),
+        }
       }
-    }
-    else
-    {
-      Self::open_sqlite(path.as_ref().to_owned()).or_else(|sq_e| {
-        Self::open_redb(path).map_err(|rb_e| {
-          StoreError::OpeningError {
-            errors: error::vec_to_error::<ErrorType>(&vec![sq_e, rb_e]),
+      #[cfg(feature = "sqlite")]
+      "sqlite" =>
+      {
+        let store = if let Some(path) = options.get("path")
+        {
+          let path: &String = path.try_into_ref()?;
+          store::sqlite::Store::open(path)?
+        }
+        else
+        {
+          store::sqlite::Store::in_memory()?
+        };
+        Ok(Connection {
+          connection: ConnectionImpl {
+            store,
+            function_manager: functions::Manager::new(),
           }
-          .into()
+          .boxed(),
         })
-      })
+      }
+      #[cfg(feature = "redb")]
+      "redb" =>
+      {
+        let store = if let Some(path) = options.get("path")
+        {
+          let path: &String = path.try_into_ref()?;
+          store::redb::Store::open(path)?
+        }
+        else
+        {
+          store::redb::Store::in_memory()?
+        };
+        Ok(Connection {
+          connection: ConnectionImpl {
+            store,
+            function_manager: functions::Manager::new(),
+          }
+          .boxed(),
+        })
+      }
+      #[cfg(feature = "postgres")]
+      "postgres" =>
+      {
+        let mut config = postgres::Config::new();
+        if let Some(host) = options.get("host")
+        {
+          let host: &String = host.try_into_ref()?;
+          config.host(host);
+        }
+        if let Some(user) = options.get("user")
+        {
+          let user: &String = user.try_into_ref()?;
+          config.user(user);
+        }
+        if let Some(password) = options.get("password")
+        {
+          let password: &String = password.try_into_ref()?;
+          config.password(password);
+        }
+        let store = store::postgres::Store::connect(config)?;
+        Ok(Connection {
+          connection: ConnectionImpl {
+            store,
+            function_manager: functions::Manager::new(),
+          },
+        })
+      }
+      _ => Err(StoreError::UnknownBackend { backend }.into()),
     }
   }
-  #[cfg(feature = "sqlite")]
-  fn open_sqlite<P: AsRef<std::path::Path>>(path: P) -> Result<Connection>
+  /// Create a builder, with a high-level API to set the options.
+  /// Example of use:
+  /// ```no_run
+  /// # use gqlitedb::{Connection, Backend};
+  /// let connection = Connection::builder().path("path/to/file").backend(Backend::SQLite).create().unwrap();
+  /// ```
+  pub fn builder() -> ConnectionBuilder
   {
-    Ok(Connection {
-      connection: ConnectionImpl {
-        store: store::sqlite::Store::new(path)?,
-        function_manager: functions::Manager::new(),
-      }
-      .boxed(),
-    })
+    ConnectionBuilder {
+      map: Default::default(),
+    }
   }
-  #[cfg(not(feature = "sqlite"))]
-  fn open_sqlite<P: AsRef<std::path::Path>>(_: P) -> Result<Connection>
+  /// List of available backends
+  pub fn available_backends() -> Vec<String>
   {
-    Err(error::ConnectionError::UnavailableBackend { backend: "sqlite" }.into())
+    vec![
+      #[cfg(feature = "sqlite")]
+      "sqlite".to_string(),
+      #[cfg(feature = "redb")]
+      "redb".to_string(),
+    ]
   }
-  #[cfg(feature = "redb")]
-  fn open_redb<P: AsRef<std::path::Path>>(path: P) -> Result<Connection>
-  {
-    Ok(Connection {
-      connection: ConnectionImpl {
-        store: store::redb::Store::new(path)?,
-        function_manager: functions::Manager::new(),
-      }
-      .boxed(),
-    })
-  }
-  #[cfg(not(feature = "redb"))]
-  fn open_redb<P: AsRef<std::path::Path>>(_: P) -> Result<Connection>
-  {
-    Err(error::StoreError::UnavailableBackend { backend: "redb" }.into())
-  }
-  #[cfg(feature = "_pgql")]
-  pub fn create() -> Result<Connection>
-  {
-    Ok(Connection {
-      store: store::Store::new()?,
-    })
-  }
+
   /// Execute the `query` (using OpenCypher), given the query `parameters` (sometimes
   /// also referred as binding).
   ///
   /// Example:
   ///
   /// ```rust
-  /// # use gqlitedb::{Connection, Value};
+  /// # use gqlitedb::{Backend, Connection, Value};
   /// # fn example() -> gqlitedb::Result<()> {
-  /// # let connection = gqlitedb::Connection::open("filename.db", gqlitedb::map!("backend" => "redb"))?;
-  /// let result = connection.execute_query("MATCH (a { name: $name }) RETURN a", gqlitedb::map!("name" => "Joe"))?;
+  /// # let connection = Connection::builder().path("filename.db").backend(Backend::Redb).create()?;
+  /// let result = connection.execute_oc_query("MATCH (a { name: $name }) RETURN a", gqlitedb::value_map!("name" => "Joe"))?;
   /// # Ok(()) }
   /// ```
-  pub fn execute_query(
+  pub fn execute_oc_query(
     &self,
-    query: impl Into<String>,
+    query: impl AsRef<str>,
     parameters: value::ValueMap,
-  ) -> Result<value::Value>
+  ) -> Result<QueryResult>
   {
-    self.connection.execute_query(query.into(), parameters)
+    self.connection.execute_oc_query(query.as_ref(), parameters)
   }
 }

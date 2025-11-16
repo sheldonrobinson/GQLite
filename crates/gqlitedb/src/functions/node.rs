@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-use super::{FResult, FunctionTypeTrait};
+use super::FResult;
 
 #[derive(Debug, Default)]
 pub(super) struct Labels {}
@@ -9,7 +9,7 @@ impl Labels
 {
   fn call_impl(node: &graph::Node) -> FResult<Vec<String>>
   {
-    Ok(node.labels.to_owned())
+    Ok(node.labels().to_owned())
   }
 }
 

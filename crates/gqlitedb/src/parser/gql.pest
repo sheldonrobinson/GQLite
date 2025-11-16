@@ -29,7 +29,7 @@ nothing = { nothing_ident? }
 // fragments
 
 labels       = { ":" ~ label_expression }
-pattern      = { ident? ~ labels? ~ map? }
+pattern      = { ident? ~ labels? ~ (map | parameter)? }
 node_pattern = { "(" ~ pattern ~ ")" }
 
 directed_edge_pattern   = { (")-[" ~ pattern ~ "]->(") | (nothing ~ ")-->(") }
@@ -63,7 +63,10 @@ where_modifier = { "WHERE" ~ expression }
 
 // Statements
 statement = {
-    create_graph_statement
+    create_graph_if_not_exists_statement
+  | create_graph_statement
+  | drop_graph_if_exists_statement
+  | drop_graph_statement
   | use_graph_statement
   | create_statement
   | optional_match_statement
@@ -81,6 +84,9 @@ statement = {
 star = { "*" }
 
 create_graph_statement   = { "CREATE" ~ "GRAPH" ~ ident }
+create_graph_if_not_exists_statement   = { "CREATE" ~ "GRAPH" ~ "IF" ~ "NOT" ~ "EXISTS" ~ ident }
+drop_graph_statement     = { "DROP" ~ "GRAPH" ~ ident }
+drop_graph_if_exists_statement     = { "DROP" ~ "GRAPH" ~ "IF" ~ "EXISTS" ~ ident }
 use_graph_statement      = { "USE" ~ ident }
 
 create_statement         = { "CREATE" ~ node_or_edge_pattern ~ ("," ~ node_or_edge_pattern)* }
@@ -121,7 +127,7 @@ remove_member_access =  { (("(" ~ ident ~ ")") | ident) ~ ("." ~ ident)+ }
 
 expression = { prefix* ~ expression_term ~ postfix* ~ (infix ~ prefix? ~ expression_term ~ postfix*)* }
 
-infix   = _{ addition | subtraction | multiplication | division | modulo | or | and | xor | equal | different | in_ | not_in | superior_equal | inferior_equal | superior | inferior }
+infix   = _{ addition | subtraction | multiplication | division | modulo | exponent | or | and | xor | equal | different | in_ | not_in | superior_equal | inferior_equal | superior | inferior }
 postfix = _{ is_null | is_not_null | member_access | range_access | range_access_to | index_access }
 prefix  = _{ negation | not }
 
@@ -130,6 +136,7 @@ subtraction    = { "-" }
 multiplication = { "*" }
 division       = { "/" }
 modulo         = { "%" }
+exponent       = { "^" }
 
 xor_kw         = @{ "XOR" ~ !ASCII_ALPHA }
 xor            =  { xor_kw }
@@ -164,8 +171,8 @@ label_check_expression = { ident ~ (":" ~ ident)+ }
 parenthesised_expression = { "(" ~ expression ~ ")" }
 named_expression         = { (expression ~ "AS" ~ ident) | expression }
 function_call            = { function_name ~ "(" ~ (expression ~ ("," ~ expression)*)? ~ ")" }
-count_star               = { "count" ~ "(" ~ "*" ~ ")" }
-expression_term          = { null_lit | true_lit | false_lit | num | hexa_int | octa_int | int | string_literal | map | array | label_check_expression | parameter | parenthesised_expression | function_call | count_star | ident }
+function_star            = { function_name ~ "(" ~ "*" ~ ")" }
+expression_term          = { null_lit | true_lit | false_lit | num | hexa_int | octa_int | int | string_literal | map | array | label_check_expression | parameter | parenthesised_expression | function_call | function_star | ident }
 
 parameter = { "$" ~ parameter_name }
 

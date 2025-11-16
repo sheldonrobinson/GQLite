@@ -1,0 +1,6 @@
+tasks:
+  gqlitebrowser:
+    description: "Run gqlitebrowser."
+    arguments: []
+    command: !commands
+      - cargo run --bin gqlitebrowser

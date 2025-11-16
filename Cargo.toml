@@ -1,9 +1,14 @@
 [workspace]
 resolver = "2"
-members = ["bindings/python/gqlitepy", "bindings/ruby/gqliterb", "crates/*"]
+members = [
+  "bindings/python/gqlitepy",
+  "bindings/ruby/gqliterb",
+  "bindings/rune/gqliterune",
+  "crates/*",
+]
 
 [workspace.package]
-version = "0.5.2"
+version = "0.7.0"
 edition = "2021"
 license = "MIT"
 homepage = "https://gqlite.org"
@@ -11,4 +16,21 @@ repository = "https://gitlab.com/gqlite/gqlite"
 
 [workspace.dependencies]
 # versions have to be specified with path: https://github.com/rust-lang/cargo/issues/11133
-gqlitedb = { version = "0.5.2", path = "crates/gqlitedb" }
+gqliterune = { version = "0.7.0", path = "bindings/rune/gqliterune" }
+graphcore = { version = "0.7.0", path = "crates/graphcore" }
+gqb = { version = "0.3.0", path = "crates/gqb" }
+gqlitedb = { version = "0.7.0", path = "crates/gqlitedb" }
+gqlparser = { version = "0.1.0", path = "crates/gqlparser" }
+gqls-macros = { version = "0.1.0", path = "crates/gqls-macros" }
+
+askama = { version = "0.14" }
+ccutils = { version = "0.4" }
+indexmap = "2"
+itertools = "0.14"
+rune = { version = "0.14" }
+serde = "1"
+thiserror = "2"
+uuid = { version = "1", features = ["v4"] }
+
+[patch.crates-io]
+# rusqlite = { git = "https://github.com/Spxg/rusqlite.git", branch = "wasm-demo", features = [] }

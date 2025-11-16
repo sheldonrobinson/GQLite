@@ -37,8 +37,13 @@ end
 
 gql = [
   # Graph
-  'Graph1'
+  'Graph1', 'Graph2'
   ]
+
+extras = [
+  # id
+  'Id'
+]
 
 features = [
   # Create
@@ -57,15 +62,20 @@ features = [
   'remove/Remove1', 'remove/Remove2', 'remove/Remove3',
   # UNWIND
   'unwind/Unwind1',
+  # RETURN
+  'return/Return1', 'return/Return2', 'return/Return3', 'return/Return4', 'return/Return6', 'return/Return7',  'return/Return8',
   # RETURN ORDER BY
   'return-orderby/ReturnOrderBy1', 'return-orderby/ReturnOrderBy2', 'return-orderby/ReturnOrderBy3', 'return-orderby/ReturnOrderBy4', 'return-orderby/ReturnOrderBy5',
   # RETURN SKIP LIMIT
   'return-skip-limit/ReturnSkipLimit1', 'return-skip-limit/ReturnSkipLimit2', 'return-skip-limit/ReturnSkipLimit3',
+  # WITH
+  'with/With1', 'with/With2', 'with/With3', 'with/With4', 'with/With6', 'with/With7',
   # WITH ORDER BY
   'with-orderBy/WithOrderBy1', 'with-orderBy/WithOrderBy2', 'with-orderBy/WithOrderBy3', 'with-orderBy/WithOrderBy4',
-  'with/With3', 
   # WITH SKIP LIMIT
   'with-skip-limit/WithSkipLimit1', 'with-skip-limit/WithSkipLimit2', 'with-skip-limit/WithSkipLimit3',
+  # with-where
+  'with-where/WithWhere1', 'with-where/WithWhere2', 'with-where/WithWhere3', 'with-where/WithWhere4', 'with-where/WithWhere5', 'with-where/WithWhere6', 'with-where/WithWhere7',
 ]
 
 expressions = [
@@ -103,7 +113,7 @@ expressions = [
 
 # In progress
 # gql = []
-# features = ['create/Create4', 'create/Create6', 'create/Create5', 'match/Match6', 'remove/Remove3', ]
+# features = ['create/Create4', 'create/Create6', 'create/Create5', 'match/Match6', 'remove/Remove3', 'return/Return5', 'with/With5', ]
 # expressions = [ 'aggregation/Aggregation8']
 
 # Regressions 1.1 -> 1.2
@@ -116,10 +126,11 @@ expressions = [
 # Build arguments
 
 gql = gql.map { |file| 'gql/features/' + file + '.feature' }
+extras = extras.map { |file| 'extras/' + file + '.feature' }
 expressions = expressions.map { |file| 'openCypher/tck/features/expressions/' + file + '.feature' }
 features = features.map { |file| 'openCypher/tck/features/clauses/' + file + '.feature' }
 
-args = (gql + features + expressions).concat %w(--require cucumber/step_definitions/)
+args = (gql + features + expressions + extras).concat %w(--require cucumber/step_definitions/)
 
 args = args.concat ['--tags', '~@skipStyleCheck']
 args = args.concat %w(--fail-fast)  if options[:abort_on_first_error]

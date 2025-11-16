@@ -1,6 +1,7 @@
 use crate::{prelude::*, value_table::ColId};
 
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 pub(crate) enum Instruction
 {
   CreateNodeLiteral
@@ -58,7 +59,6 @@ pub(crate) enum Instruction
   Rot3,        // If a is the top of the stack, then a b c -> b c a
   InverseRot3, // If a is the top of the stack, then a b c -> c a b
   Swap,
-  Drop,
   AndBinaryOperator,
   OrBinaryOperator,
   XorBinaryOperator,
@@ -78,6 +78,7 @@ pub(crate) enum Instruction
   MultiplicationBinaryOperator,
   DivisionBinaryOperator,
   ModuloBinaryOperator,
+  ExponentBinaryOperator,
 }
 
 pub(crate) type Instructions = Vec<Instruction>;
@@ -206,7 +207,11 @@ pub(crate) enum Block
 {
   CreateGraph
   {
-    name: String
+    name: String, if_not_exists: bool
+  },
+  DropGraph
+  {
+    name: String, if_exists: bool
   },
   UseGraph
   {
@@ -217,7 +222,7 @@ pub(crate) enum Block
     actions: Vec<CreateAction>,
     variables_size: VariablesSizes,
   },
-  BlockMatch
+  Match
   {
     blocks: Vec<BlockMatch>,
     filter: Instructions,
@@ -229,10 +234,11 @@ pub(crate) enum Block
     variables: Vec<(String, RWExpression)>,
     filter: Instructions,
     modifiers: Modifiers,
-    variables_size: VariablesSizes,
+    variables_sizes: VariablesSizes,
   },
   Call
   {
+    #[allow(dead_code)]
     arguments: Instructions,
     name: String,
   },
@@ -241,7 +247,7 @@ pub(crate) enum Block
     variables: Vec<RWExpression>,
     filter: Instructions,
     modifiers: Modifiers,
-    variables_size: VariablesSizes,
+    variables_sizes: VariablesSizes,
   },
   Unwind
   {

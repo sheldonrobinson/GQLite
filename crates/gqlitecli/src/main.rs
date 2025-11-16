@@ -17,23 +17,46 @@ To execute a query, write the query and end it with a ';'"
   );
 }
 
-fn print_results(arr: &Vec<gqlitedb::Value>)
+fn print_results(arr: &gqlitedb::Table)
 {
   let mut builder = tabled::builder::Builder::new();
-  arr.iter().for_each(|row| match row
+  builder.push_record(arr.headers());
+  for row in arr.row_iter()
   {
-    gqlitedb::Value::Array(arr) => builder.push_record(arr.iter().map(|x| x.to_string())),
-    _ =>
-    {
-      println!("Unexpected: {}", row);
-    }
-  });
+    builder.push_record(row.iter().map(|x| x.to_string()));
+  }
 
   let table = builder
     .build()
     .with(tabled::settings::Style::ascii_rounded())
     .to_string();
   println!("{}", table);
+}
+
+fn print_query_result(qr: &gqlitedb::QueryResult)
+{
+  match qr
+  {
+    gqlitedb::QueryResult::Table(table) =>
+    {
+      print_results(table);
+    }
+    gqlitedb::QueryResult::Array(arr) =>
+    {
+      for a in arr
+      {
+        print_query_result(a);
+      }
+    }
+    gqlitedb::QueryResult::Value(val) =>
+    {
+      println!("{:?}", val);
+    }
+    gqlitedb::QueryResult::Empty =>
+    {
+      println!("No results.");
+    }
+  }
 }
 
 //   ____ _ _ ___ _                 _
@@ -44,7 +67,10 @@ fn print_results(arr: &Vec<gqlitedb::Value>)
 
 trait CliIterator<E>: Iterator<Item = Result<String, E>>
 {
-  fn add_history_entry(&mut self, _: &String) {}
+  fn add_history_entry(&mut self, _: &String) -> Result<(), E>
+  {
+    Ok(())
+  }
 }
 
 impl CliIterator<std::io::Error> for io::Lines<io::BufReader<fs::File>> {}
@@ -81,9 +107,9 @@ impl<'de> Iterator for ReadLineIterator<'de>
 
 impl<'de> CliIterator<rustyline::error::ReadlineError> for ReadLineIterator<'de>
 {
-  fn add_history_entry(&mut self, h: &String)
+  fn add_history_entry(&mut self, h: &String) -> Result<(), rustyline::error::ReadlineError>
   {
-    self.rl.add_history_entry(h);
+    self.rl.add_history_entry(h).map(|_| ())
   }
 }
 
@@ -114,11 +140,11 @@ impl Cli
         Some(line) => line,
         None => return Ok(false),
       };
-      if line.len() > 0
+      if !line.is_empty()
       {
         if line.starts_with(".")
         {
-          it.add_history_entry(&line);
+          it.add_history_entry(&line)?;
           let splited_line: Vec<_> = line.split(" ").collect();
           match splited_line[0]
           {
@@ -134,8 +160,9 @@ impl Cli
               }
               else
               {
-                let connection_res =
-                  gqlitedb::Connection::open(splited_line[1], gqlitedb::ValueMap::new());
+                let connection_res = gqlitedb::Connection::builder()
+                  .path(splited_line[1])
+                  .create();
                 match connection_res
                 {
                   Ok(c) =>
@@ -208,7 +235,7 @@ impl Cli
             {
               Some(line) =>
               {
-                if line.len() == 0
+                if line.is_empty()
                 {
                   break;
                 }
@@ -221,56 +248,22 @@ impl Cli
               None => break,
             }
           }
-          if query.len() > 0
+          if !query.is_empty()
           {
-            it.add_history_entry(&query);
+            it.add_history_entry(&query)?;
             match self.connection
             {
               Some(ref c) =>
               {
-                let qr = c.execute_query(query, gqlitedb::ValueMap::new());
+                let qr = c.execute_oc_query(query, gqlitedb::ValueMap::new());
                 match qr
                 {
-                  Ok(value) => match value
-                  {
-                    gqlitedb::Value::Array(arr) =>
-                    {
-                      print_results(&arr);
-                    }
-                    gqlitedb::Value::Map(map) =>
-                    {
-                      if matches!(map.get("type"), Some(gqlitedb::Value::String(s)) if s == "results")
-                      {
-                        map.get("results").map(|results| match results
-                        {
-                          gqlitedb::Value::Array(arr) =>
-                          {
-                            for val in arr
-                            {
-                              match val
-                              {
-                                gqlitedb::Value::Array(arr) =>
-                                {
-                                  print_results(arr);
-                                }
-                                _ =>
-                                {}
-                              }
-                            }
-                          }
-                          _ =>
-                          {}
-                        });
-                      }
-                    }
-                    _ =>
-                    {}
-                  },
+                  Ok(value) => print_query_result(&value),
                   Err(err) => match err.error()
                   {
                     gqlitedb::Error::CompileTime(ct) =>
                     {
-                      println!("Compilation error:\n{}", ct.to_string());
+                      println!("Compilation error:\n{}", ct);
                     }
                     _ =>
                     {
@@ -303,7 +296,7 @@ fn main_loop(rl: &mut rustyline::DefaultEditor) -> rustyline::Result<()>
   args.next(); // remove program name
   if let Some(filename) = args.next()
   {
-    let connection_res = gqlitedb::Connection::open(filename, gqlitedb::ValueMap::new());
+    let connection_res = gqlitedb::Connection::builder().path(filename).create();
     match connection_res
     {
       Ok(c) =>
@@ -333,8 +326,10 @@ fn main() -> rustyline::Result<()>
   let gqlite_history = standard_paths::StandardPaths::new("gqlitecli", "gqlite.org")
     .writable_location(standard_paths::LocationType::ConfigLocation)?
     .join("gqlite_history");
-  if rl.load_history(&gqlite_history).is_err()
-  {}
+  if let Err(e) = rl.load_history(&gqlite_history)
+  {
+    println!("Failed to read command line history: {:?}", e);
+  }
   println!("Enter '.help' for usage hints.");
   match main_loop(&mut rl)
   {

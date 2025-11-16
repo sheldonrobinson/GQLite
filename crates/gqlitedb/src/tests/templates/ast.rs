@@ -37,7 +37,7 @@ pub(crate) fn create_named_node() -> Statements
   vec![
     Create {
       patterns: vec![Pattern::Node(NodePattern {
-        variable: Some(var_ids.from_name("n")),
+        variable: Some(var_ids.create_variable_from_name("n")),
         labels: LabelExpression::None,
         properties: Some(
           Map {
@@ -57,10 +57,10 @@ pub(crate) fn create_named_node() -> Statements
     Return {
       all: false,
       expressions: vec![NamedExpression {
-        identifier: var_ids.from_name("p"),
+        identifier: var_ids.create_variable_from_name("p"),
         expression: MemberAccess {
           left: Variable {
-            identifier: var_ids.from_name("n"),
+            identifier: var_ids.create_variable_from_name("n"),
           }
           .into(),
           path: vec!["name".into()],
@@ -85,7 +85,7 @@ pub(crate) fn create_named_node_double_return() -> Statements
   vec![
     Create {
       patterns: vec![Pattern::Node(NodePattern {
-        variable: Some(var_ids.from_name("n")),
+        variable: Some(var_ids.create_variable_from_name("n")),
         labels: LabelExpression::None,
         properties: Some(
           Map {
@@ -109,10 +109,10 @@ pub(crate) fn create_named_node_double_return() -> Statements
       all: false,
       expressions: vec![
         NamedExpression {
-          identifier: var_ids.from_name("id"),
+          identifier: var_ids.create_variable_from_name("id"),
           expression: MemberAccess {
             left: Variable {
-              identifier: var_ids.from_name("n"),
+              identifier: var_ids.create_variable_from_name("n"),
             }
             .into(),
             path: vec!["id".into()],
@@ -120,10 +120,10 @@ pub(crate) fn create_named_node_double_return() -> Statements
           .into(),
         },
         NamedExpression {
-          identifier: var_ids.from_name("p"),
+          identifier: var_ids.create_variable_from_name("p"),
           expression: MemberAccess {
             left: Variable {
-              identifier: var_ids.from_name("n"),
+              identifier: var_ids.create_variable_from_name("n"),
             }
             .into(),
             path: vec!["name".into()],
@@ -151,11 +151,11 @@ pub(crate) fn double_with_return() -> Statements
       all: false,
       expressions: vec![
         NamedExpression {
-          identifier: var_ids.from_name("n"),
+          identifier: var_ids.create_variable_from_name("n"),
           expression: Value { value: 1.into() }.into(),
         },
         NamedExpression {
-          identifier: var_ids.from_name("m"),
+          identifier: var_ids.create_variable_from_name("m"),
           expression: Value { value: 2.into() }.into(),
         },
       ],
@@ -171,16 +171,16 @@ pub(crate) fn double_with_return() -> Statements
       all: false,
       expressions: vec![
         NamedExpression {
-          identifier: var_ids.from_name("a"),
+          identifier: var_ids.create_variable_from_name("a"),
           expression: Variable {
-            identifier: var_ids.from_name("n"),
+            identifier: var_ids.create_variable_from_name("n"),
           }
           .into(),
         },
         NamedExpression {
-          identifier: var_ids.from_name("b"),
+          identifier: var_ids.create_variable_from_name("b"),
           expression: Variable {
-            identifier: var_ids.from_name("m"),
+            identifier: var_ids.create_variable_from_name("m"),
           }
           .into(),
         },
@@ -193,7 +193,7 @@ pub(crate) fn double_with_return() -> Statements
       where_expression: None,
     }
     .into(),
-    return_statement(var_ids.from_name("a")),
+    return_statement(var_ids.create_variable_from_name("a")),
   ]
 }
 
@@ -203,14 +203,14 @@ pub(crate) fn unwind() -> Statements
   let var_ids = VariableIdentifiers::default();
   vec![
     Unwind {
-      identifier: var_ids.from_name("i"),
+      identifier: var_ids.create_variable_from_name("i"),
       expression: Array {
         array: vec![Value { value: 0.into() }.into()],
       }
       .into(),
     }
     .into(),
-    return_statement(var_ids.from_name("i")),
+    return_statement(var_ids.create_variable_from_name("i")),
   ]
 }
 
@@ -223,12 +223,12 @@ pub(crate) fn match_loop() -> Statements
       patterns: vec![Pattern::Edge(EdgePattern {
         variable: None,
         source: NodePattern {
-          variable: Some(var_ids.from_name("n")),
+          variable: Some(var_ids.create_variable_from_name("n")),
           labels: LabelExpression::None,
           properties: None,
         },
         destination: NodePattern {
-          variable: Some(var_ids.from_name("n")),
+          variable: Some(var_ids.create_variable_from_name("n")),
           labels: LabelExpression::None,
           properties: None,
         },
@@ -240,7 +240,7 @@ pub(crate) fn match_loop() -> Statements
       optional: false,
     }
     .into(),
-    return_statement(var_ids.from_name("n")),
+    return_statement(var_ids.create_variable_from_name("n")),
   ]
 }
 
@@ -251,7 +251,7 @@ pub(crate) fn optional_match() -> Statements
   vec![
     Match {
       patterns: vec![Pattern::Node(NodePattern {
-        variable: Some(var_ids.from_name("a")),
+        variable: Some(var_ids.create_variable_from_name("a")),
         labels: LabelExpression::None,
         properties: None,
       })],
@@ -259,7 +259,7 @@ pub(crate) fn optional_match() -> Statements
       optional: true,
     }
     .into(),
-    return_statement(var_ids.from_name("a")),
+    return_statement(var_ids.create_variable_from_name("a")),
   ]
 }
 
@@ -270,7 +270,7 @@ pub(crate) fn match_count() -> Statements
   vec![
     Match {
       patterns: vec![Pattern::Node(NodePattern {
-        variable: Some(var_ids.from_name("a")),
+        variable: Some(var_ids.create_variable_from_name("a")),
         labels: LabelExpression::None,
         properties: None,
       })],
@@ -281,7 +281,7 @@ pub(crate) fn match_count() -> Statements
     Return {
       all: false,
       expressions: vec![NamedExpression {
-        identifier: var_ids.from_name("count(*)"),
+        identifier: var_ids.create_variable_from_name("count(*)"),
         expression: FunctionCall {
           name: "count".into(),
           arguments: vec![Value { value: 0.into() }.into()],
@@ -306,7 +306,7 @@ pub(crate) fn aggregation() -> Statements
   vec![
     Match {
       patterns: vec![Pattern::Node(NodePattern {
-        variable: Some(var_ids.from_name("n")),
+        variable: Some(var_ids.create_variable_from_name("n")),
         labels: LabelExpression::None,
         properties: None,
       })],
@@ -318,10 +318,10 @@ pub(crate) fn aggregation() -> Statements
       all: false,
       expressions: vec![
         NamedExpression {
-          identifier: var_ids.from_name("n.name"),
+          identifier: var_ids.create_variable_from_name("n.name"),
           expression: MemberAccess {
             left: Variable {
-              identifier: var_ids.from_name("n"),
+              identifier: var_ids.create_variable_from_name("n"),
             }
             .into(),
             path: vec!["name".into()],
@@ -329,12 +329,12 @@ pub(crate) fn aggregation() -> Statements
           .into(),
         },
         NamedExpression {
-          identifier: var_ids.from_name("count(n.num)"),
+          identifier: var_ids.create_variable_from_name("count(n.num)"),
           expression: FunctionCall {
             name: "count".into(),
             arguments: vec![MemberAccess {
               left: Variable {
-                identifier: var_ids.from_name("n"),
+                identifier: var_ids.create_variable_from_name("n"),
               }
               .into(),
               path: vec!["num".into()],
