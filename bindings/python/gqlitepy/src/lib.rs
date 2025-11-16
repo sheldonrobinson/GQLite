@@ -1,27 +1,17 @@
-// #![deny(warnings)]
-
 use pyo3::{
   prelude::*,
-  types::{PyDict, PyList, PyNone},
+  types::{PyDateTime, PyDelta, PyDict, PyList, PyNone, PyTzInfo},
   IntoPyObjectExt,
 };
 
 pyo3::create_exception!(gqlitepy, Error, pyo3::exceptions::PyException);
 
-pub fn new_error(py: Python, msg: &str) -> PyErr
+pub fn new_error(py: Python<'_>, msg: &str) -> PyErr
 {
   let exc_type = py.get_type::<Error>();
-
-  let result: PyResult<PyObject> = exc_type.call1((msg,)).and_then(|obj| {
-    obj.setattr("msg", msg.into_bound_py_any(py)?)?;
-    Ok(obj.into())
-  });
-
-  match result
-  {
-    Ok(obj) => PyErr::from_value(obj.bind(py).to_owned()), // converting owned PyObject to borrowed PyAny
-    Err(e) => e,
-  }
+  let obj = exc_type.call1((msg,)).unwrap();
+  obj.setattr("msg", msg).unwrap();
+  PyErr::from_value(obj)
 }
 
 fn map_err<T>(py: Python, result: gqlitedb::Result<T>) -> PyResult<T>
@@ -51,11 +41,11 @@ fn from_pany<'py>(py: Python<'py>, value: &Bound<'py, PyAny>) -> PyResult<gqlite
   {
     Ok(gqlitedb::Value::String(s))
   }
-  else if let Ok(list) = value.downcast::<PyList>()
+  else if let Ok(list) = value.cast::<PyList>()
   {
     Ok(from_plist(py, list)?.into())
   }
-  else if let Ok(dict) = value.downcast::<PyDict>()
+  else if let Ok(dict) = value.cast::<PyDict>()
   {
     Ok(from_pdict(py, dict)?.into())
   }
@@ -70,22 +60,18 @@ fn from_pany<'py>(py: Python<'py>, value: &Bound<'py, PyAny>) -> PyResult<gqlite
 
 fn from_plist<'py>(py: Python<'py>, list: &Bound<'py, PyList>) -> PyResult<Vec<gqlitedb::Value>>
 {
-  Ok(
-    list
-      .iter()
-      .map(|value| from_pany(py, &value))
-      .collect::<Result<Vec<_>, _>>()?,
-  )
+  list
+    .iter()
+    .map(|value| from_pany(py, &value))
+    .collect::<Result<Vec<_>, _>>()
 }
 
 fn from_pdict<'py>(py: Python<'py>, hash: &Bound<'py, PyDict>) -> PyResult<gqlitedb::ValueMap>
 {
-  Ok(
-    hash
-      .iter()
-      .map(|(k, v)| Ok((k.to_string(), from_pany(py, &v)?)))
-      .collect::<PyResult<_>>()?,
-  )
+  hash
+    .iter()
+    .map(|(k, v)| Ok((k.to_string(), from_pany(py, &v)?)))
+    .collect::<PyResult<_>>()
 }
 
 fn node_to_pdict<'py>(py: Python<'py>, node: gqlitedb::Node) -> PyResult<Bound<'py, PyAny>>
@@ -132,15 +118,34 @@ fn to_pvalue<'py>(py: Python<'py>, val: gqlitedb::Value) -> PyResult<Bound<'py, 
   {
     gqlitedb::Value::Array(arr) => Ok(to_plist(py, arr)?.into_any()),
     gqlitedb::Value::Boolean(b) => b.into_bound_py_any(py),
+    gqlitedb::Value::Key(k) => k.uuid().into_bound_py_any(py),
     gqlitedb::Value::Integer(i) => i.into_bound_py_any(py),
     gqlitedb::Value::Float(f) => f.into_bound_py_any(py),
     gqlitedb::Value::String(s) => s.into_bound_py_any(py),
+    gqlitedb::Value::TimeStamp(ts) => Ok(to_ptime(py, ts)?.into_any()),
     gqlitedb::Value::Map(m) => Ok(to_pdict(py, m)?.into_any()),
     gqlitedb::Value::Null => Ok(PyNone::get(py).to_owned().into_any()),
     gqlitedb::Value::Edge(e) => Ok(edge_to_pdict(py, e)?),
     gqlitedb::Value::Node(n) => Ok(node_to_pdict(py, n)?),
     gqlitedb::Value::Path(p) => Ok(path_to_pdict(py, p)?),
   }
+}
+
+fn to_ptime<'py>(py: Python<'py>, ts: gqlitedb::TimeStamp) -> PyResult<Bound<'py, PyDateTime>>
+{
+  let tzinfo = PyTzInfo::fixed_offset(py, PyDelta::new(py, 0, ts.offset_seconds(), 0, true)?)?;
+
+  PyDateTime::new(
+    py,
+    ts.year() as i32,
+    ts.month() as u8,
+    ts.day() as u8,
+    ts.hour() as u8,
+    ts.minute() as u8,
+    ts.second() as u8,
+    ts.microsecond() as u32,
+    Some(&tzinfo),
+  )
 }
 
 fn to_pdict<'py>(py: Python<'py>, map: gqlitedb::ValueMap) -> PyResult<Bound<'py, PyDict>>
@@ -160,8 +165,7 @@ fn to_plist<'py>(py: Python<'py>, arr: Vec<gqlitedb::Value>) -> PyResult<Bound<'
     arr
       .into_iter()
       .map(|x| to_pvalue(py, x))
-      .collect::<PyResult<Vec<_>>>()?
-      .into_iter(),
+      .collect::<PyResult<Vec<_>>>()?,
   )
 }
 
@@ -183,7 +187,13 @@ impl Connection
     {
       options.insert("backend".into(), backend.into());
     }
-    let dbhandle = map_err(py, gqlitedb::Connection::open(filename, options))?;
+    let dbhandle = map_err(
+      py,
+      gqlitedb::Connection::builder()
+        .options(options)
+        .path(filename)
+        .create(),
+    )?;
     Ok(Self { dbhandle })
   }
   #[pyo3(signature = (query, bindings=None))]
@@ -198,9 +208,9 @@ impl Connection
       .map(|bindings| from_pdict(py, bindings))
       .transpose()?
       .unwrap_or_default();
-    let result = map_err(py, self.dbhandle.execute_query(query, bindings))?;
+    let result = map_err(py, self.dbhandle.execute_oc_query(query, bindings))?;
 
-    to_pvalue(py, result)
+    to_pvalue(py, result.into_value())
   }
 }
 

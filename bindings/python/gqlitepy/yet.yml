@@ -1,0 +1,50 @@
+# Full documentation is available at https://gitlab.com/cyloncore/yte/-/blob/stable/docs/yte_yml.md
+tasks:
+  make_sdist:
+    description: "Generate sdist"
+    command: !script |
+      env.set_env("CARGO_TARGET_DIR", env.cwd());
+      env.execute("maturin sdist")
+
+  build_many_wheel:
+    description: "Generate a many wheel"
+    command: !commands
+      - make_sdist
+      - |
+        docker run --rm -e PLAT=manylinux2014_x86_64 \
+          -v $(pwd)/wheels:/io \
+          quay.io/pypa/manylinux2014_x86_64 \
+          bash -c '
+            set -e
+
+            cd /io
+
+            rm -rf target
+
+            # Find the first sdist file (*.tar.gz)
+            SDIST=$(ls *.tar.gz | head -n1)
+            echo "Found sdist: $SDIST"
+
+            # Extract base directory name from the sdist file
+            PKG_DIR=$(tar tzf "$SDIST" | head -1 | cut -f1 -d"/")
+            echo "Extracting to: $PKG_DIR"
+
+            # Extract the sdist
+            tar xf "$SDIST"
+
+            cd "$PKG_DIR"
+
+            # Build wheel for Python >= 3.9 only
+            for PYBIN in /opt/python/cp39* /opt/python/cp31[0-9]*; do
+              if [ -d "$PYBIN/bin" ]; then
+                echo "🔧 Building for: $PYBIN"
+                "$PYBIN/bin/pip" wheel . -w /io/wheelhouse/ --no-deps || echo "⚠️ Failed for $PYBIN"
+              fi
+            done
+            # Repair wheels with auditwheel
+            for whl in /io/wheelhouse/*.whl; do
+              echo "🔍 Repairing: $whl"
+              auditwheel repair "$whl" -w /io/wheelhouse/
+              rm "$whl"
+            done
+          '

@@ -25,7 +25,7 @@ include:
   script:
     - mkdir build
     - pushd build
-    - cmake .. -DCMAKE_INSTALL_PREFIX=../inst -DGQLITE_TESTS_OUTPUT_JUNIT=ON -DGQLITE_TESTS_DISABLE_RUST_TESTS=ON
+    - cmake .. -DCMAKE_INSTALL_PREFIX=../inst -DGQLITE_TESTS_OUTPUT_JUNIT=ON -DGQLITE_TESTS_DISABLE_RUST_TESTS=ON -DCMAKE_BUILD_TYPE=release
     - make -j8 install
     - popd
   artifacts:
@@ -85,14 +85,9 @@ include:
 
 precheck:
   stage: precheck
-  extends:
-    - .cc_retrieve_scripts
-    - .cc_check_binary_files
-    - .cc_check_commit_message
-  script:
-    - echo "Pre-check are running."
+  extends: .cc_all_checks
   variables:
-    CC_CI_REF_BRANCH: "dev/2"
+    CC_CI_REF_BRANCH: "dev/1"
 
 check-default-features:
   stage: precheck
@@ -100,6 +95,15 @@ check-default-features:
     - grep -q 'default = \["redb", "capi", "sqlite"\]' crates/gqlitedb/Cargo.toml
 
 # Extra-tests
+clippy:
+  stage: postcheck
+  image: cyloncore/ci:debian
+  script:
+    - cargo clippy --features capi,gqb,redb,sqlite -- -D warnings
+  needs:
+    - job: "debian:build"
+      artifacts: true
+
 doc:
   stage: postcheck
   image: cyloncore/ci:debian
@@ -113,7 +117,7 @@ semver:
   stage: postcheck
   image: cyloncore/ci:debian
   script:
-    - cargo semver-checks --exclude gqliterb --exclude gqlitepy
+    - cargo semver-checks --default-features --exclude gqliterb --exclude gqlitepy --exclude gqlparser --exclude gqls --exclude gqls-macros
   needs:
     - job: "debian:build"
       artifacts: true
@@ -131,13 +135,8 @@ dists:
   stage: postcheck
   image: cyloncore/ci:debian
   script:
-    - pushd bindings/ruby
-    - rake prepare:ext
-    - rake gem
-    - popd
-    - pushd bindings/python/gqlitepy
-    - CARGO_TARGET_DIR=`pwd` maturin sdist
-    - popd
+    - yet bindings/ruby/build_gem
+    - yet bindings/python/make_sdist
   needs:
     - job: "debian:build"
       artifacts: true
@@ -175,10 +174,16 @@ benchmarks_iai:
     TARGET_REPO: git@gitlab.com:GQLite/benchmark-results.git
     TARGET_SUB_DIR: $CI_COMMIT_SHA/pokec_iai
     TARGET_DIR: results_repo/$TARGET_SUB_DIR
+  dependencies: []
   script:
     - mkdir -p ${TARGET_DIR}
 
     - echo "🚀 Run 'iai' benchmarks..."
+
+    # Needed to work around valgrind opening too many file descriptors
+    - export VALGRIND_LIB="/tmp/valgrind"
+    - export VALGRIND_OPTS="--track-fds=no"
+    - ulimit -n 1024
     - export PATH=`pwd`/scripts/workaround/iai_callgrind/:$PATH
     - cargo bench -p gqlitedb --bench pokec_iai -- --save-summary=json --home=pokec_iai | tee ${TARGET_DIR}/${CI_PIPELINE_ID}.log
 

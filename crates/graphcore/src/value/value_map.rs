@@ -28,11 +28,12 @@ impl ValueMap
       .map(|(k, v)| (k, v.remove_null()))
       .collect()
   }
-  pub(crate) fn remove_value<'a>(
+  /// Remove a value in the given path.
+  pub fn remove_value<'a>(
     &mut self,
     field: Option<&'a String>,
     mut path: impl Iterator<Item = &'a String>,
-  ) -> crate::Result<()>
+  ) -> Result<()>
   {
     if let Some(field) = field
     {
@@ -47,9 +48,9 @@ impl ValueMap
           }
           None =>
           {}
-          _ => Err(InternalError::Unimplemented(
-            "remove_value should get a better error",
-          ))?, // TODO
+          _ => Err(Error::MissingKeyInPath {
+            key: field.to_owned(),
+          })?,
         }
       }
       else
@@ -59,18 +60,17 @@ impl ValueMap
     }
     else
     {
-      Err(InternalError::Unimplemented(
-        "remove_value should get a better error",
-      ))? // TODO
+      Err(Error::MissingKey)?
     }
     Ok(())
   }
-  pub(crate) fn add_values<'a>(
+  /// Add a value at the given path.
+  pub fn add_values<'a>(
     &mut self,
     field: Option<&'a String>,
     mut path: impl Iterator<Item = &'a String>,
     value: ValueMap,
-  ) -> crate::Result<()>
+  ) -> Result<()>
   {
     if let Some(field) = field
     {
@@ -90,38 +90,35 @@ impl ValueMap
             o.set_value(Some(next_field), path, value.remove_null().into())?;
             self.insert(field.to_owned(), o.into());
           }
-          _ => Err(InternalError::Unimplemented(
-            "add_values should get a better error",
-          ))?, // TODO
+          _ => Err(Error::MissingKeyInPath {
+            key: field.to_owned(),
+          })?,
         }
       }
       else
       {
         match v
         {
-          Some(v) =>
+          Some(v) => match v
           {
-            match v
+            Value::Map(object) =>
             {
-              Value::Map(object) =>
+              for (k, v) in value.into_iter()
               {
-                for (k, v) in value.into_iter()
+                if v.is_null()
                 {
-                  if v.is_null()
-                  {
-                    object.remove(&k);
-                  }
-                  else
-                  {
-                    object.insert(k, v);
-                  }
+                  object.remove(&k);
+                }
+                else
+                {
+                  object.insert(k, v);
                 }
               }
-              _ => Err(InternalError::Unimplemented(
-                "add_values should get a better error",
-              ))?, // TODO
             }
-          }
+            _ => Err(Error::MissingKeyInPath {
+              key: field.to_owned(),
+            })?,
+          },
           None =>
           {
             self.insert(field.to_owned(), value.remove_null().into());
@@ -145,12 +142,13 @@ impl ValueMap
     }
     Ok(())
   }
-  pub(crate) fn set_value<'a>(
+  /// Set the value in the given path. Unlike add_value, it will complain if there is no existing value.
+  pub fn set_value<'a>(
     &mut self,
     field: Option<&'a String>,
     mut path: impl Iterator<Item = &'a String>,
     value: Value,
-  ) -> crate::Result<()>
+  ) -> Result<()>
   {
     if let Some(field) = field
     {
@@ -173,29 +171,26 @@ impl ValueMap
               self.insert(field.to_owned(), o.into());
             }
           }
-          _ => Err(InternalError::Unimplemented(
-            "update_value should get a better error",
-          ))?, // TODO
+          _ => Err(Error::MissingKeyInPath {
+            key: field.to_owned(),
+          })?,
         }
+      }
+      else if value.is_null()
+      {
+        self.remove(field);
       }
       else
       {
-        if value.is_null()
+        match v
         {
-          self.remove(field);
-        }
-        else
-        {
-          match v
+          Some(v) =>
           {
-            Some(v) =>
-            {
-              *v = value;
-            }
-            None =>
-            {
-              self.insert(field.to_owned(), value);
-            }
+            *v = value;
+          }
+          None =>
+          {
+            self.insert(field.to_owned(), value);
           }
         }
       }
@@ -211,7 +206,7 @@ impl ValueMap
           *self = o;
           Ok(())
         }
-        _ => Err(InternalError::Unimplemented("set_value should get a better error").into()), // TODO
+        _ => Err(Error::MissingKey),
       }
     }
   }

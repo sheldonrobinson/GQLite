@@ -14,7 +14,7 @@ path = "src/main.rs"
 
 [dependencies]
 gqlitedb = { workspace = true, features = [] }
-rustyline = "16"
+rustyline = "17"
 standard_paths = "2.1.0"
 tabled = "0.20"
 

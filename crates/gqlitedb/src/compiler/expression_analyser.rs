@@ -11,6 +11,7 @@ use crate::{compiler::variables_manager::VariablesManager, parser::ast, prelude:
 pub(crate) enum ExpressionType
 {
   Array,
+  Key,
   Map,
   Node,
   Edge,
@@ -20,6 +21,7 @@ pub(crate) enum ExpressionType
   Float,
   Path,
   String,
+  TimeStamp,
   Variant,
 }
 
@@ -134,7 +136,7 @@ where
   }
 }
 
-impl<'a, VT> ExpressionAnalyser for (&'a ast::Expression, VT)
+impl<VT> ExpressionAnalyser for (&ast::Expression, VT)
 where
   VT: Fn(ExpressionInfo) -> Result<ExpressionInfo>,
 {
@@ -188,8 +190,8 @@ impl ExpressionInfo
     let dependents = dependents.into();
     Self {
       expression_type,
-      constant: dependents.iter().all(|x| x.constant == true),
-      aggregation_result: dependents.into_iter().any(|x| x.aggregation_result == true),
+      constant: dependents.iter().all(|x| x.constant),
+      aggregation_result: dependents.into_iter().any(|x| x.aggregation_result),
     }
   }
 }
@@ -253,7 +255,7 @@ impl<'b> Analyser<'b>
             arguments.iter().map(|x| x.expression_type).collect(),
           )?,
           self.functions_manager.is_deterministic(&call.name)?
-            && arguments.iter().all(|x| x.constant == true),
+            && arguments.iter().all(|x| x.constant),
           self.functions_manager.is_aggregate(&call.name)?,
         ))
       }
@@ -349,6 +351,10 @@ impl<'b> Analyser<'b>
         ExpressionType::Variant,
         ([&ri.left, &ri.right].into_iter(), validators::any).analyse(self)?,
       )),
+      ast::Expression::Exponent(ri) => Ok(ExpressionInfo::new_type(
+        ExpressionType::Variant,
+        ([&ri.left, &ri.right].into_iter(), validators::any).analyse(self)?,
+      )),
       ast::Expression::Map(map) => Ok(ExpressionInfo::new_type(
         ExpressionType::Map,
         (map.map.iter().map(|(_, v)| v), validators::any).analyse(self)?,
@@ -404,6 +410,7 @@ impl<'b> Analyser<'b>
         match val.value
         {
           value::Value::Array(_) => ExpressionType::Array,
+          value::Value::Key(_) => ExpressionType::Key,
           value::Value::Boolean(_) => ExpressionType::Boolean,
           value::Value::Edge(_) => ExpressionType::Edge,
           value::Value::Node(_) => ExpressionType::Node,
@@ -413,6 +420,7 @@ impl<'b> Analyser<'b>
           value::Value::Map(_) => ExpressionType::Map,
           value::Value::Path(_) => ExpressionType::Path,
           value::Value::String(_) => ExpressionType::String,
+          value::Value::TimeStamp(_) => ExpressionType::TimeStamp,
         },
         true,
         false,

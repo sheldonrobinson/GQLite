@@ -9,23 +9,12 @@ use crate::{
 use interpreter::instructions;
 
 #[derive(Debug, Clone)]
+#[allow(clippy::enum_variant_names)]
 enum Value
 {
   GraphValue(value::Value),
   NodeQuery(store::SelectNodeQuery),
   EdgeQuery(store::SelectEdgeQuery),
-}
-
-impl Value
-{
-  fn is_null(&self) -> bool
-  {
-    match self
-    {
-      Value::GraphValue(gv) => gv.is_null(),
-      _ => false,
-    }
-  }
 }
 
 impl<T> From<T> for Value
@@ -46,7 +35,7 @@ macro_rules! try_into_gv_impl {
       fn try_into(self) -> crate::Result<$vn>
       {
         let a: value::Value = self.try_into()?;
-        a.try_into()
+        Ok(a.try_into()?)
       }
     }
     impl TryPopInto<$vn> for Stack
@@ -54,12 +43,12 @@ macro_rules! try_into_gv_impl {
       fn try_pop_into(&mut self) -> crate::Result<$vn>
       {
         self.try_pop()?.try_into()
-          .map_err(|e: ErrorType| error::map_error!(e, Error::Internal(InternalError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))
+          .map_err(|e: ErrorType| error::map_error!(e, Error::RunTime(RunTimeError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))
       }
       fn try_drain_into(&mut self, n: usize) -> Result<Vec<$vn>>
       {
         self.try_drain(n)?.map(|x| x.try_into()).collect::<Result<_>>()
-          .map_err(|e| error::map_error!(e, Error::Internal(InternalError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))
+          .map_err(|e| error::map_error!(e, Error::RunTime(RunTimeError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))
       }
     }
   };
@@ -96,13 +85,13 @@ macro_rules! try_into_impl {
       fn try_pop_into(&mut self) -> Result<$type>
       {
         self.try_pop()?.try_into()
-        .map_err(|e: ErrorType| error::map_error!(e, Error::Internal(InternalError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))
+        .map_err(|e: ErrorType| error::map_error!(e, Error::RunTime(RunTimeError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))
 
       }
       fn try_drain_into(&mut self, n: usize) -> Result<Vec<$type>>
       {
         self.try_drain(n)?.map(|x| x.try_into()).collect::<Result<_>>()
-          .map_err(|e| error::map_error!(e, Error::Internal(InternalError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))
+          .map_err(|e| error::map_error!(e, Error::RunTime(RunTimeError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))
       }
     }
   };
@@ -116,7 +105,7 @@ impl From<store::SelectNodeQuery> for Value
 {
   fn from(value: store::SelectNodeQuery) -> Self
   {
-    Self::NodeQuery(value.into())
+    Self::NodeQuery(value)
   }
 }
 
@@ -124,7 +113,7 @@ impl From<store::SelectEdgeQuery> for Value
 {
   fn from(value: store::SelectEdgeQuery) -> Self
   {
-    Self::EdgeQuery(value.into())
+    Self::EdgeQuery(value)
   }
 }
 
@@ -195,7 +184,7 @@ impl Stack
       Ok(self.stack.drain((self.stack.len() - len)..))
     }
   }
-  fn to_vec(self) -> Vec<Value>
+  fn into_vec(self) -> Vec<Value>
   {
     self.stack
   }
@@ -226,12 +215,12 @@ where
   fn try_pop_into(&mut self) -> Result<T>
   {
     self.try_pop()?.try_into()
-      .map_err(|e: ErrorType| error::map_error!(e, Error::Internal(InternalError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))
+      .map_err(|e: ErrorType| error::map_error!(e, Error::RunTime(RunTimeError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))
   }
   fn try_drain_into(&mut self, n: usize) -> Result<Vec<T>>
   {
     self.try_drain(n)?.map(|x| x.try_into()).collect::<Result<Vec<_>>>()
-      .map_err(|e| error::map_error!(e, Error::Internal(InternalError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))
+      .map_err(|e| error::map_error!(e, Error::RunTime(RunTimeError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))
   }
 }
 
@@ -246,11 +235,11 @@ fn execute_boolean_operator(
   let b: value::Value = b.try_into()?;
   match instruction
   {
-    &instructions::Instruction::AndBinaryOperator =>
+    instructions::Instruction::AndBinaryOperator =>
     {
       if a.is_null()
       {
-        if b.is_null() || <value::Value as TryInto<bool>>::try_into(b)? == true
+        if b.is_null() || <value::Value as TryInto<bool>>::try_into(b)?
         {
           stack.push(value::Value::Null);
         }
@@ -279,11 +268,11 @@ fn execute_boolean_operator(
         }
       }
     }
-    &instructions::Instruction::OrBinaryOperator =>
+    instructions::Instruction::OrBinaryOperator =>
     {
       if a.is_null()
       {
-        if b.is_null() || <value::Value as TryInto<bool>>::try_into(b)? == false
+        if b.is_null() || !<value::Value as TryInto<bool>>::try_into(b)?
         {
           stack.push(value::Value::Null);
         }
@@ -299,20 +288,17 @@ fn execute_boolean_operator(
         {
           stack.push(true);
         }
+        else if b.is_null()
+        {
+          stack.push(value::Value::Null);
+        }
         else
         {
-          if b.is_null()
-          {
-            stack.push(value::Value::Null);
-          }
-          else
-          {
-            stack.push(b);
-          }
+          stack.push(b);
         }
       }
     }
-    &instructions::Instruction::XorBinaryOperator =>
+    instructions::Instruction::XorBinaryOperator =>
     {
       if a.is_null() || b.is_null()
       {
@@ -335,7 +321,7 @@ fn execute_boolean_operator(
 
 fn execute_binary_operator<T: Into<crate::value::Value>>(
   stack: &mut Stack,
-  operand: impl FnOnce(crate::value::Value, crate::value::Value) -> Result<T>,
+  operand: impl FnOnce(crate::value::Value, crate::value::Value) -> Result<T, graphcore::Error>,
 ) -> Result<()>
 {
   let a = stack.try_pop()?;
@@ -371,22 +357,22 @@ fn eval_instructions(
         let props: value::Value = stack.try_pop_into()?;
         let dst: graph::Node = stack.try_pop_into()?;
         let src: graph::Node = stack.try_pop_into()?;
-        stack.push(crate::graph::Edge {
-          key: graph::Key::default(),
-          source: src,
-          destination: dst,
-          labels: labels.to_owned(),
-          properties: props.into_map(),
-        });
+        stack.push(crate::graph::Path::new(
+          graph::Key::default(),
+          src,
+          labels.to_owned(),
+          props.into_map(),
+          dst,
+        ));
       }
       instructions::Instruction::CreateNodeLiteral { labels } =>
       {
         let props: value::Value = stack.try_pop_into()?;
-        stack.push(crate::graph::Node {
-          key: crate::graph::Key::default(),
-          labels: labels.clone(),
-          properties: props.into_map(),
-        });
+        stack.push(crate::graph::Node::new(
+          crate::graph::Key::default(),
+          labels.clone(),
+          props.into_map(),
+        ));
       }
       instructions::Instruction::CreateEdgeQuery { labels } =>
       {
@@ -399,7 +385,7 @@ fn eval_instructions(
           {
             stack.push(store::SelectEdgeQuery::select_source_destination_keys(
               src,
-              [ed.key],
+              [ed.key()],
               dst,
             ));
           }
@@ -418,8 +404,8 @@ fn eval_instructions(
           {
             stack.push(store::SelectEdgeQuery::select_none());
           }
-          _ => Err(InternalError::InvalidValueCast {
-            value: props,
+          _ => Err(RunTimeError::InvalidValueCast {
+            value: Box::new(props),
             typename: "Edge properties",
           })?,
         }
@@ -431,7 +417,7 @@ fn eval_instructions(
         {
           value::Value::Node(no) =>
           {
-            stack.push(store::SelectNodeQuery::select_keys([no.key]));
+            stack.push(store::SelectNodeQuery::select_keys([no.key()]));
           }
           value::Value::Map(ob) =>
           {
@@ -444,8 +430,8 @@ fn eval_instructions(
           {
             stack.push(store::SelectNodeQuery::select_none());
           }
-          _ => Err(InternalError::InvalidValueCast {
-            value: props,
+          _ => Err(RunTimeError::InvalidValueCast {
+            value: Box::new(props),
             typename: "Node properties",
           })?,
         }
@@ -531,7 +517,7 @@ fn eval_instructions(
             value::Value::Array(array) =>
             {
               let idx: i64 = index.try_into()
-              .map_err(|e: ErrorType| error::map_error!(e, Error::Internal(InternalError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))?;
+              .map_err(|e: graphcore::Error| error::map_error!(e.into(), Error::RunTime(RunTimeError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))?;
               stack.push(
                 array
                   .get(idx as usize)
@@ -539,23 +525,35 @@ fn eval_instructions(
                   .to_owned(),
               );
             }
-            value::Value::Map(map)
-            | value::Value::Node(graph::Node {
-              key: _,
-              labels: _,
-              properties: map,
-            })
-            | value::Value::Edge(graph::Edge {
-              key: _,
-              source: _,
-              destination: _,
-              labels: _,
-              properties: map,
-            }) =>
+            value::Value::Map(map) =>
             {
               let idx: String = index.try_into()
-                .map_err(|e: ErrorType| error::map_error!(e, Error::Internal(InternalError::InvalidValueCast{..}) => RunTimeError::MapElementAccessByNonString ))?;
+              .map_err(|e: graphcore::Error| error::map_error!(e.into(), Error::RunTime(RunTimeError::InvalidValueCast{..}) => RunTimeError::MapElementAccessByNonString ))?;
               stack.push(map.get(&idx).unwrap_or(&value::Value::Null).to_owned());
+            }
+            value::Value::Node(node) =>
+            {
+              let idx: String = index.try_into()
+              .map_err(|e: graphcore::Error| error::map_error!(e.into(), Error::RunTime(RunTimeError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))?;
+              stack.push(
+                node
+                  .properties()
+                  .get(&idx)
+                  .unwrap_or(&value::Value::Null)
+                  .to_owned(),
+              );
+            }
+            value::Value::Edge(edge) =>
+            {
+              let idx: String = index.try_into()
+              .map_err(|e: graphcore::Error| error::map_error!(e.into(), Error::RunTime(RunTimeError::InvalidValueCast{..}) => RunTimeError::InvalidArgumentType ))?;
+              stack.push(
+                edge
+                  .properties()
+                  .get(&idx)
+                  .unwrap_or(&value::Value::Null)
+                  .to_owned(),
+              );
             }
             value::Value::Null => stack.push(value::Value::Null),
             _ => Err(error::RunTimeError::InvalidArgumentType)?,
@@ -583,8 +581,7 @@ fn eval_instructions(
         // Get the array out of the stack
         let v: value::Value = stack.try_pop_into()?;
         // if either end or start are null, return null
-        if end.as_ref().map_or(false, |e| e.is_null())
-          || start.as_ref().map_or(false, |s| s.is_null())
+        if end.as_ref().is_some_and(|e| e.is_null()) || start.as_ref().is_some_and(|s| s.is_null())
         {
           stack.push(value::Value::Null);
         }
@@ -599,14 +596,14 @@ fn eval_instructions(
             (Some(start), Some(end)) => Some(end - start),
             _ => None,
           };
-          if length.map_or(false, |l| l >= v.len() as i64)
+          if length.is_some_and(|l| l >= v.len() as i64)
           {
             stack.push(v);
           }
           else
           {
             // If start is negative, it should be made into a positive number
-            while start.map_or(false, |x| x < 0)
+            while start.is_some_and(|x| x < 0)
             {
               start = start.map(|x| x + v.len() as i64);
               end = end.map(|x| x + v.len() as i64);
@@ -658,10 +655,6 @@ fn eval_instructions(
         let b = stack.try_pop()?;
         stack.push(a);
         stack.push(b);
-      }
-      &instructions::Instruction::Drop =>
-      {
-        stack.try_pop()?;
       }
       &instructions::Instruction::AndBinaryOperator
       | &instructions::Instruction::OrBinaryOperator
@@ -754,7 +747,7 @@ fn eval_instructions(
         execute_binary_operator::<value::Value>(stack, |a, b| {
           if b.is_null()
           {
-            Ok(value::Value::Null.into())
+            Ok(value::Value::Null)
           }
           else
           {
@@ -771,7 +764,7 @@ fn eval_instructions(
         execute_binary_operator::<value::Value>(stack, |a, b| {
           if b.is_null()
           {
-            Ok(value::Value::Null.into())
+            Ok(value::Value::Null)
           }
           else
           {
@@ -803,18 +796,23 @@ fn eval_instructions(
       {
         execute_binary_operator(stack, |a, b| a % b)?;
       }
+      &instructions::Instruction::ExponentBinaryOperator =>
+      {
+        execute_binary_operator(stack, |a, b| a.pow(b))?;
+      }
     }
   }
   Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn eval_update_property<TStore: store::Store>(
   store: &TStore,
-  mut tx: &mut TStore::TransactionBox,
+  tx: &mut TStore::TransactionBox,
   graph_name: &String,
   row: &mut value_table::Row,
   target: value_table::ColId,
-  path: &Vec<String>,
+  path: &[String],
   instructions: &instructions::Instructions,
   parameters: &crate::value::ValueMap,
   set: bool,
@@ -822,12 +820,12 @@ pub(crate) fn eval_update_property<TStore: store::Store>(
 {
   let var = row.get(target)?;
   let mut stack = Stack::default();
-  eval_instructions(&mut stack, row, &instructions, &parameters)?;
+  eval_instructions(&mut stack, row, instructions, parameters)?;
   let value: value::Value = stack.try_pop_into()?;
   let value = match value
   {
-    value::Value::Node(n) => n.properties.into(),
-    value::Value::Edge(e) => e.properties.into(),
+    value::Value::Node(n) => n.take_properties().into(),
+    value::Value::Edge(e) => e.take_properties().into(),
     _ => value,
   };
   let mut piter = path.iter();
@@ -838,15 +836,15 @@ pub(crate) fn eval_update_property<TStore: store::Store>(
       let mut n = n.to_owned();
       if set
       {
-        n.properties
+        n.properties_mut()
           .set_value(piter.next(), piter, value.remove_null())?;
       }
       else
       {
-        n.properties
+        n.properties_mut()
           .add_values(piter.next(), piter, value.try_into()?)?;
       }
-      store.update_node(&mut tx, &graph_name, &n)?;
+      store.update_node(tx, graph_name, &n)?;
       row.set(target, n.into())?;
     }
     value::Value::Edge(e) =>
@@ -854,15 +852,15 @@ pub(crate) fn eval_update_property<TStore: store::Store>(
       let mut e = e.to_owned();
       if set
       {
-        e.properties
+        e.properties_mut()
           .set_value(piter.next(), piter, value.remove_null())?;
       }
       else
       {
-        e.properties
+        e.properties_mut()
           .add_values(piter.next(), piter, value.try_into()?)?;
       }
-      store.update_edge(&mut tx, &graph_name, &e)?;
+      store.update_edge(tx, graph_name, &e)?;
       row.set(target, e.into())?;
     }
     value::Value::Null =>
@@ -873,8 +871,6 @@ pub(crate) fn eval_update_property<TStore: store::Store>(
   }
   Ok(())
 }
-
-struct OrderByKey(Vec<(value::Value, bool)>);
 
 fn handle_asc(o: std::cmp::Ordering, asc: bool) -> std::cmp::Ordering
 {
@@ -891,18 +887,6 @@ fn handle_asc(o: std::cmp::Ordering, asc: bool) -> std::cmp::Ordering
       std::cmp::Ordering::Greater => std::cmp::Ordering::Less,
     }
   }
-}
-
-fn compute_order_by(
-  a: &Vec<(value::Value, bool)>,
-  b: &Vec<(value::Value, bool)>,
-) -> std::cmp::Ordering
-{
-  a.iter()
-    .zip(b.iter())
-    .map(|(a, b)| handle_asc(a.0.orderability(&b.0), a.1))
-    .find(|p| *p != std::cmp::Ordering::Equal)
-    .unwrap_or(std::cmp::Ordering::Equal)
 }
 
 #[derive(Debug, Default, Clone, Hash, PartialEq)]
@@ -932,7 +916,7 @@ fn create_aggregations_states(
           )?;
           let state = agg.aggregator.create(
             stack
-              .to_vec()
+              .into_vec()
               .into_iter()
               .map(|v| v.try_into())
               .collect::<Result<_>>()?,
@@ -956,7 +940,7 @@ fn compute_return_with_table(
 {
   let mut output_table = value_table::ValueTable::new(variables_sizes.total_size());
   // Compute table
-  if variables.iter().any(|v| v.aggregations.len() > 0)
+  if variables.iter().any(|v| !v.aggregations.is_empty())
   {
     // 1) For each row, compute non-aggregated columns, based on those columns, select a vector of aggregator states. and update them
 
@@ -966,22 +950,19 @@ fn compute_return_with_table(
     for row in input_table.into_row_iter()
     {
       // a) compute non-aggregated columns
-      let mut row = row.extended(variables_sizes.total_size())?;
       let out_row = variables
         .iter()
         .map(|rw_expr| {
-          if rw_expr.aggregations.len() > 0
-          {
-            Ok(value::Value::Null)
-          }
-          else
+          if rw_expr.aggregations.is_empty()
           {
             assert_eq!(rw_expr.aggregations.len(), 0);
             let mut stack = Stack::default();
-            eval_instructions(&mut stack, &row, &rw_expr.instructions, &parameters)?;
-            let value: value::Value = stack.try_pop_into()?;
-            row.set(rw_expr.col_id, value.to_owned())?;
-            Ok(value)
+            eval_instructions(&mut stack, &row, &rw_expr.instructions, parameters)?;
+            stack.try_pop_into()
+          }
+          else
+          {
+            Ok(value::Value::Null)
           }
         })
         .collect::<Result<Row>>()?;
@@ -1012,8 +993,8 @@ fn compute_return_with_table(
       }
     }
 
-    // Aggregation always return at least once
-    if aggregation_table.is_empty()
+    // Aggregation always return at least once, unless there is a non-aggregated value
+    if aggregation_table.is_empty() && variables.iter().all(|v| !v.aggregations.is_empty())
     {
       let row = Row::new(Default::default(), variables_sizes.total_size());
       let aggregations_states = create_aggregations_states(&variables, parameters)?;
@@ -1030,7 +1011,7 @@ fn compute_return_with_table(
         .zip(aggregations_states.into_iter())
         .enumerate()
       {
-        if rw_expr.aggregations.len() == 0
+        if rw_expr.aggregations.is_empty()
         {
           out_row.set(rw_expr.col_id, row.0.get(idx)?.to_owned())?;
         }
@@ -1038,10 +1019,11 @@ fn compute_return_with_table(
         {
           for (name, s) in aggregation_states.into_iter()
           {
-            out_row.set(name, s.finalise()?)?;
+            let value = s.finalise()?;
+            out_row.set(name, value)?;
           }
           let mut stack = Stack::default();
-          eval_instructions(&mut stack, &out_row, &rw_expr.instructions, &parameters)?;
+          eval_instructions(&mut stack, &out_row, &rw_expr.instructions, parameters)?;
           let value: value::Value = stack.try_pop_into()?;
           out_row.set(rw_expr.col_id, value.to_owned())?;
         }
@@ -1054,12 +1036,12 @@ fn compute_return_with_table(
     output_table = input_table
       .into_row_iter()
       .map(|row| {
-        let mut out_row = row.extended(variables_sizes.total_size())?;
+        let mut out_row = row.clone().extended(variables_sizes.total_size())?;
         for rw_expr in variables.iter()
         {
           assert_eq!(rw_expr.aggregations.len(), 0);
           let mut stack = Stack::default();
-          eval_instructions(&mut stack, &out_row, &rw_expr.instructions, &parameters)?;
+          eval_instructions(&mut stack, &row, &rw_expr.instructions, parameters)?;
           let value: value::Value = stack.try_pop_into()?;
           out_row.set(rw_expr.col_id, value.to_owned())?;
         }
@@ -1070,7 +1052,7 @@ fn compute_return_with_table(
   // Apply filter
   if !filter.is_empty()
   {
-    output_table = filter_rows(output_table.into_row_iter(), &filter, &parameters)?.try_into()?;
+    output_table = filter_rows(output_table.into_row_iter(), filter, parameters)?.try_into()?;
   }
   // Apply modifiers
   // Sort the table according to order_by
@@ -1083,7 +1065,7 @@ fn compute_return_with_table(
         for info in modifiers.order_by.iter()
         {
           let mut stack = Stack::default();
-          eval_instructions(&mut stack, &x, &info.instructions, &parameters)?;
+          eval_instructions(&mut stack, &x, &info.instructions, parameters)?;
           v.push((stack.try_pop_into()?, info.asc));
         }
         Ok((x, v))
@@ -1106,7 +1088,7 @@ fn compute_return_with_table(
   if let Some(skip) = &modifiers.skip
   {
     let mut stack = Stack::default();
-    eval_instructions(&mut stack, &value_table::Row::default(), &skip, &parameters)?;
+    eval_instructions(&mut stack, &value_table::Row::default(), skip, parameters)?;
     let q: i64 = stack
       .try_pop_into()
       .map_err(|_| RunTimeError::InvalidArgumentType)?;
@@ -1124,12 +1106,7 @@ fn compute_return_with_table(
   if let Some(limit) = &modifiers.limit
   {
     let mut stack = Stack::default();
-    eval_instructions(
-      &mut stack,
-      &value_table::Row::default(),
-      &limit,
-      &parameters,
-    )?;
+    eval_instructions(&mut stack, &value_table::Row::default(), limit, parameters)?;
     let q: i64 = stack
       .try_pop_into()
       .map_err(|_| RunTimeError::InvalidArgumentType)?;
@@ -1154,7 +1131,7 @@ fn compute_return_with_table(
         0,
       ))
     })
-    .map(|r| value_table::RowResult(r))
+    .map(value_table::RowResult)
     .collect()
 }
 
@@ -1168,7 +1145,7 @@ fn filter_rows(
     .filter_map(|row| {
       let res: Result<bool> = (|| {
         let mut stack = Stack::default();
-        eval_instructions(&mut stack, &row, &filter, &parameters)?;
+        eval_instructions(&mut stack, &row, filter, parameters)?;
         stack.try_pop_as_boolean()
       })();
       match res
@@ -1195,24 +1172,24 @@ fn is_write_program(program: &super::Program) -> bool
   program.iter().any(|b| match b
   {
     Block::UseGraph { .. }
-    | Block::BlockMatch { .. }
+    | Block::Match { .. }
     | Block::Return { .. }
     | Block::Unwind { .. }
     | Block::Call { .. }
     | Block::With { .. } => false,
     Block::CreateGraph { .. }
+    | Block::DropGraph { .. }
     | Block::Create { .. }
     | Block::Update { .. }
     | Block::Delete { .. } => true,
   })
 }
 
-///
 pub(crate) fn eval_program<TStore: store::Store>(
   store: &TStore,
   program: &super::Program,
   parameters: &crate::value::ValueMap,
-) -> crate::Result<crate::value::Value>
+) -> crate::Result<query_result::QueryResult>
 {
   let mut graph_name: String = "default".into();
   let mut input_table = value_table::ValueTable::new(0);
@@ -1235,12 +1212,25 @@ pub(crate) fn eval_program<TStore: store::Store>(
     }
     match block
     {
-      instructions::Block::CreateGraph { name } =>
+      instructions::Block::CreateGraph {
+        name,
+        if_not_exists,
+      } =>
       {
         store
-          .create_graph(&mut tx, name, false)
+          .create_graph(&mut tx, name, *if_not_exists)
           .map_err(|e|
             error::map_error!(e, Error::StoreError(StoreError::DuplicatedGraph { graph_name }) => RunTimeError::DuplicatedGraph {
+              graph_name: graph_name.clone(),
+            } ))?;
+        graph_name = name.to_owned();
+      }
+      instructions::Block::DropGraph { name, if_exists } =>
+      {
+        store
+          .drop_graph(&mut tx, name, *if_exists)
+          .map_err(|e|
+            error::map_error!(e, Error::StoreError(StoreError::UnknownGraph { graph_name }) => RunTimeError::UnknownGraph {
               graph_name: graph_name.clone(),
             } ))?;
         graph_name = name.to_owned();
@@ -1266,7 +1256,7 @@ pub(crate) fn eval_program<TStore: store::Store>(
           let mut new_row = row.extended(variables_size.total_size())?;
           for action in actions.iter()
           {
-            eval_instructions(&mut stack, &new_row, &action.instructions, &parameters)?;
+            eval_instructions(&mut stack, &new_row, &action.instructions, parameters)?;
             for (v, var) in stack
               .try_drain_into(action.variables.len())?
               .into_iter()
@@ -1276,18 +1266,18 @@ pub(crate) fn eval_program<TStore: store::Store>(
               {
                 crate::value::Value::Node(n) =>
                 {
-                  store.create_nodes(&mut tx, &graph_name, vec![n.to_owned()].iter())?;
+                  store.create_nodes(&mut tx, &graph_name, vec![&n])?;
                   if let Some(var) = var
                   {
                     new_row.set_if_unset(*var, crate::value::Value::Node(n))?;
                   }
                 }
-                crate::value::Value::Edge(e) =>
+                crate::value::Value::Path(p) =>
                 {
-                  store.create_edges(&mut tx, &graph_name, vec![e.to_owned()].iter())?;
+                  store.create_edges(&mut tx, &graph_name, vec![&p])?;
                   if let Some(var) = var
                   {
-                    new_row.set(*var, crate::value::Value::Edge(e))?;
+                    new_row.set(*var, crate::value::Value::Edge(p.into()))?;
                   }
                 }
                 _ =>
@@ -1301,7 +1291,7 @@ pub(crate) fn eval_program<TStore: store::Store>(
         }
         input_table = output_table;
       }
-      instructions::Block::BlockMatch {
+      instructions::Block::Match {
         blocks,
         filter,
         optional,
@@ -1325,21 +1315,16 @@ pub(crate) fn eval_program<TStore: store::Store>(
                   filter,
                 } =>
                 {
-                  eval_instructions(&mut stack, &row, &instructions, &parameters)?;
+                  eval_instructions(&mut stack, &row, instructions, parameters)?;
                   let query: store::SelectNodeQuery = stack.try_pop_into()?;
                   let nodes = store.select_nodes(&mut tx, &graph_name, query)?;
 
-                  for node in nodes.iter()
+                  for node in nodes.into_iter()
                   {
                     let mut new_row = row.clone();
-                    match &variable
+                    if let Some(variable) = variable
                     {
-                      Some(variable) =>
-                      {
-                        new_row.set_if_unset(*variable, node.to_owned().into())?;
-                      }
-                      None =>
-                      {}
+                      new_row.set_if_unset(*variable, node.to_owned().into())?;
                     }
                     let should_add_row = if filter.is_empty()
                     {
@@ -1349,8 +1334,8 @@ pub(crate) fn eval_program<TStore: store::Store>(
                     {
                       let mut stack = Stack::default();
                       stack.push(true);
-                      stack.push(node.to_owned());
-                      eval_instructions(&mut stack, &new_row, &filter, &parameters)?;
+                      stack.push(node);
+                      eval_instructions(&mut stack, &new_row, filter, parameters)?;
                       stack.try_pop()?; // Get rid of the edge
                       stack.try_pop_into()?
                     };
@@ -1370,54 +1355,37 @@ pub(crate) fn eval_program<TStore: store::Store>(
                   directivity,
                 } =>
                 {
-                  eval_instructions(&mut stack, &row, &instructions, &parameters)?;
+                  eval_instructions(&mut stack, &row, instructions, parameters)?;
                   let query = stack.try_pop_into()?;
 
                   let edges = store.select_edges(&mut tx, &graph_name, query, *directivity)?;
 
-                  for edge in edges.iter()
+                  for edge in edges.into_iter()
                   {
                     let mut new_row = row.clone();
+                    let (left, right) = if edge.reversed
+                    {
+                      (edge.path.destination(), edge.path.source())
+                    }
+                    else
+                    {
+                      (edge.path.source(), edge.path.destination())
+                    };
                     if let Some(left_variable) = left_variable.to_owned()
                     {
-                      new_row.set(
-                        left_variable,
-                        if edge.reversed
-                        {
-                          edge.edge.destination.to_owned()
-                        }
-                        else
-                        {
-                          edge.edge.source.to_owned()
-                        }
-                        .into(),
-                      )?;
+                      new_row.set(left_variable, left.to_owned().into())?;
                     }
                     if let Some(right_variable) = right_variable.to_owned()
                     {
-                      new_row.set(
-                        right_variable,
-                        if edge.reversed
-                        {
-                          edge.edge.source.to_owned()
-                        }
-                        else
-                        {
-                          edge.edge.destination.to_owned()
-                        }
-                        .into(),
-                      )?;
+                      new_row.set(right_variable, right.to_owned().into())?;
                     }
                     if let Some(edge_variable) = edge_variable.to_owned()
                     {
-                      new_row.set(edge_variable, edge.edge.to_owned().into())?;
+                      new_row.set(edge_variable, edge.path.to_edge().into())?;
                     }
                     if let Some(path_variable) = path_variable.to_owned()
                     {
-                      new_row.set(
-                        path_variable,
-                        crate::value::Value::Path(edge.edge.to_owned().into()),
-                      )?;
+                      new_row.set(path_variable, edge.path.to_owned().into())?;
                     }
                     let should_add_row = if filter.is_empty()
                     {
@@ -1427,8 +1395,8 @@ pub(crate) fn eval_program<TStore: store::Store>(
                     {
                       let mut stack = Stack::default();
                       stack.push(true);
-                      stack.push(edge.edge.to_owned());
-                      eval_instructions(&mut stack, &new_row, &filter, &parameters)?;
+                      stack.push(edge.path.into_edge());
+                      eval_instructions(&mut stack, &new_row, filter, parameters)?;
                       stack.try_pop()?; // Get rid of the edge
                       stack.try_pop_into()?
                     };
@@ -1444,7 +1412,7 @@ pub(crate) fn eval_program<TStore: store::Store>(
           }
           if !filter.is_empty()
           {
-            current_rows = filter_rows(current_rows.into_iter(), &filter, &parameters)?;
+            current_rows = filter_rows(current_rows.into_iter(), filter, parameters)?;
           }
           if current_rows.is_empty() && *optional
           {
@@ -1461,47 +1429,41 @@ pub(crate) fn eval_program<TStore: store::Store>(
         variables,
         filter,
         modifiers,
-        variables_size,
+        variables_sizes: variables_size,
       } =>
       {
-        let (names, variables): (Vec<_>, Vec<_>) =
-          variables.into_iter().map(|(s, e)| (s, e)).unzip();
+        let (names, variables): (Vec<_>, Vec<_>) = variables.iter().map(|(s, e)| (s, e)).unzip();
         let output_table = compute_return_with_table(
           variables,
-          &filter,
-          &modifiers,
+          filter,
+          modifiers,
           input_table,
-          &parameters,
-          &variables_size,
+          parameters,
+          variables_size,
         )?;
-        let mut r = Vec::<crate::value::Value>::new();
-        r.push(crate::value::Value::Array(
-          names
-            .into_iter()
-            .map(|name| crate::value::Value::String(name.to_owned()))
-            .collect(),
-        ));
+        let headers = names.into_iter().map(|name| name.to_owned()).collect();
+        let mut data = Vec::<crate::value::Value>::new();
         for row in output_table.into_row_iter()
         {
-          r.push(row.into());
+          data.extend(row.into_iter());
         }
         tx.close()?;
-        return Ok(r.into());
+        return Ok(graphcore::Table::new(headers, data)?.into());
       }
       instructions::Block::With {
         variables,
         filter,
         modifiers,
-        variables_size,
+        variables_sizes: variables_size,
       } =>
       {
         input_table = compute_return_with_table(
           variables.iter().collect(),
-          &filter,
-          &modifiers,
+          filter,
+          modifiers,
           input_table,
-          &parameters,
-          &variables_size,
+          parameters,
+          variables_size,
         )?;
       }
       instructions::Block::Unwind {
@@ -1514,7 +1476,7 @@ pub(crate) fn eval_program<TStore: store::Store>(
         for row in input_table.into_row_iter()
         {
           let mut stack = Stack::default();
-          eval_instructions(&mut stack, &row, &instructions, &parameters)?;
+          eval_instructions(&mut stack, &row, instructions, parameters)?;
           let value = stack.try_pop_into()?;
           match value
           {
@@ -1551,12 +1513,12 @@ pub(crate) fn eval_program<TStore: store::Store>(
           for instructions in instructions.iter()
           {
             let mut stack = Stack::default();
-            eval_instructions(&mut stack, &row, &instructions, &parameters)?;
+            eval_instructions(&mut stack, &row, instructions, parameters)?;
             let value: value::Value = stack.try_pop_into()?;
             match value
             {
-              value::Value::Node(node) => nodes_keys.push(node.key),
-              value::Value::Edge(edge) => edges_keys.push(edge.key),
+              value::Value::Node(node) => nodes_keys.push(node.unpack().0),
+              value::Value::Edge(edge) => edges_keys.push(edge.unpack().0),
               value::Value::Null =>
               {}
               _ => return Err(RunTimeError::InvalidDelete.into()),
@@ -1604,7 +1566,7 @@ pub(crate) fn eval_program<TStore: store::Store>(
                   *target,
                   path,
                   instructions,
-                  &parameters,
+                  parameters,
                   true,
                 )?;
               }
@@ -1622,7 +1584,7 @@ pub(crate) fn eval_program<TStore: store::Store>(
                   *target,
                   path,
                   instructions,
-                  &parameters,
+                  parameters,
                   false,
                 )?;
               }
@@ -1635,14 +1597,14 @@ pub(crate) fn eval_program<TStore: store::Store>(
                   value::Value::Node(n) =>
                   {
                     let mut n = n.to_owned();
-                    n.properties.remove_value(piter.next(), piter)?;
+                    n.properties_mut().remove_value(piter.next(), piter)?;
                     store.update_node(&mut tx, &graph_name, &n)?;
                     out_row.set(*target, n.into())?;
                   }
                   value::Value::Edge(e) =>
                   {
                     let mut e = e.to_owned();
-                    e.properties.remove_value(piter.next(), piter)?;
+                    e.properties_mut().remove_value(piter.next(), piter)?;
                     store.update_edge(&mut tx, &graph_name, &e)?;
                     out_row.set(*target, e.into())?;
                   }
@@ -1673,15 +1635,11 @@ pub(crate) fn eval_program<TStore: store::Store>(
                     let mut n = n.to_owned();
                     if add_labels
                     {
-                      n.labels.append(&mut labels.clone());
+                      n.labels_mut().append(&mut labels.clone());
                     }
                     else
                     {
-                      n.labels = n
-                        .labels
-                        .into_iter()
-                        .filter(|x| !labels.contains(x))
-                        .collect();
+                      n.labels_edit(|l| l.into_iter().filter(|x| !labels.contains(x)).collect());
                     }
                     store.update_node(&mut tx, &graph_name, &n)?;
                     out_row.set(*target, n.into())?;
@@ -1691,15 +1649,11 @@ pub(crate) fn eval_program<TStore: store::Store>(
                     let mut e = e.to_owned();
                     if add_labels
                     {
-                      e.labels.append(&mut labels.clone());
+                      e.labels_mut().append(&mut labels.clone());
                     }
                     else
                     {
-                      e.labels = e
-                        .labels
-                        .into_iter()
-                        .filter(|x| !labels.contains(x))
-                        .collect();
+                      e.labels_edit(|l| l.into_iter().filter(|x| !labels.contains(x)).collect());
                     }
                     store.update_edge(&mut tx, &graph_name, &e)?;
                     out_row.set(*target, e.into())?;
@@ -1733,7 +1687,7 @@ pub(crate) fn eval_program<TStore: store::Store>(
             "properties_count".into(),
             (stats.properties_count as i64).into(),
           );
-          return Ok(crate::value::Value::Map(res));
+          return Ok(crate::value::Value::Map(res).into());
         }
         else
         {
@@ -1743,7 +1697,7 @@ pub(crate) fn eval_program<TStore: store::Store>(
     }
   }
   tx.close()?;
-  Ok(crate::value::Value::Null)
+  Ok(crate::QueryResult::Empty)
 }
 
 #[cfg(test)]

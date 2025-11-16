@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "gqlitedb"
-version = "1.2.2"
+version = "1.4.0"
 requires-python = ">=3.9"
 authors = [{ name = "Cyrille Berger" }]
 description = "Python bindings for GQLite, a Graph Query library"

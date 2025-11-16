@@ -1,12 +1,14 @@
-#[cfg(feature = "_pgql")]
-pub(crate) mod pgql;
+#[cfg(any(feature = "sqlite", feature = "postgres", feature = "_pgrx"))]
+pub(crate) mod sqlbase;
+
+#[cfg(feature = "_pgrx")]
+pub(crate) mod pgrx;
+#[cfg(feature = "postgres")]
+pub(crate) mod postgres;
 #[cfg(feature = "redb")]
 pub(crate) mod redb;
 #[cfg(feature = "sqlite")]
 pub(crate) mod sqlite;
-
-#[cfg(feature = "_pgql")]
-pub(crate) use pgql::Store;
 
 use crate::prelude::*;
 
@@ -112,30 +114,35 @@ pub(crate) trait Store
   fn create_graph(
     &self,
     transaction: &mut Self::TransactionBox,
-    name: &String,
-    _ignore_if_exists: bool,
+    name: impl AsRef<str>,
+    ignore_if_exists: bool,
   ) -> Result<()>;
   /// Delete a graph
-  fn delete_graph(&self, transaction: &mut Self::TransactionBox, name: &String) -> Result<()>;
-  /// Create nodes and add them to a graph
-  fn create_nodes<'a, T: Iterator<Item = &'a crate::graph::Node>>(
+  fn drop_graph(
     &self,
     transaction: &mut Self::TransactionBox,
-    graph_name: &String,
+    name: impl AsRef<str>,
+    if_exists: bool,
+  ) -> Result<()>;
+  /// Create nodes and add them to a graph
+  fn create_nodes<'a, T: IntoIterator<Item = &'a crate::graph::Node>>(
+    &self,
+    transaction: &mut Self::TransactionBox,
+    graph_name: impl AsRef<str>,
     nodes_iter: T,
   ) -> Result<()>;
   /// Create nodes and add them to a graph
   fn update_node(
     &self,
     transaction: &mut Self::TransactionBox,
-    graph_name: &String,
+    graph_name: impl AsRef<str>,
     node: &graph::Node,
   ) -> Result<()>;
   /// Delete nodes according to a given query
   fn delete_nodes(
     &self,
     transaction: &mut Self::TransactionBox,
-    graph_name: &String,
+    graph_name: impl AsRef<str>,
     query: SelectNodeQuery,
     detach: bool,
   ) -> Result<()>;
@@ -143,27 +150,27 @@ pub(crate) trait Store
   fn select_nodes(
     &self,
     transaction: &mut Self::TransactionBox,
-    graph_name: &String,
+    graph_name: impl AsRef<str>,
     query: SelectNodeQuery,
   ) -> Result<Vec<crate::graph::Node>>;
   /// Add edge
-  fn create_edges<'a, T: Iterator<Item = &'a crate::graph::Edge>>(
+  fn create_edges<'a, T: IntoIterator<Item = &'a crate::graph::SinglePath>>(
     &self,
     transaction: &mut Self::TransactionBox,
-    graph_name: &String,
+    graph_name: impl AsRef<str>,
     edges_iter: T,
   ) -> Result<()>;
   fn update_edge(
     &self,
     transaction: &mut Self::TransactionBox,
-    graph_name: &String,
+    graph_name: impl AsRef<str>,
     edge: &graph::Edge,
   ) -> Result<()>;
   /// Delete nodes according to a given query
   fn delete_edges(
     &self,
     transaction: &mut Self::TransactionBox,
-    graph_name: &String,
+    graph_name: impl AsRef<str>,
     query: SelectEdgeQuery,
     directivity: graph::EdgeDirectivity,
   ) -> Result<()>;
@@ -171,7 +178,7 @@ pub(crate) trait Store
   fn select_edges(
     &self,
     transaction: &mut Self::TransactionBox,
-    graph_name: &String,
+    graph_name: impl AsRef<str>,
     query: SelectEdgeQuery,
     directivity: graph::EdgeDirectivity,
   ) -> Result<Vec<EdgeResult>>;
@@ -188,7 +195,7 @@ pub(crate) trait Store
 
 pub(crate) struct EdgeResult
 {
-  pub(crate) edge: graph::Edge,
+  pub(crate) path: graph::SinglePath,
   pub(crate) reversed: bool,
 }
 
@@ -250,6 +257,7 @@ impl SelectNodeQuery
       select_all: false,
     }
   }
+  #[allow(dead_code)]
   pub(crate) fn select_labels(labels: impl Into<Vec<String>>) -> Self
   {
     Self {
@@ -279,14 +287,14 @@ impl SelectNodeQuery
     }
     if let Some(keys) = &self.keys
     {
-      if !keys.iter().any(|x| node.key == *x)
+      if !keys.iter().any(|x| node.key() == *x)
       {
         return false;
       }
     }
     if let Some(labels) = &self.labels
     {
-      if !labels.iter().all(|x| node.labels.contains(x))
+      if !labels.iter().all(|x| node.labels().contains(x))
       {
         return false;
       }
@@ -295,12 +303,12 @@ impl SelectNodeQuery
     {
       if !properties
         .iter()
-        .all(|(k, v)| node.properties.get(k) == Some(v))
+        .all(|(k, v)| node.properties().get(k) == Some(v))
       {
         return false;
       }
     }
-    return true;
+    true
   }
 }
 
@@ -323,6 +331,7 @@ pub(crate) struct SelectEdgeQuery
 
 impl SelectEdgeQuery
 {
+  #[allow(dead_code)]
   pub(crate) fn is_select_only_keys(&self) -> bool
   {
     self.keys.is_some()
@@ -402,18 +411,18 @@ impl SelectEdgeQuery
       destination: destination_query,
     }
   }
-  pub(crate) fn is_match(&self, edge: &graph::Edge) -> bool
+  pub(crate) fn is_match(&self, edge: &graph::Path) -> bool
   {
     if let Some(keys) = &self.keys
     {
-      if !keys.iter().any(|x| edge.key == *x)
+      if !keys.iter().any(|x| edge.key() == *x)
       {
         return false;
       }
     }
     if let Some(labels) = &self.labels
     {
-      if !labels.iter().all(|x| edge.labels.contains(x))
+      if !labels.iter().all(|x| edge.labels().contains(x))
       {
         return false;
       }
@@ -422,11 +431,11 @@ impl SelectEdgeQuery
     {
       if !properties
         .iter()
-        .all(|(k, v)| edge.properties.get(k) == Some(v))
+        .all(|(k, v)| edge.properties().get(k) == Some(v))
       {
         return false;
       }
     }
-    return self.source.is_match(&edge.source) && self.destination.is_match(&edge.destination);
+    self.source.is_match(edge.source()) && self.destination.is_match(edge.destination())
   }
 }

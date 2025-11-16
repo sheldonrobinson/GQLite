@@ -2,7 +2,7 @@ use serde::de::{self, Visitor};
 use serde::{Deserializer, Serializer};
 use std::fmt;
 
-const NAN: f64 = std::f64::NAN;
+const NAN: f64 = f64::NAN;
 
 pub fn serialize_float<S>(x: &f64, serializer: S) -> Result<S::Ok, S::Error>
 where
@@ -68,7 +68,7 @@ impl<'de> Visitor<'de> for FloatDeserializeVisitor
   where
     E: de::Error,
   {
-    Ok(v as f64)
+    Ok(v)
   }
 
   fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>

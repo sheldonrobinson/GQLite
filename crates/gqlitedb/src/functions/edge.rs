@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-use super::{FResult, FunctionTypeTrait};
+use super::FResult;
 
 #[derive(Debug, Default)]
 pub(super) struct Type {}
@@ -10,9 +10,9 @@ impl Type
   fn call_impl(edge: &graph::Edge) -> FResult<String>
   {
     edge
-      .labels
+      .labels()
       .first()
-      .ok_or_else(|| RunTimeError::MissingEdgeLabel)
+      .ok_or(RunTimeError::MissingEdgeLabel)
       .map(|v| v.to_owned())
   }
 }

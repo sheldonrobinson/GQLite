@@ -11,6 +11,7 @@ pub(crate) trait RowInterface: Debug
   {
     Ok(self.get(index)?.to_owned())
   }
+  #[cfg(test)]
   fn len(&self) -> usize;
 }
 
@@ -52,7 +53,7 @@ impl Row
     {
       Err(
         InternalError::InvalidIndex {
-          index: index,
+          index,
           length: self.values.len(),
         }
         .into(),
@@ -97,6 +98,7 @@ impl RowInterface for Row
       .into()
     })
   }
+  #[cfg(test)]
   fn len(&self) -> usize
   {
     self.values.len()
@@ -136,11 +138,11 @@ impl MutableRowInterface for Row
   }
 }
 
-impl Into<value::Value> for Row
+impl From<Row> for value::Value
 {
-  fn into(self) -> value::Value
+  fn from(v: Row) -> Self
   {
-    value::Value::Array(self.values)
+    value::Value::Array(v.values)
   }
 }
 
@@ -152,10 +154,19 @@ impl FromIterator<value::Value> for Row
   }
 }
 
+impl IntoIterator for Row
+{
+  type Item = value::Value;
+  type IntoIter = <Vec<Self::Item> as IntoIterator>::IntoIter;
+  fn into_iter(self) -> Self::IntoIter
+  {
+    self.values.into_iter()
+  }
+}
+
 pub(crate) trait Header
 {
   fn columns(&self) -> usize;
-  fn titles(&self) -> Option<Vec<String>>;
 }
 
 impl Header for usize
@@ -164,10 +175,6 @@ impl Header for usize
   {
     *self
   }
-  fn titles(&self) -> Option<Vec<String>>
-  {
-    None
-  }
 }
 
 impl Header for Vec<String>
@@ -175,10 +182,6 @@ impl Header for Vec<String>
   fn columns(&self) -> usize
   {
     self.len()
-  }
-  fn titles(&self) -> Option<Vec<String>>
-  {
-    Some(self.clone())
   }
 }
 
@@ -256,12 +259,14 @@ where
     Ok(())
   }
 
+  #[allow(dead_code)]
   pub fn row_count(&self) -> usize
   {
     self.row_count
   }
 
   /// Create a RowView into a specific row
+  #[allow(dead_code)]
   pub fn row_view(&self, row_index: usize) -> Option<RowView<'_>>
   {
     if self.header.columns() == 0 && row_index >= self.row_count
@@ -302,10 +307,6 @@ where
       index: 0,
     }
   }
-  pub(crate) fn first_row(&self) -> Option<RowView>
-  {
-    self.row_view(0)
-  }
   pub(crate) fn remove_first_rows(&mut self, n: usize)
   {
     let n = n * self.header.columns();
@@ -334,6 +335,7 @@ pub(crate) struct RowView<'a>
 
 impl<'a> RowView<'a>
 {
+  #[allow(dead_code)]
   /// Create an owned Row by cloning the values in this row view
   pub fn to_row(&self) -> Row
   {
@@ -341,6 +343,7 @@ impl<'a> RowView<'a>
       values: self.row.to_vec(),
     }
   }
+  #[allow(dead_code)]
   /// Create an owned Row by cloning the values in this row view, and extend it to the given size
   pub fn to_extended_row(&self, length: usize) -> Result<Row>
   {
@@ -363,6 +366,7 @@ impl<'a> RowInterface for RowView<'a>
       .into()
     })
   }
+  #[cfg(test)]
   fn len(&self) -> usize
   {
     self.row.len()
@@ -449,7 +453,7 @@ impl Iterator for IntoRowIter
     else
     {
       let v: Vec<_> = self.data.by_ref().take(self.columns).collect();
-      if v.len() == 0
+      if v.is_empty()
       {
         None
       }

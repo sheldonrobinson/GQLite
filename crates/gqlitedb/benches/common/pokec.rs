@@ -1,7 +1,7 @@
 use std::{collections::HashSet, fs};
 
 use ccutils::temporary::TemporaryFile;
-use gqlitedb::{map, Connection};
+use gqlitedb::{value_map, Connection};
 use rand::{seq::IndexedRandom, Rng};
 use regex::Regex;
 
@@ -24,11 +24,21 @@ impl Pokec
 {
   pub(crate) fn load(backend: &str, size: PokecSize) -> Pokec
   {
+    let backend = match backend
+    {
+      "sqlite" => gqlitedb::Backend::SQLite,
+      "redb" => gqlitedb::Backend::Redb,
+      o => panic!("Unknown backend '{}'", o),
+    };
     let temporary_file = TemporaryFile::builder()
       .should_create_file(false)
       .label("gqlite_bench")
       .create();
-    let connection = Connection::open(temporary_file.path(), map!("backend" => backend)).unwrap();
+    let connection = Connection::builder()
+      .path(temporary_file.path())
+      .backend(backend)
+      .create()
+      .unwrap();
 
     let filename = match size
     {
@@ -39,7 +49,7 @@ impl Pokec
     let import_query = fs::read_to_string(filename).unwrap();
 
     connection
-      .execute_query(import_query, Default::default())
+      .execute_oc_query(import_query, Default::default())
       .unwrap();
     Self {
       temporary_file,
@@ -71,9 +81,9 @@ impl Pokec
     let random_id = self.ids.choose(rng).unwrap();
     self
       .connection
-      .execute_query(
+      .execute_oc_query(
         "MATCH (n:User {id: $id}) RETURN n",
-        map!("$id" => *random_id),
+        value_map!("$id" => *random_id),
       )
       .unwrap();
   }
@@ -84,9 +94,9 @@ impl Pokec
     let random_id = self.ids.choose(rng).unwrap();
     self
       .connection
-      .execute_query(
+      .execute_oc_query(
         "MATCH (n:User) WHERE n.id = $id RETURN n",
-        map!("$id" => *random_id),
+        value_map!("$id" => *random_id),
       )
       .unwrap();
   }
@@ -97,9 +107,9 @@ impl Pokec
     let random_id = self.ids.choose(rng).unwrap();
     self
       .connection
-      .execute_query(
+      .execute_oc_query(
         "MATCH (s:User {id: $id})-->(n:User) RETURN n.id",
-        map!("$id" => *random_id),
+        value_map!("$id" => *random_id),
       )
       .unwrap();
   }
@@ -110,9 +120,9 @@ impl Pokec
     let random_id = self.ids.choose(rng).unwrap();
     self
       .connection
-      .execute_query(
+      .execute_oc_query(
         "MATCH (s:User {id: $id})-->(n:User) WHERE n.age >= 18 RETURN n.id",
-        map!("$id" => *random_id),
+        value_map!("$id" => *random_id),
       )
       .unwrap();
   }
@@ -123,9 +133,9 @@ impl Pokec
     let random_id = self.ids.choose(rng).unwrap();
     self
       .connection
-      .execute_query(
+      .execute_oc_query(
         "MATCH (s:User {id: $id})-->()-->(n:User) RETURN n.id",
-        map!("$id" => *random_id),
+        value_map!("$id" => *random_id),
       )
       .unwrap();
   }
@@ -136,9 +146,9 @@ impl Pokec
     let random_id = self.ids.choose(rng).unwrap();
     self
       .connection
-      .execute_query(
+      .execute_oc_query(
         "MATCH (s:User {id: $id})-->()-->(n:User) WHERE n.age >= 18 RETURN n.id",
-        map!("$id" => *random_id),
+        value_map!("$id" => *random_id),
       )
       .unwrap();
   }
@@ -149,9 +159,9 @@ impl Pokec
     let random_id = self.ids.choose(rng).unwrap();
     self
       .connection
-      .execute_query(
+      .execute_oc_query(
         "MATCH (n:User {id: $id})-[e1]->(m)-[e2]->(n) RETURN e1, m, e2",
-        map!("$id" => *random_id),
+        value_map!("$id" => *random_id),
       )
       .unwrap();
   }
@@ -159,14 +169,14 @@ impl Pokec
   {
     self
       .connection
-      .execute_query("MATCH (n:User) RETURN n.age, count(*)", Default::default())
+      .execute_oc_query("MATCH (n:User) RETURN n.age, count(*)", Default::default())
       .unwrap();
   }
   pub(crate) fn aggregate_count_filter(&self)
   {
     self
       .connection
-      .execute_query(
+      .execute_oc_query(
         "MATCH (n:User) WHERE n.age >= 18 RETURN n.age, count(*)",
         Default::default(),
       )
@@ -176,7 +186,7 @@ impl Pokec
   {
     self
       .connection
-      .execute_query(
+      .execute_oc_query(
         "MATCH (n) RETURN min(n.age), max(n.age), avg(n.age)",
         Default::default(),
       )

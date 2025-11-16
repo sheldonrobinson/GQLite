@@ -25,4 +25,4 @@ impl ToString
   }
 }
 
-super::declare_function!(toString, ToString, call_impl(crate::value::Value) -> String, validate_args(ExpressionType::Boolean | ExpressionType::Integer | ExpressionType::Float | ExpressionType::String | ExpressionType::Null));
+super::declare_function!(tostring, ToString, call_impl(crate::value::Value) -> String, validate_args(ExpressionType::Boolean | ExpressionType::Integer | ExpressionType::Float | ExpressionType::String | ExpressionType::Null));

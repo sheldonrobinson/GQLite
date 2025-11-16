@@ -135,6 +135,11 @@ namespace gqlite
      */
     static connection create_from_file(const std::string& _filename,
                                        const value& _options = value());
+    /**
+     * Create a connection from the options.
+     * Backend can be selected using options, settings options["backend"] = "redb" or "sqlite".
+     */
+    static connection create(const value& _options);
   public:
     /**
      * Execute a query.

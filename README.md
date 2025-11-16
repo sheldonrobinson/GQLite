@@ -2,7 +2,6 @@
 
 [![stable pipeline](https://gitlab.com/gqlite/gqlite/badges/stable/pipeline.svg?key_text=stable)](https://gitlab.com/gqlite/gqlite/-/pipelines?ref=stable)
 [![dev/1 pipeline](https://gitlab.com/gqlite/gqlite/badges/dev/1/pipeline.svg?key_text=dev/1)](https://gitlab.com/gqlite/gqlite/-/pipelines?ref=dev/1)
-[![dev/2 pipeline](https://gitlab.com/gqlite/gqlite/badges/dev/2/pipeline.svg?key_text=dev/2)](https://gitlab.com/gqlite/gqlite/-/pipelines?ref=dev/2)
 [![docs](https://docs.rs/gqlitedb/badge.svg)](https://docs.rs/gqlitedb)
 [![crates.io](https://img.shields.io/crates/v/gqlitedb.svg)](https://crates.io/crates/gqlitedb)
 </div>
@@ -33,6 +32,7 @@ This table summarizes the versions used by GQLite. The database version refers t
 
 | Database Version | GQLite Version | Crate Version |
 |------------------|----------------|---------------|
+| 1.3 (1.2-1.0)    | 1.3            | 0.6.x         |
 | 1.2 (1.1-1.0)    | 1.2            | 0.5.x         |
 | 1.2              | -              | 0.4.x         |
 | -                | -              | 0.1.x-0.3.x   |

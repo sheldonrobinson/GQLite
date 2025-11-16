@@ -7,8 +7,7 @@
 //! for an example of use.
 
 #![warn(missing_docs)]
-#![allow(dead_code)]
-#![deny(warnings)]
+#![allow(clippy::result_large_err)]
 
 mod aggregators;
 #[cfg(feature = "capi")]
@@ -22,7 +21,7 @@ mod graph;
 mod interpreter;
 mod parser;
 mod prelude;
-mod serialize_with;
+mod query_result;
 mod store;
 mod utils;
 mod value;
@@ -32,11 +31,14 @@ mod value_table;
 pub(crate) mod tests;
 
 pub use {
-  connection::Connection,
+  connection::{Backend, Connection},
   error::{CompileTimeError, Error, RunTimeError, StoreError},
-  graph::{Edge, Node, Path},
-  value::{Value, ValueMap},
+  graph::{labels, Edge, Node, Path},
+  query_result::QueryResult,
+  value::{array, value_map, TimeStamp, Value, ValueMap, ValueTryIntoRef},
 };
+
+pub use graphcore::{table, Table};
 
 /// GQLite Result alias. Usable as a standard `Result<T, E>` or default to gqlite::Error with `Result<T>`
 pub type Result<T, E = error::export::Error> = std::result::Result<T, E>;

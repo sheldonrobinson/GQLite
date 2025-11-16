@@ -1,0 +1,19 @@
+[package]
+name = "gqb"
+version = "0.3.0"
+readme = "README.MD"
+description = "GQL Query Builder API."
+edition.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+[dependencies]
+graphcore = { workspace = true }
+
+askama = { workspace = true }
+itertools = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+gqlitedb = { workspace = true }

@@ -59,6 +59,13 @@ impl FunctionTypeTrait for f64
   }
 }
 
+impl FunctionTypeTrait for graph::Key
+{
+  fn result_type() -> ExpressionType
+  {
+    ExpressionType::Key
+  }
+}
 impl<T> FunctionTypeTrait for Vec<T>
 {
   fn result_type() -> ExpressionType
@@ -133,56 +140,54 @@ impl Manager
     Self {
       inner: ManagerInner {
         functions: HashMap::from([
-          containers::Head::new(),
-          containers::Keys::new(),
-          containers::Range::new(),
-          containers::Size::new(),
-          edge::Type::new(),
-          math::Ceil::new(),
-          math::Floor::new(),
-          math::Rand::new(),
-          node::Labels::new(),
-          path::Length::new(),
-          scalar::Coalesce::new(),
-          scalar::Properties::new(),
-          scalar::ToInteger::new(),
-          string::ToString::new(),
-          value::HasLabel::new(),
-          value::HasLabels::new(),
+          containers::Head::create(),
+          containers::Keys::create(),
+          containers::Range::create(),
+          containers::Size::create(),
+          edge::Type::create(),
+          math::Ceil::create(),
+          math::Floor::create(),
+          math::Rand::create(),
+          node::Labels::create(),
+          path::Length::create(),
+          path::Nodes::create(),
+          path::Edges::create(),
+          scalar::Coalesce::create(),
+          scalar::Id::create(),
+          scalar::Properties::create(),
+          scalar::ToInteger::create(),
+          string::ToString::create(),
+          value::HasLabel::create(),
+          value::HasLabels::create(),
         ]),
         aggregators: aggregators::init_aggregators(),
       }
       .into(),
     }
   }
-  pub(crate) fn get_function<E: error::GenericErrors>(
-    &self,
-    name: impl Into<String>,
-  ) -> Result<Function>
+  pub(crate) fn get_function<E: error::GenericErrors>(&self, name: &str) -> Result<Function>
   {
-    let name = name.into();
     Ok(
       self
         .inner
         .read()?
         .functions
-        .get(&name)
+        .get(&name.to_lowercase())
         .ok_or_else(|| E::unknown_function(name).into())?
         .clone(),
     )
   }
   pub(crate) fn get_aggregator<E: error::GenericErrors>(
     &self,
-    name: impl Into<String>,
+    name: &str,
   ) -> Result<aggregators::Aggregator>
   {
-    let name = name.into();
     Ok(
       self
         .inner
         .read()?
         .aggregators
-        .get(&name)
+        .get(&name.to_lowercase())
         .ok_or_else(|| E::unknown_function(name).into())?
         .clone(),
     )
@@ -190,13 +195,13 @@ impl Manager
   pub(crate) fn is_deterministic(&self, name: impl Into<String>) -> Result<bool>
   {
     let name = name.into();
-    let fun = self.get_function::<crate::error::CompileTimeError>(name.clone());
+    let fun = self.get_function::<crate::error::CompileTimeError>(&name);
     match fun
     {
       Ok(fun) => Ok(fun.is_deterministic()),
       Err(_) =>
       {
-        self.get_aggregator::<crate::error::CompileTimeError>(name)?;
+        self.get_aggregator::<crate::error::CompileTimeError>(&name)?;
         Ok(false)
       }
     }
@@ -213,12 +218,12 @@ impl Manager
   ) -> Result<ExpressionType>
   {
     let name = name.into();
-    let fun = self.get_function::<crate::error::CompileTimeError>(name.clone());
+    let fun = self.get_function::<crate::error::CompileTimeError>(&name);
     match fun
     {
       Ok(fun) => fun.validate_arguments(arguments),
       Err(_) => self
-        .get_aggregator::<crate::error::CompileTimeError>(name)?
+        .get_aggregator::<crate::error::CompileTimeError>(&name)?
         .validate_arguments(arguments),
     }
   }
@@ -288,6 +293,7 @@ macro_rules! default_validate_ {
       -> crate::Result<$crate::compiler::expression_analyser::ExpressionType>
     {
       // TODO
+      use $crate::functions::FunctionTypeTrait;
       Ok(<$ret_type>::result_type())
     }
   };
@@ -325,7 +331,7 @@ macro_rules! declare_function_ {
   ($function_name: ident, $type_name: ty, $f_name: ident (  $( $arg_type: ty $(,)? )* ) -> $ret_type: ty, $allow_null: expr, $validator: block ) => {
     impl $type_name
     {
-      pub(super) fn new() -> (String, crate::functions::Function)
+      pub(super) fn create() -> (String, crate::functions::Function)
       {
         (
           stringify!($function_name).to_string(),
@@ -391,7 +397,7 @@ macro_rules! declare_function {
   ($function_name: ident, $type_name: ty, custom_trait ) => {
     impl $type_name
     {
-      pub(super) fn new() -> (String, crate::functions::Function)
+      pub(super) fn create() -> (String, crate::functions::Function)
       {
         (
           stringify!($function_name).to_string(),

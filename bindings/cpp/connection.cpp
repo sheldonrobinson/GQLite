@@ -95,6 +95,16 @@ connection connection::create_from_file(const std::string& _filename, const valu
   return c;
 }
 
+connection connection::create(const value& _options)
+{
+  connection c;
+  c.d->api_context = gqlite_api_context_create();
+  gqlite_value_wrapper options{c.d->api_context, _options};
+  c.d->connection = gqlite_connection_create(c.d->api_context, options.gqlite_value);
+  check_errors(c.d->api_context);
+  return c;
+}
+
 value connection::execute_oc_query(const std::string& _query, const value_map& _bindings)
 {
   gqlite_value_wrapper bindings{d->api_context, _bindings};

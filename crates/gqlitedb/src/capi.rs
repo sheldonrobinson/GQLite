@@ -114,12 +114,35 @@ pub extern "C" fn gqlite_connection_create_from_file(
   check_error(context);
   let options = get_value(options);
   let path = unsafe { std::ffi::CStr::from_ptr(filename) };
+
   if let Ok(path) = handle_error(context, path.to_str())
   {
-    if let Ok(c) = handle_error(context, crate::Connection::open(path, options.into_map()))
+    if let Ok(c) = handle_error(
+      context,
+      crate::Connection::builder()
+        .options(options.into_map())
+        .path(path)
+        .create(),
+    )
     {
       return Box::into_raw(Box::new(GqliteConnectionT { connection: c }));
     }
+  }
+  std::ptr::null::<GqliteConnectionT>() as *mut GqliteConnectionT
+}
+
+#[no_mangle]
+pub extern "C" fn gqlite_connection_create(
+  context: *mut GqliteApiContextT,
+  options: *mut GqliteValueT,
+) -> *mut GqliteConnectionT
+{
+  check_error(context);
+  let options = get_value(options);
+
+  if let Ok(c) = handle_error(context, crate::Connection::create(options.into_map()))
+  {
+    return Box::into_raw(Box::new(GqliteConnectionT { connection: c }));
   }
   std::ptr::null::<GqliteConnectionT>() as *mut GqliteConnectionT
 }
@@ -150,11 +173,13 @@ pub extern "C" fn gqlite_connection_query(
     let conn = unsafe { Box::from_raw(connection) };
     let result = conn
       .connection
-      .execute_query(query, get_value(bindings).into_map());
+      .execute_oc_query(query, get_value(bindings).into_map());
     let _ = Box::into_raw(conn);
     if let Ok(v) = handle_error(context, result)
     {
-      return Box::into_raw(Box::new(GqliteValueT { value: v }));
+      return Box::into_raw(Box::new(GqliteValueT {
+        value: v.into_value(),
+      }));
     }
   }
   std::ptr::null::<GqliteValueT>() as *mut GqliteValueT
@@ -199,7 +224,7 @@ pub extern "C" fn gqlite_value_to_json(
     return r;
   }
   let _ = Box::into_raw(value);
-  return std::ptr::null();
+  std::ptr::null()
 }
 
 #[no_mangle]
@@ -218,7 +243,7 @@ pub extern "C" fn gqlite_value_from_json(
       return Box::into_raw(Box::new(GqliteValueT { value: v }));
     }
   }
-  return std::ptr::null::<GqliteValueT>() as *mut GqliteValueT;
+  std::ptr::null::<GqliteValueT>() as *mut GqliteValueT
 }
 
 #[no_mangle]
@@ -228,9 +253,8 @@ pub extern "C" fn gqlite_value_is_valid(
 ) -> bool
 {
   check_error(context);
-  match unsafe { (*value).value.borrow() }
-  {
-    crate::value::Value::Null => false,
-    _ => true,
-  }
+  !matches!(
+    unsafe { (*value).value.borrow() },
+    crate::value::Value::Null
+  )
 }

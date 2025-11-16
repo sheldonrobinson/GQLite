@@ -50,6 +50,11 @@ void gqlite_api_context_clear_error(gqlite_api_context_t);
 gqlite_connection_t gqlite_connection_create_from_file(gqlite_api_context_t, const char* _filename, gqlite_value_t _options);
 
 /**
+ * Create a connection. Using the database specified by the options.
+ */
+gqlite_connection_t gqlite_connection_create(gqlite_api_context_t, gqlite_value_t _options);
+
+/**
  * Destroy the connection. Does not delete any connection handle passed as an argument.
  */
 void gqlite_connection_destroy(gqlite_api_context_t, gqlite_connection_t);

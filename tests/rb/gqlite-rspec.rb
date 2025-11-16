@@ -289,4 +289,10 @@ RSpec.describe "test opening older database" do
   it "can open 1.2 (redb) database" do
     validate_db("1.2", "redb")
   end
+  it "can open 1.3 (sqlite) database" do
+    validate_db("1.3", "sqlite")
+  end
+  it "can open 1.3 (redb) database" do
+    validate_db("1.3", "redb")
+  end
 end

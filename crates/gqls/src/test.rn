@@ -1,0 +1,55 @@
+fn test_api()
+{
+  let connection = gqlite::Connection::create({})?;
+  let graph = test_rune_module::Graph::new(connection, "test")?;
+
+  // Test creating person
+  let bob_marley = graph.create_person("Bob", "Marley")?;
+  assert_eq!(bob_marley.first_name()?, "Bob");
+  assert_eq!(bob_marley.last_name()?, "Marley");
+  bob_marley.set_last_name("Marley/The Builder")?;
+  assert_eq!(bob_marley.last_name()?, "Marley/The Builder");
+
+  // Test creating Post
+  let timestamp = gqlite::TimeStamp::parse("2024-06-15T07:00:00.123000-00:00[GMT]")?;
+  let post = graph
+    .create_post(timestamp, "FireGoupil", None)
+    .unwrap();
+  assert_eq!(post.creation_date().unwrap().to_string(), timestamp.to_string());
+  assert_eq!(post.browser_used()?, "FireGoupil");
+  assert!(post.image_file()?.is_none());
+
+  // Test creating edge
+  let edge_bm_post = graph.create_likes(bob_marley, post)?;
+  let edge_bm_post_source = edge_bm_post.source()?;
+  assert_eq!(edge_bm_post_source.element_key(), bob_marley.element_key());
+  assert_eq!(edge_bm_post_source.first_name()?, "Bob");
+  assert_eq!(edge_bm_post_source.last_name()?, "Marley/The Builder");
+  
+  let edge_bm_post_destination = edge_bm_post.destination()?;
+  assert_eq!(edge_bm_post_destination.creation_date().unwrap().to_string(), timestamp.to_string());
+  assert_eq!(edge_bm_post_destination.browser_used()?, "FireGoupil");
+  assert!(edge_bm_post_destination.image_file()?.is_none());
+
+  // Test matching nodes
+  let bob_marley_q = graph.match_person()?[0];
+  assert_eq!(bob_marley_q.element_key(), bob_marley.element_key());
+  assert_eq!(bob_marley_q.first_name()?, "Bob");
+  assert_eq!(bob_marley_q.last_name()?, "Marley/The Builder");
+
+  // Test matching edges
+  let edge_bm_post_q = graph.match_likes(None, None)?[0];
+  assert_eq!(edge_bm_post_q.element_key(), edge_bm_post.element_key());
+  let edge_bm_post_source = edge_bm_post_q.source()?;
+  assert_eq!(edge_bm_post_source.element_key(), bob_marley.element_key());
+  assert_eq!(edge_bm_post_source.first_name()?, "Bob");
+  assert_eq!(edge_bm_post_source.last_name()?, "Marley/The Builder");
+  
+  let edge_bm_post_destination = edge_bm_post_q.destination()?;
+  assert_eq!(edge_bm_post_destination.creation_date().unwrap().to_string(), timestamp.to_string());
+  assert_eq!(edge_bm_post_destination.browser_used()?, "FireGoupil");
+  assert!(edge_bm_post_destination.image_file()?.is_none());
+
+  Ok(())
+}
+test_api()

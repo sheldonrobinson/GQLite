@@ -1,0 +1,26 @@
+// Properties definitions
+Person{
+  firstName: STRING, lastName : STRING
+},
+Message {
+  creationDate: TIMESTAMP, browserUsed: STRING
+},
+Comment <: Message {},
+Post <: Message {
+  imageFile: STRING?
+},
+REPLY_OF {},
+KNOWS {
+  creationDate : TIMESTAMP
+},
+LIKES {},
+HAS_CREATOR {},
+
+// Nodes
+(Person), (Post), (Comment),
+
+// Edges
+(Person)-[KNOWS]->(Person),
+(Person)-[LIKES]->(Message),
+(Message)-[HAS_CREATOR]->(Person),
+(Comment)-[REPLY_OF]->(Message)
